@@ -46,6 +46,15 @@ f_SAD.Volkov <- function(i,df_ = df_par.Volkov,replicas = 100){
 l_SAD.Volkov <- llply(.data = as.list(1:nrow(df_par.Volkov)), 
                       .fun = f_SAD.Volkov, .parallel = TRUE)
 
+## Plot: SADs 'observadas' e as réplicas ##
+# 1 janela por conjunto de SADs: SAD observada em vermelho e SAD réplicas em preto
+
+
+```
+
+
+
+```{r}
 ## Comparando as SADs usando o teste de Kolmogorov-Smirnov ##
 
 # f_ks.test0 - extrai as estatísticas de interesse do teste, 'KS.D' (a maior distancia entre as curvas acumuladas) e 'KS.p' (o p valor associado à estatistica)
@@ -71,11 +80,12 @@ df_par.Volkov %<>% cbind(.,
 names(df_par.Volkov)[5] <- "pSAD"
 ```
 
+
 Dado uma lista onde cada elemento é uma distribuição de espécies, retorno um data frame com os parâmetros estimados, as estatísticas associadas ao teste de KS e uma lista com as SADs réplicas, simuladas a partir dos parâmetros ajustados.
 
-```{r}
-library("CARS")
-
+```{r auditoria visual dos dados}
+library(car)
+scatterplotMatrix(~pSAD + KS.D_mean + KS.D_var + KS.p_mean + KS.p_var, data=df_par.Volkov)
 ```
-
+figura 1. Variável de interesse 'pSAD' e as estatística de resumo do teste de Kolmogorov-Smirnov. KS.D_ correspondem a média e variância da maior distância entre das SADs observada e réplicas; KS.p_ são a media e variancia do p valor associado ao teste.  
 
