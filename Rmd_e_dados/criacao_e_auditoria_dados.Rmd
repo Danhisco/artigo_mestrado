@@ -1,0 +1,167 @@
+---
+title: "Artigo mestrado -  criação dos dados"
+author: "Mori, Danilo Pereira"
+date: "14 de fevereiro de 2018"
+output: pdf_document
+---
+
+```{r global_options, echo=FALSE}
+knitr::opts_chunk$set(echo=T, warning=FALSE, message=FALSE, cache = TRUE, tidy = TRUE, include = FALSE)
+```
+
+```{r global packages and directory, echo=F, message=FALSE, warning=FALSE}
+library(sads)
+library(gridExtra)
+library(ggplot2)
+library(reshape2)
+library(doMC)
+library(magrittr)
+library(plyr)
+library(dplyr)
+# setwd("") 
+# load("")
+```
+
+
+Estrutura do arquivo:
+- Prólogo  
+- seleção dos sítios  
+- modelo neutro clássico  
+  i) ajuste dos parâmetros do modelo de Volkov et al. 2003 às SADs observadas  
+  ii) simulação das SADs a partir dos parâmetros ajustados
+  iii) comparação das SADs usando teste KS e sintese dos dados 
+- modelo neutro coalescente (Rosindell et al. 2008)  
+  i) seleção dos percentis de interesse da função de dispersão  
+  ii) estimativa da taxa de extinção necessária para gerar a riqueza observada (U)  
+  iii) simulação das SADs a partir do U estimado  
+  iv) comparação das SADs usando teste KS e síntese dos dados
+- organização dos dados para modelagem estatística  
+
+### Prólogo ###
+
+  O objetivo geral dos métodos é gerar distribuições de abundância de espécies (SAD) segundo dois modelos neutros e comparar com as SADs observadas em um gradiente de cobertura vegetal. O primeiro modelo neutro é uma derivação do modelo clássico de Hubbell 2001, onde considera-se uma dinâmica ecológica ocorrendo em 'campo médio', ou seja, com o espaço implicito (Volkov et al. 2003); o segundo modelo neutro considera a distância e posição dos indivíduos na comunidade local e paisagem, permitindo simular diferentes cenários de limitação à dispersão (Rosindell et al. 2008). O fluxo de trabalho é similar em ambos os casos: ajusta-se/estima-se os parâmetros dos modelos a partir das SADs observadas, então simula-se 100 SADs réplicas segundo os respectivos modelos e compara-se SADs observadas e simuladas usando o teste de Kolmogorov-Smirnov. Em cada caso, contabiliza-se o número de réplicas em que não é possível refutar a hipótese de que as SADs são amostras de uma mesma distribuição teórica.
+
+### Seleção dos Sítios ###
+  
+  Obtemos as distribuições de abundância de espécies (SAD) da base de dados TreeCo. As SADs selecionadas são oriundas de trabalhos fitossociológicas realizados na Mata Atlântica com amostragem contígua (em bloco único) de pelo menos 1 hectare (>= 1ha) e com a coordenada central da amostragem disponível e precisa. Além disso, foram descartados os sítios em que não foi possível obter um recorte de paisagem adequado à data de meu mestrado. Outro critério foi a data da amostragem, como as imagens de satélite foram tiradas em 2000 estabeleceu-se uma janela de tempo aceitável para que a paisagem da imagem fosse suficientemente similar àquela da época do estudo; para mais detalhes procurar email de Lima. 
+  Por hora vou utilizar os sítios em que as simulações coalescentes (modelo neutro com espaço explicito) já haviam sido rodadas. Se for necessário/possível acrescentar sítios aos dados, a janela de código a seguir será expandida, por hora vou apenas selecionar aqueles sítios que já foram trabalhados.
+  
+```{r selecao dos sitios e preparacao das SADs}
+# SdT: i) selecionar os sitecodes de trabalho; ii) selecionar e preparar as SADs observadas em forma de lista
+
+# df com os dados prontos para a modelagem estatística
+load("/home/danilo/Documentos/Doutorado/dados/df_dados-analise.Rdata")
+SiteCodes <- as.factor(df_ad$SiteCode) %>% levels # sitecodes de trabalho
+# lista com os dados brutos desenvolvidos durante o mestrado (contêm as SADs observadas)
+load("/home/danilo/Documentos/Doutorado/dados/l_dados_brutos.Rdata")
+l_SAD.obs <- l_dados_brutos$df_SAD.obs[,1:3] %>% filter(SiteCode %in% SiteCodes) %>% droplevels() %>% split(x=.,f=.$SiteCode) # lista de SADs obs
+```
+
+
+### Modelo neutro de campo médio ###
+
+Trecho da documentação da função 'fitvolkov' do pacote 'sads': 
+
+"Function fitvolkov fits the SAD model for a community under neutral drift with immigration (Volkov et al. 2003). The model is a stationary distribution deduced from a stochastic process compatible with the Neutral Theory of Biodiversity (Hubbell 2001). It has two free parameters, the ‘fundamental biodiversity number’ theta, and the immigration rate m (see dvolkov) fitvolkov builds on function volkov from package untb to fit Volkov’s et al. SAD model to a vector of abundances. The fit can be extremely slow even for vectors of moderate size."
+
+```{r Simulacao Volkov}
+#SdT: i) ajustar as SADs observadas; ii) simular as SADs a partir dos parâmetros; iii) comparar com as SADs observadas usando o teste KS
+
+# Ajustar as SADs observadas ao modelo de Volkov et al. 2003 #
+registerDoMC(4)
+df_par.Volkov <- ldply(l_SAD.obs, function(x) coef(fitvolkov(x$N)), .parallel = TRUE)
+df_par.Volkov %<>% mutate(S = sapply(l_SAD.obs,nrow)) # adicionando a riqueza observada
+
+## Simulando 100 SADs para cada conjunto de parâmetros ##
+f_SAD.Volkov <- function(i,df_ = df_par.Volkov,replicas = 100){
+  SAD.replicas <- replicate(replicas,
+                            {rvolkov(n = df_[i,"S"],
+                                     theta = df_[i,"theta"],
+                                     m = df_[i,"m"],
+                                     J = df_[i,"J"])
+                              }
+  )
+  return(SAD.replicas)
+}
+# lista onde cada elemento é uma matrix com 100 réplicas para um mesmo conjunto de par #
+l_SAD.Volkov <- llply(.data = as.list(1:nrow(df_par.Volkov)), 
+                      .fun = f_SAD.Volkov, .parallel = TRUE)
+
+
+## Comparando as SADs usando o teste de Kolmogorov-Smirnov ##
+
+# f_ks.test0 - extrai as estatísticas de interesse do teste, 'KS.D' (a maior distancia entre as curvas acumuladas) e 'KS.p' (o p valor associado à estatistica)
+f_ks.test0 <- function(SAD.obs, SAD.sim){ #teste bicaudal
+  a <- suppressWarnings(ks.test(x = SAD.obs,
+                                y = SAD.sim))
+  a <- data.frame(KS.D = a$statistic, KS.p = a$p.value)
+}
+# f_ks.test - compara cada SAD observada com as 100 SAD replicas correspondentes (simuladas segundo o modelo de Volkov)
+f_ks.test <- function(i, SAD_obs = l_SAD.obs, SAD_sim = l_SAD.Volkov){
+  ks_stat <- apply(SAD_sim[[i]],2,function(A) f_ks.test0(SAD.obs = SAD_obs[[i]]$N, SAD.sim = A))
+  ks_stat %<>% rbind.fill() # o output eh uma lista, onde cada elemento é um df com os valores da estatística para cada comparacao
+}
+
+# lista onde cada elemento é um df com o valor da estatística KS e o p valor associado da comparação entre a SAD obs e as réplicas neutras #
+l_df.KS <- llply(.data = as.list(1:nrow(df_par.Volkov)),
+                 .fun = f_ks.test, .parallel = TRUE)
+
+## Sintetizando os dados ##
+df_par.Volkov %<>% cbind(., 
+                         ldply(l_df.KS, function(x) nrow(x[x$KS.p >= 0.05,])), # pSAD
+                         ldply(l_df.KS, summarise, KS.D_mean = mean(KS.D),KS.D_var = var(KS.D), KS.p_mean = mean(KS.p), KS.p_var = var(KS.p))) # estat resumo
+names(df_par.Volkov)[6] <- "pSAD"
+```
+
+### Auditoria dos dados ###
+- Avaliação da autocoerência dos dados:
+  - plots: KS.D_mean X KS.p_mean; KS.D_mean X KS.D_var; pSAD X KS.p_mean, pSAD X KS.p_var
+  
+```{r auditoria dados Volkov}
+
+```
+
+### Modelo neutro coalescente ###
+
+#### estimativa dos sigmas ####
+
+```{r}
+
+```
+
+#### estimativa dos U ####
+
+```{r}
+
+```
+
+#### simulação das SADs e teste KS ####
+
+```{r}
+
+```
+
+#### Auditoria dos Dados ####
+
+### Síntese dos dados ###
+
+  Aqui preparo os dados para a modelagem dos dados. Como não refiz as simulações do modelo coalescente, preciso apenas unir o df gerado na simulação de campo médio com 'df_ad'.
+
+```{r}
+## df_par.Volkov ##
+df_temp1 <- df_par.Volkov[,c(1:3,6)] # colunas de interesse
+df_temp1$kernel_percentil <- rep("campo_medio",nrow(df_temp1))
+names(df_temp1)[1] <- "SiteCode"
+
+## df_ad ##
+df_temp2 <- df_ad[,c(1:2,5:8,14,20)]
+names(df_temp2)[8] <- "pSAD"
+
+# jeito confuso de fazer: #
+df_temp1 %<>% inner_join(x=.,y=unique(df_temp2[,-c(2,7:8)]),by="SiteCode")
+df_resultados <- merge(x=df_temp2,y=df_temp1, all = TRUE)
+write.table(df_resultados,file="/home/danilo/Documentos/Doutorado/dados/resultados_c_Volkov.txt",sep = "\t",row.names = FALSE)
+save(df_ad,l_SAD.obs,file = "/home/danilo/Documentos/Doutorado/dados/reuniao_15fev18.Rdata")
+```
+
+

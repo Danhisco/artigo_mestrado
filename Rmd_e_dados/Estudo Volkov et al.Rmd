@@ -1,0 +1,81 @@
+---
+title: "Estudo Volkov et al. 2003"
+author: "Mori, Danilo Pereira"
+date: "8 de fevereiro de 2018"
+output: pdf_document
+---
+```{r}
+library(sads)
+library(gridExtra)
+library(ggplot2)
+library(doMC)
+library(reshape2)
+library(magrittr)
+library(plyr)
+library(dplyr)
+```
+
+
+Objetivo: Comparar SADs geradas segundo uma distribuição de probabilidades conhecida e aquelas geradas pelo modelo de Volkov et al. 2003. Primeiro vamos gerar 100 SADs em um crescente de abundância total (N) e riqueza (S), segundo uma log-normal. Então vamos ajustar estas SADs ao modelo de Volkov et al. 2003; com as estimativas dos parâmetros rodaremos 100 SADs segundo o modelo de Volkov et al. 2003, para cada SAD oriunda da log-normal, e com posterior do teste de Kolmogorov-Smirnov.
+
+```{r}
+# Simulando algumas SADs #
+f_sim.SAD <- function(riqueza = 100, N){
+  rsad(S=riqueza, frac=N, sad = "lnorm", coef = list(meanlog=3, sdlog=1.5))
+}
+# SADs com diferentes tamanhos e riquezas
+l_SAD.sim <- lapply(seq(0.1,0.8,by=0.05), function(x) f_sim.SAD(N=x)) 
+
+## Ajustando as SADs simuladas ao modelo de Volkov et al e armazenando os coef em um data frame ##
+registerDoMC(4)
+df_par.Volkov <- ldply(l_SAD.sim, function(x) coef(fitvolkov(x)), .parallel = TRUE)
+df_par.Volkov %<>% mutate(S = sapply(l_SAD.sim,length)) # adicionando a riqueza observada
+
+## Simulando 100 SADs para cada conjunto de parâmetros ##
+f_SAD.Volkov <- function(i,df_ = df_par.Volkov,replicas = 100){
+  SAD.replicas <- replicate(replicas,
+                            {rvolkov(n = df_[i,"S"],
+                                     theta = df_[i,"theta"],
+                                     m = df_[i,"m"],
+                                     J = df_[i,"J"])
+                              }
+  )
+  return(SAD.replicas)
+}
+# lista onde cada elemento é uma matrix com 100 réplicas para um mesmo conjunto de par #
+l_SAD.Volkov <- llply(.data = as.list(1:nrow(df_par.Volkov)), 
+                      .fun = f_SAD.Volkov, .parallel = TRUE)
+
+## Comparando as SADs usando o teste de Kolmogorov-Smirnov ##
+
+# f_ks.test0 - extrai as estatísticas de interesse do teste, 'KS.D' (a maior distancia entre as curvas acumuladas) e 'KS.p' (o p valor associado à estatistica)
+f_ks.test0 <- function(SAD.obs, SAD.sim){ #teste bicaudal
+  a <- suppressWarnings(ks.test(x = SAD.obs,
+                                y = SAD.sim))
+  a <- data.frame(KS.D = a$statistic, KS.p = a$p.value)
+}
+# f_ks.test - compara cada SAD observada com as 100 SAD replicas correspondentes (simuladas segundo o modelo de Volkov)
+f_ks.test <- function(i, SAD_obs = l_SAD.sim, SAD_sim = l_SAD.Volkov){
+  ks_stat <- apply(SAD_sim[[i]],2,function(A) f_ks.test0(SAD.obs = SAD_obs[[i]], SAD.sim = A))
+  ks_stat %<>% rbind.fill() # o output eh uma lista, onde cada elemento é um df com os valores da estatística para cada comparacao
+}
+
+# lista onde cada elemento é um df com o valor da estatística KS e o p valor associado da comparação entre a SAD obs e as réplicas neutras #
+l_df.KS <- llply(.data = as.list(1:nrow(df_par.Volkov)),
+                 .fun = f_ks.test, .parallel = TRUE)
+
+## Sintetizando os dados ##
+df_par.Volkov %<>% cbind(., 
+                         ldply(l_df.KS, function(x) nrow(x[x$KS.p >= 0.05,])), # pSAD
+                         ldply(l_df.KS, summarise, KS.D_mean = mean(KS.D),KS.D_var = var(KS.D), KS.p_mean = mean(KS.p), KS.p_var = var(KS.p))) # estat resumo
+names(df_par.Volkov)[5] <- "pSAD"
+```
+
+Dado uma lista onde cada elemento é uma distribuição de espécies, retorno um data frame com os parâmetros estimados, as estatísticas associadas ao teste de KS e uma lista com as SADs réplicas, simuladas a partir dos parâmetros ajustados.
+
+```{r}
+library("CARS")
+
+```
+
+
