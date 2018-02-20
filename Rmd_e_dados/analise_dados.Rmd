@@ -1,0 +1,83 @@
+---
+title: "analise_dos_dados"
+author: "Mori, Danilo Pereira"
+date: "20 de fevereiro de 2018"
+output: pdf_document
+---
+
+```{r global_options, echo=FALSE}
+knitr::opts_chunk$set(echo=T, warning=FALSE, message=FALSE, cache = TRUE, tidy = TRUE, include = FALSE)
+```
+
+```{r global packages and directory, echo=F, message=FALSE, warning=FALSE}
+library(doMC)
+library(gridExtra) 
+library(ggplot2) 
+library(tidyr)
+library(broom)
+library(purrr)
+library(lme4)
+library(sads)
+library(merTools) ## para intervalos de previsao
+library(magrittr)
+library(plyr)
+library(dplyr)
+```
+
+
+Estrutura do arquivo:
+- Prólogo
+- modelo neutro de campo médio
+i) VR ~ p + N + S; VR = pSAD, theta e m
+- modelo neutro com espaço explícito
+i) VR ~ p * k + (1|Site); VR = pSAD e U
+ii) construção de theta do modelo coalescente e sua relação com o kernel de dispersão; theta ~ kernel + (1|Site)
+- relação entre os parâmetros dos modelos
+
+
+### Prólogo ###
+
+  Os dados a serem analisados são oriundos da comparação da SAD observada em um gradiente de cobertura vegetal com a SAD simulada segundo dois modelos neutros distintos: campo médio e de espaço explícito. Esses modelos não diferem apenas em seus pressupostos auxiliares ao de equivalência funcional entre as spp, mas também na forma com que relacionamos o observado com o modelo. No modelo de campo médio, utilizamos a SAD observada e ajustamos os parâmetro do modelo de Volkov et al. 2003 utilizando verossimilhança. No modelo com espaço explícito informamos a matriz de paisagem (que descreve a posição de habitat e não habitat na paisagem onde a comunidade local está inserida, a densidade observada (número de indivíduos/ha) e o número de indivíduos total da SAD) e a função de dispersão, o único parâmetro estimado é a taxa de especiação necessária para se obter a riqueza observada, contudo, essa estimativa não é feita utilizando verossimilhança e sim um algoritmo semi-analítico (o qual utiliza uma arvore genealógica da comunidade considerando isolamento total, detalhes em Rosindell et al. 2008 apêndice A). Em reunião, desenvolmos 2 perguntas norteadoras:
+
+i) Quanto a congruência da SAD observada, qual o desempenho do modelo de Volkov et al. 2003 (campo médio) em comparação com o modelo de Rosindell et al. 2008 (espaço explícito)?
+
+  A variável pSAD é comparável entre os modelos. Detalhes sobre pSAD estão no arquivo 'criacao_e_auditoria_dados.Rmd'. Contudo, ainda não definimos a melhor maneira de abordar a análise em conjunto dos dois modelos. Cito algumas ideias que levantamos até o momento:
+  
+  a) comparação entre campo médio e o melhor conjunto de simulações do espaço explícito; aqui podemos considerar a função de dispersão que em média gerou as melhores simulações considerando todos os Sites (o que pode ser um problema considerando a grande variação intra-site) ou as melhores simulações para cada Site (ou seja, colocar simulações com diferentes parâmetros de dispersão em uma mesma categoria)
+obs: O Coutinho levantou a questão de que se a melhor simulação ocorre em kernels extremos, e como não simulamos todos os possíveis kernels de dispersão, poderiamos não estar comparando o melhor possível, mas sim algo próximo dele.
+
+  b) uma ideia que tive era simplesmente concatenar todas as simulações de espaço explícito em uma mesma categoria, então teriamos apenas duas categorias. Novamente a grande variação intra-sites pode ser um problema aqui e além disso estaria comparando categorias (campo médio e espaço explícito) com número de observações totalmente diferentes: para o campo médio existe sempre apenas 1 obversação, enquanto que para o modelo de espaço explícito há 12 observações (uma para cada valor de variância da função de dispersão)
+
+  c) Analisar separadamente cada um dos conjuntos de dados. Essa abordagem é a mais fácil e é a que irei desenvolver a seguir.
+
+
+ii) Qual a correspondência entre os parâmetros dos dois modelos?
+
+  O modelo de campo médio apresenta dois parâmetros livres em que ajustamos usando verossimilhança: theta (= 2 * Jm * nu; Jm = tamanho da metacomunidade, nu = taxa de especiação) e m (probabilidade de um indivíduo da comunidade local seja substituido por um indivíduo da metacomunidade).
+
+  O modelo com espaço explícito possui dois parâmetros informados a priori: função de dispersão (variamos sua variância segundo o percentil de propagulos que fica na área da planta progenitora) e matriz de paisagem. E um parâmetro que estimamos, U, a taxa de especiação necessária para manter a riqueza observada. A taxa de especiação também pode ser interpretada como a probabilidade de um indivíduo ser substituido por um singleton (um indivíduo de uma nova espécie) por evento de morte. 
+
+- considerando que a paisagem e a metacomunidade são entidades similares, Jm = total de indivíduos na paisagem (NOTA: continuar lendo Hubbell 2001 sobre essa questão)
+- como kernel de dispersão descreve a movimentação de indivíduos na paisagem (ou seja, na metacomunidade), podemos considerar que m ~ kernel de dispersão
+- e como U é tal que considera que qualquer novo indivíduo na paisagem pode ser oriundo de uma especiação, então U ~ nu
+
+Dos últimos três pontos levantamos a possibilidade de comparar o theta estimado pelo modelo de campo médio com aquele calculado a partir do modelo com espaço explícito. Como o theta do modelo explícito é uma variável composta pela porcentagem de cobertura vegetal, então a análise desta variável deve ficar restrita ao kernel de dispersão (ou seja, theta ~ kernel + (1|Site)). Dentro desse contexto, podemos ainda considerar que o modelo de campo médio seria equivalente ao de espaço explícito quando o kernel de dispersão é gigantesco ao ponto de desconsiderarmos a limitação à dispersão. Assim, poderiamos considerar o theta do modelo de campo médio como o nível mais alto do kernel de dispersão. Essa abordagem tem resssalvas uma vez que o theta do modelo de campo médio é um parâmetro livre estimado segundo verossimilhança a partir da SAD observada e o theta do modelo de espaço explícito têm um limite espacial, que é o do recorte de paisagem (500 ha). theta[espaço explicito] = 2 * 500 * DAobs * p * U; Jm[espaço explícito] = 500 * DAobs * p; p = % cobertura vegetal. 
+
+Algumas ideias podem ainda vir da leitura que irei fazer de dois artigos que me parecem chave aqui: 
+
+a) Etienne & Rosindell. 2011. The spatial limitations of current neutral models of biodiversity
+b) Chisholm et al 2009 Linking dispersal, immigration and scale in neutral theory of biodiversity
+
+
+### Modelo neutro de campo médio ###
+
+  Aqui começo a primeira abordagem de análise dos dados onde analiso separadamente os conjuntos de dados (considerando a natureza do modelo). O modelo de campo médio apresenta 2 parâmetros livres: theta - 'the fundamental biodiversity number', a measure of the effective regional (or metacommunity) diveristy; e m - probabilidade de reposição de um indivíduo da comunidade local por um indivíduo da metacomunidade. A partir dos parâmetros ajustados à SAD observada, simulou-se 100 SADs réplicas, da onde contabilizou-se quantas são boas aproximações da SAD observada utilizando o teste de Kolmogorov-Smirnov (variável 'pSAD'). Assim, o modelo de campo médio apresenta três variáveis a serem analisadas: pSAD, theta e m. 
+
+#### pSAD ####
+
+```{r}
+
+```
+
+
+
