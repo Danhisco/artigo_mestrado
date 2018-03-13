@@ -1,0 +1,202 @@
+---
+title: "Estudo Etienne 2005"
+author: "Mori, Danilo Pereira"
+date: "8 de fevereiro de 2018"
+output: pdf_document
+---
+```{r}
+library(sads)
+library(gridExtra)
+library(ggplot2)
+library(doMC)
+library(reshape2)
+library(magrittr)
+library(plyr)
+library(dplyr)
+library(untb)
+library(GUILDS)
+```
+
+
+Objetivo: Comparar SADs geradas segundo uma distribuição de probabilidades conhecida e aquelas geradas pelo modelo de Etienne 2005. Primeiro vamos gerar 100 SADs em um crescente de abundância total (N) e riqueza (S), segundo uma log-normal. Então vamos ajustar estas SADs ao modelo; com as estimativas dos parâmetros simularemos 100 SADs segundo o mesmo modelo, para cada SAD oriunda da log-normal, e com posterior do teste de Kolmogorov-Smirnov.
+Objetivo2: Usar as SADs selecionadas no TreeCo para isso
+Objetivo3: Comparar a congruência dos modelos usando Log-series e a Log-Normal
+
+```{r}
+# Simulando algumas SADs #
+f_sim.SAD <- function(riqueza = 100, N){
+  rsad(S=riqueza, frac=N, sad = "lnorm", coef = list(meanlog=3, sdlog=1.5))
+}
+# SADs com diferentes tamanhos e riquezas
+l_SAD.sim <- lapply(seq(0.1,0.8,by=0.05), function(x) f_sim.SAD(N=x)) 
+```
+
+Para ajustar a SAD observada ao modelo de Etienne 2005, primeiro é necessário estimar os parâmetros do modelo a partir da SAD utilizando a função optimal.params(). Essa função apresenta dois parâmetros importantes: D e log.kda. D é a SAD observada, a base de dados; log.kda calcula Etienne’s K(D, A). A formula de amostragem desenvolvido por Etienne 2005
+
+Mensagem de erro ao ajustar os parâmetros:
+Mensagens de aviso:
+1: In log.kda + lgamma(theta + J) - lgamma(theta + A) :
+  comprimento do objeto maior não é múltiplo do comprimento do objeto menor %>% 
+
+Essa mensagem de erro surge quando usamos um vetor númerico na função, para funcionar corretamente é necessário que se transforme a SAD usando a função  untb::count. Quando fazemos isso os parâmetros calculados foram próximos do que obtive usando o fitvolkov, então diria que está correto. No final vou comparar as duas abordagens tanto quanto seus parâmetros quantos à comparação à SAD nos quais foram estimados (simulando outras SADs e comparando usando o teste de Kolmogorov-Smirnov)
+
+O pacote untb apresenta o conjunto de funções logkada() e optimal.params() que permite estimar os parâmetros do modelo de Etienne 2005. Para gerar as SADs há a função generate.ESF do pacote GUILDS. Essa função utiliza três parâmetros theta, o número fundamental da biodiversidade, J, o tamanho da comunidade a ser amostrada e I número fundamental de imigração. A função optimal.params() estima theta e m, o último está relacionado com I por:  m * (J-1) / (1 - m)
+
+
+```{r}
+## Ajustando as SADs ao modelo de Etienne e armazendo os coefs em um data frame ##
+# SdT: i) estimar os parâmetros usando a função optimal.params; ii) gerar lista com 100 SADs para cada; iii) comparar cada conjunto de réplicas com a SAD original usando o teste de Kolmogorov-Smirnov
+
+## Funcao para estimar os parâmetros do modelo neutro clássico a partir da formula de Etienne 2005 ##
+fitetienne <- function(SAD_){
+  SAD_count <- untb::count(SAD_)
+  SAD_log.kda <- logkda.pari(SAD_count)
+  par_etienne <- optimal.params(SAD_count, log.kda = SAD_log.kda)
+  return(par_etienne)
+}
+
+# Estimando os parâmetros a partir da lista de SADs e armazenar os valores em um data frame #
+registerDoMC(4)
+df_par.Etienne <- ldply(l_SAD.sim, fitetienne, .parallel = TRUE)
+df_par.Etienne %<>% mutate(J = sapply(l_SAD.sim,sum),#tamanho do amostra
+                           S = sapply(l_SAD.sim,length), #riqueza observada
+                           I = m * (J-1)/(1-m)) #convertendo parâmetros
+## Simulando 100 SADs para cada conjunto de parâmetros ##
+f_SAD.Etienne <- function(i,df_=df_par.Etienne,replicas=100){
+  SAD.replicas <- replicate(replicas,
+                            {generate.ESF(theta = df_[i,"theta"],
+                                          I = df_[i,"I"],
+                                          J = df_[i,"J"])
+                            }
+  )
+}
+
+# Lista com as SADs simuladas #
+# Como a teoria de amostragem de Etienne se baseia em uma amostragem de J indivíduos e não até alcançar um determinado número de espécies (como na formula de Volkov),
+# não é possível concatenar as SADs simuladas em uma matrix para cada conjunto de parâmetros, assim, na lista l_SAD.Etienne cada elemento é uma lista com 100 vetores 
+# de abundância no qual diferem no número de S mas a soma total de indivíduos é a mesma. 
+l_SAD.Etienne <- llply(.data = as.list(1:nrow(df_par.Etienne)), 
+                       .fun = f_SAD.Etienne, .parallel = TRUE)
+```
+
+
+## Mesma rotina a partir da formula de Volkov et al. 2005 ##
+
+```{r}
+df_par.Volkov <- ldply(l_SAD.sim, function(x) coef(fitvolkov(x)), .parallel = TRUE)
+df_par.Volkov %<>% mutate(S = sapply(l_SAD.sim,length),
+                          I = m * (J-1)/(1-m)) # adicionando a riqueza observada
+
+## Simulando 100 SADs para cada conjunto de parâmetros ##
+f_SAD.Volkov <- function(i,df_ = df_par.Volkov,replicas = 100){
+  SAD.replicas <- replicate(replicas,
+                            {rvolkov(n = df_[i,"S"],
+                                     theta = df_[i,"theta"],
+                                     m = df_[i,"m"],
+                                     J = df_[i,"J"])
+                              }
+  )
+  return(SAD.replicas)
+}
+# lista onde cada elemento é uma matrix com 100 réplicas para um mesmo conjunto de par #
+l_SAD.Volkov <- llply(.data = as.list(1:nrow(df_par.Volkov)), 
+                      .fun = f_SAD.Volkov, .parallel = TRUE)
+```
+
+
+## Comparando as SADs simuladas segundo o teste de Kolmogorov-Smirnov ##
+
+i) para o modelo de Etienne 2005
+
+```{r}
+## Função comum ##
+# função que utiliza o teste não parâmetrico bicaudal de Kolmogorov-Smirnov
+f_ks.test0 <- function(SAD.obs, SAD.sim){ #teste bicaudal
+  a <- suppressWarnings(ks.test(x = SAD.obs,
+                                y = SAD.sim))
+  a <- data.frame(KS.D = a$statistic, KS.p = a$p.value)
+}
+
+## Segundo Etienne 2005 ##
+f_ks.Etienne <- function(i, SAD_obs = l_SAD.sim, SAD_sim = l_SAD.Etienne){
+     ks_stat <- ldply(SAD_sim[[i]],function(A) f_ks.test0(SAD.obs = SAD_obs[[i]], SAD.sim = A))
+}
+
+# lista onde cada elemento é um df com o valor da estatística KS e o p valor associado da comparação entre a SAD obs e as réplicas neutras #
+l_df.KS.Etienne <- llply(.data = as.list(1:nrow(df_par.Etienne)),
+                         .fun = f_ks.Etienne, .parallel = TRUE)
+
+## Sintetizando os dados ##
+df_par.Etienne %<>% cbind(., 
+                          ldply(l_df.KS.Etienne, function(x) nrow(x[x$KS.p >= 0.05,])), # pSAD
+                          ldply(l_df.KS.Etienne, summarise, KS.D_mean = mean(KS.D),KS.D_var = var(KS.D), KS.p_mean = mean(KS.p), KS.p_var = var(KS.p))) # estat resumo
+names(df_par.Etienne)[6] <- "pSAD"
+df_par.Etienne$modelo <- factor("etienne",levels = c("etienne","volkov"))
+```
+
+ii) Para o modelo de Volkov et al. 2003
+
+```{r}
+## Segundo Volkov et al. 2003 ##
+# f_ks.test - compara cada SAD observada com as 100 SAD replicas correspondentes (simuladas segundo o modelo de Volkov)
+f_ks.Volkov <- function(i, SAD_obs = l_SAD.sim, SAD_sim = l_SAD.Volkov){
+    ks_stat <- apply(SAD_sim[[i]],2,function(A) f_ks.test0(SAD.obs = SAD_obs[[i]], SAD.sim = A))
+    ks_stat %<>% rbind.fill() # o output eh uma lista, onde cada elemento é um df com os valores da estatística para cada comparacao
+}
+
+# lista onde cada elemento é um df com o valor da estatística KS e o p valor associado da comparação entre a SAD obs e as réplicas neutras #
+l_df.KS.Volkov <- llply(.data = as.list(1:nrow(df_par.Volkov)),
+                        .fun = f_ks.Volkov, .parallel = TRUE)
+
+## Sintetizando os dados ##
+df_par.Volkov %<>% cbind(., 
+                         ldply(l_df.KS.Volkov, function(x) nrow(x[x$KS.p >= 0.05,])), # pSAD
+                         ldply(l_df.KS.Volkov, summarise, KS.D_mean = mean(KS.D),KS.D_var = var(KS.D), KS.p_mean = mean(KS.p), KS.p_var = var(KS.p))) # estat resumo
+names(df_par.Volkov)[6] <- "pSAD"
+df_par.Volkov$modelo <- factor("volkov",levels = c("etienne","volkov"))
+```
+
+iii) Organizando os dados em um data frame unico
+
+```{r}
+##SdT: i) criar coluna guia em ambos df: obs: SAD.1, SAD.2, ...; ii) avaliar se as colunas batem; iii) merge os df
+df_par.Etienne$SAD <- paste("SAD.",1:15,sep="")
+df_par.Volkov$SAD <- paste("SAD.",1:15,sep="")
+# df para a análise dos dados
+df_resultados <- rbind(df_par.Etienne,df_par.Volkov)
+```
+
+## Análise dos Dados ##
+
+i) Análise exploratória 
+
+```{r}
+##SdT: i) boxplots por parâmetro para cada modelo; ii) gráfico de dispersão: a) parametros por modelo (theta X m) b) regressão dos parâmetros para avaliar a congruência entre os modelos;
+# Boxplot #
+l_boxplot <- vector("list")
+l_boxplot[[1]] <- ggplot(df_resultados, aes(x=modelo, y = theta)) + geom_boxplot() + geom_jitter()
+l_boxplot[[2]] <- ggplot(df_resultados, aes(x=modelo, y = m)) + geom_boxplot() + geom_jitter()
+l_boxplot[[3]] <- ggplot(df_resultados, aes(x=modelo, y = pSAD)) + geom_boxplot() + geom_jitter()
+# do.call("grid.arrange",c(l_boxplot,ncol=3,nrow=1))
+
+# Gráficos de Dispersão #
+plot(df_par.Etienne$theta ~ df_par.Volkov$theta)
+plot(df_par.Etienne$m ~ df_par.Volkov$m)
+plot(df_par.Etienne$pSAD ~ df_par.Volkov$pSAD)
+
+# ver todos os dados #
+# car::scatterplotMatrix(~pSAD + theta + m, data = df_par.Etienne)
+# car::scatterplotMatrix(~pSAD + theta + m, data = df_par.Volkov)
+```
+
+ii) Avaliar a sensibilidade das estimativas quanto aos atributos da SAD observada: N e S
+
+```{r}
+## SdT: i) seleção de modelos par ~ N * S
+```
+
+iii) Avaliar qual modelo apresentou a maior congruência com a SAD observada
+- seleção de modelos: pSAD ~ modelo * N * S
+
+
+
