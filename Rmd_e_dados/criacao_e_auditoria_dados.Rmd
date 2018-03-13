@@ -291,6 +291,7 @@ figura 2. Relação entre os parametros originais (theta e m) e as estimativas a
 # i) info de interesse
 df_EE <- df_ad[,c(1:2,5:8,13:14,20)]
 names(df_EE)[c(4,6)] <- c("S","J") #uniformizando os nomes
+df_EE$modelo<- rep("EE",nrow(df_EE))
 
 # ii) conversão de parâmetros
 df_EE %<>% mutate(theta = 2*500*DA*p*U,
@@ -312,23 +313,13 @@ Os resultados da conversão de d em m 'estouraram' os possíveis valores de m, u
 
 ### Síntese dos dados ###
 
-Sessão em construção
+SdT: i) unir os data frames
 
-```{r include=FALSE, echo=FALSE,eval=FALSE}
-## df_par.Volkov ##
-df_temp1 <- df_par.Volkov[,c(1:3,6)] # colunas de interesse
-df_temp1$kernel_percentil <- rep("campo_medio",nrow(df_temp1))
-names(df_temp1)[1] <- "SiteCode"
-
-## df_ad ##
-df_temp2 <- df_ad[,c(1:2,5:8,14,20)]
-names(df_temp2)[8] <- "pSAD"
-
-# jeito confuso de fazer: #
-df_temp1 %<>% inner_join(x=.,y=unique(df_temp2[,-c(2,7:8)]),by="SiteCode")
-df_resultados <- merge(x=df_temp2,y=df_temp1, all = TRUE)
-write.table(df_resultados,file="/home/danilo/Documentos/Doutorado/dados/resultados_c_Volkov.txt",sep = "\t",row.names = FALSE)
-save(df_ad,l_SAD.obs,file = "/home/danilo/Documentos/Doutorado/dados/reuniao_15fev18.Rdata")
+```{r unindo os data frames}
+# df_EE %>% str
+# df_EI %>% str
+df_resultados <- merge(x=df_EE,y=df_EI, all = TRUE) 
+write.table(df_resultados,file="/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/df_resultados.txt",sep = "\t",row.names = FALSE)
 ```
 
 
