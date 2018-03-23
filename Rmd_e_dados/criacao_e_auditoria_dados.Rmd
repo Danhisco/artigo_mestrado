@@ -40,7 +40,7 @@ Estrutura do arquivo:
   iii) simulação das SADs a partir do U estimado  
   iv) comparação das SADs usando teste KS e síntese dos dados
 - organização dos dados para modelagem estatística  
-
+- parâmetros modelo EI a partir das SADs{EE}
 ### Prólogo ###
 
   O objetivo geral dos métodos é gerar distribuições de abundância de espécies (SAD) segundo dois modelos neutros e comparar com as SADs observadas em um gradiente de cobertura vegetal. O primeiro modelo neutro é uma derivação do modelo clássico de Hubbell 2001, onde considera-se uma dinâmica ecológica ocorrendo em 'campo médio', ou seja, com o espaço implicito (Etienne et al. 2005); o segundo modelo neutro considera a distância e posição dos indivíduos na comunidade local e paisagem, permitindo simular diferentes cenários de limitação à dispersão (Rosindell et al. 2008). O fluxo de trabalho é similar em ambos os casos: ajusta-se/estima-se os parâmetros dos modelos a partir das SADs observadas, então simula-se 100 SADs réplicas segundo os respectivos modelos e compara-se SADs observadas e simuladas usando o teste de Kolmogorov-Smirnov. Em cada caso, contabiliza-se o número de réplicas em que não é possível refutar a hipótese de que as SADs são amostras de uma mesma distribuição teórica.
@@ -322,4 +322,48 @@ df_resultados <- merge(x=df_EE,y=df_EI, all = TRUE)
 write.table(df_resultados,file="/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/df_resultados.txt",sep = "\t",row.names = FALSE)
 ```
 
+
+### Parâmetros do modelo EI a partir das SADs{EE} ###
+
+As SAS{EE} réplicas estão armazenadas em um data frame com quatro colunas: N, rep, SiteCode, Kernel. N contêm o vetor de abundância (a SAD); rep detona qual a réplica; as outras duas colunas são de identificação com df_ad, nota: kernel = kernel_perncentil.
+
+Então para aproveitar o código já desenvolvido: i) filtrar as SADs pelo SiteCode; ii) transformar em lista de SADs
+
+SdT: i) ajustar 'fitetienne' a todas as SADs{EE} réplicas para cada conjunto de parâmetros para cada Site e concatenar tudo em um data frame 
+
+
+```{r}
+## Qual a estrutura dos dados? (SADs{EE})##
+load("/home/danilo/Documentos/Doutorado/dados/l_dados_brutos.Rdata")
+df_SAD.sim <- l_dados_brutos$df_SAD.sim %>% filter(SiteCode %in% SiteCodes) %>% droplevels()
+```
+
+-> Ajustando as SADs{EE} 
+```{r}
+# Estimando os parâmetros a partir da lista de SADs e armazenar os valores em um data frame #
+registerDoMC(4)
+df_EE_viaEI <- ddply(.data=df_SAD.sim, .variables = c("SiteCode","kernel","rep") , .fun=fitetienne, .parallel = TRUE)
+write.table(df_EE_viaEI,file = "/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/df_SAD_EE-parEI-viaEI.txt",sep = "\t",row.names = FALSE)
+```
+
+alguns gráficos exploratórios
+
+```{r}
+df_EE_viaEI %>% ggplot(aes(x=SiteCode,y=theta)) + geom_boxplot() + facet_wrap(~kernel,nrow = 3)
+df_temp %>% ggplot(aes(x=SiteCode,y=theta_var)) + geom_boxplot() + facet_wrap(~kernel,nrow = 3)
+```
+
+
+
+-> Juntando o data frame df_EE e df_EE_viaEI
+
+```{r}
+df_resultados <- read.table(file = "/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/df_resultados.txt", header = T, as.is = T)
+df_EE_viaEI <- read.table(file = "/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/df_SAD_EE-parEI-viaEI.txt", header = T, as.is = T)
+
+df_temp <- ddply(df_EE_viaEI,c("SiteCode", "kernel"),summarise, 
+                 theta_mean = mean(theta),theta_var = var(theta),
+                 m_mean = mean(m), m_var = var(m))
+
+```
 
