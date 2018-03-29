@@ -3,12 +3,12 @@ title: "reuniao_DaniloMori_29mar"
 author: "Mori, Danilo Pereira"
 date: "27 de março de 2018"
 output:
-  html_document: default
   pdf_document: default
+  html_document: default
 ---
 
 ```{r global_options, echo=FALSE}
-knitr::opts_chunk$set(echo=T, warning=FALSE, message=FALSE, cache = TRUE, tidy = TRUE, include = FALSE)
+knitr::opts_chunk$set(echo=T, warning=FALSE, message=FALSE, cache = TRUE, tidy = TRUE, include = T)
 ```
 
 ```{r global packages and data, echo=F, message=FALSE, warning=FALSE}
@@ -201,7 +201,7 @@ figura 2. Relação entre os parametros originais (theta e m) e as estimativas a
 
 Em uma primeira avaliação me parece que existe um problema com 'm', em todas as classes de kernel_percentil tem valores que distoam do padrão geral dos pontos sendo sistematicaente superiores, a diferença entre o padrão da nuvem e esses pontos diminui com o aumento de kernel_percentil. Olhando os gráficos de (theta,U) ~ m parece que há valores distoando em theta e U também e eles parecem estar relacionados com 'm'. Pelo o que observamos na sessão anterior, especulo que esses pontos devem estar associados com o tamanho da amostra (J). Vou começar avaliando qual os pontos com maior 'm'
 
-```{r}
+```{r fig3, fig.height=4, fig.width=5, fig.align="center"}
 df_EE %>% mutate(k = factor(kernel_percentil)) %>% 
   ggplot(aes(x=k,y=m)) + geom_boxplot() + geom_text(aes(label=SiteCode))
 ```
@@ -233,27 +233,27 @@ figura 4. Relação entre GOF ('Goodness-of-fit') e p (% cobertura vegetal)
 a seguir seleção dos modelos que podem descrever a possível relação entre as variáveis. Em um primeiro momento utilizei a distribuição binomial mas obtive melhores resultados utilizando a função normal:
 
 ```{r selecao modelos GOF}
-l_md <- vector("list", length = 10)
-names(l_md) <- c("bin_logit","bin_logit_null",
-                 "normal","normal_null",
-                 "Gamma_inv","Gamma_inv_null","Gamma_id","Gamma_id_null","Gamma_log","Gamma_log_null")
-l_md[[1]] <- glm(cbind(GOF,100-GOF) ~ p, family = "binomial",df_EI)
-l_md[[2]] <- glm(cbind(GOF,100-GOF) ~ 1, family = "binomial",df_EI)
-l_md[[3]] <- glm(GOF ~ p,family = "gaussian",df_EI)
-l_md[[4]] <- glm(GOF ~ 1,family = "gaussian",df_EI)
-l_md[[5]] <- glm(GOF ~ p,family = "Gamma"(link=inverse),df_EI)
-l_md[[6]] <- glm(GOF ~ 1,family = "Gamma"(link=inverse),df_EI)
-l_md[[7]] <- glm(GOF ~ p,family = "Gamma"(link=identity),df_EI)
-l_md[[8]] <- glm(GOF ~ 1,family = "Gamma"(link=identity),df_EI)
-l_md[[9]] <- glm(GOF ~ p,family = "Gamma"(link=log),df_EI)
-l_md[[10]] <- glm(GOF ~ 1,family = "Gamma"(link=log),df_EI)
-AICctab(l_md, weights = TRUE)
+# l_md <- vector("list", length = 10)
+# names(l_md) <- c("bin_logit","bin_logit_null",
+#                  "normal","normal_null",
+#                  "Gamma_inv","Gamma_inv_null","Gamma_id","Gamma_id_null","Gamma_log","Gamma_log_null")
+# l_md[[1]] <- glm(cbind(GOF,100-GOF) ~ p, family = "binomial",df_EI)
+# l_md[[2]] <- glm(cbind(GOF,100-GOF) ~ 1, family = "binomial",df_EI)
+# l_md[[3]] <- glm(GOF ~ p,family = "gaussian",df_EI)
+# l_md[[4]] <- glm(GOF ~ 1,family = "gaussian",df_EI)
+# l_md[[5]] <- glm(GOF ~ p,family = "Gamma"(link=inverse),df_EI)
+# l_md[[6]] <- glm(GOF ~ 1,family = "Gamma"(link=inverse),df_EI)
+# l_md[[7]] <- glm(GOF ~ p,family = "Gamma"(link=identity),df_EI)
+# l_md[[8]] <- glm(GOF ~ 1,family = "Gamma"(link=identity),df_EI)
+# l_md[[9]] <- glm(GOF ~ p,family = "Gamma"(link=log),df_EI)
+# l_md[[10]] <- glm(GOF ~ 1,family = "Gamma"(link=log),df_EI)
+# AICctab(l_md, weights = TRUE)
 ```
 
 Os modelos mais plausíveis são aqueles que consideram a distribuição normal e o modelo que considera a influência de p em GOF está dentro do intervalo de plausibilidade mais soma menos da metade do peso de evidência do modelo mais plausível o modelo nulo. Segue os coeficientes estimados dos modelos mais plausíveis:
 
 ```{r}
-sapply(l_md[4:3],coef)
+# sapply(l_md[4:3],coef)
 ```
 
 O intercepto ou a média dos valores de GOF é similar para os dois modelos (~ 95). Curiosamente o modelo que considera o efeito da cobertura vegetal apresenta relação contrária à expectativa teórica: efeito negativo; esperava-se que com o aumento da cobertura houvesse também o aumento de GOF. Contudo esses valores podem estar sendo influenciados pelos valores distoantes de GOF < 70. Com isso podemos estabelecer o 
@@ -273,24 +273,24 @@ figura 5. Relação de m ~ p
 A variável apresenta grande variância ao longo de seus possíveis valores, apesar de parecer existir um acumulo de pontos ao redor de ~ 1, não é possível afirmar a priori que existe algum efeito da fragmentação. Vou utilizar as distribuições normal e Gamma como distribuições subjacentes para construir os modelos.
 
 ```{r}
-l_md <- vector("list", length = 8)
-names(l_md) <- c("normal","normal_null",
-                 "Gamma_inv","Gamma_inv_null","Gamma_id","Gamma_id_null","Gamma_log","Gamma_log_null")
-l_md[[1]] <- glm(m ~ p,family = "gaussian",df_EI)
-l_md[[2]] <- glm(m ~ 1,family = "gaussian",df_EI)
-l_md[[3]] <- glm(m ~ p,family = "Gamma"(link=inverse),df_EI)
-l_md[[4]] <- glm(m ~ 1,family = "Gamma"(link=inverse),df_EI)
-l_md[[5]] <- glm(m ~ p,family = "Gamma"(link=identity),df_EI)
-l_md[[6]] <- glm(m ~ 1,family = "Gamma"(link=identity),df_EI)
-l_md[[7]] <- glm(m ~ p,family = "Gamma"(link=log),df_EI)
-l_md[[8]] <- glm(m ~ 1,family = "Gamma"(link=log),df_EI)
-AICctab(l_md, weights = TRUE)
+# l_md <- vector("list", length = 8)
+# names(l_md) <- c("normal","normal_null",
+#                  "Gamma_inv","Gamma_inv_null","Gamma_id","Gamma_id_null","Gamma_log","Gamma_log_null")
+# l_md[[1]] <- glm(m ~ p,family = "gaussian",df_EI)
+# l_md[[2]] <- glm(m ~ 1,family = "gaussian",df_EI)
+# l_md[[3]] <- glm(m ~ p,family = "Gamma"(link=inverse),df_EI)
+# l_md[[4]] <- glm(m ~ 1,family = "Gamma"(link=inverse),df_EI)
+# l_md[[5]] <- glm(m ~ p,family = "Gamma"(link=identity),df_EI)
+# l_md[[6]] <- glm(m ~ 1,family = "Gamma"(link=identity),df_EI)
+# l_md[[7]] <- glm(m ~ p,family = "Gamma"(link=log),df_EI)
+# l_md[[8]] <- glm(m ~ 1,family = "Gamma"(link=log),df_EI)
+# AICctab(l_md, weights = TRUE)
 ```
 
 Os dois modelos dentro do intervalo de plausibilidade são aqueles que utilizam a distribuição normal como subjacente. O modelo mais plausível aculumando 0.71 peso de evidência foi o modelo nulo, o modelo que considera o efeito da fragmentação soma apenas 0.29 de peso de evidência e está bem próximo do limite de plausibilidade. Primeiro vou olhar para a estimativa dos parâmetros desses dois modelos:
 
 ```{r}
-sapply(l_md[2:1],coef)
+# sapply(l_md[2:1],coef)
 ```
 
 A estimativa do intercepto é bem próxima entre os dois modelos; o efeito da cobertura vegetal no segundo modelo mais plausível é bem sútil e positiva o que vem de encontro com a expectativa de quanto menor a fragmentação menor o isolamento da comunidade local (ou da amostra que estamos simulando).
@@ -309,24 +309,24 @@ figura 6. theta ~ p
 A variável parece apresentar uma certa tendência positiva com a cobertura vegetal. Para modelar está variável vou utilizar as mesmas distribuições subjacentes da variável 'm'.
 
 ```{r}
-l_md <- vector("list", length = 8)
-names(l_md) <- c("normal","normal_null",
-                 "Gamma_inv","Gamma_inv_null","Gamma_id","Gamma_id_null","Gamma_log","Gamma_log_null")
-l_md[[1]] <- glm(theta ~ p,family = "gaussian",df_EI)
-l_md[[2]] <- glm(theta ~ 1,family = "gaussian",df_EI)
-l_md[[3]] <- glm(theta ~ p,family = "Gamma"(link=inverse),df_EI)
-l_md[[4]] <- glm(theta ~ 1,family = "Gamma"(link=inverse),df_EI)
-l_md[[5]] <- glm(theta ~ p,family = "Gamma"(link=identity),df_EI)
-l_md[[6]] <- glm(theta ~ 1,family = "Gamma"(link=identity),df_EI)
-l_md[[7]] <- glm(theta ~ p,family = "Gamma"(link=log),df_EI)
-l_md[[8]] <- glm(theta ~ 1,family = "Gamma"(link=log),df_EI)
-AICctab(l_md, weights = TRUE)
+# l_md <- vector("list", length = 8)
+# names(l_md) <- c("normal","normal_null",
+#                  "Gamma_inv","Gamma_inv_null","Gamma_id","Gamma_id_null","Gamma_log","Gamma_log_null")
+# l_md[[1]] <- glm(theta ~ p,family = "gaussian",df_EI)
+# l_md[[2]] <- glm(theta ~ 1,family = "gaussian",df_EI)
+# l_md[[3]] <- glm(theta ~ p,family = "Gamma"(link=inverse),df_EI)
+# l_md[[4]] <- glm(theta ~ 1,family = "Gamma"(link=inverse),df_EI)
+# l_md[[5]] <- glm(theta ~ p,family = "Gamma"(link=identity),df_EI)
+# l_md[[6]] <- glm(theta ~ 1,family = "Gamma"(link=identity),df_EI)
+# l_md[[7]] <- glm(theta ~ p,family = "Gamma"(link=log),df_EI)
+# l_md[[8]] <- glm(theta ~ 1,family = "Gamma"(link=log),df_EI)
+# AICctab(l_md, weights = TRUE)
 ```
 
 Os modelos com distribuição Gamma e que consideram o efeito da cobertura vegetal na variável são os únicos dentro do intervalor de plausibilidade. O peso de evidência mostra que a qualidade de ajuste dos três é bem próxima, sendo aquele que utiliza a função de ligação inversa o mais plausível. Segue o sumário do modelo mais plausível:
 
 ```{r}
-summary(l_md[[3]])
+# summary(l_md[[3]])
 ```
 
 Como a função de ligação é inversa a leitura das estimativas não é na mesma escala da plotada na análise exploratória da variável. Podemos avaliar que existe um efeito positivo da cobertura vegetal em theta, para avaliar a estimativa do intercepto é necessário transformar para a escala da função de ligação. Isso vai de encontro com as expectativas: quanto maior a fragmentação => menor a metacomunidade; menor o tamanho das populações => maior as taxas de extinção - mesmo considerando que a fragmentação não altere o padrão biogeográfico da taxa de especiação certamente podemos considerar que vai dirminuir o tamanho da metacomunidade e portanto theta, uma vez, que theta := 2*Jm*U 
@@ -345,32 +345,32 @@ figura 8. U{EI} ~ p
 Parece que há uma tendência de diminuição de U com o aumento de p, essa diminuição acompanha diminuição da variância.
 
 ```{r}
-l_md <- vector("list", length = 8)
-names(l_md) <- c("normal","normal_null",
-                 "Gamma_inv","Gamma_inv_null","Gamma_id","Gamma_id_null","Gamma_log","Gamma_log_null")
-l_md[[1]] <- glm(U ~ p,family = "gaussian",df_EI)
-l_md[[2]] <- glm(U ~ 1,family = "gaussian",df_EI)
-l_md[[3]] <- glm(U ~ p,family = "Gamma"(link=inverse),df_EI)
-l_md[[4]] <- glm(U ~ 1,family = "Gamma"(link=inverse),df_EI)
-l_md[[5]] <- glm(U ~ p,family = "Gamma"(link=identity),df_EI)
-l_md[[6]] <- glm(U ~ 1,family = "Gamma"(link=identity),df_EI)
-l_md[[7]] <- glm(U ~ p,family = "Gamma"(link=log),df_EI)
-l_md[[8]] <- glm(U ~ 1,family = "Gamma"(link=log),df_EI)
-AICctab(l_md, weights = TRUE)
+# l_md <- vector("list", length = 8)
+# names(l_md) <- c("normal","normal_null",
+#                  "Gamma_inv","Gamma_inv_null","Gamma_id","Gamma_id_null","Gamma_log","Gamma_log_null")
+# l_md[[1]] <- glm(U ~ p,family = "gaussian",df_EI)
+# l_md[[2]] <- glm(U ~ 1,family = "gaussian",df_EI)
+# l_md[[3]] <- glm(U ~ p,family = "Gamma"(link=inverse),df_EI)
+# l_md[[4]] <- glm(U ~ 1,family = "Gamma"(link=inverse),df_EI)
+# l_md[[5]] <- glm(U ~ p,family = "Gamma"(link=identity),df_EI)
+# l_md[[6]] <- glm(U ~ 1,family = "Gamma"(link=identity),df_EI)
+# l_md[[7]] <- glm(U ~ p,family = "Gamma"(link=log),df_EI)
+# l_md[[8]] <- glm(U ~ 1,family = "Gamma"(link=log),df_EI)
+# AICctab(l_md, weights = TRUE)
 ```
 
 O modelo gama com função de ligação inversa onde considera a influência da cobertura vegetal foi o único modelo dentro do intervalo de plausibilidade e acumula todo o peso de evidência dos dados. Segue 
 
 
 ```{r include=FALSE, echo=FALSE}
-par(mfrow=c(2,2))
-plot(l_md[[3]])
+# par(mfrow=c(2,2))
+# plot(l_md[[3]])
 ```
 
 Em código os gráficos diagnósticos, eu diria que o modelo mais plausível está realizando um ajuste bom. Segue o sumário do modelo:
 
 ```{r}
-summary(l_md[[3]])
+# summary(l_md[[3]])
 ```
 
 O modelo descreve uma relação negativa entre as variáveis, quê vem de encontro com a análise exploratória. Novamente lembrando que a escala do modelo e do gráfico exploratório não coincidem. Futuramente irei trabalhar melhor em cada modelo.
@@ -388,24 +388,24 @@ Figura 9. kernel percentil ~ p
 Diria que não há uma tendência dos valores de %k variarem ao longo de p, me parece que de maneira geral a conversão de 'm' para %k apresenta cenários de alta severidade na limitação à dispersão dos indivíduos. 
 
 ```{r}
-l_md <- vector("list", length = 8)
-names(l_md) <- c("normal","normal_null",
-                 "Gamma_inv","Gamma_inv_null","Gamma_id","Gamma_id_null","Gamma_log","Gamma_log_null")
-l_md[[1]] <- glm(kernel_percentil ~ p,family = "gaussian",df_EI)
-l_md[[2]] <- glm(kernel_percentil ~ 1,family = "gaussian",df_EI)
-l_md[[3]] <- glm(kernel_percentil ~ p,family = "Gamma"(link=inverse),df_EI)
-l_md[[4]] <- glm(kernel_percentil ~ 1,family = "Gamma"(link=inverse),df_EI)
-l_md[[5]] <- glm(kernel_percentil ~ p,family = "Gamma"(link=identity),df_EI)
-l_md[[6]] <- glm(kernel_percentil ~ 1,family = "Gamma"(link=identity),df_EI)
-l_md[[7]] <- glm(kernel_percentil ~ p,family = "Gamma"(link=log),df_EI)
-l_md[[8]] <- glm(kernel_percentil ~ 1,family = "Gamma"(link=log),df_EI)
-AICctab(l_md, weights = TRUE)
+# l_md <- vector("list", length = 8)
+# names(l_md) <- c("normal","normal_null",
+#                  "Gamma_inv","Gamma_inv_null","Gamma_id","Gamma_id_null","Gamma_log","Gamma_log_null")
+# l_md[[1]] <- glm(kernel_percentil ~ p,family = "gaussian",df_EI)
+# l_md[[2]] <- glm(kernel_percentil ~ 1,family = "gaussian",df_EI)
+# l_md[[3]] <- glm(kernel_percentil ~ p,family = "Gamma"(link=inverse),df_EI)
+# l_md[[4]] <- glm(kernel_percentil ~ 1,family = "Gamma"(link=inverse),df_EI)
+# l_md[[5]] <- glm(kernel_percentil ~ p,family = "Gamma"(link=identity),df_EI)
+# l_md[[6]] <- glm(kernel_percentil ~ 1,family = "Gamma"(link=identity),df_EI)
+# l_md[[7]] <- glm(kernel_percentil ~ p,family = "Gamma"(link=log),df_EI)
+# l_md[[8]] <- glm(kernel_percentil ~ 1,family = "Gamma"(link=log),df_EI)
+# AICctab(l_md, weights = TRUE)
 ```
 
 O modelo mais plausível é aquele que desconsidera o efeito da cobertua vegetal em kernel percentil, ainda dentro do intervalo de plausibilidade está o modelo que considera tal efeito. Vamos ver quais os coeficientes destes modelos:
 
 ```{r}
-sapply(l_md[2:1],coef)
+# sapply(l_md[2:1],coef)
 ```
 
 A estimativa do intercepto dos dois modelos é similar ~ 0.99%, o modelo que considera o efeito de p mostra um efeito sútil e negativo. Sem levar em conta o possível valor distoante discutido na sessão da conversão de dados, me parece razoável afirmar que o efeito de p pode ser desprezível para efeitos práticos.
@@ -413,4 +413,84 @@ A estimativa do intercepto dos dois modelos é similar ~ 0.99%, o modelo que con
 fato 5: %k{EI} apresenta valor médio ~ 0.99% ao longo de todo o gradiente de cobertura vegetal, que por sua vez tem efeito sútil ou mesmo desprezível na variável.
 
 
+
+##################### Reunião 29 de Abril #####################
+Email PI:
+Oi Danilo
+
+Bem legais os resultados. Fiquei super curioso com a comparação entre os valores de theta, U e m obtidos pelos dois modelos. Vc pode fazer scatterplots para cada um destes parâmetros (cada ponto seria um plot) pra amanhã?
+Abrs
+
+-> Ideia de gráfico:
+VR ~ %k * modelo + (~p_class)
+
+descrição: Para cada uma das variáveis de interesse (VR; theta, U e m) vou produzir um scatterplot cuja variável independente será %k, os gráficos serão separados por classes de cobertura vegetal e os pontos serão coloridos pelo SiteCode e a forma deles pelo modelo (EI ou EE)
+
+-> alternativa:
+VR ~ p * modelo + (~%k)
+
+descrição: para cada VR ~ p e dividiria por classe de %k, o problema nesse caso é que as observações do modelo EI iriam aparecer apenas em um dos gráficos. A primeira opção permite melhor comparação.
+
+
+```{r}
+df_resultados <- read.table(file = "/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/df_resultados.txt", header = T, as.is = T)
+## Preparação dos dados ##
+df_resultados %<>% mutate(p_class = cut(p,12),
+                          k = 1-kernel_percentil)
+df_resultados %>% head
+```
+
+### Theta ###
+
+```{r log theta}
+df_resultados %>% ggplot(aes(x=k,y=log(theta), colour = SiteCode, shape = modelo)) +
+  geom_point(aes(shape=modelo)) +
+  geom_line() +
+  facet_wrap(~p_class,ncol = 3,scales = "free") + 
+  theme(legend.position = "none")
+```
+
+```{r theta}
+df_resultados %>% ggplot(aes(x=k,y=theta, colour = SiteCode, shape = modelo)) +
+  geom_point(aes(shape=modelo)) +
+  geom_line() +
+  facet_wrap(~p_class,ncol = 3,scales = "free") + 
+  theme(legend.position = "none")
+```
+
+### U ###
+
+```{r log U}
+df_resultados %>% ggplot(aes(x=k,y=log(U), colour = SiteCode, shape = modelo)) +
+  geom_point(aes(shape=modelo)) +
+  geom_line() +
+  facet_wrap(~p_class,ncol = 3,scales = "free") + 
+  theme(legend.position = "none")
+```
+
+```{r}
+df_resultados %>% ggplot(aes(x=k,y=U, colour = SiteCode, shape = modelo)) +
+  geom_point(aes(shape=modelo)) +
+  geom_line() +
+  facet_wrap(~p_class,ncol = 3,scales = "free") + 
+  theme(legend.position = "none")
+```
+
+### m ###
+
+```{r}
+df_resultados %>% ggplot(aes(x=k,y=log(m), colour = SiteCode, shape = modelo)) +
+  geom_point(aes(shape=modelo)) +
+  geom_line() +
+  facet_wrap(~p_class,ncol = 3,scales = "free") + 
+  theme(legend.position = "none")
+```
+
+```{r}
+df_resultados %>% ggplot(aes(x=k,y=m, colour = SiteCode, shape = modelo)) +
+  geom_point(aes(shape=modelo)) +
+  geom_line() +
+  facet_wrap(~p_class,ncol = 3,scales = "free") + 
+  theme(legend.position = "none")
+```
 
