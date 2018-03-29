@@ -14,14 +14,15 @@ library(sads)
 library(gridExtra)
 library(ggplot2)
 library(rmutil)
+library(untb)
 library(doMC)
+library(GUILDS)
 library(magrittr)
 library(plyr)
 library(dplyr)
-library(untb)
-library(GUILDS)
 
 df_ad <- read.table("/home/danilo/Documentos/Doutorado/dados/df_dados.txt", sep = "\t",header = TRUE)
+names(df_ad)[13] <- "sd_k"
 df_SAD.obs <- read.table("/home/danilo/Documentos/Doutorado/dados/df_SADs-obs.txt", sep = "\t", header = TRUE)
 ```
 
@@ -185,7 +186,7 @@ Diria que está autocoerente: GOF é proporcional à KS.p_mean e KS.p_mean é in
 
 ### Conversão dos parâmetros ###
 
-  Os dois modelos neutros EE e EI são implementações da teoria geral desenvolvida por Hubbell 2001, contudo, a relação entre seus parâmetros não é direta. Aqui convertemos os parâmetros obtidos por verossimilhança utilizando o modelo EI nos parâmetros do modelo EE, U (taxa de especiação na paisagem) e d (média da dispersão). E convertemos o parâmetro U do modelo EE, estimado utilizando uma formula semi-analítica baseada na natureza genealogica do modelo coalescente dado a função de dispersão e riqueza observada, e a função de dispersão (parâmetro informado a priori), em theta e m respectivamente. Para fazer a conversão entre U e theta utilizamos a definição presente em Hubbell 2001 onde: 
+  Os dois modelos neutros EE e EI são implementações da teoria geral desenvolvida por Hubbell 2001, contudo, a relação entre seus parâmetros não é direta. Aqui convertemos os parâmetros obtidos por verossimilhança utilizando o modelo EI nos parâmetros do modelo EE, U (taxa de especiação na paisagem) e d (média da dispersão). E convertemos o parâmetro U do modelo EE, estimado utilizando uma formula semi-analítica baseada na natureza genealogica do modelo coalescente dado a riqueza observada e a função de dispersão (parâmetro informado a priori), em theta e m. Para fazer a conversão entre U e theta utilizamos a definição presente em Hubbell 2001 onde: 
 
 $theta := 2*JM*U$; 
 
@@ -216,9 +217,24 @@ $m = 4*d / \pi*sqrt(J/DA)$
 
 $d = m*\pi*sqrt(J/DA)/4$
 
-A função de dispersão que utilizamos no modelo EE tem como distribuição de probabilidade subjacente a distribuição de LaPlace. Essa distribuição possui dois parâmetros, média  e escalar. A distribuição de LaPlace pode ser entendida como uma distribuição exponencial negativa espelhada, assim, sua média não é equivalente à distância média de dispersão, essa informação está associada com o parâmetro escalar da distribuição.
+A função de dispersão que desenvolvemos foi parâmetrizada para que informemos o desvio padrão da distribuição, assim, é possível utilizar a mesma variável com diferentes funções de probabilidade subjacente como a distribuição uniforme e a normal. 
 
-Uma vez calculado d a partir do modelo EI, estimamos a equivalente chuva de propágulos que definimos em termos de porcentagem de propágulos que se mantêm até uma determinada distãncia da planta progenitora. Aqui vale relembrar uma nota sobre a função que criamos para realizar tal tarefa:
+A função de dispersão que utilizamos no modelo EE tem como distribuição de probabilidade subjacente a distribuição de Laplace, nela a variância é descrita por:
+
+$var = 2 b ^2$
+
+e assim,
+
+$b=sd/sqrt(2)$
+
+Onde b é o parâmetro escalar, que descreve a "distância média" da Laplaciana (não é a distância média per se, pois podemos entender a Laplaciana como uma exponencial espelhada, seria o equivalente ao escalar médio), portanto b = d. Assim, substituindo b na aproximação
+
+$m = 4 * sd/(\pi sqrt(J/DA) sqrt(2)$
+
+$sd = m sqrt(2) \pi sqrt(J/DA)/4$
+
+
+Uma vez calculado sd a partir do modelo EI, estimamos a equivalente chuva de propágulos que definimos em termos de porcentagem de propágulos que se mantêm até uma determinada distãncia da planta progenitora. Aqui vale relembrar uma nota sobre a função que criamos para realizar tal tarefa:
 
 "Há um erro que é proporcionalmente maior quando as distâncias são pequenas. Acho que é arredondamento que está na função de quantil, que faz ela andar aos saltos. Mas a boa notícia é que o erro é o mesmo para todos os kerneis. Então, apesar da função não achar exatamente o sigma necessário para que p indivíduos caiam até distance de distância, o sigma encontrado resulta na mesma distância (quantil), o que torna os sigmas calculados com os mesmos parametros p e distance equivalentes."
 
@@ -228,7 +244,10 @@ A distância de referência é dist_0 = 100/sqrt(DA) (lado da célula da simula�
 
 
 ```{r conversao de par modelo EI}
-# SdT: i) adicionar as informações observadas necessárias para a conversão (p e DA); ii) converter theta -> U e m -> d; iii) calcular a correspondente chuva de propágulos
+# SdT: 
+#i) adicionar as informações observadas necessárias para a conversão (p e DA); 
+#ii) converter theta -> U e m -> d; 
+#iii) calcular a correspondente chuva de propágulos
 
 # i) Adicionar as informações necesssárias #
 # seleção dos campos de interesse 
@@ -241,7 +260,7 @@ df_EI %<>% inner_join(x=.,y=unique(df_ad[,c(1,5,7)]),by=c("SiteCode")) # DA e p
 # ii) conversão dos parâmetros #
 # conversão dos parâmetros
 df_EI %<>% mutate(U = theta/(2*500*DA*p),
-                  kernel = m*pi*(sqrt(J/DA))/4)
+                  sd_k = m*sqrt(2)*pi*sqrt(J/DA)/4)
 
 # iii) Calculando a correspondente chuva de propágulos #
 # A função a seguir é uma modificação de qkernel de utility_functions, que o PI desenvolveu.
@@ -261,7 +280,7 @@ f_percentil.kernel <- function(i,df_=df_EI){
       percentil <- length(dist_laplace[dist_laplace<=d_ind_MA])/length(dist_laplace) # percentil
       return(percentil)
   }
-  kernel_percentil <- percentilkernel(sigma = df_[i,"kernel"],
+  kernel_percentil <- percentilkernel(sigma = df_[i,"sd_k"],
                                       density = df_[i,"DA"])
   return(kernel_percentil)
 }
@@ -276,7 +295,7 @@ Danilo: eu havia pensando que 'd' era a variância (ou escalar, correto?) da dis
 ii) A função para calcular o percentil está correta? Em especial gostaria de confirmar que fiz a indexação corretamente para calcular o percentil correspondente 
 
 ```{r auditoria visual da conversao EI}
-car::scatterplotMatrix(~ theta + U + m + kernel + kernel_percentil,
+car::scatterplotMatrix(~ theta + U + m + sd_k + kernel_percentil,
                        reg.line = "", smoother = "",
                        data=df_EI, main = "Parâmetros modelo EI")
 ```
@@ -295,14 +314,14 @@ df_EE$modelo<- rep("EE",nrow(df_EE))
 
 # ii) conversão de parâmetros
 df_EE %<>% mutate(theta = 2*500*DA*p*U,
-                  m = 4*kernel/pi*sqrt(J/DA)) # estou considerando que sigma = d
+                  m = 4*(sd_k/sqrt(2))/(pi*sqrt(J/DA))) 
 ```
 
 -> Pontos a confirmar:
 i) a questão da relação de 'd' da aproximação e do parâmetro da LaPlace é válido aqui
 
 ```{r auditoria visual da conversao EE}
-car::scatterplotMatrix(~ theta + U + m + kernel + kernel_percentil,
+car::scatterplotMatrix(~ theta + U + m + sd_k + kernel_percentil,
                        reg.line = "", smoother = "",
                        data=df_EE, main = "Parâmetros modelo EE")
 ```
@@ -338,7 +357,8 @@ load("/home/danilo/Documentos/Doutorado/dados/l_dados_brutos.Rdata")
 df_SAD.sim <- l_dados_brutos$df_SAD.sim %>% filter(SiteCode %in% SiteCodes) %>% droplevels()
 ```
 
--> Ajustando as SADs{EE} 
+-> Ajustando as SADs{EE}
+obs: leva um bom tempo para fazer todo o processo; estimei mais de 10 horas usando os 4 processadores do meu computador e usando a pari/GP na função fitetienne 
 ```{r}
 # Estimando os parâmetros a partir da lista de SADs e armazenar os valores em um data frame #
 registerDoMC(4)
@@ -353,17 +373,4 @@ df_EE_viaEI %>% ggplot(aes(x=SiteCode,y=theta)) + geom_boxplot() + facet_wrap(~k
 df_temp %>% ggplot(aes(x=SiteCode,y=theta_var)) + geom_boxplot() + facet_wrap(~kernel,nrow = 3)
 ```
 
-
-
--> Juntando o data frame df_EE e df_EE_viaEI
-
-```{r}
-df_resultados <- read.table(file = "/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/df_resultados.txt", header = T, as.is = T)
-df_EE_viaEI <- read.table(file = "/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/df_SAD_EE-parEI-viaEI.txt", header = T, as.is = T)
-
-df_temp <- ddply(df_EE_viaEI,c("SiteCode", "kernel"),summarise, 
-                 theta_mean = mean(theta),theta_var = var(theta),
-                 m_mean = mean(m), m_var = var(m))
-
-```
 
