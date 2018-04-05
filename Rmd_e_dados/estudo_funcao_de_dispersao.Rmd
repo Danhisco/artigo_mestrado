@@ -1,6 +1,6 @@
 ---
 title: "Estudo da relação entre os parâmetros de um modelo neutro de campo médio e um modelo neutro de espaço explícito"
-author: "Mori, Danilo Pereira; Coutinho, Renato Mendes; Prado, Paulo Inácio K"
+author: "Mori, Danilo Pereira; Coutinho, Renato Mendes; Lima, Renato A.F. ; Prado, Paulo Inácio K."
 date: "3 de abril de 2018"
 output:
   pdf_document: default
@@ -151,13 +151,13 @@ Uma maneira de avaliar se o percentil está corretamente é utilizar esse valor 
 
 O valor de percentil calculado pela distância referência, a distância entre indivíduos, e o quantil correspondente ao percentil possuem o mesmo valor. O erro da simulação deve ocorrer pelo uso da função 'round' na simulação de valores de uma distribuição Laplace em dois eixos ortogonais. Portanto, existe um problema de aproximação da função que provavelmente está relacionado com a necessidade de tornar discreta uma distribuição de probabilidade que é contínua, assim, esse erro indepedente da $DA_{obs}$. 
 
-Isso quer dizer que apenas `r percentil*100`% dos propágulos se mantêm até cerca de `r 100/sqrt(DA)` da planta progenitora. Considerando um modelo coalescente, então isso representaria que menos de 1% dos propagulos permanece até $l_{cel}$ da planta progenitora, ou seja, até duas vezes a área da sua copa (assumindo uma árvore que ocupa toda á área da unidade de habitat). Esse é um cenário de ausência de limitação à dispersão no nível da comunidade local. Acredito que esse valor ocorre pois no modelo neutro, o evento de dispersão é resultado do processo de dispersão *per se* e do de colonização seguido do  amadurecimento até a idade reprodutiva. Os dados de BCI são de DBH >= 10 cm, considerando que existe considerável correlação entre o diâmetro da árvore e sua idade, podemos considerar que estamos amostrando em BCI indivíduos que já existem há muitas gerações. E como a produção de propagulos é muitas vezes mais rápido que o processo de dispersão (*sensu* teoria neutra) podemos considerar que já ocorreram diversos eventos de dispersão *per se* de modo que todas as classes de distância já foram apresentados, permitindo o surgimento de indivíduos em longas distâncias de suas respectivas árvores progenitoras. Esse efeito é forte o suficiente para produzir populações com indices de agregamento que tendem a zero. Uma vez que o modelo de campo médio, desconsidera o efeito da limitação à dispersão no nível de suas escalas (comunidade local e metacomunidade) e considera esse efeito apenas entre escalas (Etienne 2005), podemos considerar razoável que o percentil tenha sido tão baixo, isso mostra coerência interna do modelo. 
+Isso quer dizer que apenas `r percentil*100`% dos propágulos se mantêm até cerca de `r 100/sqrt(DA)` da planta progenitora. Considerando um modelo coalescente, então isso representaria que menos de 1% dos propagulos permanece até $l_{cel}$ da planta progenitora, ou seja, até duas vezes a área da sua copa (assumindo uma árvore que ocupa toda á área da unidade de habitat). Esse é um cenário de ausência de limitação à dispersão no nível da comunidade local. Acredito que esse valor ocorre pois no modelo neutro, o evento de dispersão é resultado do processo de dispersão *per se* e do de colonização seguido do  amadurecimento até a idade reprodutiva. Os dados de BCI são de DBH >= 10 cm, considerando que existe considerável correlação entre o diâmetro da árvore e sua idade, podemos considerar que estamos amostrando em BCI indivíduos que já existem há muitas gerações. E como a produção de propagulos é muitas vezes mais rápido que o processo de dispersão (*sensu* teoria neutra) podemos considerar que já ocorreram diversos eventos de dispersão *per se* de modo que todas as classes de distância já foram apresentados, permitindo o surgimento de indivíduos em longas distâncias de suas respectivas árvores progenitoras. Pelo percentil apresentado, esse efeito deve ser forte o suficiente para produzir populações com indices de agregamento que tendem a zero. Uma vez que o modelo de campo médio, desconsidera o efeito da limitação à dispersão no nível de suas escalas (comunidade local e metacomunidade) e considera esse efeito apenas entre escalas (Etienne 2005), podemos considerar razoável que o percentil tenha sido tão baixo, isso mostra coerência interna do modelo, apesar do baixo realismo biológico. (Seria interessante realizar uma pesquisa bibliográfica para avaliar as questões levantadas nesse parágrafo - MAS NÃO AGORA).
 
 Uma possível pergunta nesse contexto é qual a equivalente chuva de propágulo para que m = 1, ou seja, sem qualquer tipo de limitação à dispersão. Como esse valor provavelmente é muito baixo, vou aumentar o número de pontos utilizado para estimar o percentil:
 
 ```{r k_max_teorico}
 # sd máximo teórico
-sd_max <- 100*pi*sqrt( (2*J/DA) )/4
+sd_max <- 100*pi*sqrt( (2*J/DA) )/4 #eqn 2
 b_laplace <- sd_max / sqrt(2)
 # aumentei o número de pontos para maximizar a resolução do percentil
 X_laplace <- d_ind_MA * round(rlaplace(1e6, s=b_laplace) / d_ind_MA) 
@@ -166,18 +166,19 @@ dist_laplace <- sqrt(X_laplace^2+Y_laplace^2)
 (percentil_max <- length(dist_laplace[dist_laplace<=d_ind_MA])/length(dist_laplace)) # percentil
 ```
 
-Essa chuva de propágulos é o esperado para quando não existe limitação à dispersão entre as escalas comunidade local e a metacomunidade. 
+O percentil máximo teórico `r percentil_max*100`% é o esperado para quando não existe limitação à dispersão entre as escalas comunidade local e a metacomunidade, ou seja, todos os indivíduos tem capacidade de produzir propágulos que podem se dispersar para qualquer unidade de habitat da metacomunidade. 
 
 Alternativamente podemos estimar *sd* que gera um determinado percentil de propágulos até a distância referência. Essa abordagem é principalmente importante na simulação coalescente, onde não possuímos ferramentário estatístico para estimar os parâmetros do modelo U e a chuva de propagulos (%k) a partir do ajuste da $SAD_{obs}$ por verossimilhança . Na simulação coalescente podemos estimar U a partir da riqueza observada utilizando uma modificação da formula semi-analítica apresenta no apêndice A de Rosindel et al. (2008). A formula estabelece relação entre a probabilidade de colonização de um singleton por evento de morte (ou seja, a probabilidade de uma nova espécie aparecer na paisagem - U) e a riqueza observada partindo de uma árvore genealogica da comunidade quando U -> 0, ou seja, quando há monodominância. No modelo coalescente, reconstruímos a arvore genealógica da comunidade no espaço, assim a função de dispersão altera a arvore genealógica da comunidade e por consequência a relação entre U e a riqueza observada. Dessa maneira, para trabalhar com o modelo neutro espacialmente explícito informamos *a priori* qual a chuva de propágulos de interesse e estimamos *sd* correspondentes. Utilizamos 12 valores de porcentagem de própágulos que permanecem até $l_{cel}$ metros da planta progenitora: `r paste(c(99, seq(95,50,by=-5), 25),"%",sep="")`. Vamos calcular os respectivos valores de *sd* que produzem os percentis de interesse utilizando a função sigkernel:
 
-```{r sigk}
+```{r sigk, tidy=FALSE}
+# data frame com os percentis de interesse
 df_ <- data.frame(l_cel = 100/sqrt(DA), 
                   percentil = c(99, seq(95,50,by=-5), 25)/100, 
-                  kernel_type = rep("laplace",12), 
+                  kernel_type = "laplace", 
                   DA_obs = DA,
                   J_obs = J,
                   stringsAsFactors = FALSE)
-# essa função é bem mais útil quando existem outros locais para se comparar
+
 f_sapply <- function(i){
   sigkernel(kernel = df_[i,"kernel_type"],
             p =  df_[i,"percentil"],
@@ -198,11 +199,64 @@ scatterplotMatrix(~ percentil + sd + m,
                   data=df_, main = "")
 ```
 
-figura 2. Relação entre o percentil de propágulos que permanecem até a distância padrão de $100/ \sqrt(DA)$ que é a distância dos indivíduos na simulação coalescente (painel[1,1]), o desvio padrão correspondente *sd* (painel[2,2]) e a taxa de imigração calculada a partir de *sd* e da equação 2. A relação entre m e sd é proporcional para valores de J e DA iguais; já a relação do percentil e sd é descrita por uma distribuição Laplace.
+figura 2. Relação entre o percentil de propágulos que permanecem até a distância padrão de $100/ \sqrt(DA)$ que é a distância dos indivíduos na simulação coalescente (painel[1,1]), o desvio padrão correspondente *sd* (painel[2,2]) e a taxa de imigração calculada a partir de *sd* e da equação 2. A relação entre m e sd é proporcional para valores de J e DA iguais (eqn 2); já a relação do percentil e sd é descrita por uma distribuição Laplace que foi transformada para valores discretos (detalhes no texto).
 
 
-Os valores utilizados até aqui são observados em BCI, as características da amostra de BCI difere daquelas presentes no TreeCo em: i) paisagem aproximada como homogênea, ou seja, existem apenas unidades de habitat na paisagem (não há fragmentação); ii) a área amostrada de BCI é cerca de 50 vezes maior que a moda das áreas amostradas em nosso filtro de trabalhos do TreeCo; iii) BCI conta com o censu de árvores com DBH >= 10 cm, os sítios selecionados no TreeCo utilizaram DBH >= 5 cm, espera-se que isso tenha efeito em $DA_{obs}$. Assim, na próxima sessão vou fazer a conversão de parâmetros do modelo EI e EE das paisagens selecionadas no TreeCo
+Os valores utilizados até aqui são observados em BCI, as características da amostra de BCI difere daquelas presentes no TreeCo em: i) paisagem aproximada como homogênea, ou seja, existem apenas unidades de habitat na paisagem (não há fragmentação); ii) a área amostrada de BCI é cerca de 50 vezes maior que a moda das áreas amostradas em nosso filtro de trabalhos do TreeCo (~ 1ha); iii) BCI conta com o censu de árvores com DBH >= 10 cm, os sítios selecionados no TreeCo utilizaram DBH >= 5 cm, espera-se que isso tenha efeito em $DA_{obs}$. Assim, na próxima sessão vou fazer a conversão de parâmetros do modelo EI e EE das paisagens selecionadas no TreeCo
 
 ## Convertendo Parâmetros de modelos neutros para as paisagens de TreeCo ##
 
-Sdt: i) carregar df_resultados; ii) converter os parâmetros segundo sua natureza (EI <-> EE); iii) plotar o obtido: 
+Foram selecionados 80 trabalhos fitossociológicos que amostram de maneira contígua pelo menos 1 ha de indivíduos arbóreos na Mata Atlântica, Brasil, e com critério de inclusão DBH >= 5 cm, além disso os trabalhos foram realizados em paisagens que mudaram pouco até o ano de 2000, ano em que a foto área do recorte de paisagem foi tomada (detalhes em outros trabalhos do TreeCo REFERÊNCIAS). Anteriormente ajustei o modelo de Etienne (2005) às SADs amostradas nos trabalhos fitossociológicos, obtendo $\theta$ e *m*. Concomitantemente, trabalhamos com o modelo coalescente nos mesmos trabalhos, utilizamos recortes de paisagens de 500 ha concêntricos à coordenada central dos trabalhos fitossociológicos, esses recortes de paisagem consideram a estrutura de habitat e não habitat na paisagem, assim, transcrevemos a estrutura de paisagem para a simulação; ao redor da coordenada central geramos um quadrado com J unidades de habitat, que representa a comunidade local (detalhes no métodos). Cada matriz de paisagem apresenta o número de elementos (unidades de habitat e de não habitat) tal que a densidade de elementos é igual a $DA_{obs}$. A simulação coalescente ocorre nas matrizes de paisagens geradas e conta com duas etapas: primeiro para estimar a taxa de especiação necessária (U) para se obter a riqueza observada no equilíbrio dado uma função de dispersão; então utilizando U e a mesma função de dispersão simulamos 100 SADs neutras. Aqui vamos focar apenas na conversão de parâmetros entre o modelo de campo médio de Etienne (2005) (modelo EI) e o modelo de espaço explícito coalescente (modelo EE).
+
+### Convertendo parâmetros do modelo EI ###
+
+O objetivo aqui é utilizar as eqn 1 e 2 para converter $\theta$ e *m* para U e %k (porcentagem da chuva de propagulos que se mantêm até o dobro da copa da planta progenitora). Primeiro vamos olhar os dados para o modelo EI:
+
+```{r}
+# data frame com todos os ddos e as conversões de parâmetros antigas (erradas)
+df_resultados <- read.table(file = "/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/df_resultados.txt", header = T, as.is = T)
+# filtrando os dados para o modelo EI e selecionando as colunas de interesse
+df_EI <- df_resultados %>% filter(modelo == "EI") %>% select(SiteCode, p, S , DA, J, theta, m)
+summary(df_EI[,c(2,4:7)])
+```
+
+Com esses dados podemos aplicar as eqn 1 e 2:
+
+```{r}
+df_EI %<>% mutate(U = theta / (2 * 500 * DA * p), #eqn1
+                  sd = m * 100 * pi * sqrt( (2*J/DA) )/4) #eqn2
+scatterplotMatrix(~ J + DA + p + theta + U + m + sd,
+                  reg.line = "", smoother = "",
+                  data= df_EI)
+```
+Figura 3. Valores utilizados na conversão de parâmetros do modelo EI (J, DA e p) e os parâmetros do modelo EI (theta e m) e seus respectivos parâmetros do modelo EE (U e sd).
+
+As amostras descrevem uma linha entre J e DA, com duas notórias exceções: há dois valores de J que são muitas vezes superiores aos demais valores; esses dois valores ocorrem em paisagens com cobertura vegetal elevada e distoam da nuvem de pontos dos parâmetros $\theta$, U, m e sd. A distribuição de p é levemente bimodal, apresentando a maioria dos valores em paisagens com alta cobertura vegetal, paisagens com valores intermediários são os menos representados - idealmente gostariamos de uma distribuição uniforme, contudo, grande parte dos trabalhos fitossociológicos ocorrem em paisagens pouco modificadas, o quê explica a alta frequência de coberturas vegetais (REFERÊNCIAS - treeco). 
+U apresenta dois valores distoantes da nuvem de pontos, esses valores ocorrem em baixos valores de p, assim, uma possibilidade é que esses valores distoantes sejam resultado de uma interação de valores baixos de p com altos valores de DA, contudo, como ocorrem em valores baixos de p não acho recomendado retira-los dada a escassez de pontos em baixos p. Existe coerência entre *m* e *sd*, onde esperamos uma relação proporcional entre m e sd (eqn 2), contudo, parece que os valores  distoantes de J estão influênciando na conversão entre as variáveis.
+
+Parece que existe coerência entre as conversões de parâmetros dos modelos, vou seguir estimando qual a correspondente chuva de propágulos para os *sd* calculados. Para isso vou desenvolver uma formula adaptada de qkernel, que ao inves de retornar o quantil, retorna o percentil de interesse:
+
+```{r f_percentil.kernel}
+f_percentil.kernel <- function(i,df_=df_EI){
+  percentilkernel<- function(sigma, density, npoints = 1e5){
+      #metríca da simulacao e distancia de referencia
+      d_ind_MA  <- 100/sqrt(density)
+      # relacao entre sd e o parametro escalar da distribuicao Laplace
+      b_laplace <- sigma / sqrt(2) 
+      # sorteios de duas distribuicoes identicas Laplace em eixos ortogonais
+      X_laplace <- d_ind_MA * round(rlaplace(npoints, s=b_laplace) / d_ind_MA) 
+      Y_laplace <- d_ind_MA * round(rlaplace(npoints, s=b_laplace) / d_ind_MA)
+      #calculando a distancia dos pontos ate a origem
+      dist_laplace <- sqrt(X_laplace^2+Y_laplace^2)
+      #Percemtil
+      percentil <- length(dist_laplace[dist_laplace<=d_ind_MA])/length(dist_laplace)
+      return(percentil)
+  }
+  kernel_percentil <- percentilkernel(sigma = df_[i,"sd"],
+                                      density = df_[i,"DA"])
+  return(kernel_percentil)
+}
+df_EI$kernel_percentil <- sapply(1:nrow(df_EI),f_percentil.kernel) #armazenando
+df_EI %>% summary
+```
+
