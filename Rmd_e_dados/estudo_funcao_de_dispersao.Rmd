@@ -1,5 +1,5 @@
 ---
-title: "Estudo função de dispersão na simulação neutra coalescente"
+title: "Estudo da relação entre os parâmetros de um modelo neutro de campo médio e um modelo neutro de espaço explícito"
 author: "Mori, Danilo Pereira; Coutinho, Renato Mendes; Prado, Paulo Inácio K"
 date: "3 de abril de 2018"
 output:
@@ -10,6 +10,13 @@ output:
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE,tidy = TRUE, cache = TRUE)
 ```
+
+```{r global packages, echo=FALSE, message = FALSE}
+library(magrittr)
+library(plyr)
+library(dplyr)
+```
+
 
 ## Introdução ##
 
@@ -51,46 +58,13 @@ O benefício de parametrizar a função de dispersão em termos de desvio padrã
 
 ### Função de dispersão e chuva de propagulos ###
 
-A chuva de propágulos pode ser entendida como o produto da fecundidade e função de dispersão (Clark et al. 1999). Por conta do pressuposto da equivalência funcional todos os indivíduos produzem o mesmo número de propágulos por unidade de tempo (Hubbell 2001), assim, podemos simular cenários de limitação à dispersão em função da porcentagem de propágulos que permace até determinada distância da planta progenitora. Dessa maneira, não precisamos definir a dispersão em termos de distância *per se* mas em termos de porcentagem de indivíduos que permanecem na área imediata da planta progenitora. Para isso é necessário estabelecer uma distância padrão da planta progenitora e estimar ou definir a porcentagem de indivíduos que se mantêm até esta distância padrão. Como distância padronizamos $l_{cel}$, assim, cada paisagem possui uma distância padrão que depende da densidade observada de indivíduos naquela paisagem. Podemos estimar qual a porcentagem de propágulos até a distância padrão que um determinado *sd* gera, partindo de um *m* (eqn 1); ou podemos informar *a priori* quais as porcentagens de interesse e estimar o *sd* necessário para gerar tais porcentagens. Na simulação coalescente, utilizamos 12 valores de porcentagem para simular os cenários de limitação à dispersão: 99%, seq(95,50,by=-5)% e 25%. Apesar da simulação coalescente ser bem eficiente e permitir simular paisagens infinitas, funções de dispersão que apresentam dispersão muito elevadas são computacionalmente muito onerosas (Rosindell et al. 2008) e apresentariam pouco realismo biológico (Nathan 2006), logo, não utilizamos porcentagens muito baixas (e.g. 1%).
+A chuva de propágulos pode ser entendida como o produto da fecundidade e função de dispersão (Clark et al. 1999). Por conta do pressuposto da equivalência funcional todos os indivíduos produzem o mesmo número de propágulos por unidade de tempo (Hubbell 2001), assim, podemos simular cenários de limitação à dispersão em função da porcentagem de propágulos que permace até determinada distância da planta progenitora. Dessa maneira, não precisamos definir a dispersão em termos de distância *per se* mas em termos de porcentagem de indivíduos que permanecem na área imediata da planta progenitora. Para isso é necessário estabelecer uma distância padrão da planta progenitora e estimar ou definir a porcentagem de indivíduos que se mantêm até esta distância padrão. Como distância padronizamos $l_{cel}$, assim, cada paisagem possui uma distância padrão que depende da densidade observada de indivíduos naquela paisagem. Podemos estimar qual a porcentagem de propágulos até a distância padrão que um determinado *sd* gera, partindo de um *m* (eqn 2); ou podemos informar *a priori* quais as porcentagens de interesse e estimar o *sd* necessário para gerar tais porcentagens. Na simulação coalescente, utilizamos 12 valores de porcentagem para simular os cenários de limitação à dispersão: 99%, seq(95,50,by=-5)% e 25%. Apesar da simulação coalescente ser bem eficiente e permitir simular paisagens infinitas, funções de dispersão que apresentam dispersão muito elevadas são computacionalmente muito onerosas (Rosindell et al. 2008) e apresentariam pouco realismo biológico (Nathan 2006), logo, não utilizamos porcentagens muito baixas (e.g. 1%).
 
 Para estimar o *sd* necessário para gerar uma determinada porcentagem de propágulos até a distância padronizada, desenvolvemos uma função no ambiente de programação R (R language team). A seguir o código utilizado nessa função, note que a função permite utilizar 3 distribuições de probabilidade (uniforme, normal e Laplace), contudo utilizamos apenas a distribuição Laplace.
 
 ```{r funcao para estimar sd da funcao de dispersao, include=T,message=F}
 library(rmutil)
 
-#' Kernel quantile
-#'
-#' Returns the quantile value that acumulates a given percentile of
-#' the density of three types of dispersion kernels in a simulation of
-#' a spatially explicit neutral dynamics (Rosindell et al. 2008).
-#'
-#' @param sigma real positive, the dispersion parameter of the kernel. For
-#'     uniform it is the total width of the kernel (max - min), and for
-#'     gaussian and laplacian kernels sigma is the standard deviation.
-#' @param kernel character, either "normal", "uniform" or "laplacian";
-#'     the kernel type. See Rosindell et al. (2008) for details.
-#' @param p real 0 < p > 1; the accumulated probability from the kernel
-#'     center.
-#' @param density real positive, the density of individual in the
-#'     simulation grid, in individuals/hectare
-#' @return kernel quantile, which is the distance in meters from the kernel
-#'     center that encompasses a proportion p of total kernel
-#'     density. For example, p = 0.5 returns the median dispersal
-#'     distance.
-#' @param npoints non-negative integer, number of distance points to
-#'     simulate.
-#' @details This function simulates the sampling of dispersion
-#'     distances from the kernel as outlined by Rosindell et al
-#'     (2008), which is not the same as a bivariate version of each
-#'     distribution (e.g. a bivariate normal, laplacian,
-#'     uniform). Rather, X and Y coordinates are sampled independently
-#'     and the used to find the dispersal distance. Though an
-#'     analytical solution might be feasible, this function uses the
-#'     random sample functions of the univariate distributions and
-#'     empirical quantile functions and so provides approximate values.
-#' @references Rosindell J, Wong Y, Etienne RS, 2008, A coalescence
-#' approach to spatial neutral ecology, Ecological Informatics, Vol: 3,
-#' Pages: 259-271 
 qkernel<- function(sigma, kernel, p, density=20852/50, npoints = 1e5){
     kernel <- match.arg(kernel, choices=c("normal","gaussian","laplace","uniform"))
     d_ind_MA  <- 100/sqrt(density)
@@ -118,31 +92,6 @@ qkernel<- function(sigma, kernel, p, density=20852/50, npoints = 1e5){
     return(unname(result))
 }
 
-#' Finds kernel dispersal parameter
-#'
-#' Returns dispersal parameter of three types of kernel that
-#' accumulates a proportion of the kernel density up to a given distance.
-#'
-#' @param kernel character, either "normal", "uniform" or "laplacian";
-#'     the kernel type. See Rosindell et al. (2008) for details.
-#' @param p real 0 < p > 1; the accumulated probability from the kernel
-#'     center.
-#' @param distance real positive, the quantile that should accumulate
-#'     p (for instance, if p=0.5 distance is the median distance)
-#' @param density real positive, the density of individual in the
-#'     simulation grid, in individuals/hectare
-#' @param npoints non-negative integer, number of distance points to
-#'     simulate.
-#' @param sigma.min real positive, the minimum value of the dispersal
-#'     value to try in the one-dimensional optmisation.
-#' @param sigma.max real positive, the maximum value of the dispersal
-#'     value to try in the one-dimensional optmisation.
-#' @return the output of function uniroot, which is a list. The
-#'     element 'root' of the list is the dispersal parameter necessary for the kernel having
-#'     dist as the quantile for p. For example, p = 0.5  and dist =10
-#'     returns the dispersal parameter such that the median dispersal
-#'     distance is 10 meters. The solution is not exact because of
-#'     rounding values to cell sizes of the simulation grid.
 sigkernel <- function(kernel, p, distance, density=20852/50,
                       npoints =1e5, sigma.min = 1, sigma.max= 100){
     f1 <- function(x) distance - qkernel(x, kernel, p, density, npoints)
@@ -151,7 +100,7 @@ sigkernel <- function(kernel, p, distance, density=20852/50,
 ```
 
 
-Nossa função para estimar *sd* necessário para gerar determinada porcentagem até a distância padrão consiste de duas funções: *qkernel* e *sigkernel*. *sigkernel* retorna o parâmetro de dispersão necessário para que a função de dispersão tenha a distância padrão como quantil da porcentagem de interesse. Essa função depende da função *qkernel*, que por sua vez retorna o valor quantil que acumula determinado percentil de propágulos. A função *qkernel* pressupõem o processo de dispersão aleatório como está originalmente implementado na simulação coalescente descrito por Rosindell et al. (2008), que não é o mesmo que a versão bivariada da distribuição de probabilidade subjacente à função de dispersão; ao invés a dispersão é simulada como duas amostras indepentendes da distribuição de probabilidade em eixos ortogonais, a distância de dispersão é descrito como o módulo do vetor resultado da amostra nos eixos ortogonais (figura 1, detalhes no código).
+Nossa função para estimar o *sd* necessário para gerar determinada porcentagem até a distância padrão consiste de duas funções: *qkernel* e *sigkernel*. *sigkernel* retorna o parâmetro de dispersão necessário para que a função de dispersão tenha a distância padrão como quantil da porcentagem de interesse. Essa função depende da função *qkernel*, que por sua vez retorna o valor quantil que acumula determinado percentil de propágulos. A função *qkernel* pressupõem o processo de dispersão aleatório como está implementado na simulação coalescente descrito por Rosindell et al. (2008), que não é o mesmo que a versão bivariada da distribuição de probabilidade subjacente à função de dispersão; ao invés a dispersão é simulada como duas amostras indepentendes da distribuição de probabilidade em eixos ortogonais, a distância de dispersão é descrito como o módulo do vetor resultado da amostra nos eixos ortogonais (figura 1).
 
 ```{r fig1, echo=FALSE}
 # Considerando DA = 1400 indivíduos/ha
@@ -170,31 +119,90 @@ hist(dist_MA,n=40, main = "",xlab = "distância (metros)", ylab = "Frequência")
 plot(X, Y, cex=0.1, main = "",xlab = "",ylab = "")
 ```
 
-Figura 1. Simulação do processo de dispersão usado na simulação coalescente (Rosindell et al. 2008), consideramos DA = 1400 indivíduos/ha, desvio-padrão da função de dispersão = 4 metros e foram simulados 1e6 pontos. No primeiro gráfico temos a distribuição de distâncias à planta progenitora (m). No segundo gráfico temos a distribuição da chuva de propagulos ao redor da planta progenitora que se encontra na origem do gráfico (ponto (0,0)). Notem que diferente de uma dispersão que assume que a distribuição de probabilidade é bivariada (que seria mais próximo de um circulo), a maneira como a simulação coalesceente (Rosindell et al. 2008) aproxima a dispersão faz com que a forma da chuva de propagulos se aproxime de um losango.
+Figura 1. Simulação do processo de dispersão usado na simulação coalescente (Rosindell et al. 2008), consideramos DA = 1400 indivíduos/ha, desvio-padrão da função de dispersão = 4 metros e 1e6 pontos. No primeiro gráfico temos a distribuição de distâncias à planta progenitora (m). No segundo gráfico temos a distribuição da chuva de propagulos ao redor da planta progenitora que se encontra na origem do gráfico (ponto (0,0)). Notem que diferente de uma dispersão que assume que a distribuição de probabilidade é bivariada (que aproximaria de um circulo), a maneira como a simulação coalesceente (Rosindell et al. 2008) aproxima a dispersão faz com que a forma da chuva de propagulos se aproxime de um losango.
+
+Podemos calcular qual a correspondente chuva de propagulo (%k) de um *m* conhecido, considerando a densidade observada e o tamanho da amostra. Considerando m=0.11 (valor estimado para BCI REFERÊNCIA), J=20852 (número de indivíduos em BCI), A=50ha (área amostrada em BCI) e DA=`r 20852/50`, podemos calcular *sd* correspondente considerando uma função de dispersão com distribuição de Laplace:
+
+```{r conversao m para d}
+J = 20852
+DA = 20852/50
+(sd = 0.11 * 100 * pi * sqrt((2*J)/DA) / 4) #eqn 2
+```
+
+O *sd* estimado é bem elevado, acredito que o principal motivo para isso é que a área amostrada é grande e a densidade dos indivíduos é baixa, gerando um baixo valor de indivíduos (J) para uma respectiva área. Assim, a função de dispersão descreve eventos de colonização em unidades de habitat que possuem arresta grande. Vamos avaliar qual é a correspondente chuva de propágulos considerando uma distribuição Laplace:
+
+```{r percentil de sd, message=FALSE}
+library(rmutil)
+# distância entre os indivíduos e a distância padrão
+d_ind_MA  <- 100/sqrt(DA) #tanto a metrica da paisagem quanto a distancia de referencia
+b_laplace <- sd / sqrt(2) ## relação entre sigma e b, a variância da laplaciana
+## gerando valores de uma distribuição laplaciana e convertendo para a distância em metros
+X_laplace <- d_ind_MA * round(rlaplace(1e5, s=b_laplace) / d_ind_MA) 
+Y_laplace <- d_ind_MA * round(rlaplace(1e5, s=b_laplace) / d_ind_MA) # idem para Y
+dist_laplace <- sqrt(X_laplace^2+Y_laplace^2) #distâncias dos pontos até a origem
+(percentil <- length(dist_laplace[dist_laplace<=d_ind_MA])/length(dist_laplace)) # percentil
+```
+
+Uma maneira de avaliar se o percentil está corretamente é utilizar esse valor na função quantil e ver se o valor é próximo de 'd_ind_MA'. O quantil correspondente à esse percentil é igual `r unname(quantile(dist_laplace, percentil))`, valor próximo em escala de `r d_ind_MA`. Uma segunda avaliação pode ser utilizar o valor do quantil para calcular o percentil  
+
+```{r}
+(percentil2 <- length(dist_laplace[dist_laplace<=unname(quantile(dist_laplace, percentil))])/length(dist_laplace)) # percentil do quantil
+```
+
+O valor de percentil calculado pela distância referência, a distância entre indivíduos, e o quantil correspondente ao percentil possuem o mesmo valor. O erro da simulação deve ocorrer pelo uso da função 'round' na simulação de valores de uma distribuição Laplace em dois eixos ortogonais. Portanto, existe um problema de aproximação da função que provavelmente está relacionado com a necessidade de tornar discreta uma distribuição de probabilidade que é contínua, assim, esse erro indepedente da $DA_{obs}$. 
+
+Isso quer dizer que apenas `r percentil*100`% dos propágulos se mantêm até cerca de `r 100/sqrt(DA)` da planta progenitora. Considerando um modelo coalescente, então isso representaria que menos de 1% dos propagulos permanece até $l_{cel}$ da planta progenitora, ou seja, até duas vezes a área da sua copa (assumindo uma árvore que ocupa toda á área da unidade de habitat). Esse é um cenário de ausência de limitação à dispersão no nível da comunidade local. Acredito que esse valor ocorre pois no modelo neutro, o evento de dispersão é resultado do processo de dispersão *per se* e do de colonização seguido do  amadurecimento até a idade reprodutiva. Os dados de BCI são de DBH >= 10 cm, considerando que existe considerável correlação entre o diâmetro da árvore e sua idade, podemos considerar que estamos amostrando em BCI indivíduos que já existem há muitas gerações. E como a produção de propagulos é muitas vezes mais rápido que o processo de dispersão (*sensu* teoria neutra) podemos considerar que já ocorreram diversos eventos de dispersão *per se* de modo que todas as classes de distância já foram apresentados, permitindo o surgimento de indivíduos em longas distâncias de suas respectivas árvores progenitoras. Esse efeito é forte o suficiente para produzir populações com indices de agregamento que tendem a zero. Uma vez que o modelo de campo médio, desconsidera o efeito da limitação à dispersão no nível de suas escalas (comunidade local e metacomunidade) e considera esse efeito apenas entre escalas (Etienne 2005), podemos considerar razoável que o percentil tenha sido tão baixo, isso mostra coerência interna do modelo. 
+
+Uma possível pergunta nesse contexto é qual a equivalente chuva de propágulo para que m = 1, ou seja, sem qualquer tipo de limitação à dispersão. Como esse valor provavelmente é muito baixo, vou aumentar o número de pontos utilizado para estimar o percentil:
+
+```{r k_max_teorico}
+# sd máximo teórico
+sd_max <- 100*pi*sqrt( (2*J/DA) )/4
+b_laplace <- sd_max / sqrt(2)
+# aumentei o número de pontos para maximizar a resolução do percentil
+X_laplace <- d_ind_MA * round(rlaplace(1e6, s=b_laplace) / d_ind_MA) 
+Y_laplace <- d_ind_MA * round(rlaplace(1e6, s=b_laplace) / d_ind_MA)
+dist_laplace <- sqrt(X_laplace^2+Y_laplace^2)
+(percentil_max <- length(dist_laplace[dist_laplace<=d_ind_MA])/length(dist_laplace)) # percentil
+```
+
+Essa chuva de propágulos é o esperado para quando não existe limitação à dispersão entre as escalas comunidade local e a metacomunidade. 
+
+Alternativamente podemos estimar *sd* que gera um determinado percentil de propágulos até a distância referência. Essa abordagem é principalmente importante na simulação coalescente, onde não possuímos ferramentário estatístico para estimar os parâmetros do modelo U e a chuva de propagulos (%k) a partir do ajuste da $SAD_{obs}$ por verossimilhança . Na simulação coalescente podemos estimar U a partir da riqueza observada utilizando uma modificação da formula semi-analítica apresenta no apêndice A de Rosindel et al. (2008). A formula estabelece relação entre a probabilidade de colonização de um singleton por evento de morte (ou seja, a probabilidade de uma nova espécie aparecer na paisagem - U) e a riqueza observada partindo de uma árvore genealogica da comunidade quando U -> 0, ou seja, quando há monodominância. No modelo coalescente, reconstruímos a arvore genealógica da comunidade no espaço, assim a função de dispersão altera a arvore genealógica da comunidade e por consequência a relação entre U e a riqueza observada. Dessa maneira, para trabalhar com o modelo neutro espacialmente explícito informamos *a priori* qual a chuva de propágulos de interesse e estimamos *sd* correspondentes. Utilizamos 12 valores de porcentagem de própágulos que permanecem até $l_{cel}$ metros da planta progenitora: `r paste(c(99, seq(95,50,by=-5), 25),"%",sep="")`. Vamos calcular os respectivos valores de *sd* que produzem os percentis de interesse utilizando a função sigkernel:
+
+```{r sigk}
+df_ <- data.frame(l_cel = 100/sqrt(DA), 
+                  percentil = c(99, seq(95,50,by=-5), 25)/100, 
+                  kernel_type = rep("laplace",12), 
+                  DA_obs = DA,
+                  J_obs = J,
+                  stringsAsFactors = FALSE)
+# essa função é bem mais útil quando existem outros locais para se comparar
+f_sapply <- function(i){
+  sigkernel(kernel = df_[i,"kernel_type"],
+            p =  df_[i,"percentil"],
+            density = df_[i,"DA_obs"],
+            distance = df_[i,"l_cel"])$root
+}
+df_$sd <- sapply(1:nrow(df_),f_sapply)
+```
 
 
+Com os valores de *sd* podemos estimar o correspondente 'm' utilizando a eqn2:
+
+```{r conversao k para m, message=FALSE}
+library(car)
+df_ %<>% mutate(m = sd * 4 / (100 * pi * sqrt( (2*J) / DA) ))
+scatterplotMatrix(~ percentil + sd + m,
+                  reg.line = "", smoother = "",
+                  data=df_, main = "")
+```
+
+figura 2. Relação entre o percentil de propágulos que permanecem até a distância padrão de $100/ \sqrt(DA)$ que é a distância dos indivíduos na simulação coalescente (painel[1,1]), o desvio padrão correspondente *sd* (painel[2,2]) e a taxa de imigração calculada a partir de *sd* e da equação 2. A relação entre m e sd é proporcional para valores de J e DA iguais; já a relação do percentil e sd é descrita por uma distribuição Laplace.
 
 
+Os valores utilizados até aqui são observados em BCI, as características da amostra de BCI difere daquelas presentes no TreeCo em: i) paisagem aproximada como homogênea, ou seja, existem apenas unidades de habitat na paisagem (não há fragmentação); ii) a área amostrada de BCI é cerca de 50 vezes maior que a moda das áreas amostradas em nosso filtro de trabalhos do TreeCo; iii) BCI conta com o censu de árvores com DBH >= 10 cm, os sítios selecionados no TreeCo utilizaram DBH >= 5 cm, espera-se que isso tenha efeito em $DA_{obs}$. Assim, na próxima sessão vou fazer a conversão de parâmetros do modelo EI e EE das paisagens selecionadas no TreeCo
 
-### Estudo de caso: BCI ###
+## Convertendo Parâmetros de modelos neutros para as paisagens de TreeCo ##
 
-Os census de Barro Coloroda Island tem sido a base de dados padrão para avaliar modelos neutros. Aqui utilizamos a SAD observada em sua amostra de 50 ha para estimar $\theta$ e *m* a partir de um modelo de campo médio (Etienne 2005) e estimamos U (a taxa de especiação) utilizando o modelo o modelo coalescente dado diferentes cenários de dispersão (Rosindell et al. 2008). Diferente de Rosindell et al. (2008) que considera uma paisagem infinita, vamos considerar um recorte de paisagem de 500 ha (ou $5 km^2$) onde a comunidade local (amostra de 50ha) está centrada e a dispersão como função da chuva de propágulos que é definida como a porcentagem de propágulos que permacene até uma determinada distância padrão da planta progenitora. A distância padrão utilizada é a distância entre os organismos na simulação (ou o lado da célula de simulação - $l_{cel}$) = $100/\sqrt{DA}$ e as porcentagens de interesse são `r paste(c(99, seq(95,50,by=-5), 25),"%",sep="")`.
-
-
-** Estimando os parâmetros do modelo de campo médio (Etienne 2005) **
-
-<!--
-i) carregar a SAD correspondente aos 50 ha amostrados em BCI
-ii) estimar os parâmetros theta e m usando a formula de Etienne (2005)
-iii) converter os parâmetos theta e m em U e %k respectivamente
-
-** Estimando os parâmetros do modelo de espaço explícito (Rosindell et al. 2008) **
-i) gerar matriz de paisagem de 500 ha com a comunidade amostrada de 50 ha no centro da matriz de paisagem
-ii) estimar os sd necessários para gerar os percentis de interesse
-iii) estimar a taxa de especiação necessária para se obter a riqueza observada no equilíbrio no tempo infinito (U)
-iv) converter os parâmetros %k e U em theta e m
--->
-
-
-
-
+Sdt: i) carregar df_resultados; ii) converter os parâmetros segundo sua natureza (EI <-> EE); iii) plotar o obtido: 
