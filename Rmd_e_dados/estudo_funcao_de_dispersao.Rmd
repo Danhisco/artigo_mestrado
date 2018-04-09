@@ -212,7 +212,7 @@ Foram selecionados 80 trabalhos fitossociológicos que amostram de maneira cont�
 
 O objetivo aqui é utilizar as eqn 1 e 2 para converter $\theta$ e *m* para U e %k (porcentagem da chuva de propagulos que se mantêm até o dobro da copa da planta progenitora). Primeiro vamos olhar os dados para o modelo EI:
 
-```{r}
+```{r df_EI}
 # data frame com todos os ddos e as conversões de parâmetros antigas (erradas)
 df_resultados <- read.table(file = "/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/df_resultados.txt", header = T, as.is = T)
 # filtrando os dados para o modelo EI e selecionando as colunas de interesse
@@ -222,10 +222,10 @@ summary(df_EI[,c(2,4:7)])
 
 Com esses dados podemos aplicar as eqn 1 e 2:
 
-```{r}
+```{r conversao EI}
 df_EI %<>% mutate(U = theta / (2 * 500 * DA * p), #eqn1
-                  sd = m * 100 * pi * sqrt( (2*J/DA) )/4) #eqn2
-scatterplotMatrix(~ J + DA + p + theta + U + m + sd,
+                  sd_k = m * 100 * pi * sqrt( (2*J)/DA )/4) #eqn2
+scatterplotMatrix(~ J + DA + p + theta + U + m + sd_k,
                   reg.line = "", smoother = "",
                   data= df_EI)
 ```
@@ -236,7 +236,7 @@ U apresenta dois valores distoantes da nuvem de pontos, esses valores ocorrem em
 
 Parece que existe coerência entre as conversões de parâmetros dos modelos, vou seguir estimando qual a correspondente chuva de propágulos para os *sd* calculados. Para isso vou desenvolver uma formula adaptada de qkernel, que ao inves de retornar o quantil, retorna o percentil de interesse:
 
-```{r f_percentil.kernel}
+```{r f_percentil.kernel df_E}
 f_percentil.kernel <- function(i,df_=df_EI){
   percentilkernel<- function(sigma, density, npoints = 1e5){
       #metríca da simulacao e distancia de referencia
@@ -252,11 +252,37 @@ f_percentil.kernel <- function(i,df_=df_EI){
       percentil <- length(dist_laplace[dist_laplace<=d_ind_MA])/length(dist_laplace)
       return(percentil)
   }
-  kernel_percentil <- percentilkernel(sigma = df_[i,"sd"],
+  kernel_percentil <- percentilkernel(sigma = df_[i,"sd_k"],
                                       density = df_[i,"DA"])
   return(kernel_percentil)
 }
 df_EI$kernel_percentil <- sapply(1:nrow(df_EI),f_percentil.kernel) #armazenando
-df_EI %>% summary
+
+scatterplotMatrix(~ J + DA + m + sd_k + kernel_percentil,
+                  reg.line = "", smoother = "",
+                  data= df_EI)
+```
+figura 4. Os valores utilizdos na conversão (J e DA) e as variáveis convertidas (m e sd) e a chuva de proágulos correspondente (kernel_percentil). 
+
+Os valores de %k variam de ~ 0.028% até cerca de 37.07%, sendo a mediana ~ 2.56 % e o terceiro quartil ~ 6.57% o quê indica que o modelo EI pressupõem em geral indivíduos com alta capacidade de dispersão - o quê indica pouca realismo biológico.
+
+### Convertendo parâmetros do modelo EE ###
+
+No modelo coalescente informamos *a priori* os valores de %k, então convertemos para o respectivo *sd*, e estimamos o U necessário para se obter a riqueza observada no equilíbrio. Vamos calcular utilizando as eqn 1 e 2 os correspondentes valores de $\theta$ e *m* para cada respectivo cenário de %k e U:
+
+```{r}
+# selecionando os dados
+df_EE <- df_resultados %>% filter(modelo == "EE") %>% select(SiteCode, kernel_percentil, p, S, DA, J, sd_k, U)
+
+#convertendo os parâmetros
+df_EE %<>% mutate(theta = 2 * 500 * p * DA * U, #eqn1
+                  m = sd * 4 / (100 * pi * sqrt( (2*J)/DA ) ) ) #eqn2
+
+# grafico exploratorio
+scatterplotMatrix(~ J + DA + U + theta + kernel_percentil + m,
+                  reg.line = "", smoother = "",
+                  data= df_EE)
+df_EE %>% names
+
 ```
 
