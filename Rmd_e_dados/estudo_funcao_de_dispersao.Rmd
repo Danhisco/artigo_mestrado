@@ -22,6 +22,8 @@ library(dplyr)
 
 Os modelos neutros de campo médio apresentam dois parâmetros para descrever a distribuição de abundãncia de espécies (SAD): theta e m (Hubbell 2001, Etienne 2005). Já o modelo neutro de espaço explícito coalescente depende de dois parâmetros: U (taxa de especiação na paisagem) e *d* (distância média de dispersão dos indivíduos na metacomunidade) (Rosindell et al 2008).
 
+*Relação entre $\theta$ e U*
+
 Theta é o chamado número fundamental da biodiversidade, número adimensional que pode ser descrita como a relação entre o número de indivíduos($J_{M}$) e da taxa de especiação da netacomunidade (U): $\theta = 2J_{M}U$ (Hubbell 2001). Assim, se $\theta = 50$, então, "o produto de duas vezes o tamanaho da metacounidade e a taxa de especiação (novas espécies por evento de nascimento na metacomunidade) é igual 50 novas espécies por geração" (Ricklefs 2012). Considerando a metacomunidade como uma paisagem finita composta de habitat e não habitat e saturada (todas as unidades de habitat estão colonizadas antes do evento de morte - *zero-sum assumption*), podemos escrever $\theta$ como:
 
 $$eqn 1: \theta = 2Ap DA_{media} U  $$
@@ -29,36 +31,60 @@ $$eqn 1: \theta = 2Ap DA_{media} U  $$
 Onde $DA_{media}$ = densidade media de indivíduos na paisagem (ind./ha), p = porcentagem de cobertura vegetal da paisagem (# unidades de habitat/ # total de unidades na paisagem [REESCREVER]), A = área total da paisagem (500 ha) e U = taxa de especiação na paisagem. Essa igualdade pressupõem que a densidade de unidades de habitat (ou de não habitat) é constante na paisagem. Considerando $DA_{media} = DA_{obs}$, podemos utilizar essa igualdade para obter U a partir do modelo neutro de campo médio (EI) e $\theta$ a partir do modelo neutro de espaço explícito (EE). 
 
 
-  *m* é a probabilidade de uma morte na 'comunidade local' ser sucedida de um evento de imigração (de movimentação sucedida de colonização e amadurecimento até a idade reprodutiva) de um indivíduos da metacomunidade. Assim, se m = 0.1, então  10% dos indivíduos na amostra (i.e. a 'comunidade local) são imigrantes que chegaram ao acaso da paisagem ao redor (adaptado de Ricklefs 2012). Esse parâmetro descreve a limitação à dispersão no nível da amostra, imaginando uma comunidade local que se relaciona por dispersão com um o conjunto de comunidades locais onde todas podem potencialmente trocar indivíduos (a metacomunidade/paisagem) (Etienne et al. 2007). Chisholm & Lichstein (2009) estabeleceram uma aproximação entre *m* e *d*:
+**Relação entre m e função de dispersão**
+
+  *m* é a probabilidade de uma morte na 'comunidade local' ser sucedida de um evento de imigração (de movimentação sucedida de colonização e amadurecimento até a idade reprodutiva) de um indivíduos da metacomunidade. Assim, se m = 0.1, então  10% dos indivíduos na amostra (i.e. a 'comunidade local) são imigrantes que chegaram ao acaso da paisagem ao redor (adaptado de Ricklefs 2012). Esse parâmetro descreve a limitação à dispersão no nível da amostra, imaginando uma comunidade local que se relaciona por dispersão com um o conjunto de comunidades locais onde todas podem potencialmente trocar indivíduos (a metacomunidade/paisagem) (Etienne et al. 2007). Chisholm & Lichstein (2009) (doravante C&L09) estabeleceram uma relação entre *m* e *A* (a área da comunidade local):
+
+>When an individual at location (x, y) in the local
+>community dies, the replacement individual may, by virtue
+>of the random dispersal and recruitment processes, be from
+>within the local community (i.e., within the quadrat) or from
+>outside the local community (i.e., from outside the quadrat).
+>Define m x,y as the probability that the replacement individual
+>at location (x, y) is drawn from outside the local community.
+>This parameter will be highest for individuals on the edges
+>of the quadrat and smallest for individuals at the centre of
+>the quadrat, where m x,y » 0 for large A. We define m as the
+>average value of m x,y across the whole of the local
+>community as follows:  
   
-$$ m = P_{amostra} d / \pi A_{amostra} $$
+$$ m = \frac{1}{A} \int \int_A m_{x,y} dxdy $$
 
-Onde $P_{amostra}$ e $A_{amostra}$ são respectivamente o perímetro e área da amostra. Essa aproximação independe da forma da amostra ou da distribuição de probabilidade subjacente a função de dispersão (probabilidade de um indivíduos colonizar um sítio como função da distância do sítio e da planta progenitora).    
+Essa equação pressupõem que a comunidade local está inserida em uma paisagem homogênea e que a dispersão ocorre de maneira radial, ou seja, com igual probabilidade para todas as direções. Utilizar essa equação no contexto da simulação coalescente (Rosindell et al. 2008) requer duas mudanças: i) na simulação a dispersão não ocorre de maneira radial, ao invés, ela é descrita como a resultante de dois sorteio independente em eixos ortogonais; ii) explicitar a função de dispersão, que descreve a probabilidade de um indivíduo colonizar uma unidade de habitat em função da distância entre está unidade de habitat e a planta progenitora [REVISÃO]. Especificamente para nosso conjunto de simulações selecionamos apenas amostras contíguas que aproximamos como quadrados o que permite reescrever a equação de C&L09 a partir do lado da amostra, L:
 
+$$ m = (\frac{1}{L} \int\limits_{-L/2}^{L/2} m_{x}(x)\mathrm{d}x )^2 $$
 
-## Função de dispersão na simulação coalescente ##
+$$ m_{x} = 1 - \int\limits_{-L/2}^{L/2} K(x-y) \mathrm{d}y  $$
 
-  Utilizando apenas amostras contíguas, aproximamos-as como um quadrado na simulação coalescente, assim, podemos simplicar a formula acima considerando que $P_{amostra} = 4 l_{amostra}$ e $A_{amostra} = l_{amostra}^2$, onde $l_{amostra}$ = lado da amostra; e como $A_{amostra} = J / DA_{obs}$:
+Onde K é a função de dispersão. Como aproximamos todas as amostras por quadrados podemos escrever o lado da amostra como função de J e DA: $L =100\sqrt{J/DA} $. Como utilizamos a mesma função de dispersão para realizar o sorteio nos dois eixos $m_{x} = m_{y}$ e podemos apenas calcular $m_{x}$ e elevar o resultado ao quadrado (primeira equação). Note que na 2a eq. a integral de K no espaço inteiro é 1, e limitamos o espaço à região dentro do quadrado, então a integral < 1, e m_x < 1; na 1a eq. tomamos uma média de m_x no espaço, então isso também é sempre menor que 1 (Coutinho, e-mail "Reunião 29mar" de 8abril18). Em outras palavras Coutinho descreve o conjunto de equações como:
 
-$$ m = d  (4/ 100 \pi \sqrt{J/DA_{obs}})$$
+>a gente pega um ponto de coordenadas x,y no plot, e vê qual a chance de ele ter vindo de fora (isso é o m). 
+>Pra isso, usamos o kernel, mas na prática sorteamos o deslocamento no eixo x e no y separadamente. 
+>Na direção x, a chance de cair no patch (que fica na região entre -L/2 e L/2) é a integral do kernel de -L/2 a L/2, a chance de cair fora é o complementar, a integral de -inf a -L/2 mais a integral de L/2 a inf. 
+>Como a integral do kernel todo tem que ser 1, é mais fácil fazer 1 - integral de -L/2 a L/2 na eq. 2, do que fazer as 2 integrais até (+/-) infinito. 
+>Essa integral te dá o m_x, e você calcula a média disso sobre todos os x, na eq. 1. 
+>Daí você faz o mesmo na direção y, mas dá o mesmo resultado, daí a expressão fica ao quadrado na eq. 1.
 
-A variável *d* está descrita na unidade de espaço utilizada para definir $DA_{obs}$. A unidade de espaço utilizada em $DA_{obs} = individuos/ha$ é o héctare (*ha*) = $100^2$ metros, assim, para escrever *d* em metros dividimos por 100, uma vez que $\sqrt{ha} = 100$ metros.
+<!--
+i) Reescrever com as minhas palavras
+ii) entender como ele fez de ir da eq 1 de C&L09 para essas duas equações
+-->
 
-  A função de dispersão descreve a probabilidade de um indivíduo colonizar um sítio como função da distância do sítio e da planta progenitora. Em geral essa função utiliza uma distribuição de probabilidade para aproximar a função de dispersão (Rosindell et al. 2008). Na simulação coalescente o espaço não é contínuo, ele é descrito como unidade de habitat discreto - onde apenas um indivíduo pode se estabelecer, que podemos aproximar como um quadrado de lado ($l_{cel}$) = $100/ \sqrt{DA_{obs}}$ (unidade de espaço = $metros / \sqrt{individuos}$). Assim, ao utilizar distribuições de probabilidade para aproximar a função de dispersão na simulação coalescente temos que converter a escala da distribuição de probabilidade da escala padrão para a escala da simulação.
+  A distribuição de probabilidade que utilizamos na função de dispersão foi a distribuição Laplace. A distribuição Laplace, que pode ser entendida como uma distribuição exponencial negativa espelhada; a distribuição exponencial é comumente utilizada para estudar o efeito de processos que operam em larga escala, como aqueles em populações em paisagens fragmentadas, na chuva de propágulos (Clark et al. 1999). Assim, podemos reescrever o conjunto de equações considerando uma distribuição Laplace. Considerando a distribuição de Laplace com a seguinte parametrização de sua função de densidade de probabilidade $ K(x) = \frac{\alpha}{2} e^{-|\alpha x|} $, temos:
+  
+$$m = (\frac{1-e^{-\alpha L}}{\alpha L})^2$$
 
-  A distribuição de probabilidade que utilizamos na função de dispersão foi a distribuição Laplace. A distribuição Laplace, que pode ser entendida como uma distribuição exponencial negativa espelhada,  é descrita por dois parâmetros: $\mu$, parâmetro de localização; e b, parâmetro escalar, que determina a dispersão estatística da distribuição. Considerando que todos os indivíduos na simulação possuem a mesma função de dispersão e na simulação coalescente voltamos no tempo afim de reconstruir a genealogia da comunidade, podemos inverter a função de dispersão e centra-la no sítio vago afim de estimar a localização do indivíduo que será o progenitor daquele indivíduo que ocupou o sítio vago (Rosindell et al. 2008), assim $\mu = 0$. *b* é estimado como a média do desvio absoluto de $\mu$ e portanto pode ser interpretado como a distância média de dispersão (*d* da aproximação de Chisholm & Lichstein 2009). A variância da distribuição Laplace pode ser descrita como: $var = 2b^2$, logo, $b = \sqrt{var}/ \sqrt{2}$;  podemos parametrizar a distribuição pelo desvio padrão ($sd = \sqrt{var}$) e temos que:
+Onde $\alpha = 1/b$, b é o parâmetro escalar da distribuição de Laplace que pode ser escrito em função do desvio-padrão da distância de valores (sd) como $b = sd/ \sqrt(2) $. Assim podemos reescrever a equação de m em funçao de sd:
 
-$$ b = sd/ \sqrt{2} $$
+$$ eq1: m = sd \frac{1 - e^{-\frac{\sqrt{2} L}{sd}} }{\sqrt{2} L} $$
 
-A unidade de *b* é a dimensão espacial padrão, metros. Como b = d então podemos reescrever a aproximação de Chisholm & Lichstein (2009) em termos do desvio padrão da função de dispersão considerando a distribuição Laplace:
+Com a equação 1 podemos calcular m a partir do desvio padrão da função de dispersão. Para calcular sd a partir de m, utilizamos o ramo principal da função W de Lambert ($W_{0}$):
 
-$$eqn 2: m = 4 sd / 100 \pi \sqrt{2J/DA}) $$
-O benefício de parametrizar a função de dispersão em termos de desvio padrão é que fica mais fácil comparar funções de dispersão utilizando outras distribuições de probabilidade na simulação coalescente, como a distribuição normal (Rosindell & Etienne 2011) e uniforme (Campos et al. 2013) [REESCREVER].
-
+$$ eq2: sd = \frac{\sqrt{2} L}{m W_{0}(- \frac{e^{-1/m}}{m} ) + 1} $$
 
 ### Função de dispersão e chuva de propagulos ###
 
-A chuva de propágulos pode ser entendida como o produto da fecundidade e função de dispersão (Clark et al. 1999). Por conta do pressuposto da equivalência funcional todos os indivíduos produzem o mesmo número de propágulos por unidade de tempo (Hubbell 2001), assim, podemos simular cenários de limitação à dispersão em função da porcentagem de propágulos que permace até determinada distância da planta progenitora. Dessa maneira, não precisamos definir a dispersão em termos de distância *per se* mas em termos de porcentagem de indivíduos que permanecem na área imediata da planta progenitora. Para isso é necessário estabelecer uma distância padrão da planta progenitora e estimar ou definir a porcentagem de indivíduos que se mantêm até esta distância padrão. Como distância padronizamos $l_{cel}$, assim, cada paisagem possui uma distância padrão que depende da densidade observada de indivíduos naquela paisagem. Podemos estimar qual a porcentagem de propágulos até a distância padrão que um determinado *sd* gera, partindo de um *m* (eqn 2); ou podemos informar *a priori* quais as porcentagens de interesse e estimar o *sd* necessário para gerar tais porcentagens. Na simulação coalescente, utilizamos 12 valores de porcentagem para simular os cenários de limitação à dispersão: 99%, seq(95,50,by=-5)% e 25%. Apesar da simulação coalescente ser bem eficiente e permitir simular paisagens infinitas, funções de dispersão que apresentam dispersão muito elevadas são computacionalmente muito onerosas (Rosindell et al. 2008) e apresentariam pouco realismo biológico (Nathan 2006), logo, não utilizamos porcentagens muito baixas (e.g. 1%).
+A chuva de propágulos pode ser entendida como o produto da fecundidade e função de dispersão (Clark et al. 1999). Por conta do pressuposto da equivalência funcional todos os indivíduos produzem o mesmo número de propágulos por unidade de tempo (Hubbell 2001), assim, podemos simular cenários de limitação à dispersão em função da porcentagem de propágulos que permace até determinada distância da planta progenitora. Dessa maneira, não precisamos definir a dispersão em termos de distância *per se* mas em termos de porcentagem de indivíduos que permanecem na área imediata da planta progenitora. Para isso é necessário estabelecer uma distância padrão da planta progenitora e estimar ou definir a porcentagem de indivíduos que se mantêm até esta distância padrão. Como distância padronizamos $l_{cel}$, assim, cada paisagem possui uma distância padrão que depende da densidade observada de indivíduos naquela paisagem [REESCREVER]. Podemos estimar qual a porcentagem de propágulos até a distância padrão que um determinado *sd* gera, partindo de um *m* (eqn 2); ou podemos informar *a priori* quais as porcentagens de interesse e estimar o *sd* necessário para gerar tais porcentagens. Na simulação coalescente, utilizamos 12 valores de porcentagem para simular os cenários de limitação à dispersão: 99%, seq(95,50,by=-5)% e 25%. Apesar da simulação coalescente ser bem eficiente e permitir simular paisagens infinitas, funções de dispersão que apresentam dispersão muito elevadas são computacionalmente muito onerosas (Rosindell et al. 2008) e apresentariam pouco realismo biológico (REFERÊNCIA), logo, não utilizamos porcentagens muito baixas (e.g.<1%).
 
 Para estimar o *sd* necessário para gerar uma determinada porcentagem de propágulos até a distância padronizada, desenvolvemos uma função no ambiente de programação R (R language team). A seguir o código utilizado nessa função, note que a função permite utilizar 3 distribuições de probabilidade (uniforme, normal e Laplace), contudo utilizamos apenas a distribuição Laplace.
 
@@ -100,7 +126,7 @@ sigkernel <- function(kernel, p, distance, density=20852/50,
 ```
 
 
-Nossa função para estimar o *sd* necessário para gerar determinada porcentagem até a distância padrão consiste de duas funções: *qkernel* e *sigkernel*. *sigkernel* retorna o parâmetro de dispersão necessário para que a função de dispersão tenha a distância padrão como quantil da porcentagem de interesse. Essa função depende da função *qkernel*, que por sua vez retorna o valor quantil que acumula determinado percentil de propágulos. A função *qkernel* pressupõem o processo de dispersão aleatório como está implementado na simulação coalescente descrito por Rosindell et al. (2008), que não é o mesmo que a versão bivariada da distribuição de probabilidade subjacente à função de dispersão; ao invés a dispersão é simulada como duas amostras indepentendes da distribuição de probabilidade em eixos ortogonais, a distância de dispersão é descrito como o módulo do vetor resultado da amostra nos eixos ortogonais (figura 1).
+Nossa função para estimar o *sd* necessário para gerar determinada porcentagem até a distância padrão consiste de duas funções: *qkernel* e *sigkernel*. *sigkernel* retorna o parâmetro de dispersão necessário para que a função de dispersão tenha a distância padrão como quantil da porcentagem de interesse. Essa função depende da função *qkernel*, que por sua vez retorna o valor quantil que acumula determinado percentil de propágulos. A função *qkernel* pressupõem o processo de dispersão aleatório como está implementado na simulação coalescente descrito por Rosindell et al. (2008), ou seja, como duas amostras indepentendes da distribuição de probabilidade em eixos ortogonais, a distância de dispersão é descrito como o módulo do vetor resultado da amostra nos eixos ortogonais (figura 1).
 
 ```{r fig1, echo=FALSE}
 # Considerando DA = 1400 indivíduos/ha
