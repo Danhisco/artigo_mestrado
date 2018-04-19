@@ -11,7 +11,7 @@ output:
 knitr::opts_chunk$set(echo = TRUE,tidy = TRUE, cache = TRUE)
 ```
 
-```{r global packages, echo=FALSE, message = FALSE}
+```{r global packages, echo=FALSE, message = FALSE, warning=FALSE}
 library(magrittr)
 library(plyr)
 library(dplyr)
@@ -26,7 +26,7 @@ Os modelos neutros de campo médio apresentam dois parâmetros para descrever a 
 
 Theta é o chamado número fundamental da biodiversidade, número adimensional que pode ser descrita como a relação entre o número de indivíduos($J_{M}$) e da taxa de especiação da netacomunidade (U): $\theta = 2J_{M}U$ (Hubbell 2001). Assim, se $\theta = 50$, então, "o produto de duas vezes o tamanaho da metacounidade e a taxa de especiação (novas espécies por evento de nascimento na metacomunidade) é igual 50 novas espécies por geração" (Ricklefs 2012). Considerando a metacomunidade como uma paisagem finita composta de habitat e não habitat e saturada (todas as unidades de habitat estão colonizadas antes do evento de morte - *zero-sum assumption*), podemos escrever $\theta$ como:
 
-$$eqn 1: \theta = 2Ap DA_{media} U  $$
+$$ eqn 1: \theta = 2Ap DA_{media} U  $$
 
 Onde $DA_{media}$ = densidade media de indivíduos na paisagem (ind./ha), p = porcentagem de cobertura vegetal da paisagem (# unidades de habitat/ # total de unidades na paisagem [REESCREVER]), A = área total da paisagem (500 ha) e U = taxa de especiação na paisagem. Essa igualdade pressupõem que a densidade de unidades de habitat (ou de não habitat) é constante na paisagem. Considerando $DA_{media} = DA_{obs}$, podemos utilizar essa igualdade para obter U a partir do modelo neutro de campo médio (EI) e $\theta$ a partir do modelo neutro de espaço explícito (EE). 
 
@@ -52,17 +52,17 @@ $$ m = \frac{1}{A} \int \int_A m_{x,y} dxdy $$
 
 Essa equação pressupõem que a comunidade local está inserida em uma paisagem homogênea e que a dispersão ocorre de maneira radial, ou seja, com igual probabilidade para todas as direções. Utilizar essa equação no contexto da simulação coalescente (Rosindell et al. 2008) requer duas mudanças: i) na simulação a dispersão não ocorre de maneira radial, ao invés, ela é descrita como a resultante de dois sorteio independente em eixos ortogonais; ii) explicitar a função de dispersão, que descreve a probabilidade de um indivíduo colonizar uma unidade de habitat em função da distância entre está unidade de habitat e a planta progenitora [REVISÃO]. Especificamente para nosso conjunto de simulações selecionamos apenas amostras contíguas que aproximamos como quadrados o que permite reescrever a equação de C&L09 a partir do lado da amostra, L:
 
-$$ m = (\frac{1}{L} \int\limits_{-L/2}^{L/2} m_{x}(x)\mathrm{d}x )^2 $$
+$$ m = \left(\frac{1}{L} \int\limits_{-L/2}^{L/2} m_{x}(x)\mathrm{d}x \right)^2 $$
 
 $$ m_{x} = 1 - \int\limits_{-L/2}^{L/2} K(x-y) \mathrm{d}y  $$
 
-Onde K é a função de dispersão. Como aproximamos todas as amostras por quadrados podemos escrever o lado da amostra como função de J e DA: $L =100\sqrt{J/DA} $. Como utilizamos a mesma função de dispersão para realizar o sorteio nos dois eixos $m_{x} = m_{y}$ e podemos apenas calcular $m_{x}$ e elevar o resultado ao quadrado (primeira equação). Note que na 2a eq. a integral de K no espaço inteiro é 1, e limitamos o espaço à região dentro do quadrado, então a integral < 1, e m_x < 1; na 1a eq. tomamos uma média de m_x no espaço, então isso também é sempre menor que 1 (Coutinho, e-mail "Reunião 29mar" de 8abril18). Em outras palavras Coutinho descreve o conjunto de equações como:
+Onde K é a função de dispersão. Como aproximamos todas as amostras por quadrados podemos escrever o lado da amostra como função de J e DA: $L = 100\sqrt{J/DA}$. Como utilizamos a mesma função de dispersão para realizar o sorteio nos dois eixos $m_{x} = m_{y}$ e podemos apenas calcular $m_{x}$ e elevar o resultado ao quadrado (primeira equação). Note que na 2a eq. a integral de K no espaço inteiro é 1, e limitamos o espaço à região dentro do quadrado, então a integral < 1, e $m_x < 1$; na 1a eq. tomamos uma média de $m_x$ no espaço, então isso também é sempre menor que 1 (Coutinho, e-mail "Reunião 29mar" de 8abril18). Em outras palavras Coutinho descreve o conjunto de equações como:
 
 >a gente pega um ponto de coordenadas x,y no plot, e vê qual a chance de ele ter vindo de fora (isso é o m). 
 >Pra isso, usamos o kernel, mas na prática sorteamos o deslocamento no eixo x e no y separadamente. 
 >Na direção x, a chance de cair no patch (que fica na região entre -L/2 e L/2) é a integral do kernel de -L/2 a L/2, a chance de cair fora é o complementar, a integral de -inf a -L/2 mais a integral de L/2 a inf. 
 >Como a integral do kernel todo tem que ser 1, é mais fácil fazer 1 - integral de -L/2 a L/2 na eq. 2, do que fazer as 2 integrais até (+/-) infinito. 
->Essa integral te dá o m_x, e você calcula a média disso sobre todos os x, na eq. 1. 
+>Essa integral te dá o $m_x$, e você calcula a média disso sobre todos os x, na eq. 1. 
 >Daí você faz o mesmo na direção y, mas dá o mesmo resultado, daí a expressão fica ao quadrado na eq. 1.
 
 <!--
@@ -70,11 +70,11 @@ i) Reescrever com as minhas palavras
 ii) entender como ele fez de ir da eq 1 de C&L09 para essas duas equações
 -->
 
-  A distribuição de probabilidade que utilizamos na função de dispersão foi a distribuição Laplace. A distribuição Laplace, que pode ser entendida como uma distribuição exponencial negativa espelhada; a distribuição exponencial é comumente utilizada para estudar o efeito de processos que operam em larga escala, como aqueles em populações em paisagens fragmentadas, na chuva de propágulos (Clark et al. 1999). Assim, podemos reescrever o conjunto de equações considerando uma distribuição Laplace. Considerando a distribuição de Laplace com a seguinte parametrização de sua função de densidade de probabilidade $ K(x) = \frac{\alpha}{2} e^{-|\alpha x|} $, temos:
+  A distribuição de probabilidade que utilizamos na função de dispersão foi a distribuição Laplace. A distribuição Laplace, que pode ser entendida como uma distribuição exponencial negativa espelhada; a distribuição exponencial é comumente utilizada para estudar o efeito de processos que operam em larga escala, como aqueles em populações em paisagens fragmentadas, na chuva de propágulos (Clark et al. 1999). Assim, podemos reescrever o conjunto de equações considerando uma distribuição Laplace. Considerando a distribuição de Laplace com a seguinte parametrização de sua função de densidade de probabilidade $K(x) = \frac{\alpha}{2} e^{-|\alpha x|}$, temos:
   
 $$m = (\frac{1-e^{-\alpha L}}{\alpha L})^2$$
 
-Onde $\alpha = 1/b$, b é o parâmetro escalar da distribuição de Laplace que pode ser escrito em função do desvio-padrão da distância de valores (sd) como $b = sd/ \sqrt(2) $. Assim podemos reescrever a equação de m em funçao de sd:
+Onde $\alpha = 1/b$, b é o parâmetro escalar da distribuição de Laplace que pode ser escrito em função do desvio-padrão da distância de valores (sd) como $b = sd/ \sqrt{2}$. Assim podemos reescrever a equação de m em funçao de sd:
 
 $$ eq1: m = sd \frac{1 - e^{-\frac{\sqrt{2} L}{sd}} }{\sqrt{2} L} $$
 
@@ -221,7 +221,6 @@ Com os valores de *sd* podemos estimar o correspondente 'm' utilizando a eqn2:
 library(car)
 df_ %<>% mutate(m = sd * 4 / (100 * pi * sqrt( (2*J) / DA) ))
 scatterplotMatrix(~ percentil + sd + m,
-                  reg.line = "", smoother = "",
                   data=df_, main = "")
 ```
 
@@ -240,7 +239,7 @@ O objetivo aqui é utilizar as eqn 1 e 2 para converter $\theta$ e *m* para U e 
 
 ```{r df_EI}
 # data frame com todos os ddos e as conversões de parâmetros antigas (erradas)
-df_resultados <- read.table(file = "/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/df_resultados.txt", header = T, as.is = T)
+df_resultados <- read.table(file = "df_resultados.txt", header = T, as.is = T)
 # filtrando os dados para o modelo EI e selecionando as colunas de interesse
 df_EI <- df_resultados %>% filter(modelo == "EI") %>% select(SiteCode, p, S , DA, J, theta, m)
 summary(df_EI[,c(2,4:7)])
@@ -252,7 +251,6 @@ Com esses dados podemos aplicar as eqn 1 e 2:
 df_EI %<>% mutate(U = theta / (2 * 500 * DA * p), #eqn1
                   sd_k = m * 100 * pi * sqrt( (2*J)/DA )/4) #eqn2
 scatterplotMatrix(~ J + DA + p + theta + U + m + sd_k,
-                  reg.line = "", smoother = "",
                   data= df_EI)
 ```
 Figura 3. Valores utilizados na conversão de parâmetros do modelo EI (J, DA e p) e os parâmetros do modelo EI (theta e m) e seus respectivos parâmetros do modelo EE (U e sd).
@@ -285,7 +283,6 @@ f_percentil.kernel <- function(i,df_=df_EI){
 df_EI$kernel_percentil <- sapply(1:nrow(df_EI),f_percentil.kernel) #armazenando
 
 scatterplotMatrix(~ J + DA + m + sd_k + kernel_percentil,
-                  reg.line = "", smoother = "",
                   data= df_EI)
 ```
 figura 4. Os valores utilizdos na conversão (J e DA) e as variáveis convertidas (m e sd) e a chuva de proágulos correspondente (kernel_percentil). 
@@ -298,7 +295,7 @@ No modelo coalescente informamos *a priori* os valores de %k, então convertemos
 
 ```{r}
 # selecionando os dados
-df_EE <- df_resultados %>% filter(modelo == "EE") %>% select(SiteCode, kernel_percentil, p, S, DA, J, sd_k, U)
+df_EE <- df_resultados %>% filter(modelo == "EE") %>% select(SiteCode, kernel_percentil, p, S, DA, J, U)
 
 #convertendo os parâmetros
 df_EE %<>% mutate(theta = 2 * 500 * p * DA * U, #eqn1
@@ -306,7 +303,6 @@ df_EE %<>% mutate(theta = 2 * 500 * p * DA * U, #eqn1
 
 # grafico exploratorio
 scatterplotMatrix(~ J + DA + U + theta + kernel_percentil + m,
-                  reg.line = "", smoother = "",
                   data= df_EE)
 df_EE %>% names
 
