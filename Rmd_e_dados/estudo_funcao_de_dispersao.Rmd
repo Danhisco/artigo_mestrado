@@ -147,6 +147,10 @@ plot(X, Y, cex=0.1, main = "",xlab = "",ylab = "")
 
 Figura 1. Simulação do processo de dispersão usado na simulação coalescente (Rosindell et al. 2008), consideramos DA = 1400 indivíduos/ha, desvio-padrão da função de dispersão = 4 metros e 1e6 pontos. No primeiro gráfico temos a distribuição de distâncias à planta progenitora (m). No segundo gráfico temos a distribuição da chuva de propagulos ao redor da planta progenitora que se encontra na origem do gráfico (ponto (0,0)). Notem que diferente de uma dispersão que assume que a distribuição de probabilidade é bivariada (que aproximaria de um circulo), a maneira como a simulação coalesceente (Rosindell et al. 2008) aproxima a dispersão faz com que a forma da chuva de propagulos se aproxime de um losango.
 
+#####################################################################################################################
+CONTINUAR DAQUI
+#####################################################################################################################
+
 Podemos calcular qual a correspondente chuva de propagulo (%k) de um *m* conhecido, considerando a densidade observada e o tamanho da amostra. Considerando m=0.11 (valor estimado para BCI REFERÊNCIA), J=20852 (número de indivíduos em BCI), A=50ha (área amostrada em BCI) e DA=`r 20852/50`, podemos calcular *sd* correspondente considerando uma função de dispersão com distribuição de Laplace:
 
 ```{r conversao m para d}
