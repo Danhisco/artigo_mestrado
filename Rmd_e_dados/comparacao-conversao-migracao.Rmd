@@ -67,9 +67,9 @@ Coutinho parte da eq.0 e aproveitando as características da simulação coalesc
 $$eq.0-C.a:  m = \left(\frac{1}{L} \int\limits_{-L/2}^{L/2} m_{x}(x)\mathrm{d}x \right)^2 $$
 $$eq.0-C.b: m_{x} = 1 - \int\limits_{-L/2}^{L/2} K(x-y) \mathrm{d}y  $$
 
-K é a função de dispersão. Podemos reescrevemos em função da distribuição de probabilidade de Laplace como:
+K é a função de dispersão. Podemos reescrevemos considerando a distribuição de probabilidade de Laplace como:
 
-$$eq. 2a: m = \left(\frac{1-e^{-\alpha L}}{\alpha L}\right)^2$$
+$$eq. 2a: m = sd \frac{1 - e^{-\frac{\sqrt{2} L}{sd}} }{\sqrt{2} L}$$
 $$ eq. 2b: sd = \frac{\sqrt{2} L}{m W_{0}(- \frac{e^{-1/m}}{m} ) + 1} $$
 
 Para escrever a equação em função do desvio-padrão (eq 2b) utilizamos o ramo principal da função W de Lambert ($W_0$).
