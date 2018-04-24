@@ -22,6 +22,7 @@ library(merTools) ## para intervalos de previsao
 library(magrittr)
 library(plyr)
 library(dplyr)
+df_resultados <- read.table(file = "/home/danilo/Documentos/Doutorado/artigo_mestrado/resultados_c_Volkov.txt", header = T, as.is = T)
 ```
 
 

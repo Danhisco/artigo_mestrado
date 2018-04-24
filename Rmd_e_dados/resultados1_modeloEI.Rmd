@@ -1,0 +1,242 @@
+---
+title: "Resultados - EI ~ fragmentacao"
+author: "Mori, Danilo Pereira"
+date: "18 de março de 2018"
+output: html_document
+---
+
+```{r global_options, echo=FALSE}
+knitr::opts_chunk$set(echo=T, warning=FALSE, message=FALSE, cache = TRUE, tidy = TRUE, include = FALSE)
+```
+
+```{r global packages and directory, echo=F, message=FALSE, warning=FALSE}
+library(doMC)
+library(gridExtra) 
+library(ggplot2) 
+library(tidyr)
+library(broom)
+library(purrr)
+library(lme4)
+library(sads)
+library(merTools) ## para intervalos de previsao
+library(magrittr)
+library(plyr)
+library(dplyr)
+df_resultados <- read.table(file = "/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/df_resultados.txt", header = T, as.is = T)
+```
+
+OBJETIVO: Fazer uma análise preliminar dos resultados obtidos a partir do ajuste e comparação das SADs observadas em um gradiente de cobertura vegetal com aquelas oriundas de um modelo neutro com espaço implícito (Etienne 2005. A new sampling formula). Os resultados que serão analisados aqui são das variáveis respostas: GOF (qualidade de ajuste), theta, m, kernel_percentil e U para o modelo de espaço explícito (EI). As duas últimas variáveis são oriundas da conversão dos parâmetros estimados usando o modelo de Etienne 2005 e considerando o tamanho da metacomunidade (JM) como o número total de indivíduos na paisagem usada no modelo de espaço explícito; e kernel_percentil a partir da aproximação desenvolvido por Chisholm & Linchestein 2009.
+
+```{r filtrando os dados para EI}
+# df_resultados %>% str
+df_EI <- df_resultados %>% filter(modelo == "EI")
+# df_EI %>% str
+```
+
+### Variáveis Resposta diretas do modelo EI ###
+
+Aqui vou analisar apenas GOF, theta e m, que derivam diretamente do modelo EI.
+
+#### GOF ~ fragmentação ####
+-> analise exploratória
+```{r}
+# l_p <- vector("list",length = 2)
+# l_p[[1]] <- df_EI$GOF %>% hist(.,breaks=40, main="Distribuição de GOF")
+plot(GOF ~ p, data=df_EI)
+
+# do.call("grid.arrange",c(l_p,nrow=1,ncol=2))
+```
+Figura 1. Distribuição de valores de GOF. A variável apresenta a maioria dos valores no máximo. Existem alguns pontos que distoam consideravelmente da grande maioria 
+
+Como GOF pode ser entendido como probabilidade vou primeiro utilizar a distribuição binomial para modelar a variável. O objetivo é avaliar a influência da fragmentação em GOF.
+
+```{r ajuste e comparacao dos modelos}
+l_md <- vector("list", length = 6)
+names(l_md) <- c("logit","logit_null","probit","probit_null","cloglog","cloglog_null")
+l_md[[1]] <- glm(cbind(GOF,100-GOF) ~ p, family = "binomial",df_EI)
+l_md[[2]] <- glm(cbind(GOF,100-GOF) ~ 1, family = "binomial",df_EI)
+l_md[[3]] <- glm(cbind(GOF,100-GOF) ~ p, family = "binomial"(link=probit),df_EI)
+l_md[[4]] <- glm(cbind(GOF,100-GOF) ~ 1, family = "binomial"(link=probit),df_EI)
+l_md[[5]] <- glm(cbind(GOF,100-GOF) ~ p, family = "binomial"(link=cloglog),df_EI)
+l_md[[6]] <- glm(cbind(GOF,100-GOF) ~ 1, family = "binomial"(link=cloglog),df_EI)
+AICctab(l_md, weights = TRUE)
+```
+
+Todos os modelos que consideram a influência de p são igualmente plausíveis. Vou avaliar os gráficos diagnósticos do modelo mais plausível.
+
+```{r}
+plot(l_md[[5]])
+```
+
+Os gráficos diagnosticos mostram que o modelo mais plausível não está fazendo um bom ajuste com os dados, apresentando diversos pontos que podem ser considerados outliers. Afim de comparar vou utilizar outras distribuições subjacentes para comparação via AICc.
+
+```{r}
+l_md <- vector("list", length = 8)
+names(l_md) <- c("logit","logit_null","probit","probit_null","cloglog","cloglog_null","normal","normal_null")
+l_md[[1]] <- glm(cbind(GOF,100-GOF) ~ p, family = "binomial",df_EI)
+l_md[[2]] <- glm(cbind(GOF,100-GOF) ~ 1, family = "binomial",df_EI)
+l_md[[3]] <- glm(cbind(GOF,100-GOF) ~ p, family = "binomial"(link=probit),df_EI)
+l_md[[4]] <- glm(cbind(GOF,100-GOF) ~ 1, family = "binomial"(link=probit),df_EI)
+l_md[[5]] <- glm(cbind(GOF,100-GOF) ~ p, family = "binomial"(link=cloglog),df_EI)
+l_md[[6]] <- glm(cbind(GOF,100-GOF) ~ 1, family = "binomial"(link=cloglog),df_EI)
+l_md[[7]] <- glm(GOF ~ p,family = "gaussian",df_EI)
+l_md[[8]] <- glm(GOF ~ 1,family = "gaussian",df_EI)
+AICctab(l_md, weights = TRUE)
+```
+
+Comparando com a distribuição normal, os modelos que utilizam a distribuição binomial não apresentam suporte dos dados. O modelo mais plausível é aquele que considera a distribuição normal e a ausência de efeito de fragmentação em GOF, contudo, o modelo normal que considera a influência de fragmentação está dentro do intervalo de plausibilidade, mas somando menos da metade do peso de evidência do modelo que desconsidera está influência.
+
+Vou olhar os gráficos diagnósticos do modelo mais plausível
+
+```{r}
+plot(l_md[[8]])
+```
+figura 3. Gráficos diagnóstico do modelo nulo que considera a distribuição normal como subjacente
+
+O gráfico Normal Q-Q mostra que esse modelo apresenta melhor ajuste do que o anterior, mas ainda há consideraveis pontos que distoam do esperado. Acredito que o distribuição dos pontos de GOF é muito assimétrica para usar a distribuição normal. Talvez uma distribuição mais fléxivel seja mais adequada, vou compara com a Gamma, para isso vou apenas incluir a binomial com a função de ligação canonica, logito:
+
+```{r}
+l_md <- vector("list", length = 10)
+names(l_md) <- c("bin_logit","bin_logit_null",
+                 "normal","normal_null",
+                 "Gamma_inv","Gamma_inv_null","Gamma_id","Gamma_id_null","Gamma_log","Gamma_log_null")
+l_md[[1]] <- glm(cbind(GOF,100-GOF) ~ p, family = "binomial",df_EI)
+l_md[[2]] <- glm(cbind(GOF,100-GOF) ~ 1, family = "binomial",df_EI)
+l_md[[3]] <- glm(GOF ~ p,family = "gaussian",df_EI)
+l_md[[4]] <- glm(GOF ~ 1,family = "gaussian",df_EI)
+l_md[[5]] <- glm(GOF ~ p,family = "Gamma"(link=inverse),df_EI)
+l_md[[6]] <- glm(GOF ~ 1,family = "Gamma"(link=inverse),df_EI)
+l_md[[7]] <- glm(GOF ~ p,family = "Gamma"(link=identity),df_EI)
+l_md[[8]] <- glm(GOF ~ 1,family = "Gamma"(link=identity),df_EI)
+l_md[[9]] <- glm(GOF ~ p,family = "Gamma"(link=log),df_EI)
+l_md[[10]] <- glm(GOF ~ 1,family = "Gamma"(link=log),df_EI)
+AICctab(l_md, weights = TRUE)
+```
+
+Novamente os dois modelos que utilizam a normal foram os mais plausíveis somando virtualmente todo o peso de evidência. a seleção de modelos está coerente com a avaliação visual da relação entre os dados: o modelo EI apresenta bons ajustes às SADs observas ao longo de todo o gradiente. Vou olhar para os coeficientes dos dois modelos mais plausíveis: 
+
+```{r}
+sapply(l_md[4:3],coef)
+```
+
+O modelo que considera relação entre GOF e fragmentação está dentro do intervalo de plausibilidade, contudo, soma apenas metade do peso de evidência do modelo mais plausível, o modelo nulo. De qualquer maneira a estimativa do intercepto de ambos é semelhante. Já o p valor associado à inclinação não permite distinguir o efeito da inclinação da ausência de efeito. Interessante que o efeito estimado é negativo, o que vai contra a expectativa de que com o aumento da fragmentação teríamos uma piora na qualidade de ajuste. Esse efeito pode ser fruto dos pontos que distoam do padrão geral de boa qualidade de ajuste em todo o gradiente de fragmentação. Assim, vou tomar o modelo nulo como o modelo mais plausível e utiliza-lo para realizar inferências. 
+
+A existência de outliers é notória, esses sites serão investigados em conjuntos após a análise das outras variáveis respostas do modelo EI e EE.
+
+Fato 1: Não é possível atribuir algum efeito da fragmentação em GOF{EI}, sendo a média deste igual à ~ 95, indicando que de maneira geral o modelo EI apresenta grande congruência com as SADs observadas no gradiente de fragmentação.
+
+### Parâmetros estimados do modelo EI ###
+
+  O modelo EI estima via verossimilhança os parâmetros do modelo neutro theta e m a partir da SAD observada.
+
+#### m - probabilidade de imigração ####
+
+  'm' é definido como a probabilidade de um indivíduo da metacomunidade migrar para a comunidade local por evento de morte e como tal pode variar apenas entre 0 e 1. Primeiro, segue uma análise exploratória da variável:
+
+```{r}
+plot(m ~ p, data=df_EI)
+# boxplot(df_EI$m)
+```
+
+A variável apresenta grande variância ao longo de seus possíveis valores, apesar de parecer existir um acumulo de pontos ao redor de ~ 1, não é possível afirmar a priori que existe algum efeito da fragmentação. Vou utilizar as distribuições normal e Gamma como distribuições subjacentes para construir os modelos.
+
+```{r}
+l_md <- vector("list", length = 8)
+names(l_md) <- c("normal","normal_null",
+                 "Gamma_inv","Gamma_inv_null","Gamma_id","Gamma_id_null","Gamma_log","Gamma_log_null")
+l_md[[1]] <- glm(m ~ p,family = "gaussian",df_EI)
+l_md[[2]] <- glm(m ~ 1,family = "gaussian",df_EI)
+l_md[[3]] <- glm(m ~ p,family = "Gamma"(link=inverse),df_EI)
+l_md[[4]] <- glm(m ~ 1,family = "Gamma"(link=inverse),df_EI)
+l_md[[5]] <- glm(m ~ p,family = "Gamma"(link=identity),df_EI)
+l_md[[6]] <- glm(m ~ 1,family = "Gamma"(link=identity),df_EI)
+l_md[[7]] <- glm(m ~ p,family = "Gamma"(link=log),df_EI)
+l_md[[8]] <- glm(m ~ 1,family = "Gamma"(link=log),df_EI)
+AICctab(l_md, weights = TRUE)
+```
+
+Os dois modelos dentro do intervalo de plausibilidade são aqueles que utilizam a distribuição normal como subjacente. O modelo mais plausível aculumando 0.71 peso de evidência foi o modelo nulo, o modelo que considera o efeito da fragmentação soma apenas 0.29 de peso de evidência e está bem próximo do limite de plausibilidade. Primeiro vou olhar para a estimativa dos parâmetros desses dois modelos:
+
+```{r}
+sapply(l_md[2:1],coef)
+```
+
+A estimativa do intercepto é bem próxima entre os dois modelos; o efeito da cobertura vegetal no segundo modelo mais plausível é bem sútil e positiva o que vem de encontro com a expectativa de quanto menor a fragmentação menor o isolamento da comunidade local (ou da amostra que estamos simulando). Contudo, primeiro preciso avaliar a qualidade de ajuste do modelo mais plausível.
+
+```{r}
+summary(l_md[[2]])
+# summary(l_md[[1]])
+```
+
+Pelo gráfico Normal Q-Q ambos os modelos mais plausíveis apresentem alguns problemas de ajuste, existindo valores distoantes nos valores extremos dos valores de m. Em resumo os modelos ajustam bem os valores intermediários dos valores observados. Me parece que preciso reler sobre análise baseada em regressão [OBSERVAÇÃO].
+
+Fato 2: a fragmentação não apresenta efeito pronunciável em 'm', o modelo que considera o efeito da cobertura vegetal, que é o segundo mais plausível, apresenta inclinação ~ 0.058. A partir do modelo nulo, modelo mais plausível, a média de valores (ou intercepto) estimado é ~ 0.697. Gostaria de avaliar a dispersão dos valores ao redor dos valores para comparação com o R quadrado dos modelos usados para análise dos resultados dos modelos EE [METAS GERAIS].
+
+
+#### Theta - número fundamental da biodiversidade ####
+
+Theta é um parâmetro adimensional que é definido como a composição do tamanho da metacomunidade, no qual a comunidade local é amostrada, e a taxa de especiação. Segue análise exploratória
+
+```{r}
+plot(theta ~ p, data=df_EI)
+```
+
+A variável parece apresentar uma certa tendência positiva com a cobertura vegetal. Para modelar está variável vou utilizar as mesmas distribuições subjacentes da variável 'm'.
+
+```{r}
+l_md <- vector("list", length = 8)
+names(l_md) <- c("normal","normal_null",
+                 "Gamma_inv","Gamma_inv_null","Gamma_id","Gamma_id_null","Gamma_log","Gamma_log_null")
+l_md[[1]] <- glm(theta ~ p,family = "gaussian",df_EI)
+l_md[[2]] <- glm(theta ~ 1,family = "gaussian",df_EI)
+l_md[[3]] <- glm(theta ~ p,family = "Gamma"(link=inverse),df_EI)
+l_md[[4]] <- glm(theta ~ 1,family = "Gamma"(link=inverse),df_EI)
+l_md[[5]] <- glm(theta ~ p,family = "Gamma"(link=identity),df_EI)
+l_md[[6]] <- glm(theta ~ 1,family = "Gamma"(link=identity),df_EI)
+l_md[[7]] <- glm(theta ~ p,family = "Gamma"(link=log),df_EI)
+l_md[[8]] <- glm(theta ~ 1,family = "Gamma"(link=log),df_EI)
+AICctab(l_md, weights = TRUE)
+```
+
+Os modelos com distribuição Gamma e que consideram o efeito da cobertura vegetal na variável são os únicos dentro do intervalor de plausibilidade. O peso de evidência mostra que a qualidade de ajuste dos três é bem próxima, sendo aquele que utiliza a função de ligação inversa o mais plausível. Segue os gráficos diagnósticos do modelo mais plausível:
+
+```{r}
+plot(l_md[[3]])
+```
+
+O modelo mais plausível apresenta bom ajuste aos dados, parecendo existir um valor distoante, como pode-se notar na análise exploratória da variável. Ainda não estou certo se é necessário acrescentar na modelagem outra variável preditora como a riqueza observada [REVISAO] Vou olhar nas estimativas dos parâmetros
+
+```{r}
+summary(l_md[[3]])
+```
+
+Como a função de ligação é inversa a leitura das estimativas não é na mesma escala da plotada na análise exploratória da variável. Podemos avaliar que existe um efeito positivo da cobertura vegetal em theta, para avaliar a estimativa do intercepto é necessário transformar para a escala da função de ligação [RETORNAR]. Isso vai de encontro com as expectativas: quanto maior a fragmentação => menor a metacomunidade; menor o tamanho das populações => maior as taxas de extinção - mesmo considerando que a fragmentação não altere o padrão biogeográfico da taxa de especiação certamente podemos considerar que vai dirminuir o tamanho da metacomunidade e portanto theta, uma vez, que theta := 2*Jm*U 
+
+Fato 3: A cobertura vegetal apresenta efeito em theta e esse efeito é posito. 
+
+
+### Parâmetros convertidos do modelo EI ###
+
+As variáveis a seguir foram calculadas a partir de theta e m, eles incorporam informações observadas nos locais de coleta das SADs, informações essas utilizadas no modelo EE: número de indivíduos na paisagem e área amostrada. 
+
+#### U - taxa de especiação ####
+
+gráficos exploratórios:
+U ~ theta
+U ~ p
+```{r}
+plot(U ~ theta, data=df_EI)
+plot(U ~ p, data=df_EI)
+```
+
+
+#### %k - chuva de propagulos ####
+
+A chuva de propagulos foi definido em termos da porcentagem dos propagulos que ficam até determinada distância da planta progenitora
+
+```{r}
+df_EI %>% head
+hist(df_EI$kernel_percentil,breaks=40)
+car::scatterplotMatrix(~kernel_percentil + p + J + DA + m, data=df_EI)
+```
+

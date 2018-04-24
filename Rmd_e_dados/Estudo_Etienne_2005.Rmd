@@ -20,7 +20,7 @@ library(GUILDS)
 
 Objetivo: Comparar SADs geradas segundo uma distribuição de probabilidades conhecida e aquelas geradas pelo modelo de Etienne 2005. Primeiro vamos gerar 100 SADs em um crescente de abundância total (N) e riqueza (S), segundo uma log-normal. Então vamos ajustar estas SADs ao modelo; com as estimativas dos parâmetros simularemos 100 SADs segundo o mesmo modelo, para cada SAD oriunda da log-normal, e com posterior do teste de Kolmogorov-Smirnov.
 Objetivo2: Usar as SADs selecionadas no TreeCo para isso
-Objetivo3: Comparar a congruência dos modelos usando Log-series e a Log-Normal
+
 
 ```{r}
 # Simulando algumas SADs #

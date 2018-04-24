@@ -211,11 +211,10 @@ Simplificando:
 
 m ~ 4 d / pi sqrt(J/DA)
 
-Afim de estabelecer uma relação reciproca entre os parâmetros utilizamos a aproximação enquanto igualdade e temos:
+A variável *d* está descrita na unidade de espaço utilizada para definir $DA_{obs}$. A unidade de espaço utilizada em $DA_{obs} = individuos/ha$ é o héctare (*ha*) = $100^2$ metros, assim, para escrever *d* em metros dividimos por 100, uma vez que $\sqrt{ha} = 100$ metros.
 
-$m = 4*d / \pi*sqrt(J/DA)$  
+$$m = 4d /100 \pi \sqrt{J/DA}$$
 
-$d = m*\pi*sqrt(J/DA)/4$
 
 A função de dispersão que desenvolvemos foi parâmetrizada para que informemos o desvio padrão da distribuição, assim, é possível utilizar a mesma variável com diferentes funções de probabilidade subjacente como a distribuição uniforme e a normal. 
 
@@ -229,18 +228,17 @@ $b=sd/sqrt(2)$
 
 Onde b é o parâmetro escalar, que descreve a "distância média" da Laplaciana (não é a distância média per se, pois podemos entender a Laplaciana como uma exponencial espelhada, seria o equivalente ao escalar médio), portanto b = d. Assim, substituindo b na aproximação
 
-$m = 4 * sd/(\pi sqrt(J/DA) sqrt(2)$
-
-$sd = m sqrt(2) \pi sqrt(J/DA)/4$
+$$m = 4 sd/(100 \pi \sqrt{2J/DA}$$
 
 
 Uma vez calculado sd a partir do modelo EI, estimamos a equivalente chuva de propágulos que definimos em termos de porcentagem de propágulos que se mantêm até uma determinada distãncia da planta progenitora. Aqui vale relembrar uma nota sobre a função que criamos para realizar tal tarefa:
 
 "Há um erro que é proporcionalmente maior quando as distâncias são pequenas. Acho que é arredondamento que está na função de quantil, que faz ela andar aos saltos. Mas a boa notícia é que o erro é o mesmo para todos os kerneis. Então, apesar da função não achar exatamente o sigma necessário para que p indivíduos caiam até distance de distância, o sigma encontrado resulta na mesma distância (quantil), o que torna os sigmas calculados com os mesmos parametros p e distance equivalentes."
 
-A distância de referência é dist_0 = 100/sqrt(DA) (lado da célula da simulação). Assim, tanto o perímetro/área da amostra quando a distância média da função de dispersão estão na mesma escala métrica. Portanto a conversão pode ser feita diretamente.
+A distância de referência é dist_0 = 100/sqrt(DA) (lado da célula da simulação).
 
 #### Conversão dos parâmetros modelo EI ####
+
 
 
 ```{r conversao de par modelo EI}
@@ -260,7 +258,7 @@ df_EI %<>% inner_join(x=.,y=unique(df_ad[,c(1,5,7)]),by=c("SiteCode")) # DA e p
 # ii) conversão dos parâmetros #
 # conversão dos parâmetros
 df_EI %<>% mutate(U = theta/(2*500*DA*p),
-                  sd_k = m*sqrt(2)*pi*sqrt(J/DA)/4)
+                  sd_k = m*100*pi*sqrt((2*J)/DA)/4)
 
 # iii) Calculando a correspondente chuva de propágulos #
 # A função a seguir é uma modificação de qkernel de utility_functions, que o PI desenvolveu.
@@ -291,8 +289,10 @@ df_EI$kernel_percentil <- sapply(1:nrow(df_EI),f_percentil.kernel) #armazenando
 i) a maneira que utilizei 'd', da aproximação de Chisholm & Linchestein 2009, está correta dentro do uso de sigma?
 
 Danilo: eu havia pensando que 'd' era a variância (ou escalar, correto?) da distribuilção de LaPlace, mas não sei se entendi corretamente a correspondência entre os parâmetros estimados pela aproximação(Chisholm & Linchestein, 2009) e pela distribuição de LaPlace.
+Danilo_04abril: eu corrigi as formulas de conversão a argumentação está melhor desenvolvida no aqruivo "estudo_funcao_de_dispersao"
 
 ii) A função para calcular o percentil está correta? Em especial gostaria de confirmar que fiz a indexação corretamente para calcular o percentil correspondente 
+Danilo_04abril: uma maneira de descobrir é utilizando a função quantil, se está tudo funcionando como o planejado então dado percentil deve retornar a distância 
 
 ```{r auditoria visual da conversao EI}
 car::scatterplotMatrix(~ theta + U + m + sd_k + kernel_percentil,
@@ -314,7 +314,7 @@ df_EE$modelo<- rep("EE",nrow(df_EE))
 
 # ii) conversão de parâmetros
 df_EE %<>% mutate(theta = 2*500*DA*p*U,
-                  m = 4*(sd_k/sqrt(2))/(pi*sqrt(J/DA))) 
+                  m = sd_k * 4 / ( 100 * pi * sqrt( (2*J) /DA) )) 
 ```
 
 -> Pontos a confirmar:
@@ -338,6 +338,13 @@ SdT: i) unir os data frames
 # df_EE %>% str
 # df_EI %>% str
 df_resultados <- merge(x=df_EE,y=df_EI, all = TRUE) 
+
+## Para arrumar o nome depois da reunião do dia 29 de março, onde compreendi que a coluna kernel é apenas o desvio padrão da dist subjacente e desta forma fica mais exp
+## como já arrumei o código acima o codigo a seguir só é válido para o que foi feito antes de 29 de março.
+## Mudei aqui para não precisar rodar todas as analises acima
+# df_resultados  <- df_resultados[,1:12]
+# names(df_resultados)[7] <- "sd_k"
+
 write.table(df_resultados,file="/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/df_resultados.txt",sep = "\t",row.names = FALSE)
 ```
 

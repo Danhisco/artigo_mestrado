@@ -1,0 +1,108 @@
+---
+title: "Estudo da relação entre os parâmetros de um modelo neutro de campo médio e um modelo neutro de espaço explícito"
+author: "Mori, Danilo Pereira; Coutinho, Renato Mendes; Lima, Renato A.F. ; Prado, Paulo Inácio K."
+date: "3 de abril de 2018"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,tidy = TRUE, cache = TRUE)
+```
+
+```{r global packages, echo=FALSE, message = FALSE, warning=FALSE}
+library(lamW)
+library(magrittr)
+library(plyr)
+library(dplyr)
+```
+
+
+## Introdução ##
+
+  *m* é a probabilidade de uma morte na 'comunidade local' ser sucedida de um evento de imigração (de movimentação sucedida de colonização e amadurecimento até a idade reprodutiva) de um indivíduos da metacomunidade. Assim, se m = 0.1, então  10% dos indivíduos na amostra (i.e. a 'comunidade local) são imigrantes que chegaram ao acaso da paisagem ao redor (adaptado de Ricklefs 2012). Esse parâmetro descreve a limitação à dispersão no nível da amostra, imaginando uma comunidade local que se relaciona por dispersão com um o conjunto de comunidades locais onde todas podem potencialmente trocar indivíduos (a metacomunidade/paisagem) (Etienne et al. 2007). Chisholm & Lichstein (2009) (doravante C&L09) estabeleceram uma relação entre *m* e *A* (a área da comunidade local):
+
+>When an individual at location (x, y) in the local
+>community dies, the replacement individual may, by virtue
+>of the random dispersal and recruitment processes, be from
+>within the local community (i.e., within the quadrat) or from
+>outside the local community (i.e., from outside the quadrat).
+>Define m x,y as the probability that the replacement individual
+>at location (x, y) is drawn from outside the local community.
+>This parameter will be highest for individuals on the edges
+>of the quadrat and smallest for individuals at the centre of
+>the quadrat, where m x,y » 0 for large A. We define m as the
+>average value of m x,y across the whole of the local
+>community as follows:  
+  
+$$ m = \frac{1}{A} \int \int_A m_{x,y} dxdy $$
+
+Essa equação pressupõem que a comunidade local está inserida em uma paisagem homogênea e que a dispersão ocorre de maneira radial, ou seja, com igual probabilidade para todas as direções. Utilizar essa equação no contexto da simulação coalescente (Rosindell et al. 2008) requer duas mudanças: i) na simulação a dispersão não ocorre de maneira radial, ao invés, ela é descrita como a resultante de dois sorteio independente em eixos ortogonais; ii) explicitar a função de dispersão, que descreve a probabilidade de um indivíduo colonizar uma unidade de habitat em função da distância entre está unidade de habitat e a planta progenitora [REVISÃO]. Especificamente para nosso conjunto de simulações selecionamos apenas amostras contíguas que aproximamos como quadrados o que permite reescrever a equação de C&L09 a partir do lado da amostra, L:
+
+$$ m = \left(\frac{1}{L} \int\limits_{-L/2}^{L/2} m_{x}(x)\mathrm{d}x \right)^2 $$
+
+$$ m_{x} = 1 - \int\limits_{-L/2}^{L/2} K(x-y) \mathrm{d}y  $$
+
+Onde K é a função de dispersão. Como aproximamos todas as amostras por quadrados podemos escrever o lado da amostra como função de J e DA: $L = 100\sqrt{J/DA}$. Como utilizamos a mesma função de dispersão para realizar o sorteio nos dois eixos $m_{x} = m_{y}$ e podemos apenas calcular $m_{x}$ e elevar o resultado ao quadrado (primeira equação). Note que na 2a eq. a integral de K no espaço inteiro é 1, e limitamos o espaço à região dentro do quadrado, então a integral < 1, e $m_x < 1$; na 1a eq. tomamos uma média de $m_x$ no espaço, então isso também é sempre menor que 1 (Coutinho, e-mail "Reunião 29mar" de 8abril18). Em outras palavras Coutinho descreve o conjunto de equações como:
+
+>a gente pega um ponto de coordenadas x,y no plot, e vê qual a chance de ele ter vindo de fora (isso é o m). 
+>Pra isso, usamos o kernel, mas na prática sorteamos o deslocamento no eixo x e no y separadamente. 
+>Na direção x, a chance de cair no patch (que fica na região entre -L/2 e L/2) é a integral do kernel de -L/2 a L/2, a chance de cair fora é o complementar, a integral de -inf a -L/2 mais a integral de L/2 a inf. 
+>Como a integral do kernel todo tem que ser 1, é mais fácil fazer 1 - integral de -L/2 a L/2 na eq. 2, do que fazer as 2 integrais até (+/-) infinito. 
+>Essa integral te dá o $m_x$, e você calcula a média disso sobre todos os x, na eq. 1. 
+>Daí você faz o mesmo na direção y, mas dá o mesmo resultado, daí a expressão fica ao quadrado na eq. 1.
+
+<!--
+i) Reescrever com as minhas palavras
+ii) entender como ele fez de ir da eq 1 de C&L09 para essas duas equações
+-->
+
+  A distribuição de probabilidade que utilizamos na função de dispersão foi a distribuição Laplace. A distribuição Laplace, que pode ser entendida como uma distribuição exponencial negativa espelhada; a distribuição exponencial é comumente utilizada para estudar o efeito de processos que operam em larga escala, como aqueles em populações em paisagens fragmentadas, na chuva de propágulos (Clark et al. 1999). Assim, podemos reescrever o conjunto de equações considerando uma distribuição Laplace. Considerando a distribuição de Laplace com a seguinte parametrização de sua função de densidade de probabilidade $K(x) = \frac{\alpha}{2} e^{-|\alpha x|}$, temos:
+  
+$$m = \left(\frac{1-e^{-\alpha L}}{\alpha L}\right)^2$$
+
+Onde $\alpha = 1/b$, b é o parâmetro escalar da distribuição de Laplace que pode ser escrito em função do desvio-padrão da distância de valores (sd) como $b = sd/ \sqrt{2}$. Assim podemos reescrever a equação de m em funçao de sd:
+
+$$ eq1: m = sd \frac{1 - e^{-\frac{\sqrt{2} L}{sd}} }{\sqrt{2} L} $$
+
+Essa equação é válida para o processo de dispersão em ambientes homogêneos, ou seja, sem fragmentação. A maneira que simulamos a dispersão em paisagens fragmentadas é diferente em uma simulação coalescente, uma vez que sorteamos um progenitor e este estaria presente em uma unidade de não hahitat, o sorteio é refeito até que o progenitor esteja em uma unidade de habitat. Uma vez que o sorteio é refeito este pode cair novamente dentro da área da comunidade local, uma equação que descreve exatamente a probabilidade de um indivíduo da comunidade ser substituido por um indivíduo de fora da comunidade em uma paisagem fragmentada dependeria de explicitamente considerar a configuração espacial. Uma aproximação do efeito da fragmentação na simulação é considerar que a chance da dispersão ser oriunda de uma área de cobertura vegetal:
+
+$$m' = \frac{mp}{1 - (1-p)m} $$
+Onde m é aquele obtido na equação 1 e p é a porcentagem de cobertura vegetal na paisagem. Note que quando p = 1, m' = m. Com a equação 1 podemos calcular m a partir do desvio padrão da função de dispersão. Para calcular sd a partir de m, utilizamos o ramo principal da função W de Lambert ($W_{0}$):
+
+$$ eq2: sd = \frac{\sqrt{2} L}{m W_{0}(- \frac{e^{-1/m}}{m} ) + 1} $$
+
+### Exemplo ###
+
+Calculando sd a partir de um m:
+
+```{r conversao m para d}
+J = 1000
+DA = 1000
+L <- sqrt(J/DA)*100
+m <- 0.6
+W0 <- lambertW0(-exp(-1/m)/m)
+(sd <- sqrt(2)*L/(m*W0+1))
+```
+
+A chuva de propágulos correspondente considerando uma distância padrão = l_{cel}
+
+```{r percentil de sd, message=FALSE}
+library(rmutil)
+# distância entre os indivíduos e a distância padrão
+d_ind_MA  <- 100/sqrt(DA) #tanto a metrica da paisagem quanto a distancia de referencia
+b_laplace <- sd / sqrt(2) ## relação entre sigma e b, a variância da laplaciana
+## gerando valores de uma distribuição laplaciana e convertendo para a distância em metros
+X_laplace <- d_ind_MA * round(rlaplace(1e5, s=b_laplace) / d_ind_MA) 
+Y_laplace <- d_ind_MA * round(rlaplace(1e5, s=b_laplace) / d_ind_MA) # idem para Y
+dist_laplace <- sqrt(X_laplace^2+Y_laplace^2) #distâncias dos pontos até a origem
+(percentil <- length(dist_laplace[dist_laplace<=d_ind_MA])/length(dist_laplace)) # percentil
+```
+
+
+################ Reunião com o PI ################
+
+O m do modelo EI precisa ser corrigido?
+- não precisa corrigir
+
