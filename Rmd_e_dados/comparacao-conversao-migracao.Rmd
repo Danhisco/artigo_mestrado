@@ -1,0 +1,94 @@
+---
+title: "conversao_migracao"
+author: "Mori, Danilo Pereira"
+date: "23 de abril de 2018"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,tidy = TRUE, cache = TRUE)
+```
+
+```{r global packages, echo=FALSE, message = FALSE, warning=FALSE}
+library(lamW)
+library(magrittr)
+library(plyr)
+library(dplyr)
+# df_resultados <- read.table(file="/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/df_resultados.txt",sep = "\t",row.names = FALSE)
+```
+
+## Objetivo ##
+
+Comparar os dois métodos de conversão de parâmetro de migração entre um modelo neutro de campo médio (Etienne 2005) e um modelo neutro de espaço explícito (Rosindell et al. 2008) a partir de deduções da eq 1 apresentada por Chisholm & Lichstein (2009). O primeiro método é desenvolvido pelos autores anteriores e trata-se de uma aproximação (eq2 Chisholm & Lichstein 2009); o segundo método foi deduzido a partir da eq 1 e aproveitou das particularidades de nossas simulações para deduzir uma equação. Ambos métodos relacionam a probabilidade de um indivíduo de fora da comunidade colonizar uma unidade de habitat na comunidade local por evento de morte ('m') com a distância média de dispersão dos indivíduos na paisagem ('d'). 
+
+O modelo neutro espacialmente explícito tem as seguintes características: i) utilizamos apenas áreas amostradas contíguas que aproximamos como quadrados; ii) a distribuição de probabilidade subjacente a função de dispersão é Laplace e parametrizamos a partir do desvio-padrão; iii) a área foi escrita em função de J e DA, número de indivíduos e densidade(ind/ha) observada na amostra, respectivamente.
+
+
+### Contexto ###
+
+Chisholm & Lichstein (2009) (doravante C&L09) estabeleceram uma relação entre *m* e *A* (a área da comunidade local):
+
+>When an individual at location (x, y) in the local
+>community dies, the replacement individual may, by virtue
+>of the random dispersal and recruitment processes, be from
+>within the local community (i.e., within the quadrat) or from
+>outside the local community (i.e., from outside the quadrat).
+>Define m x,y as the probability that the replacement individual
+>at location (x, y) is drawn from outside the local community.
+>This parameter will be highest for individuals on the edges
+>of the quadrat and smallest for individuals at the centre of
+>the quadrat, where m x,y » 0 for large A. We define m as the
+>average value of m x,y across the whole of the local
+>community as follows:  
+  
+$$eq.0:  m = \frac{1}{A} \int \int_A m_{x,y} dxdy $$
+
+Essa equação é válida para o processo de dispersão em ambientes homogêneos, ou seja, sem fragmentação. A maneira que simulamos a dispersão em paisagens fragmentadas é diferente em uma simulação coalescente: uma vez que sorteamos um progenitor e este estaria presente em uma unidade de não habitat, o sorteio é refeito até que o progenitor esteja em uma unidade de habitat. Uma vez que o sorteio é refeito este pode cair novamente dentro da área da comunidade local, uma equação que descreve exatamente a probabilidade de um indivíduo da comunidade ser substituido por um indivíduo de fora da comunidade em uma paisagem fragmentada dependeria de explicitamente considerar a configuração espacial. Uma aproximação do efeito da fragmentação na simulação é considerar que a chance da dispersão ser oriunda de uma área de cobertura vegetal, assim, podemos corrigir m pela porcentagem de cobertura vegetal na paisagem:
+
+$$eq.0': m' = \frac{mp}{1 - (1-p)m} $$
+
+Onde _p_ é a porcentagem de cobertura vegetal na paisagem. É necessário corrigir o valor de m quando partimos de parâmetros da simulação coalescente em paisagens fragmentadas 
+
+### Método C&L09 ###
+
+A aproximação deduzida por Cl09 é $m = \frac{Pd}{\pi A}$, onde P e A são o perímetro e área do plot, respectivamente. Considerando o plot quadrado e a distribuição de Laplace podemos reescrever essa aproximação como:
+
+$$eq.1a: m = sd  \frac{4}{100 \pi \sqrt{2J/DA} }  $$
+$$eq.1b: sd = m \frac{100 \pi \sqrt{2J/DA}}{4} $$
+
+Onde $P = 4 L$, $A = L^2$ e $L= 100 \sqrt{J/DA}$ metros 
+
+### Método Coutinho apud C&L09 ###
+
+Coutinho parte da eq.0 e aproveitando as características da simulação coalescente que utilizamos: a) utiliza apenas plot quadrados; b) a dispersão não é radial, ao invs, é descrita como o resultado do sorteio independente em eixos ortogonais. Assim, podemos escrever a eq.0 como:
+
+$$eq.0-C.a:  m = \left(\frac{1}{L} \int\limits_{-L/2}^{L/2} m_{x}(x)\mathrm{d}x \right)^2 $$
+$$eq.0-C.b: m_{x} = 1 - \int\limits_{-L/2}^{L/2} K(x-y) \mathrm{d}y  $$
+
+K é a função de dispersão. Podemos reescrevemos em função da distribuição de probabilidade de Laplace como:
+
+$$eq. 2a: m = \left(\frac{1-e^{-\alpha L}}{\alpha L}\right)^2$$
+$$ eq. 2b: sd = \frac{\sqrt{2} L}{m W_{0}(- \frac{e^{-1/m}}{m} ) + 1} $$
+
+Para escrever a equação em função do desvio-padrão (eq 2b) utilizamos o ramo principal da função W de Lambert ($W_0$).
+
+### Comparação dos métodos ###
+
+<!-- Método C&L09 
+i) implementação
+ii) auditoria
+-->
+
+<!-- Método Coutinho 
+i) implementação
+ii) auditoria
+-->
+
+<!-- Comparação dos métodos
+i) seleção de modelos
+-->
+
+
+
