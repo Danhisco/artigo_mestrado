@@ -1,0 +1,412 @@
+---
+title: "artigo_mestrado_DaniloPMori"
+author: "Danilo Pereira Mori"
+date: "5 de maio de 2017"
+output: pdf_document
+---
+
+```{r global_options, echo=FALSE}
+knitr::opts_chunk$set(echo=F, warning=FALSE, message=FALSE, cache = TRUE, tidy = TRUE)
+```
+
+
+```{r global packages and data, echo=F, message=FALSE, warning=FALSE}
+library(gridExtra) 
+library(sjPlot)
+library(ggplot2) 
+library(tidyr)
+library(broom)
+library(purrr)
+library(lme4)
+library(sads)
+library(magrittr)
+library(plyr)
+library(dplyr)
+load("/home/danilo/Desktop/l_dados.Rdata")
+df_ad <- l_dados[[1]] %>% select(SiteCode, Sindrome, kernel, p, S, GOF, U) %>% 
+  mutate(p.z = (p-mean(p))/sd(p),
+         K.z = (kernel-mean(kernel))/sd(kernel),
+         S.z = (S-mean(S))/sd(S))
+names(df_ad)[1] <- "Site"
+```
+
+
+
+
+#Introdução#
+
+- Introdução:
+
+i) fragmentação e perda de habitat: a necessidade de estudar os
+ efeitos da fragmentação nos sistemas naturais; diferentes respostas
+ em diferentes sistemas de estudo; diferentes parâmetros dos sistemas
+ biológicos; a) impacto na movimentação de indivíduos na paisagem
+ (colocar aqui a questão do kernel de dispersão?)  b) impacto na
+ interação de indivíduos com seu habitat e com outros indivíduos
+
+
+ii) teoria neutra como um forma de abordar o problema: explicação
+  geral, pressupostos, relação comunidade local e metacomunidade,
+  dinâmica no equilíbrio e interpretações, pq é uma boa forma. 
+  a) explicação geral, pressupostos
+  b) deriva ecológica, migração e
+  especiação: a relação entre comunidade local e metacomunidade
+  c) interpretações do modelo: ao refutarmos um modelo simples como o
+  modelo neutro fazemos-isso de maneira informátiva. Assim, a
+  comparação das predições se faz
+
+iv) teoria neutra X fragmentação: as diferentes abordagen e resultados
+  a) falar de trabalhos que estudaram a fragmentação usando o modelo
+  neutro: modelo de espaço médio e de efeitos locais e comparando as
+  predições da modelo (predições de diversidade) e de dinâmica. 
+  b) Assim, para alguns parâmetros da comunidade e considerando alguns
+  aspecto da fragmentação o modelo neutro parece gerar boas predições
+  do observado e para outros não. Aqui eu devo apresentar a questão da
+  qualidade de predição. 
+  c) Teoria neutra
+  espacialmente explicita: dinâmica de nascimentos e mortes neutras
+  acoplada a movimentação de indivíduos no espaço. O kernel de
+  dispersão é a razão pela qual o espaço explícito é necessário. O
+  kernel uma expressão/formalização da limitação à dispersão.
+  (PI: Teoria neutra
+  campo médio x limitação à dispersão dentro da comunidade. Isso é
+  legal pq a TNB campo médio só trata da limitação de dispersão vindo
+  da metacomunidade. Mendes: considerar limitação à dispersão dentro de uma
+  comunidade é uma boa maneira de entender o que acontece quando esta comunidade é fragmentada.)
+
+v) abordagem usada aqui: (PI: aqui fala de TNB espacialmente explícita)
+ a) esquema conceitual usado
+
+  O modelo neutro espacialmente explícito de Rosindell et al. (2008) apresenta uma comunidade local inserida em uma paisagem contínua de tamanho infinito. Assumindo dimensões infinitas, pode-se criar uma paisagem fragmentada periodica [REFERÊNCIA Solé et al. 2004] .Alternativamente, podemos usar uma paisagem de tamanho finito com diferentes cenários de fragmentação avaliando toda a paisagem e assumindo uma taxa de surgimento de novas espécies na paisagem (Campos et al. 2012, Campos et al. 2013, Campos et al. 2015 REFERÊNCIA). Aqui implementamos uma dinâmica neutra que depende de três níveis hierarquicos: uma comunidade local, J, inserida em uma paisagem finita, Jl, que apresentam fluxo de indivíduos com uma fonte externa de espécies, a metacomunidade (figura X).
+ 
+  O movimento dos indivíduos na paisagem se da explicitamente no espaço estruturado, a dispersão local é descrita por uma distribuição de probabilidades de colonização segundo a distância do indivíduo progenitor, essa função é o _kernel_ de dispersão e possui média K. O espaço é formado por unidades de habitat colonizáveis por apenas um indivíduo. O movimento de indivíduos entre a paisagem e a metacomunidade é expressa como a propabilidade de colonização de espécies raras por evento de morte de indivíduos da comunidade local, U. A dinâmica neutra de nascimentos e mortes estruturada no espaço gera a deriva ecológica. O modelo prediz a espécie e posição de cada indivíduo da comunidade local em um momento no equilíbrio, informação que é sumarizada em uma distribuição de abundância de espécies (SAD); e estima o U necessário para gerar em média a riqueza observada.
+ 
+ c) Em termos gerais: comparação de SADs empíricas com as geradas pela
+ simulação, e análises do efeito do kernel e da cobertura sobre este
+ ajuste e sobre o U. Duas perguntas: (1) o quão bom é o modelo? e (2)
+ há relação dos resultados do modelo (incluindo o quão bom ele é) com
+ cobertura e kernel?
+
+- Objetivo e Hipóteses: avaliar as predições do modelo neutro em um
+  gradiente de cobertura vegetal
+
+- Hipóteses gerais
+
+i) GOF: qualidade da predição do modelo neutro (número de vezes que a
+simulação produziu boas aproximações da SAD observada) (referência da
+sigla está em algum artigo do Rosindell sobre limitações espaciais do
+modelo neutro) Como a qualidade da predição do modelo neutro varia ao
+longo do gradiente de fragmentação? 
+H1: GOF ~ p < 0 (relação negativa
+entre fragmentação e qualidade na predição pelo modelo neutro (Gilbert
+et a. 2006) )
+H2: GOF ~ p = 0 ( o modelo neutro espacialmente
+explícito faz boas predições sobre as SADs observadas )
+H3: existe p * K 
+ - Mendes: ao invés de GOF, que é metodologia, pensar aqui em termos
+   de qualidade do ajuste. Explica GOF nos métodos
+
+
+#Mat. Met#
+
+  A partir de valores empíricos, extimamos taxas de migração e dinâmicas ecológicas neutras usando um algoritmo coalescente. Selecionamos trabalhos fitossociológicos que
+amostraram comunidades em fragmentos florestais em um gradiente natural de cobertura vegetal. Para cada fragmento, simulamos 8 cenários neutros considerando diferentes médias 
+de kernel, que são as médias da movimentação de espécies de uma mesma sindrome de dispersão. Sumarizamos os resultados da simulação em duas predições: taxa de imigração U e
+distribuição de abundância de espécies (SAD). Contabilizamos a proporção de SADs réplicas que são boas aproximações do observado por simulação utilizando um teste frequentista
+não parâmetrico na variável GOF (Goodness-of-fit). Para explicar a relação entre as variáveis, criamos modelos generalizados mistos que consideram correlação entre grupos de amostras, agrupamos os resultados de modo a permitir que cada conjunto de simulações por fragmento possa ter intercepto e inclinação próprios. 
+
+  Em seguida descrevemos: i) como preparamos as simulações baseadas em parâmetros observados; ii) ideia geral da simulação; iii) apresentamos a comparação da predição com o observado; e iv) avaliamos o efeito da cobertura vegetal e função de dispersão nas predições do modelo neutro. No item iv consideramos dois níveis de análise, a) o padrão oriundo da dinâmica neutra espacializada, a SAD, métrica que comparamos com o observado nos fragmentos florestais e b) uma predição do modelo neutro que considera a relação entre a dinâmica local e a metacomunidade, medindo um fluxo de indivíduos 
+
+
+##Construção da paisagem##
+
+  Alimentamos a simulação com dados extraídos de um banco de trabalhos fitossociológicos (TreeCo). Os trabalhos selecionados amostraram fragmentos florestais de forma contigua
+(em bloco único), cujo critério de inclusão na amostra é diâmetro à altura do peito (DBH) >= 4.80 cm (Lima et al. 2015). Para cada fragmento florestal selecionado, criamos um recorte de paisagem de 5 km^2 em torno do centro do fragmento a partir das imagens da Mata Atlântica presentes no banco de imagens descrito em Hansel et al. (2013; MATERIAL SUPLEMENTAR: mais detalhes?).
+
+
+  Ajustamos a resolução do recorte de paisagem para o produto da densidade de indivíduos na área amostrada (número de indivíduos/ha) e da área do recorte de paisagem (5 ha) 
+usando o programa Image Magick [REFERENCIA]. O modelo neutro simula a dinâmica ecológica acompanhando a trajetória de indivíduos no espaço, considerando que todos os indivíduos possuem as mesmas propriedades. Para tornar o recorte de paisagem em uma paisagem estruturada onde ocorre a dinâmica ecológica consideramos que cada pixel da imagem 
+consideramos que cada pixel representa uma unidade de habitat
+CONVERSÃO DE PIXEL: ifelse(>0.7,10-,0) - cada pixel representa uma unidade de espaço que pode estar ou não disponível para 
+colonização, habitat e não habitat, respectivamente. Como proxy de fragmentação usamos a cobertura vegetal que é o número de pixels de habitat sob o número total de pixels na 
+paisagem.
+
+  Para representar a comunidade amostrada, J unidades de habitat foram convertidas em unidades de habitat da dinâmica local. Usamos o número de indivíduos na 
+amostra como J observado. A partir do pixel central, estalece-se a ordem de conversão seguindo uma espiral quadrada divergente. Criando agregados de habitats no centro da 
+paisagem onde a dinâmica local vai ser monitorada durante a simulação coalescente (MATERIAL SUPLEMENTAR). Assim, estabelecemos o recorte de paisagem onde a simulação 
+coalescente vai ocorrer (Rosindell et al. 2008, Campos et al. 2013).
+
+
+##Simulação Coalescente##
+
+  Na simulação coalescente constroí-se árvores genealogicas de comunidades no espaço estruturado segundo os pressupostos do modelo neutro (Rosindell et al. 2008). Quando em 
+isolamento (U=0), a árvore da comunidade é influênciada apenas por deriva ecológica. Nesse sistema, a dinâmica local resulta do acoplamento da dinâmica neutra de nascimento e 
+mortes com a movimentação dos indivíduos na paisagem. A movimentação dos indivíduos na paisagem é modelada usando funções que permitem relacionar a probabilidade de colonizar 
+uma unidade de habitat com a distância entre a unidade de habitat vaga e a planta progenitora [REESCREVER]. Essa função descreve a movimentação dos indivíduos no espaço 
+bidimensional da paisagem. Com a árvore genealógica da comunidade gerada sob o cenário de isolamento, estimamos a taxa de imigração (U) necessária para que a riqueza no 
+equilíbrio seja igual a riqueza observada no fragmento florestal (S) (MATERIAL SUPLEMENTAR).
+
+
+  Quando há fluxo de indivíduos com a metacomunidade (U>0), a árvore da comunidade resulta do balanço entre a perda de espécies por deriva ecológica e pela chegada de novas 
+espécies, descrito por U. O modelo distingue dois tipos de movimentos no espaço: aquele que ocorre explicitamente em nível de paisagem, e aquele que ocorre implicitamente em 
+forma de uma taxa de troca de indivíduos com a metacomunidade. Simulamos a identidade dos indivíduos presentes na comunidade local em um instante do equilíbrio dinâmico e 
+sumarizamos essa informação em forma de SADs (MATERIAL SUPLEMENTAR). No equilíbrio, a taxa de entrada de novas espécies se iguala a taxa de perdas de espécies.
+
+
+  Para modelar kernel, assumimos uma distribuição de Laplace com parâmetro escalar, K, a distância média de um indivíduo e seus progenitores (MATERIAL SUPLEMENTAR). Para K 
+usamos estimativas da distância média de espécies arbóreas que apresentam o mesmo tipo de sindrome de dispersão (tabela 1 Seidler et al. 2006) [REESCREVER]. K tem  8 níveis: 
+1- ballistic, 31.1 m; 2 - gravity, 47.4 m; 3 - gyration, 54.5 m; 4 - wind, 64.5 m; 5 - média das sindromes, 82.17 m; 6 - animal_fruit<2cm, 99.3 m; 7 - animal_fruit2-5cm, 120.6
+m; 8 - animal_fruit>5cm, 157.8 m. Para cada nível de K e recorte de paisagem, estimamos 20 taxas de imigração, cuja média (U) foi usada para gerar 100 SADs réplicas.
+
+##Comparação com o observado e análise dos dados##
+
+  Para comparar as SADs réplicas com a SAD amostrada no fragmento florestal utilizamos o teste de Kolmogorov-Smirnov (teste KS). No teste KS utiliza-se a maior distância entre
+as curvas acumuladas de dois vetores númericos (SAD observada e SAD réplicas) para gerar uma distribuição nula de distâncias máximas entre as curvas acumuladas. Usando a 
+distância observada e a distribuição nula de distâncias, estimamos a probabilidade de errarmos ao afirmar que os vetores são amostras de uma mesma distribuição (p valor). 
+Tomando p valor crítico > 0.05, contabilizamos a proporção de SADs réplicas que são boas aproximações do observado na variável GOF, que varia entre 0 e 1.
+
+  Para cada um dos 86 fragmentos florestais (Site) que preparamos o recorte de paisagem (ANEXO: tabela 1) realizamos 8 simulações, uma para cada nível de K. Os resultados das 
+simulações foram sumarizados em taxa de imigração média (U) e GOF, totalizando 688 observações para cada variável. Para estimar o efeito da cobertura vegetal e de kernel de 
+dispersão nas variáveis respostas, construímos modelos generalizaos mistos. Esse tipo de modelo estatístico permitem levar em conta a relação que observações de um mesmo 
+fragmento florestal (Site) podem ter entre si. Consideramos dois tipos de estruturas aleatórias ou formas de agrupar os dados: i) considerando que todos os fragmentos 
+compartilham a mesma relação com a variação do kernel, ou seja, apresentam um intercepto livre e compartilham a mesma inclinação nas diferentes simulações - (1 | Site); ii) 
+possuem intercepto e inclinação livre, ou seja, cada fragmento pode ter uma relação própria com kernel - (K | Site). 
+
+
+  Primeiro modelamos GOF para avaliar o efeito da cobertura vegetal na qualidade da predição do modelo neutro espacialmente explícito. Avaliamos U ponderando o achado em GOF. 
+Para modelar GOF estabelecemos duas variáveis preditoras candidatas cobertura vegetal (p) e kernel de dispersão (K), variável com 8 níveis que foi interpretado como variável 
+contínua. A estrutura completa do modelo misto cheio pode ser representada por:
+
+	GOF ~ p * K + (K | Site)  
+
+  Um protocolo de validação visual foi adaptado de Bolker et al. (2008) para avaliar o modelo misto cheio. Para seleção dos modelos mais plausível utilizamos um protocolo de 
+seleção similar ao de Zurr et al. (2009). Comparamos os modelor usando AICc [REFERÊNCIA], e como critério de plausibilidade deltaAICc menor que 2. A distribuição de erros 
+binomial com função de ligação logito foi a mais plausível considerando além dela as funções de ligação probito e cloglog. Primeiro comparamos qual a 
+estrutura aleatória mais plausível considerando a estrutura fixa do modelo misto cheio: (1 | Site) ou ( K | Site). Seguimos selecionando as variáveis da estrutura fixa, 
+comparando diferentes relações entre p e K: com interação (p * K), com efeito aditivo (p + K), sem efeito de alguma das variáveis e nula.
+
+
+  Utilizamos um protocolo similar para modelar U. Como U é estimado para modelar a riqueza observada, esperamos que exista uma relação entre essas variáveis. Consideramos o 
+seguinte modelo cheio para U:
+
+	U ~ p * K + S * K + (K | Site)
+	
+  Usamos cinco combinações de distribuições de erro/função de ligação: 1) normal/identidade; 2) normal/log; 3) Gamma/identidade; 4) Gamma/inversa; 5) Gamma/log. Usando a 
+estrutura fixa do modelo misto cheio selecionamos a melhor combinação, com um função glm (REFERÊNCIA). Os modelos que consideraram a distribuição Gamma ficaram dentro do 
+critério de plausibilidade mas não foi possível modelar os dados com essa distribuição pois houveram problemas de convergência usando a função glmer (pacote lme4  REFERÊNCIA).
+Obtamos, portanto, por usar a quarta combinação mais plausível, distribuição normal com função de ligação identidade. Para facilitar o ajuste fizemos a transformação Z [(observado - médio)/sd]. de todas as variáveis preditoras.
+  
+
+
+## Resultados ##
+
+###GOF - Qualidade de Ajuste###
+
+  De maneira geral o modelo neutro produziu boas aproximações do observado (figura 1), o primeiro quarto da amostra está entre 0 até 89, então 75% da amostra possui GOF >= 0.90. Interpretando GOF como probabilidade de acerto, podemos considerar que o modelo neutro com espaço explícito gera boas aproximações do observado em todo o gradiente de cobertura vegetal. Alternativamente, podemos interpretar que os presupostos do modelo neutro ocorrendo em duas escalas de dispersão é suficiente para explicar o padrão de distribuição de espécies nos fragmentos florestais usados. Detalhes das análises no material suplementar: "Modelando fragmentos florestais em duas escalas de dispersão de indivíduos arboreos: avaliando predições de um modelo neutro espacialmente explicito"
+
+```{r}
+df_ad %>% mutate(kernel.f = factor(kernel)) %>% 
+ggplot(aes(y=GOF, x=kernel.f)) + 
+  geom_boxplot(aes(group=kernel)) +
+  geom_line(aes(group=Site),colour="wheat2") +
+  geom_point() + 
+  labs(y="GOF (proporção de SADs com bom ajuste)", x="K")
+```
+
+__Figura 1__ GOF, a proporção de SADs réplicas que apresentaram um bom ajuste segundo o teste KS pelos blocos de simulação e análise (mais informações Material e Métodos::Comparação com o observado e Análise dos dados). As linhas ligam valores de um mesmo fragmento florestal, en x os valores de K usados para simular a dinâmica ecológica neutra nos fragmentos.
+
+
+  A escala logito foi selecionada para linearirar a relação entre U e as variáveis preditoras. Na figura 1 cada ponto representa a simulação de um fragmento florestal em dado valor de K (eixo y). No eixo x temos a proporção de SADs com bom ajuste segundo o teste KS (Material e Métodos::Comparação e análise dos dados). Consideramos que a resposta do efeito pode estar condicionado ao fragmento florestal modelado (figura 1, as linhas claras ligam observações para um mesmo fragmento florestal). Para considerar a relação entre observações de um mesmo fragmento florestal, comparamos duas formas de agregar as observações para construir os modelos mistos. Na tabela 1 temos o resultado da seleção de modelos da estrutura aleatória. 
+
+
+__Tabela 1__ Comparação de possíveis estruturas aleatórias
+
+```{r}
+l_md <- vector("list", length = 3)
+names(l_md) <- c("(1|Site)", "(K | Site)", "1")
+l_md[[1]] <- glmer(cbind(GOF,100-GOF) ~ p.z * K.z + (1 | Site), 
+                    family = binomial, data = df_ad)
+l_md[[2]] <- glmer(cbind(GOF,100-GOF) ~ p.z * K.z + (K.z | Site), 
+                    family = binomial, data = df_ad)
+l_md[[3]] <- glm(cbind(GOF,100-GOF) ~ p.z * K.z, 
+                    family = binomial, data = df_ad)
+AICctab(l_md, weights = TRUE)
+
+```
+
+
+  A estrutura aleatória mais plausível é a que considera interação entre kernel e fragmento florestal (Site), ou seja, o efeito de kernel (K) na qualidada do ajuste varia entre fragmentos florestais. Na figura 2 os dados plotados no nível da estrutura aleatória, as linhas estão coloridas pelo fragmento floresta (Site). Notem como há grande variação entre os fragmentos florestais (Material suplementar::figura 2, linhas coloridas por fragmento florestal). Comparamos as diferentes relações entre as variáveis na tabela 2. O modelo misto permite establecer uma relação entre o intercepto e inclinação de cada subconjunto de dados com as variáveis de interesse, presentes na estrutura fixa do modelo.  Outra forma de pensamos é que estamos avaliando se a inclinação e intercepto de GOF por kernel estão relacionados pela cobertura vegetal e função de dispersão.
+
+
+__Tabela 2__ Comparação da estrutura fixa
+
+```{r}
+l_md1 <- vector("list", length = 5)
+names(l_md1) <- c("p * K", "p + K", "K", "1" ,"p")
+l_md1[[1]] <- glmer(cbind(GOF,100-GOF) ~ p.z * K.z + (K.z | Site), 
+                    family = binomial, data = df_ad)
+l_md1[[2]] <- glmer(cbind(GOF,100-GOF) ~ p.z + K.z + (K.z | Site),
+                    family = binomial, data = df_ad)
+l_md1[[3]] <- glmer(cbind(GOF,100-GOF) ~ K.z + (K.z | Site),
+                    family = binomial, data = df_ad)
+l_md1[[4]] <- glmer(cbind(GOF,100-GOF) ~ p.z + (K.z | Site),
+                    family = binomial, data = df_ad)
+l_md1[[5]] <- glmer(cbind(GOF,100-GOF) ~ 1 + (K.z | Site),
+                    family = binomial, data = df_ad)
+AICctab(l_md1, weights = TRUE)
+```
+
+
+  Três modelos ficaram dentro do intervalo de plausabilidade: o modelo que considera interação entre p e K, e os dois que consideram os efeitos das variáveis isoladas. O modelo mais plausível é aquele que considera a interação entre cobertura vegetal e kernel de dispersão; os modelos que consideram o efeito das variáveis isoladas ficaram dentro do intervalo de plausibilidade, o modelo que considera kernel de dispersão foi o segundo mais plausível (tabela 2). Na tabela 3 há o sumário dos três modelos mais plausíveis
+
+
+__Tabela 3__ Modelos dentro do interval de plausabilidade
+```{r}
+# sjp.glmer(l_md1[[1]],l_md1[[2]],l_md1[[3]])
+```
+
+
+
+
+  Consideramos que o modelo fez um ajuste adequado para entender o padrão geral dos dados (Material Complementar:: Análise Completa). 
+
+
+-U
+
+
+
+```{r}
+df_ad %>% mutate(kernel.f = factor(kernel)) %>% 
+ggplot(aes(y=U, x=kernel.f)) + 
+  geom_boxplot() + 
+  geom_jitter(aes(colour=kernel)) + labs(y="U - 'taxa de imigração no equilíbrio'", x="K")
+```
+
+__figura 3__ 
+
+  O efeito de kernel é mais claro do que na variável anterior
+  
+A estrutura aleatória selecionada considera que há intercepto e inclinação livre para cada fragento florestal (tabela 3).
+
+__Tabela 4__ Seleção da estrutura aleatória 
+```{r}
+l_md <- vector("list",length=3)
+names(l_md) <- c("( K.z | Site )", "( 1 | Site )","1")
+l_md[[1]] <- lmer(U ~ p.z * K.z + S.z * K.z +  (K.z | Site), data = df_ad)
+l_md[[2]] <- lmer(U ~ p.z * K.z + S.z * K.z + (1 | Site), data = df_ad)
+l_md[[3]] <- lm(U ~ p.z * K.z + S.z *K.z, data = df_ad)
+AICtab(l_md, weights = TRUE)
+```
+  
+ Dados na estrutura aleatória
+  
+```{r}
+# range(df_U$U)
+df_ad %>% ggplot(aes(x=kernel,y=U,group=Site)) + 
+  geom_line(col="red") +
+  geom_point() +
+  facet_wrap(~cut(df_ad$p.z,10),ncol=5)
+```
+
+__figura 4__ U ao nível da estrutura aleatória
+
+
+__Tabela 5__ Seleção de variáveis
+
+```{r}
+l_md2 <- vector("list",length=5)
+names(l_md2) <- c("p * k", "p + k", "p", "k", "1")
+l_md2[[1]] <- lmer(U ~ p.z * K.z + (K.z | Site), data = df_ad)
+l_md2[[2]] <- lmer(U ~ p.z + K.z + (K.z | Site), data = df_ad)
+l_md2[[3]] <- lmer(U ~ p.z + (K.z | Site), data = df_ad)
+l_md2[[4]] <- lmer(U ~ K.z + (K.z | Site), data = df_ad)
+l_md2[[5]] <- lmer(U ~ 1 + (K.z | Site), data = df_ad)
+AICctab(l_md2, weights = TRUE)
+```
+
+Apesar de ser o único modelo plausível, o modelo que considera interação não apresentou bom ajuste (figura 5)
+
+
+```{r}
+df_temp <- df_ad %>% inner_join(x=.,y=augment(l_md2[[1]]), by=c("U","p.z","K.z","Site") )
+l_p <- vector("list",length=4)
+l_p[[1]] <- ggplot(df_temp,aes(x=.fitted,y=.resid))+
+  geom_point() +
+  geom_smooth(se=F,col="red") +
+  labs(x="predito",y="reśiduo")
+l_p[[2]] <- ggplot(df_temp,aes(x=p.z,y=.resid))+
+  geom_point() +
+  geom_smooth(se=F,col="red") +
+  labs(x="p - cobertura vegetal",y="")
+l_p[[3]] <- ggplot(df_temp,aes(x=S.z,y=.resid))+
+  geom_point() +
+  geom_smooth(se=F,col="red") +
+  labs(x="S - riqueza observada",y="reśiduo")
+l_p[[4]] <- ggplot(df_temp,aes(x=K.z,y=.resid))+
+  geom_point() +
+  geom_smooth(se=F,col="red") +
+  labs(x="K - média do kernel de dispersão",y="")
+do.call("grid.arrange",c(l_p,ncol=2,nrow=2))
+```
+
+__Figura 5__ Resíduos do modelo selecionado contra valores preditos e as variáveis preditoras do modelo nulo
+
+  
+  O modelo não está captando boa parte da variação que parece estar associada com kernel (figura 5, 4o painel) e em valores altos de riqueza e cobertura (figura 5, 2 e 3 paineis). Acreditamos que isso se deve a relação que parece ser log quadrática na estrutura aleatória (figura 4 e figura 5 4o painel). Segue sumário do modelo selecionado:
+
+```{r}
+summary(l_md2[[1]])
+```
+
+### Material Suplementar ###
+
+
+```{r fig.height=7}
+df_temp <- df_ad
+df_temp$GOF[df_temp$GOF == 0] <- 1
+df_temp$GOF[df_temp$GOF == 100] <- 99
+df_temp %>% mutate(p.f = as.factor(cut(p.z,10)), logito.GOF = log(GOF/(100-GOF))) %>%
+              ggplot( aes(x = kernel,y = logito.GOF, group = Site)) +
+              geom_line(aes(colour = Site)) +
+              geom_point(col = "black")+
+              facet_wrap(~ p.f,ncol = 5) +
+              theme(legend.position = "none") +
+              theme(strip.background = element_rect(fill = "white")) +
+              labs(title = "",x = "kernel", y = "logito(GOF)")
+```
+
+__Figura 2__ Observações no nível da estrutura aleatória selecionada, cada linha representa um fragmento florestal. Ao todo são 86 linhas, notem como o gradiente natural de cobertura vegetal não é igualmente representado em todas as classes de cobertura vegetal (valores no título dos paineis). Na tabela 2 há a seleção das variáveis da estrutura fixa.
+
+
+
+
+```{r fig.height=10,fig.width=6}
+#lista com os coeficientes
+coef <- fixef(l_md1[[1]]) #modelo de trabalho
+
+#função de ligação logito
+fun_logit <- function(x,a0,a1){
+  exp(a0 + a1*x)/(1 + exp(a0 + a1*x))
+}
+
+par(mfrow=c(4,2))
+# x11(); par(mfrow=c(2,4)) 
+
+k <- df_ad$K.z %>% unique # objeto para o subset
+for(i in 1:8){
+plot(I(GOF/100) ~ p.z, df_ad, 
+       subset = K.z == k[i], 
+       xlim = c(0,1), ylim = c(0,1),
+       main = paste("kernel = ", df_ad$kernel[K.z==k[i]]," m"), 
+       xlab = "p.z", 
+       ylab = "GOF",
+       cex.main=0.9)
+curve(fun_logit(x, 
+                a0=coef[1] + coef[3]*k[i], 
+                a1=coef[2] + coef[4]*k[i]),
+      add=T,col="red")
+}
+```
+  
+__Figura 3__ GOF (pontos) e a estimativa do modelo selecionado `GOF ~ p.z * K.z + (K.z | Site)` (curvas vermelhas). Cada painel é composto por um subgrupo da amostra dividido pelo kernel de dispersão usado na rodada da simulação
+

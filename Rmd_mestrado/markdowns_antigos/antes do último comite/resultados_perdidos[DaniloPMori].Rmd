@@ -1,0 +1,2423 @@
+---
+title: 'Análise dos Dados'
+author: ""
+date: ""
+output: pdf_document
+---
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(
+                      #fig.width=20, 
+                      #fig.height=10, 
+                      echo=FALSE, 
+                      message=FALSE, 
+                      warning=FALSE,
+                      cache=TRUE
+                      )
+```
+
+```{r global packages, echo=FALSE}
+#setwd("/home/danilo/Documents/dissertacao/dados/imagens/paisagens_selecionadas")
+library(car)
+library(fitdistrplus)
+library(ggfortify)
+library(ggplot2)
+library(RColorBrewer)
+require(bbmle)
+#library(MASS)
+library(reshape2)
+library(gridExtra)
+library(magrittr)
+library(plyr)
+library(dplyr)
+setwd("/home/danilo/Documents/dissertacao/dados/")
+load("resultados_DaniloPMori.Rdata")
+```
+
+OBJETIVO: Aqui utilizamos o modelo neutro como uma fonte de predições para avaliar o impacto da fragmentação e perda de habitat nas comunidades arbóreas da Mata Atlântica, Brasil. A abordagem é similar à de Gilbert et al. (2006), contudo investigamos aspectos diferentes da diversidade das comunidades. Os aspectos da diversidade que investigamos são: i) taxa de especiação/imigração/perda de espécies no equilíbrio (U), ii) Distribuição de abundância de espécies (SAD).
+
+# Material e métodos #
+# TreeCo #
+# Hansen #
+# Modelo Neutro e simulação #
+# análise exploratória #
+# protocolo de criação de modelo cheio
+# seleção de modelos per se #
+# produção dos resultados #
+
+
+# Modelo Neutro e simulação #
+<!-- essa sessão vai provavelmente para o começo do material e métodos assim com um box resumindo a dinâmica neutra e o algoritmo coalescente-->
+  O modelo neutro pressupõem que a comunidade é regida por processos aleatórios de morte, nascimento, imigração e especiação. Todas as espécies estão sujeitas a estocasticidade demográfica. No tempo infinito, o sistema entra em equilibrio onde a perda de espécies por deriva ecológica é compensada pelos processos de introdução de novas espécies no sistema (imigração para a comunidade local e especiação na metacomunidade). Quando o equilíbrio é alcançado não há variação no número de espécies e na forma com que a abundância se distribui nas espécies. A manutenção da diversidade depende da taxa de imigração, a probabilidade de um indivíduo de uma nova espécie substituir um indivíduo da comunidade local por evento de morte ("U").No equilíbrio, essa valor também corresponde a taxa com que singletons (espécies com apenas 1 indivíduo) se extinguem por evento de morte na comunidade local.
+<!--aqui poderia ter um box explicando como que funciona o modelo neutro e o algoritmo coalescente. ou seja um resumo da dinâmica no modelo no tempo normal e para trás-->
+  O algoritmo coalescente simula uma dinâmica neutra espacialmente explicíta que ocorre em uma matriz de posições concêntrica a uma matriz da paisagem (BOX explicação modelo e algoritmo). A simulação retorna a identidade, i.e., a espécie, de cada indivíduo na matriz de posições em um momento no equilíbrio. Apesar da simulação não acompanhar a identidade dos indivíduos fora da matriz de posições, esses indivíduos participam da dinâmica. A distribuição que descreve a probabilidade de um propagulo se estabelecer em função da distância da árvore máe, 'kernel', modula o impacto da paisagem na dinâmica local. Assim, as simulações e seus produtos ('U' e SAD réplica) dependem de duas variáveis de exposição: o tamanho de matriz de posições (J) e o tamanho da matriz de paisagem (Jl; l - landscape). Jl é a soma das unidades de espaço que são habitat  e não habitat, que também pode ser obtido pelo produto da densidade de indivíduos de cada levantamento (indivíduos/ha) e do número de hectares do recorte de paisagem (500 ha). Assim, obtemos uma estimativa do número de indivíduos que a paisagem suporta se toda ela fosse preenchida por habitat. Nesse contexto, a variável de interesse "cobertura" pode ser entendido como porcentagem remanescente de Jl ('p'). 
+  A taxa de imigração ("U") pode ser entendido como o parâmetro de escala de uma distribuição que descreve a probabilidade de substituição de um indivíduo qualquer da comunidade de tamanho 'J' por um indivíduo de uma nova espécie por evento de morte (REFERÊNCIA). Os eventos de substituição ocorrem de maneira independente, não há correlação temporal. A probabilidade de substituição é constante no tempo e para todo o intervalo das variáveis preditoras. Apenas um evento de substituição ocorre por ciclo. As simulações distinguem-se em J e em Jl, assim algumas variáveis serão calculadas a partir de U para compensar a diferença de J (Jl será considerada efeito aleatório ou offset). Do modelo clássico com espaço implicito, podemos calcular o fluxo de imigrantes para a comunidade local (I), que leva em conta J: I = U*(J-1)/(1-U) (Etienne et al. 2011). E tambem vai ser calculado a taxa de imigração per capita U..J: probabilidade de substituição de um indivíduo da comunidade local por um indivíduo de uma espécie nova/(morte * indivívuo) (REFERÊNCIA!) (faz sentido?). Segundo Etienne et al. (2011) os parâmetros do modelo neutro implicito e explicíto (algoritmo coalescente) não são necessariamente analogos
+
+# Divergência entre as SADs obs e SADs sim - teste de Kolmogorov #
+-descrever a rotina de análise do resultado do teste usado para comparar as SADs obs e réplicas 
+
+
+# Diagnóstico da Simulação e  Análise Exploratória #
+
+```{r analise grafica dos dados}
+df_resultados$cluster_medio %<>% as.numeric 
+names(df_resultados)[c(3,17,20)] <- c("U", "p", "J")
+df_resultados %<>% mutate(Jl = DA * 500, # tamanho da comunidade da paisagem,produto da densidade de indivíduos (N/ha) pelo número de hectares do recorte de paisagem (500 ha)
+                          Jl.p = DA * 500 * p,  #número de indivíduos presentes na paisagem ou número de pixels do tipo "habitat"
+                          I = U*(J-1)/(1-U), # fluxo de imigrantes para a comunidade local (Rosindell et al. 2011)
+                          U..J = U/J) # taxa de imigração per capita;
+# x11()
+# scatterplotMatrix(~ S.obs + J + Jl + Jl.p + U + S.medio + KS + KS.p + GOF, data = df_resultados)
+```
+  <!--Ao todo foram feitas 96 baterias de simulação, uma para cada levantamento fitossociológico disponível no TreeCo(REFERÊNCIA) e no banco de imagens de Hansel et al.(REFERÊNCIA) que apresentam pelo menos 1 ha amostrado e que o arranjo das amostras é em bloco único.
+Figura A1. Relação entre as variáveis de controle da simulação e e as variáveis respostas. S.obs = riqueza observada; S.medio = S médio das SADs réplicas de cada simulação; KS = média da maior distância entre a SAD observada e a SAD réplica; KS.p = média do p valor associado ao teste de Kolmogovor-Smirnov; GOF (Goodness of fit - adaptado de Etienne & Rosindell 2011) = número de réplicas que obtiveram um bom ajuste (critério de ajuste: p valor > 0.05). As três primeiras variáveis são variáveis de controle da simulação: S,.obs, J e Jp. U.medio é a media da taxa de imigração esimada para cada simulação. S.medio, pode ser entendido como uma avaliação da qualidade da simulação. KS, KS.p, GOF podem ser entendidos como métricas da congruência da SAD simulada com a SAD observada.-->
+
+  Para uma primeira visualização dos dados recomendo que olhem a figura A1 - scatterplotMatrix com as variáveis de controle e as variaveis resposta. Vou dividir a análise exploratória por tipos de variáveis. Utilizamos valores empíricos para alimentar as simulações, assim os valores de entrada não podem ser vistos como parâmetros que podem apresentar qualquer combinação. Estamos presos aos padrões existentes na natureza, portanto é necessário avaliar o peso que as eventuais relações entre covariáveis têm na relação investigada: efeito da fragmentação na diferença entre o simulado neutro e o observado (REESCREVER). Em ordem, analisei: i) covariáveis e cobertura vegetal ('p'); ii) variáveis respostas (VR) com 'p' e 'kernel', ponderando por classes de riqueza observada, a variável de controle com maior peso na simulação; iii) variáveis de controle (S.obs, J e Jl) e as variáveis de efeito aleatório (e.g estado, fitofisionomia) na relação VR ~ cobertura.
+  
+### Covariáveis de Controle (S.obs, J, Jl) e Cobertura Vegetal ('p') ###  
+
+
+## S.obs ~ p ##
+
+```{r distibuições que melhor ajustam sua frequência}
+df_ae <- unique(df_resultados[,c(1,22)])
+# x11()
+# plotdist(df_ae$S.obs) #ela parece ser levemente assimétrica para a esquerda
+md1 <- fitdist(df_ae$S.obs,"weibull")
+md2 <- fitdist(df_ae$S.obs,"gamma")
+md3 <- fitdist(df_ae$S.obs,"lnorm")
+md4 <- fitdist(df_ae$S.obs,"norm")
+par(mfrow=c(2,2))
+denscomp(list(md1,md2,md3,md4), legendtext=c("weibull", "lnorm", "gamma", "norm"))
+qqcomp(list(md1,md2,md3,md4), legendtext=c("weibull", "lnorm", "gamma", "norm"))
+cdfcomp(list(md1,md2,md3,md4), legendtext=c("weibull", "lnorm", "gamma", "norm"))
+ppcomp(list(md1,md2,md3,md4), legendtext=c("weibull", "lnorm", "gamma", "norm"))
+par(mfrow=c(1,1))
+df_AIC <- data.frame(dist = c("Weibull", "lognormal", "gamma", "norm"),
+                     AIC = sapply(list(md1,md2,md3,md4),function(x) x$aic),
+                     df = sapply(list(md1,md2,md3,md4),function(x) length(x$estimate)) ) %>% arrange(AIC)
+df_AIC %<>% mutate(dAIC = AIC-(AIC[1]))
+
+#l_md.S <- vector("list",length = length(dist)) #lista que vai armazenar os modelos 
+#names(l_md.S) <- dist #nomeando 
+#for(i in 1:length(dist) ){
+#  l_md.S[[i]] <- fitdist(df_ae$S.obs, dist[i])
+#}
+
+#for(i in 1:5){
+#  l_md.S[[i]] <- vector("list",length=3)
+#  names(l_md.S[[i]]) <- c("fun_md", "start", "mle")
+#}
+
+#l_md[[1]] <-  fitdist(df_ae) #Poisson
+#l_md[[2]] <- glm(S.obs ~ 1,family="binomial"(), data = df_ae) #binomial
+```
+Figura 1. A distribuição de Riqueza Observada
+
+
+```{r }
+df_ae <- df_resultados[,c(1,17,22)] %>% unique
+names(df_ae)[3] <- "S"
+df_ae %<>% mutate(.,S_factor = cut(S,10),
+                    p_factor = cut(p,10))
+lm_S.p <- lm(S ~ p, data = df_ae)
+df_ae$fit <- lm_S.p$fitted.values
+df_ae$res <- lm_S.p$residuals
+# df_ae %>% mutate(S_true = S - (fit + res) ) %>% .$S_true %>% summary # OK
+# summary(lm_S.p)
+# plots #
+p_S.p_bx <- ggplot(df_ae, aes(y=p, x=S)) +
+              geom_boxplot(aes(colour=S_factor)) + 
+              geom_jitter() +
+              theme(legend.position="none",plot.background=element_blank()) + 
+              coord_flip()
+p_p.S_bx <- ggplot(df_ae, aes(y = S, x="")) + geom_boxplot() + geom_jitter(aes(colour=S_factor)) +
+              theme(axis.ticks=element_blank(), legend.position="none", panel.background=element_blank(), panel.border=element_blank(),
+                    panel.grid.major=element_blank(), panel.grid.minor=element_blank(),plot.background=element_blank())
+p_S.p_lm <- ggplot(df_ae, aes(x=p, y=S)) + geom_smooth(method="lm", se=FALSE, colour = "#003300") +
+              geom_point(aes(colour=S_factor ,shape = S_factor, size = 10)) +
+              scale_shape_manual(values=LETTERS[1:10]) + theme_bw() +
+              annotate("rect", xmin = -0.01, xmax = 0.11, ymin = 170, ymax = 220, fill="white", colour="red") + #caixa
+              annotate("text", x=0.05, y=c(213,196,179), label = c("R^2 == 0.367","alpha == 50.854", "beta == 83.290"), parse=T, size = 3)
+p_S.p_lm.diag <- autoplot(lm_S.p) + theme_bw()
+# diagnostic grafics #
+#p1<-ggplot(df_ae, aes(x = fit, y = res)) + #Residual vs Fitted Plot
+#      geom_point(aes(colour=S_factor ,shape = S_factor, size = 10)) + 
+#      stat_smooth(method="loess") + geom_hline(yintercept=0, col="red", linetype="dashed") +
+#      scale_shape_manual(values=LETTERS[1:10]) +
+#      xlab("Fitted values") + ylab("Residuals")
+#      ggtitle("Residual vs Fitted Plot") +
+#      theme(legend.position="none", panel.background=element_blank(), panel.border=element_blank(),
+#            panel.grid.major=element_blank(), panel.grid.minor=element_blank(),plot.background=element_blank())
+lay <- rbind(c(1,1,1,3,4,4,5,5),
+             c(2,2,2,2,6,6,7,7))
+
+grid.arrange(p_S.p_bx,
+             p_S.p_lm,
+             p_p.S_bx,
+             p_S.p_lm.diag@plots[[1]], p_S.p_lm.diag@plots[[2]],p_S.p_lm.diag@plots[[3]],p_S.p_lm.diag@plots[[4]], 
+             ncol = 8, nrow = 2, layout_matrix = lay)
+```
+Figura 2 - Riqueza observada e Cobertura vegetal. Acima na esquerda, regressão linear S ~ p, abaixo boxplot da mesma relação pelas 10 classes de riqueza, a direita gráficas diagnósticos da regressão. 
+
+  Tanto 'S' quanto 'p' não estou igualmente representados por toda o espectro de valores (figura 1)
+
+
+
+## J ~ p ##
+```{r distibuições que melhor ajustam sua frequência}
+df_ae <- unique(df_resultados[,c(1,22)])
+# x11()
+# plotdist(df_ae$S.obs) #ela parece ser levemente assimétrica para a esquerda
+md1 <- fitdist(df_ae$S.obs,"weibull")
+md2 <- fitdist(df_ae$S.obs,"gamma")
+md3 <- fitdist(df_ae$S.obs,"lnorm")
+md4 <- fitdist(df_ae$S.obs,"norm")
+par(mfrow=c(2,2))
+denscomp(list(md1,md2,md3,md4), legendtext=c("weibull", "lnorm", "gamma", "norm"))
+qqcomp(list(md1,md2,md3,md4), legendtext=c("weibull", "lnorm", "gamma", "norm"))
+cdfcomp(list(md1,md2,md3,md4), legendtext=c("weibull", "lnorm", "gamma", "norm"))
+ppcomp(list(md1,md2,md3,md4), legendtext=c("weibull", "lnorm", "gamma", "norm"))
+par(mfrow=c(1,1))
+df_AIC <- data.frame(dist = c("Weibull", "lognormal", "gamma", "norm"),
+                     AIC = sapply(list(md1,md2,md3,md4),function(x) x$aic),
+                     df = sapply(list(md1,md2,md3,md4),function(x) length(x$estimate)) ) %>% arrange(AIC)
+df_AIC %<>% mutate(dAIC = AIC-(AIC[1]))
+
+#l_md.S <- vector("list",length = length(dist)) #lista que vai armazenar os modelos 
+#names(l_md.S) <- dist #nomeando 
+#for(i in 1:length(dist) ){
+#  l_md.S[[i]] <- fitdist(df_ae$S.obs, dist[i])
+#}
+
+#for(i in 1:5){
+#  l_md.S[[i]] <- vector("list",length=3)
+#  names(l_md.S[[i]]) <- c("fun_md", "start", "mle")
+#}
+
+#l_md[[1]] <-  fitdist(df_ae) #Poisson
+#l_md[[2]] <- glm(S.obs ~ 1,family="binomial"(), data = df_ae) #binomial
+```
+Figura 1. A distribuição de Riqueza Observada
+
+
+```{r }
+df_ae <- df_resultados[,c(1,17,22)] %>% unique
+names(df_ae)[3] <- "S"
+df_ae %<>% mutate(.,S_factor = cut(S,10),
+                    p_factor = cut(p,10))
+lm_S.p <- lm(S ~ p, data = df_ae)
+df_ae$fit <- lm_S.p$fitted.values
+df_ae$res <- lm_S.p$residuals
+# df_ae %>% mutate(S_true = S - (fit + res) ) %>% .$S_true %>% summary # OK
+# summary(lm_S.p)
+# plots #
+p_S.p_bx <- ggplot(df_ae, aes(y=p, x=S)) +
+              geom_boxplot(aes(colour=S_factor)) + 
+              geom_jitter() +
+              theme(legend.position="none",plot.background=element_blank()) + 
+              coord_flip()
+p_p.S_bx <- ggplot(df_ae, aes(y = S, x="")) + geom_boxplot() + geom_jitter(aes(colour=S_factor)) +
+              theme(axis.ticks=element_blank(), legend.position="none", panel.background=element_blank(), panel.border=element_blank(),
+                    panel.grid.major=element_blank(), panel.grid.minor=element_blank(),plot.background=element_blank())
+p_S.p_lm <- ggplot(df_ae, aes(x=p, y=S)) + geom_smooth(method="lm", se=FALSE, colour = "#003300") +
+              geom_point(aes(colour=S_factor ,shape = S_factor, size = 10)) +
+              scale_shape_manual(values=LETTERS[1:10]) + theme_bw() +
+              annotate("rect", xmin = -0.01, xmax = 0.11, ymin = 170, ymax = 220, fill="white", colour="red") + #caixa
+              annotate("text", x=0.05, y=c(213,196,179), label = c("R^2 == 0.367","alpha == 50.854", "beta == 83.290"), parse=T, size = 3)
+p_S.p_lm.diag <- autoplot(lm_S.p) + theme_bw()
+# diagnostic grafics #
+#p1<-ggplot(df_ae, aes(x = fit, y = res)) + #Residual vs Fitted Plot
+#      geom_point(aes(colour=S_factor ,shape = S_factor, size = 10)) + 
+#      stat_smooth(method="loess") + geom_hline(yintercept=0, col="red", linetype="dashed") +
+#      scale_shape_manual(values=LETTERS[1:10]) +
+#      xlab("Fitted values") + ylab("Residuals")
+#      ggtitle("Residual vs Fitted Plot") +
+#      theme(legend.position="none", panel.background=element_blank(), panel.border=element_blank(),
+#            panel.grid.major=element_blank(), panel.grid.minor=element_blank(),plot.background=element_blank())
+lay <- rbind(c(1,1,1,3,4,4,5,5),
+             c(2,2,2,2,6,6,7,7))
+
+grid.arrange(p_S.p_bx,
+             p_S.p_lm,
+             p_p.S_bx,
+             p_S.p_lm.diag@plots[[1]], p_S.p_lm.diag@plots[[2]],p_S.p_lm.diag@plots[[3]],p_S.p_lm.diag@plots[[4]], 
+             ncol = 8, nrow = 2, layout_matrix = lay)
+```
+Figura 2 - Riqueza observada e Cobertura vegetal. Acima na esquerda, regressão linear S ~ p, abaixo boxplot da mesma relação pelas 10 classes de riqueza, a direita gráficas diagnósticos da regressão. 
+
+  Tanto 'S' quanto 'p' não estou igualmente representados por toda o espectro de valores (figura 1)
+
+## J ~ p ##
+```{r distibuições que melhor ajustam sua frequência}
+df_ae <- unique(df_resultados[,c(1,22)])
+# x11()
+# plotdist(df_ae$S.obs) #ela parece ser levemente assimétrica para a esquerda
+md1 <- fitdist(df_ae$S.obs,"weibull")
+md2 <- fitdist(df_ae$S.obs,"gamma")
+md3 <- fitdist(df_ae$S.obs,"lnorm")
+md4 <- fitdist(df_ae$S.obs,"norm")
+par(mfrow=c(2,2))
+denscomp(list(md1,md2,md3,md4), legendtext=c("weibull", "lnorm", "gamma", "norm"))
+qqcomp(list(md1,md2,md3,md4), legendtext=c("weibull", "lnorm", "gamma", "norm"))
+cdfcomp(list(md1,md2,md3,md4), legendtext=c("weibull", "lnorm", "gamma", "norm"))
+ppcomp(list(md1,md2,md3,md4), legendtext=c("weibull", "lnorm", "gamma", "norm"))
+par(mfrow=c(1,1))
+df_AIC <- data.frame(dist = c("Weibull", "lognormal", "gamma", "norm"),
+                     AIC = sapply(list(md1,md2,md3,md4),function(x) x$aic),
+                     df = sapply(list(md1,md2,md3,md4),function(x) length(x$estimate)) ) %>% arrange(AIC)
+df_AIC %<>% mutate(dAIC = AIC-(AIC[1]))
+
+#l_md.S <- vector("list",length = length(dist)) #lista que vai armazenar os modelos 
+#names(l_md.S) <- dist #nomeando 
+#for(i in 1:length(dist) ){
+#  l_md.S[[i]] <- fitdist(df_ae$S.obs, dist[i])
+#}
+
+#for(i in 1:5){
+#  l_md.S[[i]] <- vector("list",length=3)
+#  names(l_md.S[[i]]) <- c("fun_md", "start", "mle")
+#}
+
+#l_md[[1]] <-  fitdist(df_ae) #Poisson
+#l_md[[2]] <- glm(S.obs ~ 1,family="binomial"(), data = df_ae) #binomial
+```
+Figura 1. A distribuição de Riqueza Observada
+
+
+```{r }
+df_ae <- df_resultados[,c(1,17,22)] %>% unique
+names(df_ae)[3] <- "S"
+df_ae %<>% mutate(.,S_factor = cut(S,10),
+                    p_factor = cut(p,10))
+lm_S.p <- lm(S ~ p, data = df_ae)
+df_ae$fit <- lm_S.p$fitted.values
+df_ae$res <- lm_S.p$residuals
+# df_ae %>% mutate(S_true = S - (fit + res) ) %>% .$S_true %>% summary # OK
+# summary(lm_S.p)
+# plots #
+p_S.p_bx <- ggplot(df_ae, aes(y=p, x=S)) +
+              geom_boxplot(aes(colour=S_factor)) + 
+              geom_jitter() +
+              theme(legend.position="none",plot.background=element_blank()) + 
+              coord_flip()
+p_p.S_bx <- ggplot(df_ae, aes(y = S, x="")) + geom_boxplot() + geom_jitter(aes(colour=S_factor)) +
+              theme(axis.ticks=element_blank(), legend.position="none", panel.background=element_blank(), panel.border=element_blank(),
+                    panel.grid.major=element_blank(), panel.grid.minor=element_blank(),plot.background=element_blank())
+p_S.p_lm <- ggplot(df_ae, aes(x=p, y=S)) + geom_smooth(method="lm", se=FALSE, colour = "#003300") +
+              geom_point(aes(colour=S_factor ,shape = S_factor, size = 10)) +
+              scale_shape_manual(values=LETTERS[1:10]) + theme_bw() +
+              annotate("rect", xmin = -0.01, xmax = 0.11, ymin = 170, ymax = 220, fill="white", colour="red") + #caixa
+              annotate("text", x=0.05, y=c(213,196,179), label = c("R^2 == 0.367","alpha == 50.854", "beta == 83.290"), parse=T, size = 3)
+p_S.p_lm.diag <- autoplot(lm_S.p) + theme_bw()
+# diagnostic grafics #
+#p1<-ggplot(df_ae, aes(x = fit, y = res)) + #Residual vs Fitted Plot
+#      geom_point(aes(colour=S_factor ,shape = S_factor, size = 10)) + 
+#      stat_smooth(method="loess") + geom_hline(yintercept=0, col="red", linetype="dashed") +
+#      scale_shape_manual(values=LETTERS[1:10]) +
+#      xlab("Fitted values") + ylab("Residuals")
+#      ggtitle("Residual vs Fitted Plot") +
+#      theme(legend.position="none", panel.background=element_blank(), panel.border=element_blank(),
+#            panel.grid.major=element_blank(), panel.grid.minor=element_blank(),plot.background=element_blank())
+lay <- rbind(c(1,1,1,3,4,4,5,5),
+             c(2,2,2,2,6,6,7,7))
+
+grid.arrange(p_S.p_bx,
+             p_S.p_lm,
+             p_p.S_bx,
+             p_S.p_lm.diag@plots[[1]], p_S.p_lm.diag@plots[[2]],p_S.p_lm.diag@plots[[3]],p_S.p_lm.diag@plots[[4]], 
+             ncol = 8, nrow = 2, layout_matrix = lay)
+```
+Figura 2 - Riqueza observada e Cobertura vegetal. Acima na esquerda, regressão linear S ~ p, abaixo boxplot da mesma relação pelas 10 classes de riqueza, a direita gráficas diagnósticos da regressão. 
+
+  Tanto 'S' quanto 'p' não estou igualmente representados por toda o espectro de valores (figura 1)
+
+  Tanto 'S' quanto 'p' não estou igualmente representados por toda o espectro de valores (figura 1)
+
+  
+  Irei explorar gráficamente a relação dessas variáveis
+  possui dois tipos de valores de entrada: i) relacionando com a variável ambiental, 'p' - cobertura vegetal, porcentagem de vegetação ('habitat') remanescente, variável de interesse; ii) relacionado com 
+  vou ver o impacto das 'variáveis de controle' riqueza observada (S.obs), tamanho da comunidade local (J) e tamanho da comunidade da paisagem (Jl - 'landscape') nas variáveis resposta e na proporção remanescente de habitat (p), a variável ambiental de interesse. Utilizarei o mesmo padrão de comparação para todas as covariáveis
+<!--(NOTA: queria manter em portugues, mas Jp confunde um pouco com o 'p' que estou usando para cobertura vegetal; se eu manter cobertura ao inves de 'p' eu deixo Jp)-->
+
+
+
+## Influência das variáveis de controle na relação estudada ##
+
+
+  A riqueza observada parece apresentar relações com as variáveis que sumarizam as simulações (fig 1). O modelo linear S.medio ~ S.obs apresenta: F(1, 766) = 1.255e+06, p-value < 2.2e-166, R² = 0.994  'S.medio = `r round(lm_S$coefficients[1], 4)` + `r round(lm_S$coefficients[2], 4)` * S.obs'. O parâmetro "U" (taxa de imigração) é estimado para obter em média a riqueza observada dado o número de indivíduos ("J") e a matriz de paisagem (cuja soma de habitat e não habitat é "Jl", densidade de indivíduos * número total de hectares do recorte de paisagem(500 ha) ).
+  
+  Além da relação esperada com S.medio, riqueza observada parece ter relação com a maior distância media entre as SADs simuladas e as SADs observadas (fig 1, KS ~ S.obs) e uma possível relação com a variância de GOF (fig 1. GOF ~ S.obs ). Como GOF é obtido pela contabilização do número de SAD répĺicas cujo KS.p > 0.05 (e portanto aceita-se a hipótese nula do teste KS de que os dois vetores de abundâcia são amostras de uma mesma distribuição hipotética de abundâncias de espécies) pode se esperar que S.obs também deve ter algum efeito em KS.p. Assim, a riqueza observada será utilizada como variável preditora tanto da taxa de imigração (U) quanto da qualidade do modelo neutro em predizer a distribuição de abundância de espécies no gradiente de cobertura (teste de KS e relacionados). Considero aqui modelos em que S.obs terá efeito fixo como alatório. Tanto J como Jp não parecem ter relação com a as variáveis respostas, assim serão usadas apenas na construção do modelo cheio ou se os modelos selecionados possuirem pequena qualidade de ajuste. Alternativamente vou fazer uma análise paralela onde vou usar os resíduos da regressão linear das variáveis da simulação como variável respoosta.
+  
+  O parâmetro 'U', taxa media de imigração, é usada para simular 100 SADs réplicas por par simulação (Sitecode, kernel) (fig 1 U ~ ). A relação entre U e as demais variáveis respostas da simulação é similar às relações ~ S.obs, sendo U também relacionado com S.obs. Assim, modelos para os valores relacionados com o teste KS serão construidos com ambas S e U como variáveis de controle (provavelmente como efeito aleatório), contudo, nunca no mesmo modelo com exceção dos modelos completos (manter o modelo mais simples possível).
+  
+  KS, KS.p e GOF podem ser entendidas como medidas de qualidade de ajuste. KS mede a maior distância entre as curvas acumuladas. KS.p mede a probabilidade de errar ao assumir que os vetores de abundância não são de uma mesma distribuição de abundância, dado um valor de KS e uma distribuição nula de valores de KS. GOF contabiliza o número de vezes que uma réplica apresentou KS.p > 0.05 por par (SiteCode, cluster_medio). Como era de se esperar essas variáveis apresentam correlação, as análises serão feitas paralelamente e comparadas. 
+  
+  A variável S.obs é um dos principais inputs da simulação se sua influência for muito grande nos dados o . Eventualmente o gradiente de riqueza está mascarando algum efeito que o gradiente de cobertura vegetal tem na resposta biológica. Assim, vou utilizar os resíduos de uma regressão linear U ~ S.obs como variável para U em um análise paralela, tentando "quebrar" a correlação com S.obs.
+
+```{r analise da influencia de S.obs nos dados}
+# Objetivo avaliar como que a riqueza observada pode estar mascarando o efeito da cobertura na resposta biológica
+# começar fitando uma regressão linear
+df_ae <- df_resultados[,c(1,18,2,17,3:5,28,6:9,22)]
+names(df_ae)[13] <- "S"
+df_ae %<>% mutate(.,S_factor = cut(S,10),
+                    p_factor = cut(p,10))
+p_S.p_lm <- ggplot(df_ae, aes(x=p, y=S)) + geom_smooth(method="lm", se=FALSE) +
+              geom_point(aes(colour=S ,shape = S_factor, size = 10)) +
+              scale_color_gradient(low="blue", high="red") +
+              scale_shape_manual(values=LETTERS[1:10]) + theme_bw()
+p_S.p_bx <- ggplot(df_ae[df_ae$Sindrome == "wind",], aes(y=p, x=S)) +
+              geom_boxplot(aes(colour=S_factor)) + 
+              geom_jitter() +
+              theme_bw() + coord_flip()
+
+autoplot(lm(S ~ p, data = df_ae))
+grid.arrange(p_S.p_lm,p_S.p_bx, ncol=1)        
+
+
+
+
+
+
+p_S.p <- ggplot(df_ae, aes(x=p, y=S, group=S_factor)) + geom_smooth(method="lm", se=FALSE, aes(colour=S_factor)) +
+          geom_point(aes(colour=S_factor ,shape = S_factor, size = 10)) +
+          scale_shape_manual(values=LETTERS[1:10]) + theme_bw() + theme(legend.position="none")
+p_U.p.S <- ggplot(df_ae, aes(x=p, y=U, group = S_factor)) + geom_smooth(method="lm", se=FALSE, aes(colour=S_factor)) +
+            geom_point(aes(colour=S_factor, shape = S_factor, size = 10)) +
+            scale_shape_manual(values=LETTERS[1:10]) + theme_bw() + theme(legend.position="none")
+p_p.S <- ggplot(df_ae, aes(x=S, y=p, group = p_factor)) + geom_smooth(method="lm", se=FALSE, aes(colour=p_factor)) +
+            geom_point(aes(colour=p_factor, shape=p_factor, size = 10)) +
+            scale_shape_manual(values=LETTERS[11:20]) + theme_bw() + theme(legend.position="none")
+p_U.S.p <- ggplot(df_ae, aes(x=S, y=U, group = p_factor)) + geom_smooth(method="lm", se=FALSE, aes(colour=p_factor)) +
+            geom_point(aes(colour=p_factor, shape = p_factor, size = 10)) +
+            scale_shape_manual(values=LETTERS[11:20]) + theme_bw() + theme(legend.position="none")
+
+grid.arrange(p_S.p, p_p.S, p_U.p.S, p_U.S.p, ncol=2,nrow=2)
+
+ggplot(df_ae, aes( y = log(U), x = cobertura, colour = S_factor)) + geom_point() + geom_smooth(method = "lm", se = FALSE)
+            
+p_U.p.S <- ggplot(df_ae, aes(x=p, y=U, colour = S)) + 
+            geom_point(aes(shape = S_factor, size = 10))
+            geom_smooth(method="lm", se=FALSE) +
+            #scale_color_gradient(low="blue", high="red") +
+            scale_shape_manual(values=LETTERS[1:10]) + theme_bw()
+            
+            
+            
+            
+p_KS.p.S <- ggplot(df_ae, aes(x=p, y=KS)) + geom_smooth(method="lm", se=FALSE, color="#003300") +
+              geom_point(aes(colour=S, shape = S_factor, size = 10)) +
+              scale_color_gradient(low="blue", high="red") +
+              scale_shape_manual(values=LETTERS[1:10]) + theme_bw()
+p_KS.p.p.S <- ggplot(df_ae, aes(x=p, y=KS.p)) + geom_smooth(method="lm", se=FALSE, color="#003300") +
+                geom_point(aes(colour=S, shape = S_factor, size = 10)) +
+                scale_color_gradient(low="blue", high="red") +
+                scale_shape_manual(values=LETTERS[1:10]) + theme_bw()
+p_GOF.p.S <- ggplot(df_ae, aes(x=p, y=GOF)) + geom_smooth(method="lm", se=FALSE, color="#003300") +
+              geom_point(aes(colour=S, shape = S_factor, size = 10)) +
+              scale_color_gradient(low="blue", high="red") +
+              scale_shape_manual(values=LETTERS[1:10]) + theme_bw()
+
+
+```
+
+
+## U ##
+
+```{r preparação dos dados e grafico das variaveis de controle}
+# objetivo: pegar os dados de interesse de df_resultados e df_ref, transformar nas novas variáveis e plotar o primeiro plot da análise exploratória
+df_res.U <- inner_join(x = df_resultados[,c(1:4,5,28,17:18,20:23)], y = df_ref[,c(1,7,9)], by = "SiteCode") #df para análise de U
+df_res.U %<>% arrange(cobertura, cluster_medio)
+df_res.U$fitofisio_type %<>% factor #drop levels
+df_res.U$estado %<>% factor
+
+### criando variável que representa a comunidade presente no recorte de paisagem ###
+df_res.U %<>% mutate(KS_factor = cut(KS, 10), # transformando apenas para facilitar a visualização
+                     KS.p_factor = cut(KS.p, 10), 
+                     J_factor = cut(J,10),
+                     Jl_factor = cut(Jl,10),
+                     S.obs_factor = cut(S.obs,10),
+                     p_factor = cut(p, 10)) 
+```
+  
+
+## KS ##
+# preparação dos dados da análise com os valores originais #
+```{r preparação dos dados e grafico das variaveis de controle}
+# objetivo: pegar os dados de interesse de df_resultados e df_ref, transformar nas novas variáveis e plotar o primeiro plot da análise exploratória
+df_res.KS <- inner_join(x = df_resultados[,c(1:4,5,28,17:18,20:22)], y = df_ref[,c(1,7,9)], by = "SiteCode") #df para análise de U
+df_res.KS$cluster_medio %<>% as.numeric 
+df_res.KS %<>% arrange(cobertura, cluster_medio)
+df_res.KS$fitofisio_type %<>% factor #drop levels
+df_res.KS$estado %<>% factor
+names(df_res.KS)[c(3,7,9,13)] <- c("U","p","J","forest") #U: taxa de imigração, p: porcentagem de habitat remanescente, J: tamanho da comunidade, forest: forest_type
+
+### criando variável que representa a comunidade presente no recorte de paisagem ###
+df_res.KS %<>% mutate(Jl = DA * 500, # tamanho da comunidade da paisagem,produto da densidade de indivíduos (N/ha) pelo número de hectares do recorte de paisagem (500 ha)
+                     I = U*(J-1)/(1-U), # fluxo de imigrantes para a comunidade local (Rosindell et al. 2011)
+                     U..J = U/J, # taxa de imigração per capita; probabilidade de substituição de um individuo da comunidade por um 
+                     KS_factor = cut(KS, 10), # transformando apenas para facilitar a visualização
+                     KS.p_factor = cut(KS.p, 10), 
+                     #J_factor = cut(J,10),
+                     #Jl_factor = cut(Jl,10),
+                     S.obs_factor = cut(S.obs,10),
+                     p_factor = cut(p, 10)) 
+scatterplotMatrix(~ S.obs + U + KS + KS.p + GOF, data = df_res.KS)
+```
+
+# usando os resíduos de U ~ S.obs
+```{r preparação dos dados e grafico das variaveis de controle}
+# objetivo: pegar os dados de interesse de df_resultados e df_ref, transformar nas novas variáveis e plotar o primeiro plot da análise exploratória
+df_res.KS <- inner_join(x = df_resultados[,c(1:4,5,28,17:18,20:22)], y = df_ref[,c(1,7,9)], by = "SiteCode") #df para análise de U
+df_res.KS$cluster_medio %<>% as.numeric 
+df_res.KS %<>% arrange(cobertura, cluster_medio)
+df_res.KS$fitofisio_type %<>% factor #drop levels
+df_res.KS$estado %<>% factor
+names(df_res.KS)[c(3,7,9,13)] <- c("U","p","J","forest") #U: taxa de imigração, p: porcentagem de habitat remanescente, J: tamanho da comunidade, forest: forest_type
+
+### criando variável que representa a comunidade presente no recorte de paisagem ###
+df_res.KS %<>% mutate(Jl = DA * 500, # tamanho da comunidade da paisagem,produto da densidade de indivíduos (N/ha) pelo número de hectares do recorte de paisagem (500 ha)
+                     I = U*(J-1)/(1-U), # fluxo de imigrantes para a comunidade local (Rosindell et al. 2011)
+                     U..J = U/J, # taxa de imigração per capita; probabilidade de substituição de um individuo da comunidade por um 
+                     KS_factor = cut(KS, 10), # transformando apenas para facilitar a visualização
+                     KS.p_factor = cut(KS.p, 10), 
+                     #J_factor = cut(J,10),
+                     #Jl_factor = cut(Jl,10),
+                     S.obs_factor = cut(S.obs,10),
+                     p_factor = cut(p, 10)) 
+# adicionar a tranformação de variável: residuals(lm(U ~ S.obs, data = df_ae))
+
+scatterplotMatrix(~ S.obs + U + KS + KS.p + GOF, data = df_res.KS)
+```
+
+
+  Similarmente ao conjunto de variáveis anteriores, KS._, também são medidas relacionadas entre si. KS.abund é o valor de abundância onde foi observado KS, pode ser entendido como a abundância acumulada que gerou a maior distância entre as SADs. KS.ac.obs é a média do valor da curva acumulada onde se observou KS; KS.ac.sim idem para a SAD simulada; KS.obs.sim mede a diferença média entre KS.ac.obs e KS.ac.sim. Espera-se que KS.obs.sim seja descrita por uma distribuição simétrica com média no zero, contudo, ela parece ser assimétrica para a direita, revelando que em média a maior distância entre as curvas acumuladas se deve ao modelo neutro subestimar a abundância onde KS foi observado (KS.abund).
+
+# Variáveis biogeográficas e históricas #
+```{r}
+df_ae <- inner_join(df_ref[,c(1,5,9:10,12:15)], unique(df_resultados[,c(1,17)]), by = "SiteCode")
+#df_ae %>% str
+for(i in seq(1,8)[-2]) {
+  df_ae[,i] %<>% factor #drop levels
+  df_ae[,i] %<>% as.character #transformando para facilitar manipulação
+}
+#df_ae %>% str
+#df_ae %>% summary # as variáveis forest_disturbance e forest_age apresentam muitos NAs, vou retira-las e considerar apenas as demais variáveis. 'ha' não será considerado
+names(df_ae)[4:8] <- c("forest","succession","age","disturbance","UC")
+df_ae %<>% select(SiteCode, p, estado, UC, succession, forest) %>% melt(.,c("SiteCode", "p"))
+names(df_ae)[3:4] <- c("var.aleatoria", "nivel")
+
+#df_ae %>% filter(var.aleatoria == "estado") %>% .$nivel %>% table
+#df_ae %>% filter(var.aleatoria == "UC") %>% .$nivel %>% table
+df_ae[df_ae$var.aleatoria == "UC" & df_ae$nivel == "UC Protecao Integral" & !is.na(df_ae$nivel), 4] <- rep("PI",33)
+df_ae[df_ae$var.aleatoria == "UC" & df_ae$nivel == "UC Uso Sustentavel" & !is.na(df_ae$nivel), 4] <- rep("US", 19)
+df_ae[df_ae$var.aleatoria == "UC" & df_ae$nivel == "universities and research center" & !is.na(df_ae$nivel), 4] <- "pesquisa"
+df_ae[df_ae$var.aleatoria == "UC" & df_ae$nivel == "universities and research centers" & !is.na(df_ae$nivel), 4] <- rep("pesquisa", 3)
+#df_ae %>% filter(var.aleatoria == "succession") %>% .$nivel %>% table
+#df_ae %>% filter(var.aleatoria == "forest") %>% .$nivel %>% table
+df_ae[df_ae$var.aleatoria == "forest" & df_ae$nivel == "Cerradao (Savana florestada)" & !is.na(df_ae$nivel), 4] <- rep("cer",2)
+df_ae[df_ae$var.aleatoria == "forest" & df_ae$nivel == "Contato FES/FOM" & !is.na(df_ae$nivel), 4] <- "FES/FOM"
+df_ae[df_ae$var.aleatoria == "forest" & df_ae$nivel == "Contato FOD/FES" & !is.na(df_ae$nivel), 4] <- "FES/FOD"
+df_ae[df_ae$var.aleatoria == "forest" & df_ae$nivel == "Floresta de galeria" & !is.na(df_ae$nivel), 4] <- "FG"
+df_ae[df_ae$var.aleatoria == "forest" & df_ae$nivel == "FOM plantada" & !is.na(df_ae$nivel), 4] <- "FOM.plant"
+df_ae[df_ae$var.aleatoria == "forest" & df_ae$nivel == "Formacao pioneira sob influencia marinha" & !is.na(df_ae$nivel), 4] <- rep("f1.IM",4)
+#x11()
+p_cobertura.va <- ggplot(df_ae, aes(y = p, x = nivel)) + 
+                    geom_boxplot(aes(fill=nivel)) + geom_jitter() +
+                    facet_wrap(~var.aleatoria, scales = "free") + labs(x="") +
+                    theme_bw() + theme(strip.background=element_rect(fill="black")) + theme(strip.text=element_text(color="white", face="bold")) + guides(fill =FALSE)
+p_cobertura.va
+```
+Figura 3. Cobertura X Variáveis de efeito aleatório: 'estado', UC - unidade de conservação, succession = sucessão ecológica
+f1.IM = Formacao pioneira sob influencia marinha, FG = Floresta de galeria, cer = Cerradão, PI = UC de proteção integral, US = UC de uso sustentável
+  
+  Procurando maximar a variação de interesse (cobertura vegetal) e minimizar a variação decorrente da distribuição dos dados (NÃO SEI COMO FALAR... a ideia é que )
+
+
+do Bolker et al 2008 BOX 4: Procedures - creating a full model -->
+  
+## Construção dos modelos ##
+ Vou dividir a construção dos modelos em sessões segundo a variável de interesse. Então primeiro irei criar modelos para 'U' e algumas derivações teóricas da taxa de imigração. Sigo para as variáveis de qualidade do ajuste KS, KS.p e GOF e termino com as variáveis que descrevem como as divergências ocorrem na SAD (KS.abund, KS.ac._, KS.obs.sim). As variáveis de interesse são duas: cobertura vegetal ( ou 'p' - porcentagem remanescente de habitat) e o parâmetro escalar da distribuição de probabilidade que descreve o evento de colonização de um propagulo em função da distância da árvore progenitora ('kernel'). Kernel apresenta 8 níveis, cada nível é a média da distância média de entre propagulos e planta mãe espécies de uma mesma estratégia de dispersão (tabela 1  de  REFERÊNCIA). Riqueza observada será usada como variável de efeito aleatório. nos modelos onde p e kernel são as variáveis de interesse. Variáveis que sintetizam aspectos biogeográficos e históricos de cada levantamento também serão usados como variáveis de efeito aleatório apenas nos modelos cheios ou quando for pertinente.
+ A análise de cada variável seguirá um mesmo protocolo de construção de modelos lineares generalizados mistos (GLMM) para criar modelos cheios (Bolker et al. 2008, Box 4 - Procedures: creating a full model). Todos os demais modelos serão submodelos do modelo cheio. Uma breve análise exploratória precede a construção dos modelos. 
+ 
+#taxa de imigração - "U" #
+-Descrição da variável
+-análise exploratória <!--modelo em mente U ~ p * kernel + (U | S) + (1 | estado) + (1 | fitofisio)-->
+-protocolo de construção de modelo cheio
+-construção dos modelos per se: argumentação
+-seleção de modelos e ajuste aos dados
+-produção de resultados: gráficos ilustrativos e descrição
+
+
+-Descrição da variável
+
+ A taxa de imigração ("U") pode ser entendido como o parâmetro de escala de uma distribuição que descreve a probabilidade de substituição de um indivíduo qualquer da comunidade de tamanho 'J' por um indivíduo de uma espécie nova, entre intervalos de morte na comunidade local (REFERÊNCIA). Os eventos de substituição ocorrem de maneira independente, não há correlação temporal. A probabilidade de substituição é constante no tempo e para todo o intervalo das variáveis preditoras. Apenas um evento de substituição ocorre por ciclo. As simulações distinguem em J e em Jl, assim algumas variáveis serão calculadas a partir de U para compensar a diferença de J (Jl será considerada efeito aleatório ou offset). Do modelo clássico com espaço implicito, podemos calcular o fluxo de imigrantes para a comunidade local (I), que leva em conta J: I = U*(J-1)/(1-U) (Rosindell et al. 2011). E tambem vai ser calculado a taxa de imigração per capita U..J: probabilidade de substituição de um indivíduo da comunidade local por um indivíduo de uma espécie nova/(morte * indivívuo) (faz sentido?).
+
+  é uma variável aleatórioa que é descrita por uma distribuição que descreve o processo estatístico de substituição de um indivíduo qualquer da comunidade de tamanho 'J' por um indivíduo de uma espécie com apenas um indivíduo ('singleton'). Os eventos de substituição ocorrem de maneira independenetemente, não há correlação temporal (REFERÊNCIA). A taxa com que as substituições ocorrem é constante no tempo e para todo o intervalo das variáveis preditoras (REFERÊNCIA) e os eventos não ocorrem de maneira simultanea (REFERÊNCIA). Assim, a distribuição exponencial é uma boa escolha para modelar "U", pois a variável foi construida par ter os mesmos pressupostos (REESCREVER) (REFERÊNCIA sobre a teoria neutra do ponto de vista de amostragem, não sei se faz sentido). A distribuição exponencial é descrita por um único parâmetro 'lambda' que mede a taxa com que um evento ocorre em um intervalo de tempo, em nosso caso, por morte na comunidade local de tamanho "J". Um indivíduo morre por ciclo.
+
+<!--ENCONTRAR MELHOR LOCAL PARA DEIXAR ESSA SESSÃO-->
+
+```{r U: preparacao dos dados, echo=FALSE}
+### U.media ###
+# preparação dos dados #
+df_ae <- inner_join(x = df_resultados[,c(1:4,5,28,17:18,20:22)], y = df_ref[,c(1,7,9)], by = "SiteCode") #df de trabalho
+df_ae$cluster_medio %<>% as.numeric 
+df_ae %<>% arrange(cobertura, cluster_medio)
+df_ae$fitofisio_type %<>% factor #drop levels
+df_ae$estado %<>% factor
+names(df_ae)[c(3,7,9,11:12)] <- c("U","p","J","S","fitofisio")
+
+### criando variável que representa a comunidade presente no recorte de paisagem ###
+df_ae %<>% mutate(Jl = DA * 500, # tamanho da comunidade da paisagem,produto da densidade de indivíduos (N/ha) pelo número de hectares do recorte de paisagem (500 ha)
+                  I = U*(J-1)/(1-U), # fluxo de imigrantes para a comunidade local (Rosindell et al. 2011)
+                  U..J = U/J, # taxa de imigração per capita; probabilidade de substituição de um individuo da comunidade por um 
+                  KS_factor = cut(KS, 10), # preciso pesquisar se existe alguma preferência em usar variáveis contínuas ou variáveis discretas na construção de GLMM
+                  KS.p_factor = cut(KS.p, 10), # mas certamente ajuda na visualização dos dados
+                  J_factor = cut(J,10),
+                  Jl_factor = cut(Jl,10),
+                  S_factor = cut(S,10),
+                  p_factor = cut(p, 10)) #referência a Hanski 1999
+```
+
+-Análise exploratória dos dados  <!--modelo em mente U ~ p * kernel + (U | S) + (1 | estado) + (1 | fitofisio)-->
+
+  Segue grupos de gráficos da variável resposta U (taxa de imigração) e de suas transformações I (fluxo de imigrantes para a comunidade local) e U..J (taxa de imigração per capita) com as variaveis de interesse, cobertura vegetal ('p'), porcentagem de habitat na paisagem e kernel de diserpsão. A riqueza será usado como fator de controle, outros possíveis fatores de controle como J, Jl e fatores biogeograficos e históricos serão investigados na sessão da criação de modelos.
+-gráficos U ~ cobertura * S_factor <!--variável ambiental + variável de controle-->
+```{r hist U, echo=FALSE}
+# Objetivo: criar 3 histogramas com 4 curvas ajustadas: Gamma, exponencial, Weibull e normal 
+
+# Criando as funções de log verossimilhança das distribuições subjacentes #
+#função de log verosimilhança da distribuição gama
+func_md.gamma.nulo <- function(forma, escala, vetor){ 
+  -sum(dgamma(vetor, shape=escala, scale=escala, log=TRUE))
+}
+#função de log verosimilhança da distribuição exponencial
+func_md.exp.nulo <- function(lam, vetor){ 
+  -sum(dexp(vetor, rate=lam, log=TRUE))
+}
+#função de log verosimilhança da distribuição Weibull
+func_md.weibull.nulo <- function(forma, escala, vetor){ 
+  -sum(dweibull(vetor, shape=forma, scale=escala, log=TRUE))
+}
+#função de log verosimilhança da distribuição Weibull
+func_md.normal.nulo <- function(media, sd, vetor){ 
+  -sum(dnorm(vetor, mean = media, sd = sd, log=TRUE))
+}
+
+## U ##
+# Gamma #
+md_gamma_U <- vector("list", length = 2)
+names(md_gamma_U) <- c("start", "ajuste")
+md_gamma_U[[1]] <- list(forma=mean(df_ae$U)^2/var(df_ae$U), escala=var(df_ae$U)/mean(df_ae$U)) #metodo dos momentos
+md_gamma_U[[2]] <- mle2(func_md.gamma.nulo , start = md_gamma_U[[1]], method="Nelder-Mead", data=list(vetor=df_ae$U))
+# Exponencial #
+md_exp_U <- vector("list", length = 2)
+names(md_exp_U) <- c("start", "ajuste")
+md_exp_U[[1]] <- list(lam = mean(df_ae$U)) #metodo dos momentos
+md_exp_U[[2]] <- mle2(func_md.exp.nulo , start = md_exp_U[[1]], data=list(vetor=df_ae$U))
+# Weibull #
+md_gamma_U <- vector("list", length = 2)
+names(md_gamma_U) <- c("start", "ajuste")
+md_gamma_U[[1]] <- list(forma=mean(df_ae$U)^2/var(df_ae$U), escala=var(df_ae$U)/mean(df_ae$U)) #metodo dos momentos
+md_gamma_U[[2]] <- mle2(func_md.gamma.nulo , start = md_gamma_U[[1]], method="Nelder-Mead", data=list(vetor=df_ae$U))
+# Normal #
+md_gamma_U <- vector("list", length = 2)
+names(md_gamma_U) <- c("start", "ajuste")
+md_gamma_U[[1]] <- list(forma=mean(df_ae$U)^2/var(df_ae$U), escala=var(df_ae$U)/mean(df_ae$U)) #metodo dos momentos
+md_gamma_U[[2]] <- mle2(func_md.gamma.nulo , start = md_gamma_U[[1]], method="Nelder-Mead", data=list(vetor=df_ae$U))
+
+
+
+
+bat1_gama_nulo <- function(shape,scale){ # funcao que encontra a soma dos valores de log-verossimilhanca negativa referentes aos dados observados, dado que os parametros da distribuicao sao constantes
+  -sum(dgamma(bat1_indice_media, shape=shape, scale=scale, log=TRUE))
+}
+bat1_gama_nulo_start <- list(shape=mean(bat1_indice_media)^2/var(bat1_indice_media),scale=var(bat1_indice_media)/mean(bat1_indice_media)) # valores que serao utilizados como start na funcao mle2, calculados a partir do metodo dos momentos
+bat1_gama_nulo_mle <- mle2(bat1_gama_nulo, start=bat1_gama_nulo_start,method="Nelder-Mead")
+
+
+
+
+md_gamma_U <- glm(U ~ 1, family="Gamma"(link="identity"), data = df_ae) #ajustando uma distribuição Gamma
+md_exp_U <- glm(U ~ 1, family="Gamma"(link="identity"), data = df_ae) #ajustando uma distribuição exponencial 
+md_Weibull_U <- glm(U ~ 1, family="Gamma"(link="identity"), data = df_ae) #ajustando uma distribuição Weibull
+md_normal_U <- glm(U ~ 1, data = df_ae) #ajustando uma distribuição Normal
+
+p_U.ae <- ggplot(df_ae, aes(df_ae$U)) + geom_histogram()  
+
+
+
+par(mfrow=c(1,3))
+hist(df_ae$U, breaks = 20, main = "frequência de U", xlab = "taxa de imigração", ylab = "")
+#hist(log(df_ae$U), breaks = 20, main = "frequência de log(U)", xlab = "log(taxa de imigração)", ylab = "")
+hist(df_ae$I, breaks = 20, main = "frequência de I", xlab = "fluxo de imigrantes da comunidade local", ylab = "")
+#hist(log(df_ae$I), breaks = 20, main = "frequência de log(I)", xlab = "fluxo de imigrantes da comunidade local", ylab = "")
+hist(df_ae$U..J, breaks = 20, main = "frequência de U..J", xlab = "taxa de imigração per capita", ylab = "")
+#hist(log(df_ae$U..J), breaks = 20, main = "frequência de log(U..J)", xlab = "log(taxa de imigração per capita)", ylab = "")
+par(mfrow=c(1,1))
+```
+
+
+
+```{r}
+# U ~ cobertura + kernel + S
+p_U.cobertura <- ggplot(df_ae, aes( y = U, x = cobertura)) + geom_point(size = 1) + geom_smooth(method = "lm", se = FALSE)  + theme_bw()
+p_U.cobertura_S <- ggplot(df_ae, aes( y = U, x = cobertura, colour = S_factor)) + geom_point(size = 1) + geom_smooth(method = "lm", se = FALSE)  + theme_bw()
+p_U.kernel.cobertura_S <- ggplot(df_ae, aes( y = U, x = cluster_medio, group = SiteCode, color = S_factor)) + geom_line() + facet_grid(~ cobertura_factor)  + theme_bw()
+lay <- matrix(c(1,3,2,3), ncol = 2)
+grid.arrange(p_U.cobertura, p_U.cobertura_S, p_U.kernel.cobertura_S, ncol = 2, nrow = 2, layout_matrix = lay)
+```
+  - I
+```{r}
+# log(U) ~ *
+p_I.cobertura <- ggplot(df_ae, aes( y = I, x = cobertura)) + geom_point() + geom_smooth()
+p_I.cobertura_S <- ggplot(df_ae, aes( y = I, x = cobertura, colour = S_factor)) + geom_point() + geom_smooth(method = "lm", se = FALSE)
+p_I.kernel.cobertura_S <- ggplot(df_ae, aes( y = I, x = cluster_medio, group = SiteCode, color = S_factor)) + geom_line() + facet_grid(~ cobertura_factor)
+p_I.cobertura_cluster <- ggplot(df_ae, aes( y = I, x = cobertura, colour = S_factor)) + 
+                            geom_point() + geom_smooth(method = "lm", se = FALSE) + facet_grid(~cluster_medio)
+lay <- matrix(c(1,3,2,3), ncol = 2)
+grid.arrange(p_I.cobertura, p_I.cobertura_S, p_I.kernel.cobertura_S, ncol = 2, nrow = 2, layout_matrix = lay)
+
+```
+  - U..J
+```{r}
+# log(U) ~ *
+p_U..J.cobertura <- ggplot(df_ae, aes( y = U..J, x = cobertura)) + geom_point() + geom_smooth()
+p_U..J.cobertura_S <- ggplot(df_ae, aes( y = U..J, x = cobertura, colour = S_factor)) + geom_point() + geom_smooth(method = "lm", se = FALSE)
+p_U..J.kernel.cobertura_S <- ggplot(df_ae, aes( y = U..J, x = cluster_medio, group = SiteCode, color = S_factor)) + geom_line() + facet_grid(~ cobertura_factor)
+p_U..J.cobertura_cluster <- ggplot(df_ae, aes( y = U..J, x = cobertura, colour = S_factor)) + 
+                            geom_point() + geom_smooth(method = "lm", se = FALSE) + facet_grid(~cluster_medio)
+lay <- matrix(c(1,3,2,3), ncol = 2)
+grid.arrange(p_U..J.cobertura, p_U..J.cobertura_S, p_U..J.kernel.cobertura_S, ncol = 2, nrow = 2, layout_matrix = lay)
+```
+
+
+
+
+-gráficos U ~ kernel * cobertura_factor <!--variável biológica + variável ambiental + variável de controle-->
+
+### Bolker et al 2008 BOX 4: Procedures - creating a full model ###
+*1)"Specify fixed and random effects; only important interactions"*
+Tipos de variável:
+i) variárel resposta: 'U' - taxa de imigração/ perda de espécies
+ii) variáveis de interesse: 'cobertura' - porcentagem de habitat na paisagem, pode ser entendido como a porcentagem remanescente de habitat 'p'
+                            'cluster_medio' - o parametro scalar da distribuição Laplaciana (ou exponecial, se não me engano o Renato Coutinho havia feito algo como: dado uma
+                                              determinada célula vazia, 1o sortea-se um angulo (0-360) e depois um valor de uma exponencial com lambda igual ao cluster médio)
+                            'medidas de ajuste' - KS, KSP.P, GOF (?) 
+                            'cobertura * cluster_medio' - a estimativa de U é calculada a partir da área de interesse (J), contudo, como os kernels são construidos usando
+                                                          distribuições que não são truncadas, toda a paisagem pode estar participando da dinâmica; baseado em nossas análises
+                                                          preliminares, na construção da simulação e de evidências empirícas (PROCURAR SOBRE SPP PODEM SER SER BENEFICIADAS
+                                                          PELA FRAGMENTAÇÃO DADO SUA SINDROME DE DISPERSÃO) o efeito do kernel parece ser modulado pela cobertura  
+iii) variáveis de controle: 'S' - a simulação estima o 'U' necessário para a simulação produzir SADs com uma riqueza aproximada dada uma configuração espacial e tamanho da   
+                                  área amostrada (J)
+                            'J' - tamanho da área amostrada em unidades de indivíduos
+                            'Jp' - tamanho da paisagem em unidade de indivíduos 
+                            'geohistóricos' - Estado/país; fitofisionomia
+"Restrict the model a priori":
+  a) "> 5-6 random effect levels/random effect". Vou considerar as variáveis de controle como variáveis de efeito aleatório
+```{r}
+df_temp <- df_ae %>% filter(cluster_medio == 31.10) # %>% select(S_factor, cobertura_factor, J_factor, Jp_factor, fitofisio, estado, KS_factor, KS.p_factor)
+x11()
+scatterplotMatrix(~ S + J + Jp + estado + fitofisio + estado + KS + KS.p + GOF, data = df_temp)
+```
+  figura 1 - 'scatterplotMatrix' das variáveis explicativas de controle de "U", taxa de imigração/morte no equilíbrio no tempo infinito. Esse gráfico contêm 96 levantamentos do banco de dados TreeCo (REFERÊNCIA). 'S' - riqueza de espécies; 'J' - número de indivíduos amostrados, o tamanho da comunidade 'local'; 'Jp' - produto da densidade de indivíduos pelo número total de hectares do recorte de paisagens (500 ha), pode ser entendido coo  
+
+
+*2)"Choose an error distribution and link function"*
+
+# Variável operacional - taxa de imigração/ morte no equilíbrio ("U") #
+
+  Podemos entender a taxa de imigração ("U") como o parâmetro de uma distribuição que descreve o processo estatístico de substituição de um indivíduo qualquer da comunidade de tamanho 'J' por um indivíduo de uma espécie com apenas um indivíduo ('singleton'). Os eventos de substituição ocorrem independenetemente um do outro, não há correlação temporal (REFERÊNCIA). A taxa com que as substituições ocorrem é constante no tempo e para todo o intervalo das variáveis preditoras (REFERÊNCIA) e os eventos não ocorrem de maneira simultanea (REFERÊNCIA). Assim, a distribuição exponencial é uma boa escolha para modelar "U", pois a variável foi construida par ter os mesmos pressupostos (REFERÊNCIA sobre a teoria neutra do ponto de vista de amostragem, não sei se faz sentido). A distribuição exponencial é descrita por um único parâmetro 'lambda'  
+
+            
+```{r U: primeira bateria de análise}
+## Análise exploratória ##
+#x11()
+md1 <- lm(U ~ cobertura, data = df_ae) #ajustando um modelo linear com as variáveis de interesse
+summary(md1)
+p_U.cobertura <- ggplot(df_ae, aes(x = cobertura, y = U)) + geom_point() + geom_smooth(method = "lm", se = FALSE) + ggtitle("lm( U ~ cobertura )") + theme_bw()
+a<-autoplot(lm(U ~ cobertura, data = df_ae), data = df_ae, colour = "S_factor", label.sizee = 3)
+lay <- matrix(c(1,1,2,3,4,5), ncol = 2, byrow = TRUE)
+grid.arrange(p_U.cobertura, 
+             a@plots[[1]],a@plots[[2]],a@plots[[3]],a@plots[[4]],  
+             ncol = 2, nrow = 3, layout_matrix = lay)
+# U ~ cobertura + kernel + S
+p_U.cobertura <- ggplot(df_ae, aes( y = U, x = cobertura)) + geom_point(size = 1) + geom_smooth(method = "lm", se = FALSE)  + theme_bw()
+p_U.cobertura_S <- ggplot(df_ae, aes( y = U, x = cobertura, colour = S_factor)) + geom_point(size = 1) + geom_smooth(method = "lm", se = FALSE)  + theme_bw()
+p_U.kernel.cobertura_S <- ggplot(df_ae, aes( y = U, x = cluster_medio, group = SiteCode, color = S_factor)) + geom_line() + facet_grid(~ cobertura_factor)  + theme_bw()
+lay <- matrix(c(1,3,2,3), ncol = 2)
+grid.arrange(p_U.cobertura, p_U.cobertura_S, p_U.kernel.cobertura_S, ncol = 2, nrow = 2, layout_matrix = lay)
+
+# log(U) ~ *
+p_lU.cobertura <- ggplot(df_ae, aes( y = log(U), x = cobertura)) + geom_point() + geom_smooth()
+p_lU.cobertura_S <- ggplot(df_ae, aes( y = log(U), x = cobertura, colour = S_factor)) + geom_point() + geom_smooth(method = "lm", se = FALSE)
+p_lU.kernel.cobertura_S <- ggplot(df_ae, aes( y = log(U), x = cluster_medio, group = SiteCode, color = S_factor)) + geom_line() + facet_grid(~ cobertura_factor)
+p_lU.cobertura_cluster <- ggplot(df_ae, aes( y = log(U), x = cobertura, colour = S_factor)) + 
+                            geom_point() + geom_smooth(method = "lm", se = FALSE) + facet_grid(~cluster_medio)
+lay <- matrix(c(1,3,2,3), ncol = 2)
+grid.arrange(p_lU.cobertura, p_lU.cobertura_S, p_lU.kernel.cobertura_S, ncol = 2, nrow = 2, layout_matrix = lay)
+
+
+# U: taxa de imigração (Que contêm informação de imigração e especiação - leitura minha: Etienne & Rosindell 2011)
+# I: usando a formula de conversao de probabilidade de imigração 
+                              ########################################
+                              ######## CONSTRUÇÃO DE MODELOS #########
+                              ########################################
+## Divido as variáveis em grupos:
+# 0) variáveis de identificação: Sitecode, Sindrome,
+# i) variável resposta: U
+# ii) variáveis de interesse(VI): cobertura - porcentagem de habitat remanescente (similar ao de Hanski 1999); 
+# cluster_medio: media de dispersão de espécies de uma mesma sindrome de dispersão
+# iii) variáveis de exposição: Jpaisagem = 500 * DA (número de elementos na matrix de paisagem, ou seja o tamanho de amostra de paisagem que estamos pegando); J (número de indivíduos na comunidade local)
+# iv) variáveis aleatórias(VA): S?, fito* ?, 
+# Como estou na fase de criar os modelos cheios não irei utilizar J e Jp como offsets
+
+### Padrão do modelo ###
+# md_dist <- 'glmm'(U ~ full, family = "", data = df_ae)
+# md_VI_VA <- lformula(U ~ VI + VA, data = df_ae) # as variáveis de exposição estarão em todos os modelos 
+
+md_gamma <- glm(U ~ cobertura * cluster_medio + S + KS.p + GOF + Jp + J, family = Gamma(link = "log") ,data = df_ae)
+md_expo <- glm(U ~ cobertura * cluster_medio + S + KS.p + Jp + J, family = Gamma(link = "log") ,data = df_ae)
+md_weibull <- glm(U ~ cobertura * cluster_medio + S + KS.p + Jp + J, family = Gamma(link = "log") ,data = df_ae)
+
+AICctab(md_gamma1, md_gamma2)
+
+```
+
+Sobre a influência do número de indivíduos na paisagem
+-> ideia Jp: 
+  O modelo neutro pressupõem que a comunidade é regida por processos aleatórios de morte, nascimento, imigração e especiação. Todas as espécies estão sujeitas a estocasticidade demográfica. No tempo infinito, o sistema entra em equilibrio onde a perda de espécies por deriva ecológica é compensada pelos processos de introdução de novas espécies no sistema (imigração na comunidade local e especiação na metacomunidade). Quando o equilíbrio é alcançado não há variação no número de espécies e na forma com que a abundância se distribui nessas espécies.
+  O algoritmo coalescente simula uma dinâmica neutra espacialmente explicíta que ocorre em uma matriz de posições concentrica a matriz da paisagem. A simulação retorna a identidade, i.e., a espécie, de cada indivíduo na matriz de posições em um momento no equilíbrio. Apesar da simulação não acompanhar a identidade dos indivíduos fora da matriz de posições, esses indivíduos participam da dinâmica, dado o 'kernel' de dispersão. Assim, as simulações e seus produtos ('U' e SAD réplica) dependem de duas variáveis de exposição: o tamanho de matriz de posições (J) e o tamanho da matriz de paisagem (Jp). Jp resulta do produto da densidade de indivíduos de cada levantamento (indivíduos/ha) e do número de hectares do recorte de paisagem (500 ha), assim, obtemos o número de indivíduos médio que poderia estar presente na paisagem se toda ela fosse preenchida por indivíduos. Nesse contexto, a variável de interesse "cobertura" pode ser entendido como porcentagem remanescente da comunidade da paisagem (Jp). 
+  
+  Concentrica à matriz de posições, a matriz do recorte de paisagem contêm elementos que mostram a 
+  inserida em uma matriz maior que corresponde ao recorte de paisagem onde a comunidade local está inserida, e que contêm indivíduos que fazem parte da dinâmica, apesar de suas trajetórias não serem acompanhadas [REESCREVER: ficou confuso, mas a ideia é que a comunidade local é um sistema aberto dentro de sua paisagem]. Cada matriz de posições contêm J elementos e cada matriz de paisagem contêm 500 * DAi elementos (número de hectares do recorte de paisagens * densidade de indivíduos por sitecode (i) ). Duas amostras são feitas para realizar a estimativa da taxa de imigração de novas espécies (m ~ probabilidade de um indivíduo de um espécie presente na metacomunidade substitua o indivíduo da espécie local/morte - o intervalo de tempo é medido em mortes de árvores): J, comunidade local que acompanhamos a dinâmica; 500 X DAi (número de hectares do recorte de paisagem, densidade de indivíduos do levantamento do respectivo recorte de paisagem), Jpaisagem, a comunidade da paisagem, ou número máximo de indivíduos que podem estar presentes na comunidade. Dessa forma, cobertura vegetal passa a ser 'p', proporção remanescente de Jpaisagem. Assim, temos que (U|J|Jpaisagem). Então, temos uma taxa que depende de duas variáveis de exposição. Eu não sei é possível utilizar dois offsets por modelo [PESQUISAR]. Alternativamente, é possível transformar a probabilidade de que um indivíduo da metacomunidade substitua um indivíduo da comunidade local por evento de morte ('U') por I
+  
+  
+  
+  é o número de indivíduos que estão disponíveis para a dinâmica, seja dentro da área de interesse  (J) ou de toda a paisagem (Jp). Então, acredito que se houver alguma influência 
+
+
+```{r KS*: seleção das melhores distribuições}
+### KS ###
+### KS.p ###
+### KS.abund ###
+### KS.ac.obs ###
+### KS.ac.sim ###
+
+# preparação dos dados #
+df_ae <- inner_join(x = df_resultados[,c(1:9,28,17:18,20:22)], y = df_ref[,c(1,7,9)], by = "SiteCode") #df de trabalho
+df_ae$cluster_medio %<>% as.numeric 
+df_ae %<>% arrange(cobertura, cluster_medio)
+df_ae$fitofisio_type %<>% factor #drop levels
+df_ae$estado %<>% factor #drop levels
+df_ae %>% filter(cluster_medio == 31.1) %>% .$fitofisio_type %>% table %>% as.data.frame #retirando as repetições, tabela de contagem dos tipos de fitofisionomias
+names(df_ae)[c(3,13,15:16)] <- c("U","J", "S","fitofisio") # U = taxa de imigração da metacomunidade/taxa de perda de espécies no equilíbrio, 
+
+### criando variável que representa a comunidade presente no recorte de paisagem ###
+df_ae %<>% mutate(Jp = DA * 500, # Jp número de indivíduos 
+#                  I = U*(J-1)/(1-U), # fluxo de imigrantes para a comunidade local (Rosindell et al. 2011)
+#                  U..J = U/J, # 'U' dado a amostra 'J', ou, "A taxa de imigração de novas espécies per capita " 
+                  U_factor = cut(U, 10),
+                  Jp_factor = cut(Jp,10),
+                  S_factor = cut(S,10),
+                  cobertura_factor = cut(cobertura, 10))
+
+## Análise exploratória ##
+#x11()
+# variável resposta
+par(mfrow=c(3,1))
+hist(df_ae$KS, breaks = 20)
+hist(df_ae$KS.p, breaks = 20)
+hist(df_ae$GOF, breaks = 20)
+par(mfrow=c(1,1))
+
+# KS ~ *
+p_KS.cobertura <- ggplot(df_ae, aes( y = KS, x = cobertura)) + geom_point() + geom_smooth()
+p_KS.cobertura_U <- ggplot(df_ae, aes( y = KS, x = cobertura, colour = U_factor)) + geom_point() + geom_smooth(method = "lm", se = FALSE)
+p_KS.kernel.cobertura_U <- ggplot(df_ae, aes( y = KS, x = cluster_medio, group = SiteCode, color = U_factor)) + geom_line() + facet_grid(~ cobertura_factor)
+lay <- matrix(c(1,3,2,3), ncol = 2)
+grid.arrange(p_KS.cobertura, p_KS.cobertura_U, p_KS.kernel.cobertura_U, ncol = 2, nrow = 2, layout_matrix = lay)
+plot(KS ~ U, df_ae)
+# KS.p ~ *
+p_KS.pcobertura <- ggplot(df_ae, aes( y = KS.p, x = cobertura)) + geom_point() + geom_smooth()
+p_KS.pcobertura_U <- ggplot(df_ae, aes( y = KS.p, x = cobertura, colour = U_factor)) + geom_point() + geom_smooth(method = "lm", se = FALSE)
+p_KS.pkernel.cobertura_U <- ggplot(df_ae, aes( y = KS.p, x = cluster_medio, group = SiteCode, color = U_factor)) + geom_line() + facet_grid(~ cobertura_factor)
+lay <- matrix(c(1,3,2,3), ncol = 2)
+grid.arrange(p_KS.pcobertura, p_KS.pcobertura_U, p_KS.pkernel.cobertura_U, ncol = 2, nrow = 2, layout_matrix = lay)
+# GOF ~ *
+p_GOF.cobertura <- ggplot(df_ae, aes( y = GOF, x = cobertura)) + geom_point() + geom_smooth()
+p_GOF.cobertura_U <- ggplot(df_ae, aes( y = GOF, x = cobertura, colour = U_factor)) + geom_point() + geom_smooth(method = "lm", se = FALSE)
+p_GOF.kernel.cobertura_U <- ggplot(df_ae, aes( y = GOF, x = cluster_medio, group = SiteCode, color = U_factor)) + geom_line() + facet_grid(~ cobertura_factor)
+lay <- matrix(c(1,3,2,3), ncol = 2)
+grid.arrange(p_GOF.cobertura, p_GOF.cobertura_U, p_GOF.kernel.cobertura_U, ncol = 2, nrow = 2, layout_matrix = lay)
+# KS.abund ~ *
+p_KS.abund.cobertura <- ggplot(df_ae, aes( y = KS.abund, x = cobertura)) + geom_point() + geom_smooth()
+p_KS.abund.cobertura_U <- ggplot(df_ae, aes( y = KS.abund, x = cobertura, colour = U_factor)) + geom_point() + geom_smooth(method = "lm", se = FALSE)
+p_KS.abund.kernel.cobertura_U <- ggplot(df_ae, aes( y = KS.abund, x = cluster_medio, group = SiteCode, color = U_factor)) + geom_line() + facet_grid(~ cobertura_factor)
+lay <- matrix(c(1,3,2,3), ncol = 2)
+grid.arrange(p_KS.abund.cobertura, p_KS.abund.cobertura_U, p_KS.abund.kernel.cobertura_U, ncol = 2, nrow = 2, layout_matrix = lay)
+# KS.ac.obs ~ *
+p_KS.ac.obs.cobertura <- ggplot(df_ae, aes( y = KS.ac.obs, x = cobertura)) + geom_point() + geom_smooth()
+p_KS.ac.obs.cobertura_U <- ggplot(df_ae, aes( y = KS.ac.obs, x = cobertura, colour = U_factor)) + geom_point() + geom_smooth(method = "lm", se = FALSE)
+p_KS.ac.obs.kernel.cobertura_U <- ggplot(df_ae, aes( y = KS.ac.obs, x = cluster_medio, group = SiteCode, color = U_factor)) + geom_line() + facet_grid(~ cobertura_factor)
+lay <- matrix(c(1,3,2,3), ncol = 2)
+grid.arrange(p_KS.ac.obs.cobertura, p_KS.ac.obs.cobertura_U, p_KS.ac.obs.kernel.cobertura_U, ncol = 2, nrow = 2, layout_matrix = lay)
+# KS.ac.sim ~ *
+p_KS.ac.sim.cobertura <- ggplot(df_ae, aes( y = KS.ac.sim, x = cobertura)) + geom_point() + geom_smooth()
+p_KS.ac.sim.cobertura_U <- ggplot(df_ae, aes( y = KS.ac.sim, x = cobertura, colour = U_factor)) + geom_point() + geom_smooth(method = "lm", se = FALSE)
+p_KS.ac.sim.kernel.cobertura_U <- ggplot(df_ae, aes( y = KS.ac.sim, x = cluster_medio, group = SiteCode, color = U_factor)) + geom_line() + facet_grid(~ cobertura_factor)
+lay <- matrix(c(1,3,2,3), ncol = 2)
+grid.arrange(p_KS.ac.sim.cobertura, p_KS.ac.sim.cobertura_U, p_KS.ac.sim.kernel.cobertura_U, ncol = 2, nrow = 2, layout_matrix = lay)
+
+
+```
+
+-variâncias
+```{r seleção das melhores distribuições}
+### U.var ###
+### KS.v ###
+### KS.p.v ###
+### KS.abund.v ###
+### KS.ac.obs.v ###
+### KS.ac.sim.v ###
+```
+
+
+########### Material e Métodos ###########
+
+  Realizamos simulações espacialmente explicitas de dinâmica neutra de espécies arbóreas utilizando dados de levantamentos fitossociológicos realizados na Mata Atlântica. Utilizamos dois bancos de dados: *TreeCo* (Neotropical tree commuinities database), que possui dados de levantamentos fitossociológicos realizados em comunidades de arbóreas na mata atlântica, e o banco de imagens de Hansel et al. [REFERÊNCIA], que possuem imagens da estrutura espacial da cobertura vegetal (REESCREVER). Para cada levantamento (*SiteCode*) realizamos recortes de paisagem de 5 km^2 concêntricos entre si. Cada recorte de paisagem teve sua resolução ajustada segundo a densidade de indivíduos observada no SiteCode. Assim, o número médio de pixels por unidade de área do recorte de paisagem é igual ao número médio de indivíduos por unidade de área da comunidade arbórea. 
+
+  Para realizar as simulações além da estrutura espacial de cobertura vegetal (habitat e não habitat), conservada no recorte de paisagem, é necessário um valor de taxa de imigração/especiação (*U.est*). No modelo neutro todas as espécies estão sob deriva ecológica, sem uma permanente adição de novas espécies o sistema tende à monodominância (Hubbell 2001). Assim, a manutenção da diversidade depende dessa taxa de adição de novas espécies(*U.est*). Para simular a dinâmica neutra espacialmente explicita, utilizamos o algoritmo coalescente que recria a distribuição de abundância de espécies no equilíbrio (Rosindell et al. 2008) (mais detalhes na descrição da metodologia). Além de ser um método mais eficiente de se produzir distribuições de abundância de espécies no equilíbrio (Rosindell et al. 2008), essa abordagem permite estimar 'U.est' dado uma estrutura espacial, kernel de dispersão e riqueza observada. Por kernel de dispersão eu considero a distribuição de probabilidade de uma planta prduzir propagulos em função da distância a ela, aqui utilizamos a distribuição laplaciana como tipo de kernel [REFERÊNCIA] e oito valores de distância média como valores do escalar da distribuição (distribuição Laplace a media e variância são iguais). Sete valores de distância média foram retirados de Seidler & Plotkin (2006, tabela 1) e são as distâncias médias de espécies arbóreas segundo diferentes tipos de sindrome de dispersão, adicionamos um valor médio entre as sindromes (*Sindrome* = tipo de sindrome de dispersão, *cluster_medio* = valor médio de dispersão daquele tipo de sindrome). Utilizamos a riqueza observada na distribuição de abundância de espécies dos levantamentos fitossociológicos do TreeCo (*S*).
+  Utilizamos dois indices para descrever a estrutura espacial da paisagem: cobertura vegetal, a porcentagem de habitat na paisagem (*cobertura*) e indice de agregação (AI, He et al. 2000), que mede o grau de agregação de habitat com relação à agregação máxima (*aggregation.index*). 
+  A figura 1 mostra a relação entre a riqueza, cobertura e agregação. Os dados completos utilizados nas simulações estão em 'df_simulacao': i) as colunas refID, ordem e paisagens são de controle interno; ii) conversao 1m é o valor usado para converter o cluster medio que está em metros para a escala da paisagem; iii) N, DA, S são informações do TreeCo, como já havia divergido antes, eu fiz uma função que contava o número de espécies de cada levantamento baseado na SAD.obs (*S obs*), utilizei esse valor para realizar as simulações. 
+
+```{r input simulacao}
+library(car)
+scatterplotMatrix(~ N + DA + S.obs + cobertura , data = df_resultados, reg.line = FALSE) #smoother=loessLine 
+```
+  Ao final da simulação obtem-se uma matriz com a estrutura espacial das espécies, dessa matriz obtem-se a distribuição de abundância de espécies simulada (SAD.sim). Foram feitas 744 simulações, uma para cada par (sindrome de dispersão, sitecode). Cada simulação contou com 100 réplicas com sementes aleatórias distintas[PONTO A DISCUTIR], resultando em 100 distribuições de abundância de espécies (SAD.rep) e U.est distintos. Cada uma dessas SAD.rep foi comparada com a respectiva SAD.obs utilizando a estatística de Kolmogorov Smirnov. Desse teste obtemos: i) a maior distância entre as curvas acumuladas das duas SAD (SAD.rep e SAD.obs) (KS, KS_ac_diff - o primeiro calculado segundo 'ks.test' e o segundo usando a função ~/Documents/dissertacao/R_source/posicao_KS.R), ii) o valor p obtido de 'ks.test()', iii) o valor de abundância onde ocorreu a maior divergência entre as acumuladas (log(SAD) = KS_log.N, SAD = KS_N); iv) a posição das respectivas curvas acumuladas onde ocorreu a maior divergência (KS_ac_*). Além das 100 réplicas, cada par (sindrome de dispersão, sitecode) possui as mesmas medidas considerando uma SAD media das SAD.rep (anexo - formulario "/R_source/sad_media.R"). O valor médio e a variância também foram calculados. Esses valores se distinguem pelo fator _rep_. Segue um sumário da tabela:
+```{r S.obs ~ S, fig.width=10, fig.height=4}
+ggplot(data = df_resultados, aes(x = S.obs, y = S.medio)) + geom_point() +  stat_smooth(method = "lm", col = "red") + facet_grid(~Sindrome)
+```
+
+
+
+
+```{r sumario df_resultados.rep}
+df_resultados %>% summary #na.omit para ocultar as linhas com S obs
+```
+  SUGESTÃO: Poderíamos pensar em algo similar para a Riqueza usando testes de permutação (monte carlo).
+
+CONSIDERANDO A SAD MÉDIA
+```{r graficos exploratorios SAD media, include=FALSE}
+#x11()
+### U.est ~ cluster_medio + S_obs  + cobertura + aggregation.index
+df_resultados %>% filter(rep == "sad_media") %>% dplyr::select (-rep) -> df_ae
+scatterplotMatrix( ~ U.est + cluster_medio + S_obs  + cobertura + aggregation.index, data = df_ae, reg.line = FALSE) #smoother=loessLine 
+scatterplotMatrix( ~ log(U.est) + cluster_medio + S_obs  + cobertura + aggregation.index, data = df_ae, reg.line = FALSE) #smoother=loessLine 
+scatterplotMatrix( ~ log(U.est) + cluster_medio + S_obs  + cobertura + log(aggregation.index), data = df_ae, reg.line = FALSE) #smoother=loessLine 
+### Ssim ~ U.est + cluster_medio + S_obs  + cobertura + aggregation.index
+p_S_obs.media <- ggplot(data = df_ae) + geom_point(aes(x = S_obs, y = S, color=Sindrome)) + facet_wrap(~cluster_medio) + geom_abline(slope = 1,intercept = 0)
+scatterplotMatrix( ~ S + U.est + cluster_medio + S_obs  + cobertura + aggregation.index, data = df_ae, reg.line = FALSE) #smoother=loessLine 
+df_ae %<>% mutate(diff.S = S - S_obs)
+p_diff.S_cobertura <- ggplot(df_ae) + geom_point(aes(x = cobertura, y = diff.S, color=Sindrome)) + facet_wrap(~cluster_medio)
+### KS* ~ U.est + cluster_medio + S_obs  + cobertura + aggregation.index
+scatterplotMatrix( ~ KS + U.est + cluster_medio + S_obs  + cobertura + aggregation.index, data = df_ae, reg.line = FALSE) #smoother=loessLine 
+scatterplotMatrix( ~ KS + log(KS_p) + U.est + cluster_medio + S_obs  + cobertura + aggregation.index, data = df_ae, reg.line = FALSE) #smoother=loessLine 
+scatterplotMatrix( ~ KS_log.N + log(KS_p) + U.est + cluster_medio + S_obs  + cobertura + aggregation.index, data = df_ae, reg.line = FALSE) #smoother=loessLine 
+scatterplotMatrix( ~ KS_N + log(KS_p) + U.est + cluster_medio + S_obs  + cobertura + aggregation.index, data = df_ae, reg.line = FALSE) #smoother=loessLine 
+scatterplotMatrix( ~ KS_ac_sim + log(KS_p) + U.est + cluster_medio + S_obs  + cobertura + aggregation.index, data = df_ae, reg.line = FALSE) #smoother=loessLine 
+scatterplotMatrix( ~ KS_ac_obs + log(KS_p) + U.est + cluster_medio + S_obs  + cobertura + aggregation.index, data = df_ae, reg.line = FALSE) #smoother=loessLine  
+```
+
+
+
+
+
+CONSIDERANDO A MÉDIA DAS REPLICAS
+```{r include=FALSE}
+#avaliando se tudo está do jeito que deveria estar
+#a riqueza media tem que ser igual independentemente se é de uma media_rep ou de uma sad_media
+df_resultados %>% filter(rep == "media_rep") -> df_ae1
+df_resultados %>% filter(rep == "sad_media") -> df_ae2
+df_ae1 %>% summary
+df_ae2 %>% summary
+#x11()
+#plot(df_ae1$S ~ df_ae2$S)
+
+# Vou proseguir plotanto a variância com as demais variáveis
+df_resultados[,1:8] %>% filter(rep != "media_rep" & rep != "sad_media") %>% ddply(.,c("SiteCode","Sindrome","cluster_medio","cobertura","aggregation.index"), summarise, S_var = var(S), U.est = mean(U.est)) -> df_ae
+df_ae %<>% mutate(S_sd = sqrt(S_var))
+scatterplotMatrix( ~ S_var + log(U.est) + cluster_medio + cobertura + aggregation.index, data = df_ae, reg.line = FALSE) #smoother=loessLine 
+
+#vou considerar os valores médios de KS e posteriormente a variância 
+df_resultados %>% filter(rep == "media_rep") -> df_ae #somente a media das réplicas
+df_ae %>% head
+scatterplotMatrix( ~ KS + log(U.est) + cluster_medio + cobertura + aggregation.index, data = df_ae, reg.line = FALSE) #smoother=loessLine 
+scatterplotMatrix( ~ KS_p + log(U.est) + cluster_medio + cobertura + aggregation.index, data = df_ae, reg.line = FALSE) #smoother=loessLine 
+scatterplotMatrix( ~ KS_log.N + log(U.est) + cluster_medio + cobertura + aggregation.index, data = df_ae, reg.line = FALSE) #smoother=loessLine 
+scatterplotMatrix( ~ KS_N + log(U.est) + cluster_medio + cobertura + aggregation.index, data = df_ae, reg.line = FALSE) #smoother=loessLine 
+scatterplotMatrix( ~ KS_ac_obs + log(U.est) + cluster_medio + cobertura + aggregation.index, data = df_ae, reg.line = FALSE) #smoother=loessLine 
+scatterplotMatrix( ~ KS_ac_sim + log(U.est) + cluster_medio + cobertura + aggregation.index, data = df_ae, reg.line = FALSE) #smoother=loessLine 
+df_ae %>% filter(KS_p >= 0.05) -> df_ae1
+scatterplotMatrix( ~ KS + log(U.est) + cluster_medio + cobertura + aggregation.index, data = df_ae1, reg.line = FALSE) #smoother=loessLine 
+scatterplotMatrix( ~ KS_p + log(U.est) + cluster_medio + cobertura + aggregation.index, data = df_ae1, reg.line = FALSE) #smoother=loessLine 
+scatterplotMatrix( ~ KS_log.N + log(U.est) + cluster_medio + cobertura + aggregation.index, data = df_ae1, reg.line = FALSE) #smoother=loessLine 
+scatterplotMatrix( ~ KS_N + log(U.est) + cluster_medio + cobertura + aggregation.index, data = df_ae1, reg.line = FALSE) #smoother=loessLine 
+scatterplotMatrix( ~ KS_ac_obs + log(U.est) + cluster_medio + cobertura + aggregation.index, data = df_ae1, reg.line = FALSE) #smoother=loessLine 
+scatterplotMatrix( ~ KS_ac_sim + log(U.est) + cluster_medio + cobertura + aggregation.index, data = df_ae1, reg.line = FALSE) #smoother=loessLine 
+df_ae %>% filter(KS_p < 0.05) -> df_ae2
+scatterplotMatrix( ~ KS + log(U.est) + cluster_medio + cobertura + aggregation.index, data = df_ae2, reg.line = FALSE) #smoother=loessLine 
+scatterplotMatrix( ~ KS_p + log(U.est) + cluster_medio + cobertura + aggregation.index, data = df_ae2, reg.line = FALSE) #smoother=loessLine 
+scatterplotMatrix( ~ KS_log.N + log(U.est) + cluster_medio + cobertura + aggregation.index, data = df_ae2, reg.line = FALSE) #smoother=loessLine 
+scatterplotMatrix( ~ KS_N + log(U.est) + cluster_medio + cobertura + aggregation.index, data = df_ae2, reg.line = FALSE) #smoother=loessLine 
+scatterplotMatrix( ~ KS_ac_obs + log(U.est) + cluster_medio + cobertura + aggregation.index, data = df_ae2, reg.line = FALSE) #smoother=loessLine 
+scatterplotMatrix( ~ KS_ac_sim + log(U.est) + cluster_medio + cobertura + aggregation.index, data = df_ae2, reg.line = FALSE) #smoother=loessLine 
+
+#considerando a variância de KS
+df_resultados[,c(1:6,7:15)] %>% filter(rep != "sad_media" & rep != "media_rep") -> df_ae
+df_ae %<>% ddply(.,c("SiteCode","Sindrome","cluster_medio","cobertura","aggregation.index"), summarise, 
+                KS = var(KS), 
+                KS_p = var(KS_p),
+                KS_log.N = var(KS_log.N),
+                KS_N = var(KS_N),
+                KS_ac_obs = var(KS_ac_obs),
+                KS_ac_sim = var(KS_ac_sim),
+                U.est = mean(U.est))
+df_ae %>% head
+scatterplotMatrix( ~ KS + log(U.est) + cluster_medio + cobertura + aggregation.index, data = df_ae, reg.line = FALSE) #smoother=loessLine 
+scatterplotMatrix( ~ KS_p + log(U.est) + cluster_medio + cobertura + aggregation.index, data = df_ae, reg.line = FALSE) #smoother=loessLine 
+scatterplotMatrix( ~ KS_log.N + log(U.est) + cluster_medio + cobertura + aggregation.index, data = df_ae, reg.line = FALSE) #smoother=loessLine 
+scatterplotMatrix( ~ KS_N + log(U.est) + cluster_medio + cobertura + aggregation.index, data = df_ae, reg.line = FALSE) #smoother=loessLine 
+scatterplotMatrix( ~ KS_ac_obs + log(U.est) + cluster_medio + cobertura + aggregation.index, data = df_ae, reg.line = FALSE) #smoother=loessLine 
+scatterplotMatrix( ~ KS_ac_sim + log(U.est) + cluster_medio + cobertura + aggregation.index, data = df_ae, reg.line = FALSE) #smoother=loessLine 
+df_ae %>% filter(KS_p >= 0.05) -> df_ae1
+scatterplotMatrix( ~ KS + log(U.est) + cluster_medio + cobertura + aggregation.index, data = df_ae1, reg.line = FALSE) #smoother=loessLine 
+scatterplotMatrix( ~ KS_p + log(U.est) + cluster_medio + cobertura + aggregation.index, data = df_ae1, reg.line = FALSE) #smoother=loessLine 
+scatterplotMatrix( ~ KS_log.N + log(U.est) + cluster_medio + cobertura + aggregation.index, data = df_ae1, reg.line = FALSE) #smoother=loessLine 
+scatterplotMatrix( ~ KS_N + log(U.est) + cluster_medio + cobertura + aggregation.index, data = df_ae1, reg.line = FALSE) #smoother=loessLine 
+scatterplotMatrix( ~ KS_ac_obs + log(U.est) + cluster_medio + cobertura + aggregation.index, data = df_ae1, reg.line = FALSE) #smoother=loessLine 
+scatterplotMatrix( ~ KS_ac_sim + log(U.est) + cluster_medio + cobertura + aggregation.index, data = df_ae1, reg.line = FALSE) #smoother=loessLine 
+df_ae %>% filter(KS_p < 0.05) -> df_ae2
+scatterplotMatrix( ~ KS + log(U.est) + cluster_medio + cobertura + aggregation.index, data = df_ae2, reg.line = FALSE) #smoother=loessLine 
+scatterplotMatrix( ~ KS_p + log(U.est) + cluster_medio + cobertura + aggregation.index, data = df_ae2, reg.line = FALSE) #smoother=loessLine 
+scatterplotMatrix( ~ KS_log.N + log(U.est) + cluster_medio + cobertura + aggregation.index, data = df_ae2, reg.line = FALSE) #smoother=loessLine 
+scatterplotMatrix( ~ KS_N + log(U.est) + cluster_medio + cobertura + aggregation.index, data = df_ae2, reg.line = FALSE) #smoother=loessLine 
+scatterplotMatrix( ~ KS_ac_obs + log(U.est) + cluster_medio + cobertura + aggregation.index, data = df_ae2, reg.line = FALSE) #smoother=loessLine 
+scatterplotMatrix( ~ KS_ac_sim + log(U.est) + cluster_medio + cobertura + aggregation.index, data = df_ae2, reg.line = FALSE) #smoother=loessLine 
+```
+
+
+
+Metodologia
+-TreeCo
+  -critério de seleção dos trabalhos: i) >=1ha, ii) amostragem continua (bloco único)
+  -descrição dos SiteCodes: riqueza, cobertura, indice de agregação, 
+-Hansel et al. 
+-Simulação
+  -algoritmo coalescente
+  -estimativa do U.est
+-Kolomogorov Smirnov
+  -valor da estatística
+  -p value
+  -posição da divergência nas acumuladas e na abundância
+Exemplo do calculo:
+```{r exemplo do calculo de KS}
+lista_dispersal[[1]][[1]] -> sad.sim
+sad.sim[1,] %>% table %>% as.data.frame -> sad.sim #uma réplica
+sad.sim %<>% arrange(Freq) %>% .$Freq %>% log #logSAD
+#df_SAD.sim0 %>% filter(SiteCode == "MGperd1", sindrome == "animal_fruit2-5cm") %>% arrange(N) %>% .$N %>% log -> sad.sim #SAD_media
+df_SAD.obs.f %>% filter(SiteCode == "BAjuss") %>% arrange(N) %>% .$N %>% log -> sad.obs #SAD.obs
+c_obs.sim <- sort(c(sad.obs,sad.sim)) #os dados concatenados e ordenados
+df_KS_st <- data.frame(c.data = c_obs.sim, #idem
+                       c.data.e = exp(c_obs.sim), #exp dos valores para tirar da escala log
+                       acumulada.obs = sapply(c_obs.sim, FUN = function(x) length(sad.obs[sad.obs<x])/length(sad.obs)), #valor da acumulada obs
+                       acumulada.sim = sapply(c_obs.sim, FUN = function(x) length(sad.sim[sad.sim<x])/length(sad.sim)) #valor da acumulada sim
+                       ) #ambas são calculadas como o número de observações menores do que o valor de c.data
+df_KS_st %<>% mutate(diff.acumulada = abs(df_KS_st$acumulada.obs-df_KS_st$acumulada.sim)) #diferença entre as acumuladas na coluna acumulada.obs
+KS_posicao <- unique(df_KS_st[df_KS_st$diff.acumulada == max(df_KS_st$diff.acumulada),]) #pegando o primeiro valor de abundância que apresenta 
+#a maior diferença entre as acumuladas. Alguns pares de distribuições possuem a mesma distância máxima para mais de um valor de abundância
+plot(acumulada.obs ~ c.data, data = df_KS_st, col = "red", main = "observada") #plotando a acumulada observada
+points(acumulada.sim ~ c.data, data = df_KS_st, col = "blue", main = "simulada") #adicionando a simulada
+abline(v = KS_posicao$c.data) #abundância em que ocorre a maior diferença entre as observadas
+abline(h = KS_posicao$acumulada.obs) #posição da curva acumulada observada onde ocorreu a maior divergência entre as acumuladas
+abline(h = KS_posicao$acumulada.sim) #posição da curva acumulada simulada onde ocorreu a maior divergência entre as acumuladas
+```
+-métricas de paisagem
+  -cobertura vegetal
+  -AI
+-ANEXO: Formulário
+  - figuras
+  -todas as funções construidas em R
+
+-figuras
+```{r preparação dos dados e grafico das variaveis de controle}
+# objetivo: pegar os dados de interesse de df_resultados e df_ref, transformar nas novas variáveis e plotar o primeiro plot da análise exploratória
+df_ae <- inner_join(x = df_resultados[,c(1:4,5,28,17:18,20:23)], y = df_ref[,c(1,7,9)], by = "SiteCode") #df de trabalho
+df_ae$cluster_medio %<>% as.numeric 
+df_ae %<>% arrange(cobertura, cluster_medio)
+df_ae$fitofisio_type %<>% factor #drop levels
+df_ae$estado %<>% factor
+names(df_ae)[c(3,7,9,13)] <- c("U","p","J","forest") #U: taxa de imigração, p: porcentagem de habitat remanescente, J: tamanho da comunidade, forest: forest_type
+
+### criando variável que representa a comunidade presente no recorte de paisagem ###
+df_ae %<>% mutate(Jl = DA * 500, # tamanho da comunidade da paisagem,produto da densidade de indivíduos (N/ha) pelo número de hectares do recorte de paisagem (500 ha)
+                  I = U*(J-1)/(1-U), # fluxo de imigrantes para a comunidade local (Rosindell et al. 2011)
+                  U..J = U/J, # taxa de imigração per capita; probabilidade de substituição de um individuo da comunidade por um 
+                  KS_factor = cut(KS, 10), # transformando apenas para facilitar a visualização
+                  KS.p_factor = cut(KS.p, 10), 
+                  J_factor = cut(J,10),
+                  Jl_factor = cut(Jl,10),
+                  S.obs_factor = cut(S.obs,10),
+                  p_factor = cut(p, 10)) 
+scatterplotMatrix(~ S.obs + N + Jl + U.medio + S.medio + KS + KS.p + GOF + KS.abund + KS.ac.obs + KS.ac.sim + KS.obs.sim, data = df_ae)
+
+
+df_resultados$cluster_medio %<>% as.numeric 
+names(df_resultados)[c(3,17,20)] <- c("U", "p", "J")
+df_resultados %<>% mutate(Jl = DA * 500, # tamanho da comunidade da paisagem,produto da densidade de indivíduos (N/ha) pelo número de hectares do recorte de paisagem (500 ha)
+                          I = U*(J-1)/(1-U)) # fluxo de imigrantes para a comunidade local (Rosindell et al. 2011)
+          #                U..J = U/J) # taxa de imigração per capita;
+# x11()
+# scatterplotMatrix(~ S.obs + J + Jl + U + S.medio + KS + KS.p + GOF, data = df_resultados)
+
+```
+  <!--Ao todo foram feitas 96 baterias de simulação, uma para cada levantamento fitossociológico disponível no TreeCo(REFERÊNCIA) e no banco de imagens de Hansel et al.(REFERÊNCIA) que apresentam pelo menos 1 ha amostrado e que o arranjo das amostras é em bloco único.-->
+Figura A1. Relação entre as variáveis de controle da simulação e e as variáveis respostas. S.obs = riqueza observada; S.medio = S médio das SADs réplicas de cada simulação; KS = média da maior distância entre a SAD observada e a SAD réplica; KS.p = média do p valor associado ao teste de Kolmogovor-Smirnov; GOF (Goodness of fit - adaptado de Etienne & Rosindell 2011) = número de réplicas que obtiveram um bom ajuste (critério de ajuste: p valor > 0.05); KS.abund =  valor de abundância médio onde se observou KS; KS.ac.obs =  percentil da SAD observada acumulada onde se observou KS; KS.ac.sim =  percentil da SAD simulada acumulada onde se observou KS;  KS.obs =  diferença média entre o percentil da SAD observada acumulada e da respectiva SAD répĺica onde se observou KS. As três primeiras variáveis são variáveis de controle da simulação: S,.obs, J e Jp. U.medio estima um valor de taxa de imigração para a paisagem dado. S.medio KS, KS.p, GOF podem ser entendidos como métricas da congruência da SAD simulada com a SAD observada. KS.abund, KS.ac.obs, KS.ac.sim, KS.obs.sim podem revelar qual o padrão de divergência entre as SADs.
+
+
+################ ideais ################
+Ideia 1: usar o U.est para predizer algo sobre a extinção das espécies reais. Segundo Gilbert (2006) o modelo neutro é um bom preditor da taxa de mortalidade das espécies raras, as espécies que provavelmente estão sujeitas ao efeito da estocasticidade demográfica. Considerando que a taxa de especiação/imigração(*U*) é um proxy da taxa com se perde espécies no equilíbrio segundo um modelo neutro. Podemos predizer qual a taxa de extinção das espécies raras segundo uma cobertura vegeta, agregação de habitat, riqueza observada (?sim,mas...), um kernel de dispersão da espécie (ou da "guilda de sindrome de dispersão"). No mestrado eu acredito que possa ser a descrição do padrão da simulação apenas, não preciso ir além nessa parte. Mas uma ideia para o futuro é criar um mapa sob a mata atlântica usando os dados do TreeCo para mapear (interpolando) a taxa de perda de espécies raras, segundo o modelo neutro. Para fazer isso precisariamos aumentar o número de trabalhos analisados, pensar em um jeito de selecionar os valores de 'U' talvez segundo o KS.
+
+
+## ANEXO: SAD - comparação entre as réplicas e a SAD obs + informações resumidas
+mfrow=c(97,8): cada linha será de um SiteCode diferente
+
+```{r}
+for(i in 1:length( levels(df_resultados$SiteCode)) ){ #para cada uma das 94 paisagens NOTA: tem que tirar o refID que não tem .txt ai fica 93
+  pdf(file = gsub(".tif",".pdf",df_simulacao[i,7]), width = 11.69*0.75, height = 8.30*0.75)
+  par(mfrow = c(1,3))
+  image(raster(df_simulacao[i,7]), main = df_simulacao[i,7], axes = FALSE)
+  image(t(as.matrix(raster(df_simulacao[i,8]))), main = df_simulacao[i,8], axes = FALSE)
+  image(as.matrix(read.table(df_simulacao[i,9], header = FALSE, sep = " ")), main = df_simulacao[i,9], axes = FALSE)
+  dev.off()
+}
+
+for(i in 1:length( levels(df_resultados$SiteCode)) ){
+  pdf(file= levels(df_resultados$SiteCode)[i], )
+  par(mfrow = c(1,8))
+  
+}
+
+
+```
+
+
+
+
+do Bolker et al 2008 BOX 4: Procedures - creating a full model -->
+  
+## Construção dos modelos ##
+ Vou dividir a construção dos modelos em sessões segundo a variável de interesse. Então primeiro irei criar modelos para 'U' e algumas derivações teóricas da taxa de imigração. Sigo para as variáveis de qualidade do ajuste KS, KS.p e GOF e termino com as variáveis que descrevem como as divergências ocorrem na SAD (KS.abund, KS.ac._, KS.obs.sim). As variáveis de interesse são duas: cobertura vegetal ( ou 'p' - porcentagem remanescente de habitat) e o parâmetro escalar da distribuição de probabilidade que descreve o evento de colonização de um propagulo em função da distância da árvore progenitora ('kernel'). Kernel apresenta 8 níveis, cada nível é a média da distância média de entre propagulos e planta mãe espécies de uma mesma estratégia de dispersão (tabela 1  de  REFERÊNCIA). Riqueza observada será usada como variável de efeito aleatório. nos modelos onde p e kernel são as variáveis de interesse. Variáveis que sintetizam aspectos biogeográficos e históricos de cada levantamento também serão usados como variáveis de efeito aleatório apenas nos modelos cheios ou quando for pertinente.
+ A análise de cada variável seguirá um mesmo protocolo de construção de modelos lineares generalizados mistos (GLMM) para criar modelos cheios (Bolker et al. 2008, Box 4 - Procedures: creating a full model). Todos os demais modelos serão submodelos do modelo cheio. Uma breve análise exploratória precede a construção dos modelos. 
+ 
+#taxa de imigração - "U" #
+-Descrição da variável
+-análise exploratória <!--modelo em mente U ~ p * kernel + (U | S) + (1 | estado) + (1 | fitofisio)-->
+-protocolo de construção de modelo cheio
+-construção dos modelos per se: argumentação
+-seleção de modelos e ajuste aos dados
+-produção de resultados: gráficos ilustrativos e descrição
+
+
+-Descrição da variável
+
+ A taxa de imigração ("U") pode ser entendido como o parâmetro de escala de uma distribuição que descreve a probabilidade de substituição de um indivíduo qualquer da comunidade de tamanho 'J' por um indivíduo de uma espécie nova, entre intervalos de morte na comunidade local (REFERÊNCIA). Os eventos de substituição ocorrem de maneira independente, não há correlação temporal. A probabilidade de substituição é constante no tempo e para todo o intervalo das variáveis preditoras. Apenas um evento de substituição ocorre por ciclo. As simulações distinguem em J e em Jl, assim algumas variáveis serão calculadas a partir de U para compensar a diferença de J (Jl será considerada efeito aleatório ou offset). Do modelo clássico com espaço implicito, podemos calcular o fluxo de imigrantes para a comunidade local (I), que leva em conta J: I = U*(J-1)/(1-U) (Rosindell et al. 2011). E tambem vai ser calculado a taxa de imigração per capita U..J: probabilidade de substituição de um indivíduo da comunidade local por um indivíduo de uma espécie nova/(morte * indivívuo) (faz sentido?).
+
+  é uma variável aleatórioa que é descrita por uma distribuição que descreve o processo estatístico de substituição de um indivíduo qualquer da comunidade de tamanho 'J' por um indivíduo de uma espécie com apenas um indivíduo ('singleton'). Os eventos de substituição ocorrem de maneira independenetemente, não há correlação temporal (REFERÊNCIA). A taxa com que as substituições ocorrem é constante no tempo e para todo o intervalo das variáveis preditoras (REFERÊNCIA) e os eventos não ocorrem de maneira simultanea (REFERÊNCIA). Assim, a distribuição exponencial é uma boa escolha para modelar "U", pois a variável foi construida par ter os mesmos pressupostos (REESCREVER) (REFERÊNCIA sobre a teoria neutra do ponto de vista de amostragem, não sei se faz sentido). A distribuição exponencial é descrita por um único parâmetro 'lambda' que mede a taxa com que um evento ocorre em um intervalo de tempo, em nosso caso, por morte na comunidade local de tamanho "J". Um indivíduo morre por ciclo.
+
+<!--ENCONTRAR MELHOR LOCAL PARA DEIXAR ESSA SESSÃO-->
+
+```{r U: preparacao dos dados, echo=FALSE}
+### U.media ###
+# preparação dos dados #
+df_ae <- inner_join(x = df_resultados[,c(1:4,5,28,17:18,20:22)], y = df_ref[,c(1,7,9)], by = "SiteCode") #df de trabalho
+df_ae$kernel %<>% as.numeric 
+df_ae %<>% arrange(cobertura, kernel)
+df_ae$fitofisio_type %<>% factor #drop levels
+df_ae$estado %<>% factor
+names(df_ae)[c(3,7,9,11:12)] <- c("U","p","J","S","fitofisio")
+
+### criando variável que representa a comunidade presente no recorte de paisagem ###
+df_ae %<>% mutate(Jl = DA * 500, # tamanho da comunidade da paisagem,produto da densidade de indivíduos (N/ha) pelo número de hectares do recorte de paisagem (500 ha)
+                  I = U*(J-1)/(1-U), # fluxo de imigrantes para a comunidade local (Rosindell et al. 2011)
+                  U..J = U/J, # taxa de imigração per capita; probabilidade de substituição de um individuo da comunidade por um 
+                  KS_factor = cut(KS, 10), # preciso pesquisar se existe alguma preferência em usar variáveis contínuas ou variáveis discretas na construção de GLMM
+                  KS.p_factor = cut(KS.p, 10), # mas certamente ajuda na visualização dos dados
+                  J_factor = cut(J,10),
+                  Jl_factor = cut(Jl,10),
+                  S_factor = cut(S,10),
+                  p_factor = cut(p, 10)) #referência a Hanski 1999
+```
+
+-Análise exploratória dos dados  <!--modelo em mente U ~ p * kernel + (U | S) + (1 | estado) + (1 | fitofisio)-->
+
+  Segue grupos de gráficos da variável resposta U (taxa de imigração) e de suas transformações I (fluxo de imigrantes para a comunidade local) e U..J (taxa de imigração per capita) com as variaveis de interesse, cobertura vegetal ('p'), porcentagem de habitat na paisagem e kernel de diserpsão. A riqueza será usado como fator de controle, outros possíveis fatores de controle como J, Jl e fatores biogeograficos e históricos serão investigados na sessão da criação de modelos.
+-gráficos U ~ cobertura * S_factor <!--variável ambiental + variável de controle-->
+
+
+```{r}
+# U ~ cobertura + kernel + S
+p_U.cobertura <- ggplot(df_ae, aes( y = U, x = cobertura)) + geom_point(size = 1) + geom_smooth(method = "lm", se = FALSE)  + theme_bw()
+p_U.cobertura_S <- ggplot(df_ae, aes( y = U, x = cobertura, colour = S_factor)) + geom_point(size = 1) + geom_smooth(method = "lm", se = FALSE)  + theme_bw()
+p_U.kernel.cobertura_S <- ggplot(df_ae, aes( y = U, x = kernel, group = SiteCode, color = S_factor)) + geom_line() + facet_grid(~ cobertura_factor)  + theme_bw()
+lay <- matrix(c(1,3,2,3), ncol = 2)
+grid.arrange(p_U.cobertura, p_U.cobertura_S, p_U.kernel.cobertura_S, ncol = 2, nrow = 2, layout_matrix = lay)
+```
+  - I
+```{r}
+# log(U) ~ *
+p_I.cobertura <- ggplot(df_ae, aes( y = I, x = cobertura)) + geom_point() + geom_smooth()
+p_I.cobertura_S <- ggplot(df_ae, aes( y = I, x = cobertura, colour = S_factor)) + geom_point() + geom_smooth(method = "lm", se = FALSE)
+p_I.kernel.cobertura_S <- ggplot(df_ae, aes( y = I, x = kernel, group = SiteCode, color = S_factor)) + geom_line() + facet_grid(~ cobertura_factor)
+p_I.cobertura_cluster <- ggplot(df_ae, aes( y = I, x = cobertura, colour = S_factor)) + 
+                            geom_point() + geom_smooth(method = "lm", se = FALSE) + facet_grid(~kernel)
+lay <- matrix(c(1,3,2,3), ncol = 2)
+grid.arrange(p_I.cobertura, p_I.cobertura_S, p_I.kernel.cobertura_S, ncol = 2, nrow = 2, layout_matrix = lay)
+
+```
+  - U..J
+```{r}
+# log(U) ~ *
+p_U..J.cobertura <- ggplot(df_ae, aes( y = U..J, x = cobertura)) + geom_point() + geom_smooth()
+p_U..J.cobertura_S <- ggplot(df_ae, aes( y = U..J, x = cobertura, colour = S_factor)) + geom_point() + geom_smooth(method = "lm", se = FALSE)
+p_U..J.kernel.cobertura_S <- ggplot(df_ae, aes( y = U..J, x = kernel, group = SiteCode, color = S_factor)) + geom_line() + facet_grid(~ cobertura_factor)
+p_U..J.cobertura_cluster <- ggplot(df_ae, aes( y = U..J, x = cobertura, colour = S_factor)) + 
+                            geom_point() + geom_smooth(method = "lm", se = FALSE) + facet_grid(~kernel)
+lay <- matrix(c(1,3,2,3), ncol = 2)
+grid.arrange(p_U..J.cobertura, p_U..J.cobertura_S, p_U..J.kernel.cobertura_S, ncol = 2, nrow = 2, layout_matrix = lay)
+```
+
+
+
+
+## 
+
+```{r analise da influencia de S.obs nos dados}
+# Objetivo avaliar como que a riqueza observada pode estar mascarando o efeito da cobertura na resposta biológica
+# começar fitando uma regressão linear
+df_ae <- df_resultados[,c(1,18,2,17,3:5,28,6:9,22)]
+names(df_ae)[13] <- "S"
+df_ae %<>% mutate(.,S_factor = cut(S,10),
+                    p_factor = cut(p,10))
+p_S.p_lm <- ggplot(df_ae, aes(x=p, y=S)) + geom_smooth(method="lm", se=FALSE) +
+              geom_point(aes(colour=S ,shape = S_factor, size = 10)) +
+              scale_color_gradient(low="blue", high="red") +
+              scale_shape_manual(values=LETTERS[1:10]) + theme_bw()
+p_S.p_bx <- ggplot(df_ae[df_ae$Sindrome == "wind",], aes(y=p, x=S)) +
+              geom_boxplot(aes(colour=S_factor)) + 
+              geom_jitter() +
+              theme_bw() + coord_flip()
+
+autoplot(lm(S ~ p, data = df_ae))
+grid.arrange(p_S.p_lm,p_S.p_bx, ncol=1)        
+
+
+
+
+
+
+p_S.p <- ggplot(df_ae, aes(x=p, y=S, group=S_factor)) + geom_smooth(method="lm", se=FALSE, aes(colour=S_factor)) +
+          geom_point(aes(colour=S_factor ,shape = S_factor, size = 10)) +
+          scale_shape_manual(values=LETTERS[1:10]) + theme_bw() + theme(legend.position="none")
+p_U.p.S <- ggplot(df_ae, aes(x=p, y=U, group = S_factor)) + geom_smooth(method="lm", se=FALSE, aes(colour=S_factor)) +
+            geom_point(aes(colour=S_factor, shape = S_factor, size = 10)) +
+            scale_shape_manual(values=LETTERS[1:10]) + theme_bw() + theme(legend.position="none")
+p_p.S <- ggplot(df_ae, aes(x=S, y=p, group = p_factor)) + geom_smooth(method="lm", se=FALSE, aes(colour=p_factor)) +
+            geom_point(aes(colour=p_factor, shape=p_factor, size = 10)) +
+            scale_shape_manual(values=LETTERS[11:20]) + theme_bw() + theme(legend.position="none")
+p_U.S.p <- ggplot(df_ae, aes(x=S, y=U, group = p_factor)) + geom_smooth(method="lm", se=FALSE, aes(colour=p_factor)) +
+            geom_point(aes(colour=p_factor, shape = p_factor, size = 10)) +
+            scale_shape_manual(values=LETTERS[11:20]) + theme_bw() + theme(legend.position="none")
+
+grid.arrange(p_S.p, p_p.S, p_U.p.S, p_U.S.p, ncol=2,nrow=2)
+
+ggplot(df_ae, aes( y = log(U), x = cobertura, colour = S_factor)) + geom_point() + geom_smooth(method = "lm", se = FALSE)
+            
+p_U.p.S <- ggplot(df_ae, aes(x=p, y=U, colour = S)) + 
+            geom_point(aes(shape = S_factor, size = 10))
+            geom_smooth(method="lm", se=FALSE) +
+            #scale_color_gradient(low="blue", high="red") +
+            scale_shape_manual(values=LETTERS[1:10]) + theme_bw()
+            
+            
+            
+            
+p_KS.p.S <- ggplot(df_ae, aes(x=p, y=KS)) + geom_smooth(method="lm", se=FALSE, color="#003300") +
+              geom_point(aes(colour=S, shape = S_factor, size = 10)) +
+              scale_color_gradient(low="blue", high="red") +
+              scale_shape_manual(values=LETTERS[1:10]) + theme_bw()
+p_KS.p.p.S <- ggplot(df_ae, aes(x=p, y=KS.p)) + geom_smooth(method="lm", se=FALSE, color="#003300") +
+                geom_point(aes(colour=S, shape = S_factor, size = 10)) +
+                scale_color_gradient(low="blue", high="red") +
+                scale_shape_manual(values=LETTERS[1:10]) + theme_bw()
+p_GOF.p.S <- ggplot(df_ae, aes(x=p, y=GOF)) + geom_smooth(method="lm", se=FALSE, color="#003300") +
+              geom_point(aes(colour=S, shape = S_factor, size = 10)) +
+              scale_color_gradient(low="blue", high="red") +
+              scale_shape_manual(values=LETTERS[1:10]) + theme_bw()
+
+
+```
+
+
+
+
+
+
+
+
+
+
+## U ##
+
+```{r preparação dos dados e grafico das variaveis de controle}
+# objetivo: pegar os dados de interesse de df_resultados e df_ref, transformar nas novas variáveis e plotar o primeiro plot da análise exploratória
+df_res.U <- inner_join(x = df_resultados[,c(1:4,5,28,17:18,20:23)], y = df_ref[,c(1,7,9)], by = "SiteCode") #df para análise de U
+df_res.U %<>% arrange(cobertura, kernel)
+df_res.U$fitofisio_type %<>% factor #drop levels
+df_res.U$estado %<>% factor
+
+### criando variável que representa a comunidade presente no recorte de paisagem ###
+df_res.U %<>% mutate(KS_factor = cut(KS, 10), # transformando apenas para facilitar a visualização
+                     KS.p_factor = cut(KS.p, 10), 
+                     J_factor = cut(J,10),
+                     Jl_factor = cut(Jl,10),
+                     S.obs_factor = cut(S.obs,10),
+                     p_factor = cut(p, 10)) 
+```
+  
+
+## KS ##
+# preparação dos dados da análise com os valores originais #
+```{r preparação dos dados e grafico das variaveis de controle}
+# objetivo: pegar os dados de interesse de df_resultados e df_ref, transformar nas novas variáveis e plotar o primeiro plot da análise exploratória
+df_res.KS <- inner_join(x = df_resultados[,c(1:4,5,28,17:18,20:22)], y = df_ref[,c(1,7,9)], by = "SiteCode") #df para análise de U
+df_res.KS$kernel %<>% as.numeric 
+df_res.KS %<>% arrange(cobertura, kernel)
+df_res.KS$fitofisio_type %<>% factor #drop levels
+df_res.KS$estado %<>% factor
+names(df_res.KS)[c(3,7,9,13)] <- c("U","p","J","forest") #U: taxa de imigração, p: porcentagem de habitat remanescente, J: tamanho da comunidade, forest: forest_type
+
+### criando variável que representa a comunidade presente no recorte de paisagem ###
+df_res.KS %<>% mutate(Jl = DA * 500, # tamanho da comunidade da paisagem,produto da densidade de indivíduos (N/ha) pelo número de hectares do recorte de paisagem (500 ha)
+                     I = U*(J-1)/(1-U), # fluxo de imigrantes para a comunidade local (Rosindell et al. 2011)
+                     U..J = U/J, # taxa de imigração per capita; probabilidade de substituição de um individuo da comunidade por um 
+                     KS_factor = cut(KS, 10), # transformando apenas para facilitar a visualização
+                     KS.p_factor = cut(KS.p, 10), 
+                     #J_factor = cut(J,10),
+                     #Jl_factor = cut(Jl,10),
+                     S.obs_factor = cut(S.obs,10),
+                     p_factor = cut(p, 10)) 
+scatterplotMatrix(~ S.obs + U + KS + KS.p + GOF, data = df_res.KS)
+```
+
+# usando os resíduos de U ~ S.obs
+```{r preparação dos dados e grafico das variaveis de controle}
+# objetivo: pegar os dados de interesse de df_resultados e df_ref, transformar nas novas variáveis e plotar o primeiro plot da análise exploratória
+df_res.KS <- inner_join(x = df_resultados[,c(1:4,5,28,17:18,20:22)], y = df_ref[,c(1,7,9)], by = "SiteCode") #df para análise de U
+df_res.KS$kernel %<>% as.numeric 
+df_res.KS %<>% arrange(cobertura, kernel)
+df_res.KS$fitofisio_type %<>% factor #drop levels
+df_res.KS$estado %<>% factor
+names(df_res.KS)[c(3,7,9,13)] <- c("U","p","J","forest") #U: taxa de imigração, p: porcentagem de habitat remanescente, J: tamanho da comunidade, forest: forest_type
+
+### criando variável que representa a comunidade presente no recorte de paisagem ###
+df_res.KS %<>% mutate(Jl = DA * 500, # tamanho da comunidade da paisagem,produto da densidade de indivíduos (N/ha) pelo número de hectares do recorte de paisagem (500 ha)
+                     I = U*(J-1)/(1-U), # fluxo de imigrantes para a comunidade local (Rosindell et al. 2011)
+                     U..J = U/J, # taxa de imigração per capita; probabilidade de substituição de um individuo da comunidade por um 
+                     KS_factor = cut(KS, 10), # transformando apenas para facilitar a visualização
+                     KS.p_factor = cut(KS.p, 10), 
+                     #J_factor = cut(J,10),
+                     #Jl_factor = cut(Jl,10),
+                     S.obs_factor = cut(S.obs,10),
+                     p_factor = cut(p, 10)) 
+# adicionar a tranformação de variável: residuals(lm(U ~ S.obs, data = df_ae))
+
+scatterplotMatrix(~ S.obs + U + KS + KS.p + GOF, data = df_res.KS)
+```
+
+
+############# Análise gráfica ################
+
+---
+title: 'Análise dos Dados'
+author: ""
+date: ""
+output: pdf_document
+---
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(
+                      fig.width=15, 
+                      fig.height=20, 
+                      echo=FALSE, 
+                      message=FALSE, 
+                      warning=FALSE,
+                      cache=TRUE
+                      )
+```
+
+```{r global packages, echo=FALSE}
+#setwd("/home/danilo/Documents/dissertacao/dados/imagens/paisagens_selecionadas")
+#library(fitdistrplus)
+#library(MASS)
+library(car)
+library(ggfortify)
+library(ggplot2) 
+#library(RColorBrewer) #?
+#require(bbmle) #?
+library(reshape2)
+library(gridExtra) 
+library(magrittr)
+library(plyr)
+library(dplyr)
+setwd("/home/danilo/Documents/dissertacao/dados/")
+load("resultados_DaniloPMori.Rdata")
+```
+<!--### ANOTAÇÕES GERAIS ###
+modificar a paleta de cores para scale_fill_brewer( type = "div" , palette = "RdBu" ) e tirar o fundo branco
+
+-->
+## Apresentação do documento ##
+
+  Esse documento apresenta a análise gráfica geral dos resultados. Ele é um recorte de um outro texto em que estou organizando minhas análises. O texto abre com o objetivo geral. Como vocês sabem ele não está 100% definido, mas serve como um norte. Sigo resumindo parte dos métodos, essa sessão é mais como um esqueletão de ideias. Existem diversos buracos nessa sessão que não tive tempo para preencher, mas está em contrução. 
+
+
+OBJETIVO: Aqui utilizamos o modelo neutro como uma fonte de predições para avaliar o impacto da fragmentação e perda de habitat nas comunidades arbóreas da Mata Atlântica, Brasil. A abordagem é similar à de Gilbert et al. (2006), contudo investigamos aspectos diferentes da diversidade das comunidades (CONTINUAR: onde diferem? como diferem?). Os aspectos da diversidade que investigamos são: i) taxa de especiação/imigração/perda de espécies no equilíbrio (U), ii) Distribuição de abundância de espécies (SAD).
+
+# Material e métodos #
+# TreeCo #
+# Hansen #
+# Modelo Neutro e simulação #
+# análise exploratória #
+# protocolo de criação de modelo cheio
+# seleção de modelos per se #
+# produção dos resultados #
+
+
+# Modelo Neutro e simulação #
+<!-- essa sessão vai provavelmente para o começo do material e métodos assim com um box resumindo a dinâmica neutra e o algoritmo coalescente-->
+  O modelo neutro pressupõem que a comunidade é regida por processos aleatórios de morte, nascimento, imigração e especiação. Todas as espécies estão sujeitas a estocasticidade demográfica. No tempo infinito, o sistema entra em equilibrio onde a perda de espécies por deriva ecológica é compensada pelos processos de introdução de novas espécies no sistema (imigração para a comunidade local e especiação na metacomunidade). Quando o equilíbrio é alcançado não há variação no número de espécies e na forma com que a abundância se distribui nas espécies. A manutenção da diversidade depende da taxa de imigração, a probabilidade de um indivíduo de uma nova espécie substituir um indivíduo da comunidade local por evento de morte ("U").No equilíbrio, essa valor também corresponde a taxa com que singletons (espécies com apenas 1 indivíduo) se extinguem por evento de morte na comunidade local.
+<!--aqui poderia ter um box explicando como que funciona o modelo neutro e o algoritmo coalescente. ou seja um resumo da dinâmica no modelo no tempo normal e para trás-->
+  O algoritmo coalescente simula uma dinâmica neutra espacialmente explicíta que ocorre em uma matriz de posições concêntrica a uma matriz da paisagem (BOX explicação modelo e algoritmo). A simulação retorna a identidade, i.e., a espécie, de cada indivíduo na matriz de posições em um momento no equilíbrio. Apesar da simulação não acompanhar a identidade dos indivíduos fora da matriz de posições, esses indivíduos participam da dinâmica. A distribuição que descreve a probabilidade de um propagulo se estabelecer em função da distância da árvore mãe, 'kernel', [modula o impacto da paisagem na dinâmica local - REESCREVER: como traduzir o que o kernel faz na dinamica?]. Assim, as simulações e seus produtos ('U' e SAD réplica) dependem de duas variáveis de exposição: o tamanho de matriz de posições (J) e o tamanho da matriz de paisagem (Jl; l - landscape). Jl é a soma das unidades de espaço que são habitat  e não habitat, que também pode ser obtido pelo produto da densidade de indivíduos de cada levantamento (indivíduos/ha) e do número de hectares do recorte de paisagem (500 ha). Assim, obtemos uma estimativa do número de indivíduos que a paisagem suporta se toda ela fosse preenchida por habitat. Nesse contexto, a variável de interesse "cobertura" pode ser entendido como porcentagem remanescente de Jl ('p'). 
+  A taxa de imigração ("U") pode ser entendido como o parâmetro de escala de uma distribuição que descreve a probabilidade de substituição de um indivíduo qualquer da comunidade de tamanho 'J' por um indivíduo de uma nova espécie por evento de morte (REFERÊNCIA). Os eventos de substituição ocorrem de maneira independente, não há correlação temporal. A probabilidade de substituição é constante no tempo e para todo o intervalo das variáveis preditoras. Apenas um evento de substituição ocorre por ciclo. As simulações distinguem-se em J e em Jl, assim algumas variáveis serão calculadas a partir de U para compensar a diferença de J (Jl será considerada efeito aleatório ou offset). Do modelo clássico com espaço implicito, podemos calcular o fluxo de imigrantes para a comunidade local (I), que leva em conta J: I = U*(J-1)/(1-U) (Etienne et al. 2011). E tambem vai ser calculado a taxa de imigração per capita U..J: probabilidade de substituição de um indivíduo da comunidade local por um indivíduo de uma espécie nova/(morte * indivívuo) (REFERÊNCIA) (faz sentido?). Segundo Etienne et al. (2011) os parâmetros do modelo neutro implicito e explicíto (algoritmo coalescente) não são necessariamente analogos [DESENVOLVER MAIS: eu preciso reler para entender a parte q ele fala que I tem 'tanto imigração quanto especiação'].
+
+# Divergência entre as SADs obs e SADs sim - teste de Kolmogorov #
+COMPLETAR
+-descrever a rotina de análise do resultado do teste usado para comparar as SADs obs e réplicas 
+
+<!-- 
+# glossário de variáveis para as análises #
+p: porcentagem de habitat remanescente, porcentagem de cobertura vegetal
+S.obs: riqueza observada
+J: tamanho da comunidade
+Jl: número de pixels na matriz de paisagem
+Jl.p: numero de indivíduos na simulação (area monitorada + area não monitorada)
+kernel = kernel = parâmetro de escala de uma distribuição que descreve a probabilidade de um propagulo se estabelecer em função da distância da planta progenitora (m)
+U: taxa de imigração
+KS: estatística de KS, maior distância entre as curvas acumuladas de dois vetores númericos.
+KS.p: probabilidade de se rejeitar a hipótese nula quando ela é verdadedeira, dado KS e a distribuição nula de KS. H0: os dois vetores são amostras de uma mesma distribuição.
+GOF: número de SAD réplicas que apresentaram KS.p > 0.05. "Goodness of Fit" abordagem similar à de Etienne & Rosindell (2011)
+KS.abund: abundância onde se observou KS
+KS.ac.obs: posição na curva acumulada da SAD observada onde KS foi observado.
+KS.ac.sim: idem para SAD simulada.
+KS.obs.sim: media da maior distância entre as acumuladas. KS sem ser diferença absoluta 
+estado: estados brasileiros
+disturbance: histórico de perturbação
+succession: estágio de sucessão
+forest: fitofisionomia
+UC: unidade de conservação
+-->
+```{r criando variaveis conforrme discutido, echo = FALSE, include=FALSE}
+df_resultados$SiteCode %<>% factor
+names(df_resultados)[c(2:3,17,20)] <- c("kernel","U", "p", "J")
+df_resultados$kernel %<>% as.numeric 
+df_resultados %<>% mutate(Jl = DA * 500, # tamanho da comunidade da paisagem,produto da densidade de indivíduos (N/ha) pelo número de hectares do recorte de paisagem (500 ha)
+                          Jl.p = DA * 500 * p)  #número de indivíduos presentes na paisagem ou número de pixels do tipo "habitat"
+                          # I = U*(J-1)/(1-U), # fluxo de imigrantes para a comunidade local (Rosindell et al. 2011)
+                          # U..J = U/J) # taxa de imigração per capita;
+lm_S <- lm(S.medio ~ S.obs, df_resultados)
+```
+<!--####################################################################################################################################
+#################################### -1o sessão: objetivo da análise exploratória , resumo do que foi feito ############################
+#####################################################################################################################################-->
+
+<!-- revisar os termos usados para descrever as variáveis, de qualquer maneira esses nomes tem relevância internamente no texto  -->  
+  
+# Análise Gráfica dos dados #
+
+  As simulações foram realizados utilizando valores empíricos, assim, não é possível assumir que todas as combinações de parâmetros são possíveis. Estamos presos aos padrões existentes na natureza. Aqui, busco entender a influência que as eventuais relações entre covariáveis têm na relação investigada: efeito da fragmentação na diferença entre o observado e o simulado neutro com diferentes kerneis de dispersão(REESCREVER). Utilizo gráficos exploratórios e modelos lineares para investigar as relações entre:
+  i) variáveis de controle (VC) e cobertura vegetal ('p'). VC: S.obs, J, Jl, Jl.p. 
+  ii) variáveis respostas (VR) com 'p' e 'kernel', ponderando por classes de VC, quando pertinente. VR: U, KS, KS.p, GOF
+  iii) variáveis biogeográficas e históricas e 'p'. estado (e.g. São Paulo), disturbio, fitofisio, unidade de conservação. 
+  De antemão, spero que a riqueza observada tenha grande impacto na simulação e nas métricas utilizadas, pois: i) U é estimada para produzir em média S.obs; ii) as SADs dependem de U; iii) a métrica de comparação das SADs, a estatística de KS, pode ser influênciada por S.obs (ela determina o número médio de ranks em que a comparação será realizada - CONFIRMAR; PROCURAR). Também espero que exista uma relação entre Jl e Jl.p e p e Jl.p, afinal Jl.p é obtido do produto dessas variáveis. [PROCURAR: se existe mesmo uma tendência de aumenta da cobertura vegetal com o aumento da cobertura vegetal na paisagem]. Gráficos mais detalhados e que permitem a comparação ficaram para o final do documento em anexo. A seguir eu resumo os achados da análise exploratória.
+
+<!--####################################################################################################################################
+########################################## 2o sessão: resumo do que foi encontrado ###################################
+#####################################################################################################################################-->
+
+# Resumo dos Achados #
+  
+  O primeiro diagnóstico para avaliar se a simulação está fazendo tudo como deveria fazer é o modelo linear S.medio ~ S.obs. O parâmetro "U" (taxa de imigração) é estimado para gerar em média a riqueza observada. O modelo linear S.medio ~ S.obs apresenta: F(1, 766) = 1.255e+06, p-value < 2.2e-166, R² = 0.994  'S.medio = `r round(lm_S$coefficients[1], 4)` + `r round(lm_S$coefficients[2], 4)` * S.obs'. Assim, me parece que a simulação está fazendo o esperado.
+  
+  Na figura 1 temos a relação de todas as variáveis de controle e cobertura par a par. Argumentei que parece ser mais adequado retirar 3 observações que divergem muito dos demais valores de J. Com exceção de S.obs, VC estão bem distribuidas no gradiente de p (fig 1). Na figura 2, avalio como que S.obs e p se relacionam, parece que existe uma correção positiva entre elas. Concluo que as quatro variáveis de controle podem ser usadas no modelo, mas não simultaneamente, há muita informação em comum. 
+  Olhando para as variáveis de interesse (VR, cobertura e kernel), a única relação que parece ser mais notória aos olhos é KS ~ p, que apresenta relação negativa (fig 5): quanto maior a cobertura vegetal menor KS. U também parece apresentar relação com p, mas ela parece ser modulada pelo kernel(fig 3). O aumento do kernel, consegue reverter a relação de U ~ p, esse efeito não parece acontecer com KS.
+  A correlação positiva entre S.obs e p parece ter influência na relação de U ~ p. Ao utilizar os resíduos do modelo linear de U ~ S.obs contra p, o efeito de p em U torna-se mais evidente(fig 4 e 3b). O mesmo procedimento não teve impacto em KS, apesar da correlação entre KS e S.obs, não notei melhora alguma em usarmos os resíduos (fig 5 e 6).
+ e negativa  Por conta da correlação positiva entre S.obs e p (fig 2) e da importância de S.obs para a simulação, avaliei o impacto de S.obs na relação de interesse VR ~ cobertura * kernel (fig 3-10). Em anexos, há os mesmos gráficos para as outras VCs.
+
+  As variáveis 'forest disturbance' e 'forest age' apresentam muitos NAs (90 e 73 respectivamente) e serão excluidas do conjunto de dados. As demais variáveis não apresentam NAs ou são poucos (UC: 6, succession: 1). Não acredito que vamos usar todas as vaiáveis de efeito aleatório, pois a amostra não está muito bem balanceada (fig 11. Fundir níveis, quando pertinente, pode ser uma boa estratégia se houver problemas com a estimação.
+
+  Na próxima sessão os gráficos que criei que me permitiram realizar tais interpretações.
+
+# Gráficos #
+<!--####################################################################################################################################
+######################################################### Início da análise ############################################################
+#####################################################################################################################################-->
+
+<!--####################################################################################################################################
+-VC ~ p: correlação entre os parâmetros da simulação; variáveis de controle da simulação
+  -objetivo do recorte e resumo do que foi feito
+  -gráficos VC ~ p + interpretação do gráfico } S.obs, J, Jl, Jlp
+#####################################################################################################################################-->
+
+### Covariáveis de Controle (S.obs, J, Jl) e Cobertura Vegetal ('p') ###  
+
+  Primeiramente, vou analisar a relação entre as variáveis de controle (VC), riqueza observada (S.obs), tamanho da comunidade (J), Jl, Jlp e cobertura vegetal, p. Podemos imaginar que esse conjunto de variáveis descrevem as combinações de parâmetros que utilizamos para rodar o conjunto de simulações.
+
+```{r}
+df_ae <- df_resultados[,c(1,17,22,20,29:30)] %>% unique %>% arrange(p)
+# x11()
+scatterplotMatrix(~ p + S.obs + J + Jl + Jl.p, df_ae)
+# df_ae %>% filter(J>5000) # trabalhos que distoam dos demais em termos de tamanho da comunidade
+# df_ae %>% summary
+# mean(df_ae[df_ae$J>5000,4]-mean(df_ae$J))
+# sd(df_ae$J[df_ae$J<5000])
+# sd(df_ae$J)
+# df_ae[df_ae$J>5000,4]/mean(df_ae$J)
+#amplitude_s<- diff(range(df_ae[df_ae$J<5000,4]))
+#amplitude_c<- diff(range(df_ae[,4]))
+```
+Figura 1. Cobertura vegetal e variáveis de controle, os "inputs observados" (REESCREVER). 
+
+```{r echo=FALSE, include=FALSE}
+sd(df_ae$J[df_ae$J<5000])
+sd(df_ae$J)
+```
+
+
+<!-- #### TABELA 1: estatísticas descritivas de VC #### --> 
+
+  As variáveis tem uma tendência a serem assimétricas, terem duas corcovas e serem platicúrtica, com exceção de J, que tem um forma leptocurtico. Parece que os SiteCodes SPeea1, SPeec1, SPpecb1 são valores que distoam dos demais dentro do conjunto de dados de J. Sem esses três valores o desvio padrão de J é 583.426 indivíduos, com eles sobe para 2596.384 indivíduos, um aumento de  445.023%. Eu acredito que J precisa ter variação bem distribuida ao longo do gradiente de p e S, olhando para os paineis dessas variáveis (e das demais), vemos que esses valores distoam dos demais. Se a amostra estivesse melhor balanceada, tivessem mais pontos com J dessas magnitudes poderiamos considerar como três classes de comunidades seria possívelusa-las como variável de efeito aleatório(Bolker et al. 2008).  Assim, afi de minimizar a variação de J, eu irei remover as observações de SPeea1, SPeec1, SPeeb1. <!-- DISCUTIR QUESTÃO E VER QUAIS SÃO OS TRABALHOS, ELES  -->
+```{r}
+df_resultados %<>% filter(SiteCode != "SPeea1" & SiteCode != "SPeec1" & SiteCode != "SPpecb1")
+```
+  Com exceção de S.obs e Jl.p que parecem apresentar alguma correlação com p, parece que todas as variáveis estão bem distribuidas ao longo de p. A correlação entre Jl.p e p era esperada, afinal a primeira é uma transformação da segunda, contudo, a correlação de S.obs pode ter uma grande influência nos resultados da simulação, dado que a simulação estima U a partir de S.obs. Se existe uma correlação entre dois parâmetros de uma simulação significa que nem todos as combinações entre eles eram possíveis. Na próxima sessão vou investigar a influência de S.obs na relação de interesse. Em anexo os mesmos gráficos para as outras VC. 
+## S.obs ~ p ##
+<!-- NOTA: adaptar para todas as variáveis
+```{r distibuições que melhor ajustam sua frequência}
+df_ae <- unique(df_resultados[,c(1,22)])
+# x11()
+# plotdist(df_ae$S.obs) #ela parece ser levemente assimétrica para a esquerda
+md1 <- fitdist(df_ae$S.obs,"weibull")
+md2 <- fitdist(df_ae$S.obs,"gamma")
+md3 <- fitdist(df_ae$S.obs,"lnorm")
+md4 <- fitdist(df_ae$S.obs,"norm")
+par(mfrow=c(2,2))
+denscomp(list(md1,md2,md3,md4), legendtext=c("weibull", "lnorm", "gamma", "norm"))
+qqcomp(list(md1,md2,md3,md4), legendtext=c("weibull", "lnorm", "gamma", "norm"))
+cdfcomp(list(md1,md2,md3,md4), legendtext=c("weibull", "lnorm", "gamma", "norm"))
+ppcomp(list(md1,md2,md3,md4), legendtext=c("weibull", "lnorm", "gamma", "norm"))
+par(mfrow=c(1,1))
+df_AIC <- data.frame(dist = c("Weibull", "lognormal", "gamma", "norm"),
+                     AIC = sapply(list(md1,md2,md3,md4),function(x) x$aic),
+                     df = sapply(list(md1,md2,md3,md4),function(x) length(x$estimate)) ) %>% arrange(AIC)
+df_AIC %<>% mutate(dAIC = AIC-(AIC[1]))
+
+#l_md.S <- vector("list",length = length(dist)) #lista que vai armazenar os modelos 
+#names(l_md.S) <- dist #nomeando 
+#for(i in 1:length(dist) ){
+#  l_md.S[[i]] <- fitdist(df_ae$S.obs, dist[i])
+#}
+
+#for(i in 1:5){
+#  l_md.S[[i]] <- vector("list",length=3)
+#  names(l_md.S[[i]]) <- c("fun_md", "start", "mle")
+#}
+
+#l_md[[1]] <-  fitdist(df_ae) #Poisson
+#l_md[[2]] <- glm(S.obs ~ 1,family="binomial"(), data = df_ae) #binomial
+```
+Figura 1. A distribuição de Riqueza Observada -->
+```{r "S.obs ~ p" }
+df_ae <- df_resultados[,c(1,17,22)] %>% unique
+names(df_ae)[3] <- "S"
+df_ae %<>% mutate(.,S_factor = cut(S,10),
+                    p_factor = cut(p,4))
+lm_S.p <- lm(S ~ p, data = df_ae)
+#df_ae$fit <- lm_S.p$fitted.values
+#df_ae$res <- lm_S.p$residuals
+# df_ae %>% mutate(S_true = S - (fit + res) ) %>% .$S_true %>% summary # OK
+# summary(lm_S.p)
+# plots #
+p_S.p_bx <- ggplot(df_ae, aes(y=p, x=S)) +
+              geom_boxplot(aes(colour=S_factor)) + 
+              geom_jitter() +
+              theme(plot.background=element_blank()) + 
+              coord_flip()
+p_p.S_bx <- ggplot(df_ae, aes(y = S, x=p, group = p_factor)) + geom_boxplot(aes(colour=p_factor)) + geom_jitter() +
+              geom_jitter() +
+              theme(plot.background=element_blank()) 
+p_S.p_lm <- ggplot(df_ae, aes(x=p, y=S)) + geom_smooth(method="lm", se=FALSE, colour = "#003300") +
+              geom_point(aes(colour=S_factor ,shape = S_factor, size = 10)) +
+              scale_shape_manual(values=LETTERS[1:10]) + theme_bw() + theme(legend.position="none") +
+              annotate("rect", xmin = -0.01, xmax = 0.11, ymin = 170, ymax = 220, fill="white", colour="red") + #caixa
+              annotate("text", x=0.05, y=c(213,196,179), label = c("R^2 == 0.367","alpha == 50.854", "beta == 83.290"), parse=T, size = 3)
+p_S.p_lm.diag <- autoplot(lm_S.p) + theme_bw()
+# diagnostic grafics #
+#p1<-ggplot(df_ae, aes(x = fit, y = res)) + #Residual vs Fitted Plot
+#      geom_point(aes(colour=S_factor ,shape = S_factor, size = 10)) + 
+#      stat_smooth(method="loess") + geom_hline(yintercept=0, col="red", linetype="dashed") +
+#      scale_shape_manual(values=LETTERS[1:10]) +
+#      xlab("Fitted values") + ylab("Residuals")
+#      ggtitle("Residual vs Fitted Plot") +
+#      theme(legend.position="none", panel.background=element_blank(), panel.border=element_blank(),
+#            panel.grid.major=element_blank(), panel.grid.minor=element_blank(),plot.background=element_blank())
+lay <- rbind(c(1,1,3,3),
+             c(1,1,3,3),
+             c(2,2,4,5),
+             c(2,2,6,7))
+grid.arrange(p_S.p_bx,
+             p_S.p_lm,
+             p_p.S_bx,
+             p_S.p_lm.diag[[1]], p_S.p_lm.diag[[2]], p_S.p_lm.diag[[3]], p_S.p_lm.diag[[4]],
+             ncol = 4, nrow = 4, layout_matrix = lay)
+```
+Figura 2 - Riqueza observada e Cobertura vegetal. canto superior esquerdo, S ~ p: boxplots classe de riqueza. Acima na direita, S ~ p: boxplot por classe de p. embaixo na esquerda, regressão linear S ~ p, p-value = 3.3634e-11. Na porção da direita, gráficas diagnósticos da regressão linear de S ~ p.
+
+  Dividi S.obs em 10 classes de igual comprimento e marqueis os pontos segundo essas classes em gráficos relacionado S.obs e p (figura 2). Os valores de S.obs não parecem estar igualmente distribuidos ao longo do gradiente de cobertura. As observações se iniciam em valores de p próximos de zero, com S.obs variando de 26 até 128 espécies, o maior valor de S.obs é 230 espécies. As classes médias de S.obs (]46;128] espécies) estão bem distribuidas em p, enquanto as classes baixas (]25.8;46.4] espécies) e altas (]128;230] espécies) estão concentrados em cantos do gradiente de p. Existe uma tendência de que com o aumento da cobertura, ocorra um aumento nos valores de S.obs (figura 2, esquerda em baixo). Olhando para p, a riqueza não esta bem distribuida ao longo de todo seu gradiente, quanto maio a cobertura maior a variância e a média (figura 2, canto superior direito. Portanto, existe uma correlação entre S.obs e cobertura. O modelo linear confirma o padrão visto nos boxplots. Contudo, não sei se a relação positiva entre as covariáveis pode interferir no resultado das simulações. Intuitivamente, me parece que relações entre covariáveis podem mascarar relações de sinal oposto entre variáveis resposta e as variáveis de interesse p e kernel. O impacto que essa correlação têm, vai depender da sensibilidade da simulação aos dados.
+  J, Jl e Jl.p serão considerados tanto como variáveis de efeito aleatório quanto como variáveis de efeito fixo, pois estão relacionadas com um questão da amostra, do viés da amostra do TreeCo, e também estão relacionados com o funcionamento da simulação, ou seja, da dinâmica neutra, então, possuem valor teórico. 
+  Vou investigar mais a influênciad de S.obs na simulação. Provavelmente irei utiliza-la como variável aleatória, acredito que S.obs teve um grande impacto nos resultados da simulação, como argumentado anteriormente. Colocando S.obs como variável aleatória eu consigo ponderar o efeito que o gradiente de espécies pode ter no gradiente de fragmentação. (Faz sentido?)
+<!--####################################################################################################################################
+-VR ~ p * kernel * VC <!-- variáveis resposta da simulação
+  -objetivo do recorte e resumo do que foi feito
+  -gráficos VR ~ p * kernel * VC } VR: U, KS, KS.p, GOF, KS.abund, KS.ac.obs, KS.ac.sim, KS.obs.sim 
+                                   VC: S.obs, J, Jl, Jlp <!-- fazer gráfico de VR linhas e VC colunas para vizualização dos resultados marcados por classe de  ANEXO
+#####################################################################################################################################-->
+  Aqui, penso na relação de todas as variáveis respostas, p e kernel. Para comparação par a par de todas as variáveis utilizadas, exceto as biogeográficas e históricas (figura A1 ). Para VR ~ p * kernel para cada VC ver gráficos em anexo. A seguir um recorte de VR ~ p * kernel por classe de S.obs.
+
+<!--
+## FAZER GRÁFICO! ## PENSAR em como representar
+descrição do gŕafico:
+tipo: scatterplot de VR ~ p, cor por classe de VC e forma por tipo de kernel ? muito poluido?
+dimensões: VC colunas, VR linhas
+```{r "(VR ~ p * kernel) ~VC"}
+df_ae <- df_resultados[,c(1,18,2,17,3:5,28,6:9,22,20,29,30)] %>% arrange(p, kernel)
+names(df_ae)[13] <- "S"
+df_ae %<>% mutate(S_factor = cut(S,10),
+                  J_factor = cut(J,3),
+                  Jl_factor = cut(Jl, 10),
+                  Jl.p_factor = cut(Jl.p,10))
+p_VR1.VC1 <- ggplot(df_ae, aes(x=p,y=U))
+  
+
+```
+-->
+
+## U ~ p * kernel * S ##
+1o gráfico: U ~ p * kernel 
+```{r "U ~ p * kernel"}
+df_ae <- df_resultados[,c(1,18,2,17,3)] %>% arrange(p, kernel)
+df_ae$kernel %<>% factor
+df_ae %<>% mutate(p_factor = cut(p,10))
+p_U.p <- ggplot(df_ae, aes(x=p,y=U)) + geom_smooth(method="lm") + geom_point() + theme_bw()
+p_U.p.kernel <- ggplot(df_ae, aes(x=p,y=U, group = kernel)) + geom_smooth(method="lm", se= FALSE, aes(colour=kernel)) +
+                  geom_point(aes(colour=kernel)) + theme_bw()
+p_U.kernel.p <- ggplot(df_ae, aes(y=U,x=kernel, group=SiteCode)) + geom_line(aes(colour=kernel)) + facet_grid(~p_factor)  + theme_bw()
+lay <- rbind(rep(1:2,each=5),
+             rep(3,10))
+grid.arrange(p_U.p, p_U.p.kernel, p_U.kernel.p, ncol=8, layout_matrix=lay)
+```
+figura 3 Taxa de imigração (U), cobertura (p) e kernel de dispersão. No painel de baixo, cada linha representa um SiteCode, simulada com diferentes kerneis de dispersão (cores)
+
+  Parece não haver relação entre U e cobertura vegetal (figura 3, painel canto superior esquerdo). Quando ponderado por kernel, parece emergir um padrão. O kernel com valor mais baixo (31.1 m), apresenta pouca mudança ao longo do gradiente de fragmentação. O segundo menor kernel apresenta tendência ao aumento de U com o aumento de 'p'. Com o gradual aumento dos valores de kernel, essa relação se amortiza e acaba por se reverter (figura 3, painel canto superior direito). Quando dividimos p em 10 classes, vemos que o efeito do kernel em U parece modificar ao longo das classes de p (figura 3, painel inferior), de maneira geral, parece que em baixos valores de 'p' incrementos de kernel implicam em incrementos de U. Como esperado, parece existir uma interação entre cobertura e kernel: o efeito do kernel em U depende da cobertura vegetal e vice e versa. Existe muita variação em U, que é muito sensível à S.obs, assim vou fazer alguns gráficos considerando S.obs como fator para investigar se parte 
+
+2o gráfico: U ~ p * kernel * VC (riqueza observada)
+
+```{r "U ~ p * kernel * S"}
+df_ae <- df_resultados[,c(1,18,2,17,3,22)] %>% arrange(p, kernel)
+# df_ae$kernel %<>% factor
+df_ae %<>% mutate(p_factor = cut(p,10),
+                  S_factor = cut(S.obs,10))
+names(df_ae)[6] <- "S"
+lm_U.S <- lm(U ~ S, df_ae)
+df_ae$fit <- lm_U.S$fitted.values
+df_ae$res <- lm_U.S$residuals
+p_S.p <- ggplot(df_ae, aes(x=p, y=S, group=S_factor)) + geom_smooth(method="lm", se=FALSE, aes(colour=S_factor)) +
+          geom_point(aes(colour=S_factor ,shape = S_factor, size = 10)) +
+          scale_shape_manual(values=LETTERS[1:10]) + theme_bw() + theme(legend.position="none")
+p_U.p.S <- ggplot(df_ae, aes(x=p, y=U, group = S_factor)) + geom_smooth(method="lm", se=FALSE, aes(colour=S_factor)) +
+            geom_point(aes(colour=S_factor, shape = S_factor, size = 10)) +
+            scale_shape_manual(values=LETTERS[1:10]) + theme_bw() + theme(legend.position="none")
+p_U.S_lm <- ggplot(df_ae, aes(x=S, y=U)) + geom_point() + geom_smooth(method="lm", se=FALSE) + theme_bw() + theme(legend.position="none")
+p_J.p_lm.diag <- autoplot(lm_U.S) + theme_bw()
+p_res.p <- ggplot(df_ae,aes(x=p,y=res)) + geom_smooth(method="lm", se= FALSE) +
+                  geom_point() + theme_bw() + theme(legend.position="none")
+p_fit.p <- ggplot(df_ae,aes(x=p,y=fit)) + geom_smooth(method="lm", se= FALSE, aes(colour=kernel)) +
+                  geom_point() + theme_bw() + theme(legend.position="none")
+lay <- rbind(c(1,1,2,2),
+             c(1,1,2,2),
+             c(3,3,4,5),
+             c(3,3,6,7))
+grid.arrange(p_S.p, p_U.p.S,
+             p_U.S_lm,
+             p_J.p_lm.diag[[1]], p_J.p_lm.diag[[2]],
+             p_res.p, p_fit.p,
+             ncol=4, layout_matrix=lay)
+```
+figura 4. Taxa de imigração, cobertura, riqueza e kernel. Porção superior, comparação entre os gráficos de dispersão de S~p e U~p. As letras representam as classes de riqueza, utilizadas anteriormente. R^2 = 0.3792, S = 7.190e-5, p-value = 2.2e-16.
+
+  Parece haver uma tendência de que U diminua com o aumento de p. Essa tendência parece não ser válida para toda as classes de riqueza, quanto maior S.obs, maior a variação entre os valores (fig 4 paineis superiores). Além de aumentar a variância, os valores médios de U ao longo de p parecem ser influenciados pela correlação de U ~ S.obs (figura 4 paineis inferiores). Apesar de parecer que o modelo linear não é o melhor modelo para descrever a relação entre essas duas variáveis (figura 4 "Residuals vs Fitted" e "Normal Q-Q"). Por simplificade optei por realizar o gráfico dos resíduos e dos valores preditos pelo modelo linear contra p e parece que existia um efeito de S na relação observada de U e p (figura 4, os dois úlimos gráficos do canto inferior direito). A seguir reproduzo a figura 3, com os valores dos resíduos de U~p no lugar de U. 
+  
+```{r}
+df_ae$kernel %<>% factor
+p_res.p <- ggplot(df_ae, aes(x=p,y=res)) + geom_smooth(method="lm") + geom_point() + theme_bw()
+p_res.p.kernel <- ggplot(df_ae, aes(x=p,y=res, group = kernel)) + geom_smooth(method="lm", se= FALSE, aes(colour=kernel)) +
+                  geom_point(aes(colour=kernel)) + theme_bw()
+p_res.kernel.p <- ggplot(df_ae, aes(y=res,x=kernel, group=SiteCode)) + geom_line(aes(colour=kernel)) + facet_grid(~p_factor)  + theme_bw()
+lay <- rbind(rep(1:2,each=5),
+             rep(3,10))
+grid.arrange(p_res.p, p_res.p.kernel, p_res.kernel.p, ncol=8, layout_matrix=lay)
+```
+figura 3B - Resíduo de U~S, cobertura e kernel,
+
+  Parece que S.obs atenua o efeito de p em U.
+
+```{r analise da influencia de S.obs nos dados}
+# Objetivo avaliar como que a riqueza observada pode estar mascarando o efeito da cobertura na resposta biológica
+# começar fitando uma regressão linear
+df_ae <- df_resultados[,c(1,18,2,17,3:5,28,6:9,22)]
+names(df_ae)[13] <- "S"
+df_ae %<>% mutate(.,S_factor = cut(S,10),
+                    p_factor = cut(p,10))
+p_S.p_lm <- ggplot(df_ae, aes(x=p, y=S)) + geom_smooth(method="lm", se=FALSE) +
+              geom_point(aes(colour=S ,shape = S_factor, size = 10)) +
+              scale_color_gradient(low="blue", high="red") +
+              scale_shape_manual(values=LETTERS[1:10]) + theme_bw()
+p_S.p_bx <- ggplot(df_ae[df_ae$Sindrome == "wind",], aes(y=p, x=S)) +
+              geom_boxplot(aes(colour=S_factor)) + 
+              geom_jitter() +
+              theme_bw() + coord_flip()
+
+autoplot(lm(S ~ p, data = df_ae))
+grid.arrange(p_S.p_lm,p_S.p_bx, ncol=1)        
+
+
+
+
+
+
+p_S.p <- ggplot(df_ae, aes(x=p, y=S, group=S_factor)) + geom_smooth(method="lm", se=FALSE, aes(colour=S_factor)) +
+          geom_point(aes(colour=S_factor ,shape = S_factor, size = 10)) +
+          scale_shape_manual(values=LETTERS[1:10]) + theme_bw() + theme(legend.position="none")
+p_U.p.S <- ggplot(df_ae, aes(x=p, y=U, group = S_factor)) + geom_smooth(method="lm", se=FALSE, aes(colour=S_factor)) +
+            geom_point(aes(colour=S_factor, shape = S_factor, size = 10)) +
+            scale_shape_manual(values=LETTERS[1:10]) + theme_bw() + theme(legend.position="none")
+p_p.S <- ggplot(df_ae, aes(x=S, y=p, group = p_factor)) + geom_smooth(method="lm", se=FALSE, aes(colour=p_factor)) +
+            geom_point(aes(colour=p_factor, shape=p_factor, size = 10)) +
+            scale_shape_manual(values=LETTERS[11:20]) + theme_bw() + theme(legend.position="none")
+p_U.S.p <- ggplot(df_ae, aes(x=S, y=U, group = p_factor)) + geom_smooth(method="lm", se=FALSE, aes(colour=p_factor)) +
+            geom_point(aes(colour=p_factor, shape = p_factor, size = 10)) +
+            scale_shape_manual(values=LETTERS[11:20]) + theme_bw() + theme(legend.position="none")
+
+grid.arrange(p_S.p, p_p.S, p_U.p.S, p_U.S.p, ncol=2,nrow=2)
+
+ggplot(df_ae, aes( y = log(U), x = cobertura, colour = S_factor)) + geom_point() + geom_smooth(method = "lm", se = FALSE)
+            
+p_U.p.S <- ggplot(df_ae, aes(x=p, y=U, colour = S)) + 
+            geom_point(aes(shape = S_factor, size = 10))
+            geom_smooth(method="lm", se=FALSE) +
+            #scale_color_gradient(low="blue", high="red") +
+            scale_shape_manual(values=LETTERS[1:10]) + theme_bw()
+            
+            
+            
+            
+p_KS.p.S <- ggplot(df_ae, aes(x=p, y=KS)) + geom_smooth(method="lm", se=FALSE, color="#003300") +
+              geom_point(aes(colour=S, shape = S_factor, size = 10)) +
+              scale_color_gradient(low="blue", high="red") +
+              scale_shape_manual(values=LETTERS[1:10]) + theme_bw()
+p_KS.p.p.S <- ggplot(df_ae, aes(x=p, y=KS.p)) + geom_smooth(method="lm", se=FALSE, color="#003300") +
+                geom_point(aes(colour=S, shape = S_factor, size = 10)) +
+                scale_color_gradient(low="blue", high="red") +
+                scale_shape_manual(values=LETTERS[1:10]) + theme_bw()
+p_GOF.p.S <- ggplot(df_ae, aes(x=p, y=GOF)) + geom_smooth(method="lm", se=FALSE, color="#003300") +
+              geom_point(aes(colour=S, shape = S_factor, size = 10)) +
+              scale_color_gradient(low="blue", high="red") +
+              scale_shape_manual(values=LETTERS[1:10]) + theme_bw()
+
+
+```
+
+## KS ~ p * kernel * S ##
+```{r "KS ~ p * kernel"}
+df_ae <- df_resultados[,c(1,18,2,17,4)] %>% arrange(p, kernel)
+df_ae$kernel %<>% factor
+df_ae %<>% mutate(p_factor = cut(p,10))
+p_KS.p <- ggplot(df_ae, aes(x=p,y=KS)) + geom_smooth(method="lm") + geom_point() + theme_bw()
+p_KS.p.kernel <- ggplot(df_ae, aes(x=p,y=KS, group = kernel)) + geom_smooth(method="lm", se= FALSE, aes(colour=kernel)) +
+                  geom_point(aes(colour=kernel)) + theme_bw()
+p_KS.kernel.p <- ggplot(df_ae, aes(y=KS,x=kernel, group=SiteCode)) + geom_line(aes(colour=kernel)) + facet_grid(~p_factor)  + theme_bw()
+lay <- rbind(rep(1:2,each=5),
+             rep(3,10))
+grid.arrange(p_KS.p, p_KS.p.kernel, p_KS.kernel.p, ncol=8, layout_matrix=lay)
+```
+figura 5 Taxa de imigração (KS), cobertura (p) e kernel de dispersão. No painel de baixo, cada linha representa um SiteCode, simulada com diferentes kerneis de dispersão (cores)
+
+  KS e p parecem apresentar relação negativa, que quando ponderado pelo kernel se acentua mais: quanto maior o kernel maior o efeito de p (figura 5, paineis superiores). Contudo, não vemos um efeito claro de p na relação KS ~ p (figura 5, paineis inferiores). De maneira geral, quanto maior a cobertura vegeta e maior o kernel, menor KS. Mas parece haver muita variação nos dados. Vou avaliar a influência de S.
+
+```{r "KS ~ p * kernel * S"}
+df_ae <- df_resultados[,c(1,18,2,17,4,22)] %>% arrange(p, kernel)
+# df_ae$kernel %<>% factor
+df_ae %<>% mutate(p_factor = cut(p,10),
+                  S_factor = cut(S.obs,10))
+names(df_ae)[6] <- "S"
+lm_KS.S <- lm(KS ~ S, df_ae)
+df_ae$fit <- lm_KS.S$fitted.values
+df_ae$res <- lm_KS.S$residuals
+p_S.p <- ggplot(df_ae, aes(x=p, y=S, group=S_factor)) + geom_smooth(method="lm", se=FALSE, aes(colour=S_factor)) +
+          geom_point(aes(colour=S_factor ,shape = S_factor, size = 10)) +
+          scale_shape_manual(values=LETTERS[1:10]) + theme_bw() + theme(legend.position="none")
+p_KS.p.S <- ggplot(df_ae, aes(x=p, y=KS, group = S_factor)) + geom_smooth(method="lm", se=FALSE, aes(colour=S_factor)) +
+            geom_point(aes(colour=S_factor, shape = S_factor, size = 10)) +
+            scale_shape_manual(values=LETTERS[1:10]) + theme_bw() + theme(legend.position="none")
+p_KS.S_lm <- ggplot(df_ae, aes(x=S, y=KS)) + geom_point() + geom_smooth(method="lm", se=FALSE) + theme_bw() + theme(legend.position="none")
+p_J.p_lm.diag <- autoplot(lm_KS.S) + theme_bw()
+p_res.p <- ggplot(df_ae,aes(x=p,y=res)) + geom_smooth(method="lm", se= FALSE) +
+                  geom_point() + theme_bw() + theme(legend.position="none")
+p_fit.p <- ggplot(df_ae,aes(x=p,y=fit)) + geom_smooth(method="lm", se= FALSE, aes(colour=kernel)) +
+                  geom_point() + theme_bw() + theme(legend.position="none")
+lay <- rbind(c(1,1,2,2),
+             c(1,1,2,2),
+             c(3,3,4,5),
+             c(3,3,6,7))
+grid.arrange(p_S.p, p_KS.p.S,
+             p_KS.S_lm,
+             p_J.p_lm.diag[[1]], p_J.p_lm.diag[[2]],
+             p_res.p, p_fit.p,
+             ncol=4, layout_matrix=lay)
+```
+figura 6. KS, cobertura, riqueza e kernel. Porção superior, comparação entre os gráficos de dispersão de S~p e U~p. As letras representam as classes de riqueza, utilizadas anteriormente. R^2 = 0.3028, S = -6.897e-04, p-value < 2.2e-16.
+
+  Apesar de existir uma correlação entre KS e S, visualizar a relação KS~p usando S como fator não ajudou para entender melhor o padrão observado. Nesse caso, a correlação entre VR ~ p e VC ~ possuem o mesmo sinal. Preciso refletir mais sobre essa questão.
+  
+```{r}
+df_ae$kernel %<>% factor
+p_res.p <- ggplot(df_ae, aes(x=p,y=res)) + geom_smooth(method="lm") + geom_point() + theme_bw()
+p_res.p.kernel <- ggplot(df_ae, aes(x=p,y=res, group = kernel)) + geom_smooth(method="lm", se= FALSE, aes(colour=kernel)) +
+                  geom_point(aes(colour=kernel)) + theme_bw()
+p_res.kernel.p <- ggplot(df_ae, aes(y=res,x=kernel, group=SiteCode)) + geom_line(aes(colour=kernel)) + facet_grid(~p_factor)  + theme_bw()
+lay <- rbind(rep(1:2,each=5),
+             rep(3,10))
+grid.arrange(p_res.p, p_res.p.kernel, p_res.kernel.p, ncol=8, layout_matrix=lay)
+```
+figura 5B - Resíduo de KS~S, cobertura e kernel,
+
+  Parece que S.obs atenua o efeito de p em U.
+
+## KS.p ~ p * kernel * S ##
+
+```{r "KS.p ~ p * kernel"}
+df_ae <- df_resultados[,c(1,18,2,17,5)] %>% arrange(p, kernel)
+df_ae$kernel %<>% factor
+df_ae %<>% mutate(p_factor = cut(p,10))
+p_KS.p.p <- ggplot(df_ae, aes(x=p,y=KS.p)) + geom_smooth(method="lm") + geom_point() + theme_bw()
+p_KS.p.p.kernel <- ggplot(df_ae, aes(x=p,y=KS.p, group = kernel)) + geom_smooth(method="lm", se= FALSE, aes(colour=kernel)) +
+                  geom_point(aes(colour=kernel)) + theme_bw()
+p_KS.p.kernel.p <- ggplot(df_ae, aes(y=KS.p,x=kernel, group=SiteCode)) + geom_line(aes(colour=kernel)) + facet_grid(~p_factor)  + theme_bw()
+lay <- rbind(rep(1:2,each=5),
+             rep(3,10))
+grid.arrange(p_KS.p.p, p_KS.p.p.kernel, p_KS.p.kernel.p, ncol=8, layout_matrix=lay)
+```
+figura 7 Taxa de imigração (KS.p), cobertura (p) e kernel de dispersão. No painel de baixo, cada linha representa um SiteCode, simulada com diferentes kerneis de dispersão (cores)
+
+  KS.p tem muita variação nos dados, difícil dizer se existe uma relação mesmo. Ponderando pelo kernel, parece que com o aumento do kernel diminui o efeito da relação até que se reverte, mas muito diserpso.  
+
+```{r "KS.p ~ p * kernel * S"}
+df_ae <- df_resultados[,c(1,18,2,17,5,22)] %>% arrange(p, kernel)
+# df_ae$kernel %<>% factor
+df_ae %<>% mutate(p_factor = cut(p,10),
+                  S_factor = cut(S.obs,10))
+names(df_ae)[6] <- "S"
+lm_KS.p.S <- lm(KS.p ~ S, df_ae)
+df_ae$fit <- lm_KS.p.S$fitted.values
+df_ae$res <- lm_KS.p.S$residuals
+p_S.p <- ggplot(df_ae, aes(x=p, y=S, group=S_factor)) + geom_smooth(method="lm", se=FALSE, aes(colour=S_factor)) +
+          geom_point(aes(colour=S_factor ,shape = S_factor, size = 10)) +
+          scale_shape_manual(values=LETTERS[1:10]) + theme_bw() + theme(legend.position="none")
+p_KS.p.p.S <- ggplot(df_ae, aes(x=p, y=KS.p, group = S_factor)) + geom_smooth(method="lm", se=FALSE, aes(colour=S_factor)) +
+            geom_point(aes(colour=S_factor, shape = S_factor, size = 10)) +
+            scale_shape_manual(values=LETTERS[1:10]) + theme_bw() + theme(legend.position="none")
+p_KS.p.S_lm <- ggplot(df_ae, aes(x=S, y=KS.p)) + geom_point() + geom_smooth(method="lm", se=FALSE) + theme_bw() + theme(legend.position="none")
+p_J.p_lm.diag <- autoplot(lm_KS.p.S) + theme_bw()
+p_res.p <- ggplot(df_ae,aes(x=p,y=res)) + geom_smooth(method="lm", se= FALSE) +
+                  geom_point() + theme_bw() + theme(legend.position="none")
+p_fit.p <- ggplot(df_ae,aes(x=p,y=fit)) + geom_smooth(method="lm", se= FALSE, aes(colour=kernel)) +
+                  geom_point() + theme_bw() + theme(legend.position="none")
+lay <- rbind(c(1,1,2,2),
+             c(1,1,2,2),
+             c(3,3,4,5),
+             c(3,3,6,7))
+grid.arrange(p_S.p, p_KS.p.p.S,
+             p_KS.p.S_lm,
+             p_J.p_lm.diag[[1]], p_J.p_lm.diag[[2]],
+             p_res.p, p_fit.p,
+             ncol=4, layout_matrix=lay)
+```
+figura 8. KS.p, cobertura, riqueza e kernel. Porção superior, comparação entre os gráficos de dispersão de S~p e U~p. As letras representam as classes de riqueza, utilizadas anteriormente. R^2 = 1.022e-3, S = 1.83e-4, p-value = 0.384.
+
+  Parece não haver relação entre as variáveis, não vou realizar os gráficos com os resíduos da regressão. 
+
+## GOF ~ p * kernel * S ##
+
+```{r "GOF ~ p * kernel"}
+df_ae <- df_resultados[,c(1,18,2,17,28)] %>% arrange(p, kernel)
+df_ae$kernel %<>% factor
+df_ae %<>% mutate(p_factor = cut(p,10))
+p_GOF.p <- ggplot(df_ae, aes(x=p,y=GOF)) + geom_smooth(method="lm") + geom_point() + theme_bw()
+p_GOF.p.kernel <- ggplot(df_ae, aes(x=p,y=GOF, group = kernel)) + geom_smooth(method="lm", se= FALSE, aes(colour=kernel)) +
+                  geom_point(aes(colour=kernel)) + theme_bw()
+p_GOF.kernel.p <- ggplot(df_ae, aes(y=GOF,x=kernel, group=SiteCode)) + geom_line(aes(colour=kernel)) + facet_grid(~p_factor)  + theme_bw()
+lay <- rbind(rep(1:2,each=5),
+             rep(3,10))
+grid.arrange(p_GOF.p, p_GOF.p.kernel, p_GOF.kernel.p, ncol=8, layout_matrix=lay)
+```
+figura 9 GOF cobertura (p) e kernel de dispersão. No painel de baixo, cada linha representa um SiteCode, simulada com diferentes kerneis de dispersão (cores)
+
+De maneira geral, a simulação parece criar SADs que são boas aproximações das curvas acumuladas para todo valore de p. A variação não parece estar associada com o gradiente de p. 
+
+```{r "GOF ~ p * kernel * S"}
+df_ae <- df_resultados[,c(1,18,2,17,28,22)] %>% arrange(p, kernel)
+# df_ae$kernel %<>% factor
+df_ae %<>% mutate(p_factor = cut(p,10),
+                  S_factor = cut(S.obs,10))
+names(df_ae)[6] <- "S"
+lm_GOF.S <- lm(GOF ~ S, df_ae)
+df_ae$fit <- lm_GOF.S$fitted.values
+df_ae$res <- lm_GOF.S$residuals
+p_S.p <- ggplot(df_ae, aes(x=p, y=S, group=S_factor)) + geom_smooth(method="lm", se=FALSE, aes(colour=S_factor)) +
+          geom_point(aes(colour=S_factor ,shape = S_factor, size = 10)) +
+          scale_shape_manual(values=LETTERS[1:10]) + theme_bw() + theme(legend.position="none")
+p_GOF.p.S <- ggplot(df_ae, aes(x=p, y=GOF, group = S_factor)) + geom_smooth(method="lm", se=FALSE, aes(colour=S_factor)) +
+            geom_point(aes(colour=S_factor, shape = S_factor, size = 10)) +
+            scale_shape_manual(values=LETTERS[1:10]) + theme_bw() + theme(legend.position="none")
+p_GOF.S_lm <- ggplot(df_ae, aes(x=S, y=GOF)) + geom_point() + geom_smooth(method="lm", se=FALSE) + theme_bw() + theme(legend.position="none")
+p_J.p_lm.diag <- autoplot(lm_GOF.S) + theme_bw()
+p_res.p <- ggplot(df_ae,aes(x=p,y=res)) + geom_smooth(method="lm", se= FALSE) +
+                  geom_point() + theme_bw() + theme(legend.position="none")
+p_fit.p <- ggplot(df_ae,aes(x=p,y=fit)) + geom_smooth(method="lm", se= FALSE, aes(colour=kernel)) +
+                  geom_point() + theme_bw() + theme(legend.position="none")
+lay <- rbind(c(1,1,2,2),
+             c(1,1,2,2),
+             c(3,3,4,5),
+             c(3,3,6,7))
+grid.arrange(p_S.p, p_GOF.p.S,
+             p_GOF.S_lm,
+             p_J.p_lm.diag[[1]], p_J.p_lm.diag[[2]],
+             p_res.p, p_fit.p,
+             ncol=4, layout_matrix=lay)
+```
+figura 10. GOF, cobertura, riqueza e kernel. Porção superior, comparação entre os gráficos de dispersão de S~p e U~p. As letras representam as classes de riqueza, utilizadas anteriormente. R^2 = 1.435e-4, S = 6.280e-3, p-value = 0.744.
+
+  Me parece que não há relaçã entre as variáveis, contudo, me parece que existe uma mudança da variância de GOF por classes de riqueza. 
+
+  Similarmente ao conjunto de variáveis anteriores, KS._, também são medidas relacionadas entre si. KS.abund é o valor de abundância onde foi observado KS, pode ser entendido como a abundância acumulada que gerou a maior distância entre as SADs. KS.ac.obs é a média do valor da curva acumulada onde se observou KS; KS.ac.sim idem para a SAD simulada; KS.obs.sim mede a diferença média entre KS.ac.obs e KS.ac.sim. Espera-se que KS.obs.sim seja descrita por uma distribuição simétrica com média no zero, contudo, ela parece ser assimétrica para a direita, revelando que em média a maior distância entre as curvas acumuladas se deve ao modelo neutro subestimar a abundância onde KS foi observado (KS.abund). Não vou discutir essas variáveis nesse documento. Os gráficos para estas variáveis estão em anexo.
+
+# Variáveis biogeográficas e históricas #
+```{r}
+df_ae <- inner_join(df_ref[,c(1,5,9:10,12:15)], unique(df_resultados[,c(1,17)]), by = "SiteCode")
+# df_ae %>% str
+for(i in seq(1,8)[-2]) {
+  df_ae[,i] %<>% factor #drop levels
+  #df_ae[,i] %<>% as.character #transformando para facilitar manipulação
+}
+# df_ae %>% str
+# df_ae %>% summary # as variáveis forest_disturbance e forest_age apresentam muitos NAs, vou retira-las e considerar apenas as demais variáveis. 'ha' não será considerado
+names(df_ae)[4:8] <- c("forest","succession","age","disturbance","UC")
+df_ae %<>% select(SiteCode, p, estado, UC, succession, forest) %>% melt(.,c("SiteCode", "p"))
+names(df_ae)[3:4] <- c("var.aleatoria", "nivel")
+
+#df_ae %>% filter(var.aleatoria == "estado") %>% .$nivel %>% table
+#df_ae %>% filter(var.aleatoria == "UC") %>% .$nivel %>% table
+df_ae[df_ae$var.aleatoria == "UC" & df_ae$nivel == "UC Protecao Integral" & !is.na(df_ae$nivel), 4] <- rep("PI",30)
+df_ae[df_ae$var.aleatoria == "UC" & df_ae$nivel == "UC Uso Sustentavel" & !is.na(df_ae$nivel), 4] <- rep("US", 19)
+df_ae[df_ae$var.aleatoria == "UC" & df_ae$nivel == "universities and research center" & !is.na(df_ae$nivel), 4] <- "pesquisa"
+df_ae[df_ae$var.aleatoria == "UC" & df_ae$nivel == "universities and research centers" & !is.na(df_ae$nivel), 4] <- rep("pesquisa", 3)
+#df_ae %>% filter(var.aleatoria == "succession") %>% .$nivel %>% table
+#df_ae %>% filter(var.aleatoria == "forest") %>% .$nivel %>% table
+df_ae[df_ae$var.aleatoria == "forest" & df_ae$nivel == "Cerradao (Savana florestada)" & !is.na(df_ae$nivel), 4] <- rep("cer",1)
+df_ae[df_ae$var.aleatoria == "forest" & df_ae$nivel == "Contato FES/FOM" & !is.na(df_ae$nivel), 4] <- "FES/FOM"
+df_ae[df_ae$var.aleatoria == "forest" & df_ae$nivel == "Contato FOD/FES" & !is.na(df_ae$nivel), 4] <- "FES/FOD"
+df_ae[df_ae$var.aleatoria == "forest" & df_ae$nivel == "Floresta de galeria" & !is.na(df_ae$nivel), 4] <- "FG"
+df_ae[df_ae$var.aleatoria == "forest" & df_ae$nivel == "FOM plantada" & !is.na(df_ae$nivel), 4] <- "FOM.plant"
+df_ae[df_ae$var.aleatoria == "forest" & df_ae$nivel == "Formacao pioneira sob influencia marinha" & !is.na(df_ae$nivel), 4] <- rep("f1.IM",4)
+#x11()
+# pdf(file = "va.p.pdf", width = 15, height = 15)
+
+p_cobertura.va <- ggplot(df_ae, aes(y = p, x = nivel)) + 
+                    geom_boxplot(aes(fill=nivel)) + geom_jitter() +
+                    facet_wrap(~var.aleatoria, scales = "free") + labs(x="") +
+                    theme_bw() + theme(strip.background=element_rect(fill="black")) + theme(strip.text=element_text(color="white", face="bold")) + guides(fill =FALSE)
+p_cobertura.va
+# dev.off()
+```
+Figura 11. Cobertura X Variáveis de efeito aleatório: 'estado', UC - unidade de conservação, succession = sucessão ecológica
+f1.IM = Formacao pioneira sob influencia marinha, FG = Floresta de galeria, cer = Cerradão, PI = UC de proteção integral, US = UC de uso sustentável
+  
+  As variáveis 'forest disturbance' e 'forest age' apresentam muitos NAs (90 e 73 respectivamente), vou retira-las e considerar apenas as demais variáveis. As demais variáveis não apresentam NAs ou são poucos (UC: 6, succession: 1). Não acredito que vamos usar todas as vaiáveis de efeito aleatório, pois a amostra não está muito bem balanceada. Fundir níveis, quando pertinente, pode ser uma boa estratégia se houver problemas com a estimação.
+
+## ANEXO ##
+## Figuras de Resultados gerais ##
+
+```{r "VC ~ VR"}
+# x11()
+scatterplotMatrix(~ S.obs + J + Jl + Jl.p + U + S.medio + KS + KS.p + GOF, data = df_resultados)
+```
+Figura A1. Relação entre as variáveis de controle da simulação e e as variáveis respostas. S.obs = riqueza observada; S.medio = S médio das SADs réplicas de cada simulação; KS = média da maior distância entre a SAD observada e a SAD réplica; KS.p = média do p valor associado ao teste de Kolmogovor-Smirnov; GOF (Goodness of fit - adaptado de Etienne & Rosindell 2011) = número de réplicas que obtiveram um bom ajuste (critério de ajuste: p valor > 0.05). As três primeiras variáveis são variáveis de controle da simulação: S,.obs, J e Jp. U.medio é a media da taxa de imigração esimada para cada simulação. S.medio, pode ser entendido como uma avaliação da qualidade da simulação. KS, KS.p, GOF podem ser entendidos como métricas da congruência da SAD simulada com a SAD observada.-->
+
+
+
+## Gráficos detalhados das variáceis de controle de de p ##
+
+# J ~ p #
+```{r "J ~ p"}
+df_ae <- df_resultados[,c(1,17,20)] %>% unique
+df_ae %<>% mutate(.,J_factor = cut(J,10),
+                    p_factor = cut(p,10))
+lm_J.p <- lm(J ~ p, data = df_ae)
+#df_ae$fit <- lm_S.p$fitted.values
+#df_ae$res <- lm_S.p$residuals
+# df_ae %>% mutate(S_true = S - (fit + res) ) %>% .$S_true %>% summary # OK
+# summary(lm_S.p)
+# plots #
+p_J.p_bx <- ggplot(df_ae, aes(y=p, x=J)) +
+              geom_boxplot(aes(colour=J_factor)) + 
+              geom_jitter() +
+              theme(plot.background=element_blank()) + 
+              coord_flip()
+p_p.J_bx <- ggplot(df_ae, aes(y = J, x=p, group = p_factor)) + geom_boxplot(aes(colour=p_factor)) + geom_jitter() +
+              geom_jitter() +
+              theme(plot.background=element_blank()) 
+p_J.p_lm <- ggplot(df_ae, aes(x=p, y=J)) + geom_smooth(method="lm", se=FALSE, colour = "#003300") +
+              geom_point(aes(colour=J_factor ,shape = J_factor, size = 10)) +
+              scale_shape_manual(values=LETTERS[1:10]) + theme_bw() + theme(legend.position="none")
+p_J.p_lm.diag <- autoplot(lm_J.p) + theme_bw()
+lay <- rbind(c(1,1,3,3),
+             c(1,1,3,3),
+             c(2,2,4,5),
+             c(2,2,6,7))
+grid.arrange(p_J.p_bx,
+             p_J.p_lm,
+             p_p.J_bx,
+             p_J.p_lm.diag[[1]], p_J.p_lm.diag[[2]], p_J.p_lm.diag[[3]], p_J.p_lm.diag[[4]],
+             ncol = 4, nrow = 4, layout_matrix = lay)
+```
+
+## Jl ~ p ##
+```{r "Jl ~ p"}
+df_ae <- df_resultados[,c(1,17,29)] %>% unique
+df_ae %<>% mutate(.,Jl_factor = cut(Jl,10),
+                    p_factor = cut(p,10))
+lm_Jl.p <- lm(Jl ~ p, data = df_ae)
+df_ae$fit <- lm_Jl.p$fitted.values
+df_ae$res <- lm_Jl.p$residuals
+# df_ae %>% mutate(Jl_true = Jl - (fit + res) ) %>% .$Jl_true %>% summary # OK
+# summary(lm_Jl.p)
+# plots #
+p_Jl.p_bx <- ggplot(df_ae, aes(y=p, x=Jl)) +
+              geom_boxplot(aes(colour=Jl_factor)) + 
+              geom_jitter() +
+              theme(legend.position="none",plot.background=element_blank()) + 
+              coord_flip()
+p_p.Jl_bx <- ggplot(df_ae, aes(y = Jl, x="")) + geom_boxplot() + geom_jitter(aes(colour=Jl_factor)) +
+              theme(axis.ticks=element_blank(), legend.position="none", panel.background=element_blank(), panel.border=element_blank(),
+                    panel.grid.major=element_blank(), panel.grid.minor=element_blank(),plot.background=element_blank())
+p_Jl.p_lm <- ggplot(df_ae, aes(x=p, y=Jl)) + geom_smooth(method="lm", se=FALSE, colour = "#003300") +
+              geom_point(aes(colour=Jl_factor ,shape = Jl_factor, size = 10)) +
+              scale_shape_manual(values=LETTERS[1:10]) + theme_bw()
+p_Jl.p_lm.diag <- autoplot(lm_Jl.p) + theme_bw()
+lay <- rbind(c(1,1,1,3,4,4,5,5),
+             c(2,2,2,2,6,6,7,7))
+grid.arrange(p_Jl.p_bx,
+             p_Jl.p_lm,
+             p_p.Jl_bx,
+             p_Jl.p_lm.diag@plots[[1]], p_Jl.p_lm.diag@plots[[2]],p_Jl.p_lm.diag@plots[[3]],p_Jl.p_lm.diag@plots[[4]], 
+             ncol = 8, nrow = 2, layout_matrix = lay)
+```
+
+
+# Jlp ~ p #
+```{r "Jlp ~ p" }
+df_ae <- df_resultados[,c(1,17,30)] %>% unique
+df_ae %<>% mutate(.,Jl.p_factor = cut(Jl.p,10),
+                    p_factor = cut(p,10))
+lm_Jl.p.p <- lm(Jl.p ~ p, data = df_ae)
+df_ae$fit <- lm_Jl.p.p$fitted.values
+df_ae$res <- lm_Jl.p.p$residuals
+# df_ae %>% mutate(Jl.p_true = Jl.p - (fit + res) ) %>% .$Jl.p_true %>% summary # OK
+# summary(lm_Jl.p.p)
+# plots #
+p_Jl.p.p_bx <- ggplot(df_ae, aes(y=p, x=Jl.p)) +
+              geom_boxplot(aes(colour=Jl.p_factor)) + 
+              geom_jitter() +
+              theme(legend.position="none",plot.background=element_blank()) + 
+              coord_flip()
+p_p.Jl.p_bx <- ggplot(df_ae, aes(y = Jl.p, x="")) + geom_boxplot() + geom_jitter(aes(colour=Jl.p_factor)) +
+              theme(axis.ticks=element_blank(), legend.position="none", panel.background=element_blank(), panel.border=element_blank(),
+                    panel.grid.major=element_blank(), panel.grid.minor=element_blank(),plot.background=element_blank())
+p_Jl.p.p_lm <- ggplot(df_ae, aes(x=p, y=Jl.p)) + geom_smooth(method="lm", se=FALSE, colour = "#003300") +
+              geom_point(aes(colour=Jl.p_factor ,shape = Jl.p_factor, size = 10)) +
+              scale_shape_manual(values=LETTERS[1:10]) + theme_bw()
+p_Jl.p.p_lm.diag <- autoplot(lm_Jl.p.p) + theme_bw()
+lay <- rbind(c(1,1,1,3,4,4,5,5),
+             c(2,2,2,2,6,6,7,7))
+grid.arrange(p_Jl.p.p_bx,
+             p_Jl.p.p_lm,
+             p_p.Jl.p_bx,
+             p_Jl.p.p_lm.diag@plots[[1]], p_Jl.p.p_lm.diag@plots[[2]],p_Jl.p.p_lm.diag@plots[[3]],p_Jl.p.p_lm.diag@plots[[4]], 
+             ncol = 8, nrow = 2, layout_matrix = lay)
+```
+
+## Gráficos das variáveis respostas pelas variáveis de interesse (fragmentação e kernel de dispersão), pelas variáveis de controle ##
+
+VR: U, KS, KS.p, GOF, KS.abund, KS.ac.obs, KS.ac.sim, KS.obs.sim 
+VC: S.obs, J, Jl, Jlp
+
+VC1
+```{r "VR1 ~ p * kernel * VC1"}
+# OBJETIVO: criar gráficos de todas as 8 VR por cobertura, separados pelo kernel de dispersão - 8 linhas (VR) X 8 colunas (kernel)
+# x11()
+# U #
+df_ae <- df_resultados[,c(1,18,2,17,22,3:5,28,6:9)] %>% arrange(p, kernel)
+df_ae %<>% mutate(.,S_factor = cut(S.obs, 10))
+# df_ae %<>% filter(Sindrome == "wind")
+p_U.p.kernel <- ggplot(df_ae, aes(x=p, y=U, group = S_factor)) + 
+                  geom_point(aes(colour=S_factor, shape=S_factor),size=3) + geom_smooth(method="lm", se=FALSE, aes(colour=S_factor)) + 
+                  scale_shape_manual(values=LETTERS[1:10]) + theme_bw() + theme(legend.position="none") + 
+                  theme(strip.background=element_rect(fill="black")) + theme(strip.text=element_text(color="white", face="bold")) +
+                  facet_wrap(~kernel,ncol=8) 
+p_KS.p.kernel <- ggplot(df_ae, aes(x=p, y=KS, group = S_factor)) + 
+                   geom_point(aes(colour=S_factor, shape=S_factor),size=3) + geom_smooth(method="lm", se=FALSE, aes(colour=S_factor)) + 
+                   scale_shape_manual(values=LETTERS[1:10]) + theme_bw() + theme(legend.position="none") + 
+                   theme(strip.background=element_rect(fill="black")) + theme(strip.text=element_text(color="white", face="bold")) +
+                    facet_wrap(~kernel,ncol=8) 
+p_KS.p.p.kernel <- ggplot(df_ae, aes(x=p, y=KS.p, group = S_factor)) + 
+                     geom_point(aes(colour=S_factor, shape=S_factor),size=3) + geom_smooth(method="lm", se=FALSE, aes(colour=S_factor)) + 
+                     scale_shape_manual(values=LETTERS[1:10]) + theme_bw() + theme(legend.position="none") + 
+                     theme(strip.background=element_rect(fill="black")) + theme(strip.text=element_text(color="white", face="bold")) +
+                     facet_wrap(~kernel,ncol=8) 
+p_GOF.p.kernel <- ggplot(df_ae, aes(x=p, y=GOF, group = S_factor)) + 
+                    geom_point(aes(colour=S_factor, shape=S_factor),size=3) + geom_smooth(method="lm", se=FALSE, aes(colour=S_factor)) + 
+                    scale_shape_manual(values=LETTERS[1:10]) + theme_bw() + theme(legend.position="none") + 
+                    theme(strip.background=element_rect(fill="black")) + theme(strip.text=element_text(color="white", face="bold")) +
+                    facet_wrap(~kernel,ncol=8) 
+p_KS.abund.p.kernel <- ggplot(df_ae, aes(x=p, y=log(KS.abund), group = S_factor)) + 
+                         geom_point(aes(colour=S_factor, shape=S_factor),size=3) + geom_smooth(method="lm", se=FALSE, aes(colour=S_factor)) + 
+                         scale_shape_manual(values=LETTERS[1:10]) + theme_bw() + theme(legend.position="none") + 
+                         theme(strip.background=element_rect(fill="black")) + theme(strip.text=element_text(color="white", face="bold")) +
+                         facet_wrap(~kernel,ncol=8) 
+p_KS.ac.obs.p.kernel <- ggplot(df_ae, aes(x=p, y=KS.ac.obs, group = S_factor)) + 
+                          geom_point(aes(colour=S_factor, shape=S_factor),size=3) + geom_smooth(method="lm", se=FALSE, aes(colour=S_factor)) + 
+                          scale_shape_manual(values=LETTERS[1:10]) + theme_bw() + theme(legend.position="none") + 
+                          theme(strip.background=element_rect(fill="black")) + theme(strip.text=element_text(color="white", face="bold")) +
+                          facet_wrap(~kernel,ncol=8)  
+p_KS.ac.sim.p.kernel <- ggplot(df_ae, aes(x=p, y=KS.ac.sim, group = S_factor)) + 
+                          geom_point(aes(colour=S_factor, shape=S_factor),size=3) + geom_smooth(method="lm", se=FALSE, aes(colour=S_factor)) + 
+                          scale_shape_manual(values=LETTERS[1:10]) + theme_bw() + theme(legend.position="none") + 
+                          theme(strip.background=element_rect(fill="black")) + theme(strip.text=element_text(color="white", face="bold")) +
+                          facet_wrap(~kernel,ncol=8) 
+p_KS.obs.sim.p.kernel <- ggplot(df_ae, aes(x=p, y=KS.obs.sim, group = S_factor)) + 
+                          geom_point(aes(colour=S_factor, shape=S_factor),size=3) + geom_smooth(method="lm", se=FALSE, aes(colour=S_factor)) + 
+                          scale_shape_manual(values=LETTERS[1:10]) + theme_bw() + theme(legend.position="none") + 
+                          theme(strip.background=element_rect(fill="black")) + theme(strip.text=element_text(color="white", face="bold")) +
+                          facet_wrap(~kernel,ncol=8) 
+# lay <- matrix(rep(1:8,8),ncol=8)
+# grid.arrange(p_U.p.kernel,
+#              p_KS.p.kernel,p_KS.p.p.kernel,p_GOF.p.kernel,
+#              p_KS.abund.p.kernel,p_KS.ac.obs.p.kernel,p_KS.ac.sim.p.kernel,p_KS.obs.sim.p.kernel,
+#              ncol = 8, nrow = 8, layout_matrix = lay)
+# U, KS, KS.p, GOF #
+lay <- matrix(rep(1:4,8),ncol=8)
+# pdf(file = "VR1_p_S.pdf", width = 30, height = 17)
+grid.arrange(p_U.p.kernel,
+             p_KS.p.kernel,p_KS.p.p.kernel,p_GOF.p.kernel,
+             ncol = 8, nrow = 4, layout_matrix = lay)
+# dev.off()
+```
+
+```{r "VR2 ~ p * kernel * S.obs"}
+# KS, KS._ #
+lay <- matrix(rep(1:4,8),ncol=8)
+# pdf(file = "VR2_p_S.pdf", width = 30, height = 17)
+grid.arrange(p_KS.abund.p.kernel,p_KS.ac.obs.p.kernel,p_KS.ac.sim.p.kernel,p_KS.obs.sim.p.kernel,
+             ncol = 5, nrow = 8, layout_matrix = lay)
+# dev.off()
+```
+
+
+VC2
+```{r "VR1 ~ p * kernel * J"}
+# OBJETIVO: criar gráficos de todas as 8 VR por cobertura, separados pelo kernel de dispersão - 8 linhas (VR) X 8 colunas (kernel)
+# x11()
+df_ae <- df_resultados[,c(1,18,2,17,20,3:5,28,6:9)] %>% arrange(p, kernel)
+df_ae %<>% mutate(.,J_factor = cut(J, 3))
+# df_ae %<>% filter(Sindrome == "wind")
+p_U.p.kernel <- ggplot(df_ae, aes(x=p, y=U, group = J_factor)) + 
+                  geom_point(aes(colour=J_factor, shape=J_factor),size=3) + geom_smooth(method="lm", se=FALSE, aes(colour=J_factor)) + 
+                  scale_shape_manual(values=LETTERS[1:3]) + theme_bw() + theme(legend.position="none") + 
+                  theme(strip.background=element_rect(fill="black")) + theme(strip.text=element_text(color="white", face="bold")) +
+                  facet_wrap(~kernel,ncol=8) 
+p_KS.p.kernel <- ggplot(df_ae, aes(x=p, y=KS, group = J_factor)) + 
+                   geom_point(aes(colour=J_factor, shape=J_factor),size=3) + geom_smooth(method="lm", se=FALSE, aes(colour=J_factor)) + 
+                   scale_shape_manual(values=LETTERS[1:3]) + theme_bw() + theme(legend.position="none") + 
+                   theme(strip.background=element_rect(fill="black")) + theme(strip.text=element_text(color="white", face="bold")) +
+                    facet_wrap(~kernel,ncol=8) 
+p_KS.p.p.kernel <- ggplot(df_ae, aes(x=p, y=KS.p, group = J_factor)) + 
+                     geom_point(aes(colour=J_factor, shape=J_factor),size=3) + geom_smooth(method="lm", se=FALSE, aes(colour=J_factor)) + 
+                     scale_shape_manual(values=LETTERS[1:3]) + theme_bw() + theme(legend.position="none") + 
+                     theme(strip.background=element_rect(fill="black")) + theme(strip.text=element_text(color="white", face="bold")) +
+                     facet_wrap(~kernel,ncol=8) 
+p_GOF.p.kernel <- ggplot(df_ae, aes(x=p, y=GOF, group = J_factor)) + 
+                    geom_point(aes(colour=J_factor, shape=J_factor),size=3) + geom_smooth(method="lm", se=FALSE, aes(colour=J_factor)) + 
+                    scale_shape_manual(values=LETTERS[1:3]) + theme_bw() + theme(legend.position="none") + 
+                    theme(strip.background=element_rect(fill="black")) + theme(strip.text=element_text(color="white", face="bold")) +
+                    facet_wrap(~kernel,ncol=8) 
+p_KS.abund.p.kernel <- ggplot(df_ae, aes(x=p, y=log(KS.abund), group = J_factor)) + 
+                         geom_point(aes(colour=J_factor, shape=J_factor),size=3) + geom_smooth(method="lm", se=FALSE, aes(colour=J_factor)) + 
+                         scale_shape_manual(values=LETTERS[1:3]) + theme_bw() + theme(legend.position="none") + 
+                         theme(strip.background=element_rect(fill="black")) + theme(strip.text=element_text(color="white", face="bold")) +
+                         facet_wrap(~kernel,ncol=8) 
+p_KS.ac.obs.p.kernel <- ggplot(df_ae, aes(x=p, y=KS.ac.obs, group = J_factor)) + 
+                          geom_point(aes(colour=J_factor, shape=J_factor),size=3) + geom_smooth(method="lm", se=FALSE, aes(colour=J_factor)) + 
+                          scale_shape_manual(values=LETTERS[1:3]) + theme_bw() + theme(legend.position="none") + 
+                          theme(strip.background=element_rect(fill="black")) + theme(strip.text=element_text(color="white", face="bold")) +
+                          facet_wrap(~kernel,ncol=8)  
+p_KS.ac.sim.p.kernel <- ggplot(df_ae, aes(x=p, y=KS.ac.sim, group = J_factor)) + 
+                          geom_point(aes(colour=J_factor, shape=J_factor),size=3) + geom_smooth(method="lm", se=FALSE, aes(colour=J_factor)) + 
+                          scale_shape_manual(values=LETTERS[1:3]) + theme_bw() + theme(legend.position="none") + 
+                          theme(strip.background=element_rect(fill="black")) + theme(strip.text=element_text(color="white", face="bold")) +
+                          facet_wrap(~kernel,ncol=8) 
+p_KS.obs.sim.p.kernel <- ggplot(df_ae, aes(x=p, y=KS.obs.sim, group = J_factor)) + 
+                          geom_point(aes(colour=J_factor, shape=J_factor),size=3) + geom_smooth(method="lm", se=FALSE, aes(colour=J_factor)) + 
+                          scale_shape_manual(values=LETTERS[1:3]) + theme_bw() + theme(legend.position="none") + 
+                          theme(strip.background=element_rect(fill="black")) + theme(strip.text=element_text(color="white", face="bold")) +
+                          facet_wrap(~kernel,ncol=8) 
+# lay <- matrix(rep(1:8,8),ncol=8)
+# grid.arrange(p_U.p.kernel,
+#              p_KS.p.kernel,p_KS.p.p.kernel,p_GOF.p.kernel,
+#              p_KS.abund.p.kernel,p_KS.ac.obs.p.kernel,p_KS.ac.sim.p.kernel,p_KS.obs.sim.p.kernel,
+#              ncol = 8, nrow = 8, layout_matrix = lay)
+# U, KS, KS.p, GOF #
+lay <- matrix(rep(1:4,8),ncol=8)
+# pdf(file = "VR1_p_J.pdf", width = 30, height = 17)
+grid.arrange(p_U.p.kernel,
+             p_KS.p.kernel,p_KS.p.p.kernel,p_GOF.p.kernel,
+             ncol = 8, nrow = 4, layout_matrix = lay)
+# dev.off()
+```
+
+```{r "VR2 ~ p * kernel * J"}
+# KS, KS._ #
+lay <- matrix(rep(1:4,8),ncol=8)
+# pdf(file = "VR2_p_J.pdf", width = 30, height = 17)
+grid.arrange(p_KS.abund.p.kernel,p_KS.ac.obs.p.kernel,p_KS.ac.sim.p.kernel,p_KS.obs.sim.p.kernel,
+             ncol = 5, nrow = 8, layout_matrix = lay)
+# dev.off()
+```
+
+
+VC3
+```{r "VR1 ~ p * kernel * Jl"}
+# OBJETIVO: criar gráficos de todas as 8 VR por cobertura, separados pelo kernel de dispersão - 8 linhas (VR) X 8 colunas (kernel)
+# x11()
+# U #
+df_ae <- df_resultados[,c(1,18,2,17,29,3:5,28,6:9)] %>% arrange(p, kernel)
+df_ae %<>% mutate(.,Jl_factor = cut(Jl, 10))
+# df_ae %<>% filter(Sindrome == "wind")
+p_U.p.kernel <- ggplot(df_ae, aes(x=p, y=U, group = Jl_factor)) + 
+                  geom_point(aes(colour=Jl_factor, shape=Jl_factor),size=3) + geom_smooth(method="lm", se=FALSE, aes(colour=Jl_factor)) + 
+                  scale_shape_manual(values=LETTERS[1:3]) + theme_bw() + theme(legend.position="none") + 
+                  theme(strip.background=element_rect(fill="black")) + theme(strip.text=element_text(color="white", face="bold")) +
+                  facet_wrap(~kernel,ncol=8) 
+p_KS.p.kernel <- ggplot(df_ae, aes(x=p, y=KS, group = Jl_factor)) + 
+                   geom_point(aes(colour=Jl_factor, shape=Jl_factor),size=3) + geom_smooth(method="lm", se=FALSE, aes(colour=Jl_factor)) + 
+                   scale_shape_manual(values=LETTERS[1:3]) + theme_bw() + theme(legend.position="none") + 
+                   theme(strip.background=element_rect(fill="black")) + theme(strip.text=element_text(color="white", face="bold")) +
+                    facet_wrap(~kernel,ncol=8) 
+p_KS.p.p.kernel <- ggplot(df_ae, aes(x=p, y=KS.p, group = Jl_factor)) + 
+                     geom_point(aes(colour=Jl_factor, shape=Jl_factor),size=3) + geom_smooth(method="lm", se=FALSE, aes(colour=Jl_factor)) + 
+                     scale_shape_manual(values=LETTERS[1:3]) + theme_bw() + theme(legend.position="none") + 
+                     theme(strip.background=element_rect(fill="black")) + theme(strip.text=element_text(color="white", face="bold")) +
+                     facet_wrap(~kernel,ncol=8) 
+p_GOF.p.kernel <- ggplot(df_ae, aes(x=p, y=GOF, group = Jl_factor)) + 
+                    geom_point(aes(colour=Jl_factor, shape=Jl_factor),size=3) + geom_smooth(method="lm", se=FALSE, aes(colour=Jl_factor)) + 
+                    scale_shape_manual(values=LETTERS[1:3]) + theme_bw() + theme(legend.position="none") + 
+                    theme(strip.background=element_rect(fill="black")) + theme(strip.text=element_text(color="white", face="bold")) +
+                    facet_wrap(~kernel,ncol=8) 
+p_KS.abund.p.kernel <- ggplot(df_ae, aes(x=p, y=log(KS.abund), group = Jl_factor)) + 
+                         geom_point(aes(colour=Jl_factor, shape=Jl_factor),size=3) + geom_smooth(method="lm", se=FALSE, aes(colour=Jl_factor)) + 
+                         scale_shape_manual(values=LETTERS[1:3]) + theme_bw() + theme(legend.position="none") + 
+                         theme(strip.background=element_rect(fill="black")) + theme(strip.text=element_text(color="white", face="bold")) +
+                         facet_wrap(~kernel,ncol=8) 
+p_KS.ac.obs.p.kernel <- ggplot(df_ae, aes(x=p, y=KS.ac.obs, group = Jl_factor)) + 
+                          geom_point(aes(colour=Jl_factor, shape=Jl_factor),size=3) + geom_smooth(method="lm", se=FALSE, aes(colour=Jl_factor)) + 
+                          scale_shape_manual(values=LETTERS[1:3]) + theme_bw() + theme(legend.position="none") + 
+                          theme(strip.background=element_rect(fill="black")) + theme(strip.text=element_text(color="white", face="bold")) +
+                          facet_wrap(~kernel,ncol=8)  
+p_KS.ac.sim.p.kernel <- ggplot(df_ae, aes(x=p, y=KS.ac.sim, group = Jl_factor)) + 
+                          geom_point(aes(colour=Jl_factor, shape=Jl_factor),size=3) + geom_smooth(method="lm", se=FALSE, aes(colour=Jl_factor)) + 
+                          scale_shape_manual(values=LETTERS[1:3]) + theme_bw() + theme(legend.position="none") + 
+                          theme(strip.background=element_rect(fill="black")) + theme(strip.text=element_text(color="white", face="bold")) +
+                          facet_wrap(~kernel,ncol=8) 
+p_KS.obs.sim.p.kernel <- ggplot(df_ae, aes(x=p, y=KS.obs.sim, group = Jl_factor)) + 
+                          geom_point(aes(colour=Jl_factor, shape=Jl_factor),size=3) + geom_smooth(method="lm", se=FALSE, aes(colour=Jl_factor)) + 
+                          scale_shape_manual(values=LETTERS[1:3]) + theme_bw() + theme(legend.position="none") + 
+                          theme(strip.background=element_rect(fill="black")) + theme(strip.text=element_text(color="white", face="bold")) +
+                          facet_wrap(~kernel,ncol=8) 
+lay <- matrix(rep(1:4,8),ncol=8)
+# pdf(file = "VR1_p_VC2.pdf", width = 30, height = 17)
+grid.arrange(p_U.p.kernel,
+             p_KS.p.kernel,p_KS.p.p.kernel,p_GOF.p.kernel,
+             ncol = 8, nrow = 4, layout_matrix = lay)
+# dev.off()
+```
+
+```{r "VR2 ~ p * kernel * Jl"}
+# KS, KS._ #
+lay <- matrix(rep(1:4,8),ncol=8)
+# pdf(file = "VR2_p_VC2.pdf", width = 30, height = 17)
+grid.arrange(p_KS.abund.p.kernel,p_KS.ac.obs.p.kernel,p_KS.ac.sim.p.kernel,p_KS.obs.sim.p.kernel,
+             ncol = 5, nrow = 8, layout_matrix = lay)
+# dev.off()
+```
+
+
+VC4
+```{r "VR1 ~ p * kernel * Jl.p"}
+# OBJETIVO: criar gráficos de todas as 8 VR por cobertura, separados pelo kernel de dispersão - 8 linhas (VR) X 8 colunas (kernel)
+# x11()
+# U #
+df_ae <- df_resultados[,c(1,18,2,17,30,3:5,28,6:9)] %>% arrange(p, kernel)
+df_ae %<>% mutate(.,Jl.p_factor = cut(Jl.p, 10))
+# df_ae %<>% filter(Sindrome == "wind")
+p_U.p.kernel <- ggplot(df_ae, aes(x=p, y=U, group = Jl.p_factor)) + 
+                  geom_point(aes(colour=Jl.p_factor, shape=Jl.p_factor),size=3) + geom_smooth(method="lm", se=FALSE, aes(colour=Jl.p_factor)) + 
+                  scale_shape_manual(values=LETTERS[1:10]) + theme_bw() + theme(legend.position="none") + 
+                  theme(strip.background=element_rect(fill="black")) + theme(strip.text=element_text(color="white", face="bold")) +
+                  facet_wrap(~kernel,ncol=8) 
+p_KS.p.kernel <- ggplot(df_ae, aes(x=p, y=KS, group = Jl.p_factor)) + 
+                   geom_point(aes(colour=Jl.p_factor, shape=Jl.p_factor),size=3) + geom_smooth(method="lm", se=FALSE, aes(colour=Jl.p_factor)) + 
+                   scale_shape_manual(values=LETTERS[1:3]) + theme_bw() + theme(legend.position="none") + 
+                   theme(strip.background=element_rect(fill="black")) + theme(strip.text=element_text(color="white", face="bold")) +
+                    facet_wrap(~kernel,ncol=8) 
+p_KS.p.p.kernel <- ggplot(df_ae, aes(x=p, y=KS.p, group = Jl.p_factor)) + 
+                     geom_point(aes(colour=Jl.p_factor, shape=Jl.p_factor),size=3) + geom_smooth(method="lm", se=FALSE, aes(colour=Jl.p_factor)) + 
+                     scale_shape_manual(values=LETTERS[1:3]) + theme_bw() + theme(legend.position="none") + 
+                     theme(strip.background=element_rect(fill="black")) + theme(strip.text=element_text(color="white", face="bold")) +
+                     facet_wrap(~kernel,ncol=8) 
+p_GOF.p.kernel <- ggplot(df_ae, aes(x=p, y=GOF, group = Jl.p_factor)) + 
+                    geom_point(aes(colour=Jl.p_factor, shape=Jl.p_factor),size=3) + geom_smooth(method="lm", se=FALSE, aes(colour=Jl.p_factor)) + 
+                    scale_shape_manual(values=LETTERS[1:3]) + theme_bw() + theme(legend.position="none") + 
+                    theme(strip.background=element_rect(fill="black")) + theme(strip.text=element_text(color="white", face="bold")) +
+                    facet_wrap(~kernel,ncol=8) 
+p_KS.abund.p.kernel <- ggplot(df_ae, aes(x=p, y=log(KS.abund), group = Jl.p_factor)) + 
+                         geom_point(aes(colour=Jl.p_factor, shape=Jl.p_factor),size=3) + geom_smooth(method="lm", se=FALSE, aes(colour=Jl.p_factor)) + 
+                         scale_shape_manual(values=LETTERS[1:3]) + theme_bw() + theme(legend.position="none") + 
+                         theme(strip.background=element_rect(fill="black")) + theme(strip.text=element_text(color="white", face="bold")) +
+                         facet_wrap(~kernel,ncol=8) 
+p_KS.ac.obs.p.kernel <- ggplot(df_ae, aes(x=p, y=KS.ac.obs, group = Jl.p_factor)) + 
+                          geom_point(aes(colour=Jl.p_factor, shape=Jl.p_factor),size=3) + geom_smooth(method="lm", se=FALSE, aes(colour=Jl.p_factor)) + 
+                          scale_shape_manual(values=LETTERS[1:3]) + theme_bw() + theme(legend.position="none") + 
+                          theme(strip.background=element_rect(fill="black")) + theme(strip.text=element_text(color="white", face="bold")) +
+                          facet_wrap(~kernel,ncol=8)  
+p_KS.ac.sim.p.kernel <- ggplot(df_ae, aes(x=p, y=KS.ac.sim, group = Jl.p_factor)) + 
+                          geom_point(aes(colour=Jl.p_factor, shape=Jl.p_factor),size=3) + geom_smooth(method="lm", se=FALSE, aes(colour=Jl.p_factor)) + 
+                          scale_shape_manual(values=LETTERS[1:3]) + theme_bw() + theme(legend.position="none") + 
+                          theme(strip.background=element_rect(fill="black")) + theme(strip.text=element_text(color="white", face="bold")) +
+                          facet_wrap(~kernel,ncol=8) 
+p_KS.obs.sim.p.kernel <- ggplot(df_ae, aes(x=p, y=KS.obs.sim, group = Jl.p_factor)) + 
+                          geom_point(aes(colour=Jl.p_factor, shape=Jl.p_factor),size=3) + geom_smooth(method="lm", se=FALSE, aes(colour=Jl.p_factor)) + 
+                          scale_shape_manual(values=LETTERS[1:3]) + theme_bw() + theme(legend.position="none") + 
+                          theme(strip.background=element_rect(fill="black")) + theme(strip.text=element_text(color="white", face="bold")) +
+                          facet_wrap(~kernel,ncol=8) 
+# lay <- matrix(rep(1:8,8),ncol=8)
+# grid.arrange(p_U.p.kernel,
+#              p_KS.p.kernel,p_KS.p.p.kernel,p_GOF.p.kernel,
+#              p_KS.abund.p.kernel,p_KS.ac.obs.p.kernel,p_KS.ac.sim.p.kernel,p_KS.obs.sim.p.kernel,
+#              ncol = 8, nrow = 8, layout_matrix = lay)
+# U, KS, KS.p, GOF #
+lay <- matrix(rep(1:4,8),ncol=8)
+# pdf(file = "VR1_p_VC2.pdf", width = 30, height = 17)
+grid.arrange(p_U.p.kernel,
+             p_KS.p.kernel,p_KS.p.p.kernel,p_GOF.p.kernel,
+             ncol = 8, nrow = 4, layout_matrix = lay)
+# dev.off()
+```
+
+```{r "VR2 ~ p * kernel * Jl.p"}
+# KS, KS._ #
+lay <- matrix(rep(1:4,8),ncol=8)
+# pdf(file = "VR2_p_VC3.pdf", width = 30, height = 17)
+grid.arrange(p_KS.abund.p.kernel,p_KS.ac.obs.p.kernel,p_KS.ac.sim.p.kernel,p_KS.obs.sim.p.kernel,
+             ncol = 5, nrow = 8, layout_matrix = lay)
+# dev.off()
+```
+
+
+
+
+
+```{r}
+df_ae <- inner_join(df_ref[,c(1,5,9:10,12:15)], unique(df_resultados[,c(1,17)]), by = "SiteCode")
+# df_ae %>% str
+for(i in seq(1,8)[-2]) {
+  df_ae[,i] %<>% factor #drop levels
+  #df_ae[,i] %<>% as.character #transformando para facilitar manipulação
+}
+# df_ae %>% str
+# df_ae %>% summary # as variáveis forest_disturbance e forest_age apresentam muitos NAs, vou retira-las e considerar apenas as demais variáveis. 'ha' não será considerado
+names(df_ae)[4:8] <- c("forest","succession","age","disturbance","UC")
+df_ae %<>% select(SiteCode, p, estado, UC, succession, forest) %>% melt(.,c("SiteCode", "p"))
+names(df_ae)[3:4] <- c("var.aleatoria", "nivel")
+
+#df_ae %>% filter(var.aleatoria == "estado") %>% .$nivel %>% table
+#df_ae %>% filter(var.aleatoria == "UC") %>% .$nivel %>% table
+df_ae[df_ae$var.aleatoria == "UC" & df_ae$nivel == "UC Protecao Integral" & !is.na(df_ae$nivel), 4] <- rep("PI",30)
+df_ae[df_ae$var.aleatoria == "UC" & df_ae$nivel == "UC Uso Sustentavel" & !is.na(df_ae$nivel), 4] <- rep("US", 19)
+df_ae[df_ae$var.aleatoria == "UC" & df_ae$nivel == "universities and research center" & !is.na(df_ae$nivel), 4] <- "pesquisa"
+df_ae[df_ae$var.aleatoria == "UC" & df_ae$nivel == "universities and research centers" & !is.na(df_ae$nivel), 4] <- rep("pesquisa", 3)
+#df_ae %>% filter(var.aleatoria == "succession") %>% .$nivel %>% table
+#df_ae %>% filter(var.aleatoria == "forest") %>% .$nivel %>% table
+df_ae[df_ae$var.aleatoria == "forest" & df_ae$nivel == "Cerradao (Savana florestada)" & !is.na(df_ae$nivel), 4] <- rep("cer",1)
+df_ae[df_ae$var.aleatoria == "forest" & df_ae$nivel == "Contato FES/FOM" & !is.na(df_ae$nivel), 4] <- "FES/FOM"
+df_ae[df_ae$var.aleatoria == "forest" & df_ae$nivel == "Contato FOD/FES" & !is.na(df_ae$nivel), 4] <- "FES/FOD"
+df_ae[df_ae$var.aleatoria == "forest" & df_ae$nivel == "Floresta de galeria" & !is.na(df_ae$nivel), 4] <- "FG"
+df_ae[df_ae$var.aleatoria == "forest" & df_ae$nivel == "FOM plantada" & !is.na(df_ae$nivel), 4] <- "FOM.plant"
+df_ae[df_ae$var.aleatoria == "forest" & df_ae$nivel == "Formacao pioneira sob influencia marinha" & !is.na(df_ae$nivel), 4] <- rep("f1.IM",4)
+#x11()
+# png(file = "va_p.png", width = 15, height = 15, cm )
+ggplot(df_ae, aes(y = p, x = nivel)) + 
+  geom_boxplot(aes(fill=nivel)) + geom_jitter() +
+  facet_wrap(~var.aleatoria, scales = "free") + labs(x="") +
+  theme_bw() + theme(strip.background=element_rect(fill="black")) + theme(strip.text=element_text(color="white", face="bold")) + guides(fill =FALSE)
+# dev.off()
+df_va <- df_ae
+save(df_resultados, df_ref, df_va, file = "/home/danilo/Documents/dissertacao/dados/resultados_DaniloPMori.Rdata")
+```

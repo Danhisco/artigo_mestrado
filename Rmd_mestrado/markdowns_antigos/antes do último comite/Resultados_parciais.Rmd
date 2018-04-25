@@ -1,0 +1,225 @@
+---
+title: <h4> Resultados Parciais - Danilo P. Mori
+author: "Danilo Pereira Mori"
+output: html_document
+---
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(fig.width=14, 
+                      fig.height=7, 
+                      echo=FALSE, 
+                      message=FALSE, 
+                      warning=FALSE,
+                      cache=TRUE)
+```
+```{r global packages and data}
+require(magrittr)
+require(ggplot2)
+require(gridExtra)
+require(dplyr)
+require(xtable)
+
+load("~/Documents/dados/mestrado/simulacao/resultados/resultados_sim6jun.Rdata") #config=30
+load("~/Documents/dados/mestrado/simulacao/resultados/df_dados_geral.Rdata") #config=1
+
+refID_reference <- df_resultados$refID %>% levels %>% as.numeric #definindo os refIDs em comum com a ultima bateria de simulacoes
+df_dados_geral %<>% filter(config == 1, refID %in% refID_reference) %>% select(refID,range,U_est,riqueza,KS,p_value,tree_cover) #filtrando a bateria de sim sem replicas
+df_dados_geral$refID %<>% factor #retirando os levels desnecessários
+```
+
+<h4> Prólogo </h4>
+
+<p style="text-align:justify;"> 
+Até meu segundo comitê o objetivo do meu trabalho era avaliar como a importância relativa de processos de nicho e neutro na estruturação de comunidades arbóreas é modulada pela fragmentação, contudo, durante o segundo comitê concluímos que nossa metodologia não permetia alcançar tal objetivo. Assim, mudamos a direção do projeto, agora o objetivo é avaliar as predições da teoria neutra para comunidades arbóreas em paisagens fragmentadas.
+</p>
+<p style="text-align:justify;"> 
+Esse documento é uma proposta de esqueleto. Há muitas sessões a preencher, achei pertinente fazer um esforço para preencher minimamente as sessões que eu não havia conversado com os Renatos. Bom qualquer dúvidas, vamos nos falando
+</p>
+
+<!-- Eu ainda tenho que adicionar o paragráfo resumo do documento aqui -->
+
+
+<h4> Introducão </h4>
+
+<p style="text-align:justify;"> 
+Stephen Hubbell em seu livro de 2001, *The Unified Neutral Theory of Biodiversity and Biogeography* (UNTBB), apresentou um modelo de dinâmica ecológica onde as comunidades locais são estruturadas por dois processos: deriva ecológica e imigração. A deriva ecológica é a mudança aleatória das abundâncias das espécies, levando a monodominância de alguma espécie. No modelo apresentado em UNTBB a deriva ecológica é resultado da equivalência funcional das espécies, segundo esse pressuposto todas as espécies possuem as mesmas taxas demográficas *per capita*. A erosão da riqueza de espécies gerada pela deriva ecológica é compensanda pela imigração, a chegada de indivíduos de fora da comunidade local. O balanço entre esses dois processos gera os padrões de riqueza, diversidade e composição das comunidades locais.
+</p>
+
+
+
+<h5> Objetivo, premissas e hipótese </h5>
+
+<p style="text-align:justify;"> 
+O objetivo dessse trabalho é avaliar as predições de um modelo de dinâmica neutral espacialmente explícita para comunidades arbóreas em paisagens fragmentadas. A hipótese de trabalho é que quanto maior a fragmentação menor o poder de predição do modelo neutro.  
+</p>
+
+
+
+<h4> Metolodologia </h4>
+-paragrafo resumo da metodologia 
+
+
+<h5> *Dados* </h5>
+-treeco
+
+  -descrição do treeco
+
+  -filtros e justificativa de cada filtro
+
+  -estatística descritiva dos levantamentos selecionados do treeco
+
+-Hansen et al.
+
+  -descrição breve da metodologia
+
+  -re-re-re-re-ler o artigo e o material complementar para entender como que eles calcularam a cobertura vegetal
+
+
+<h5>*Simulação*</h5>
+-breve descrição do algoritmo
+-descrição de como é feito o calculo do U est [ajuda do Coutinho]
+-inputs
+  -tipo de kernel de dispersão
+  -ranges 
+-outputs
+-número de réplicas de cada simulação e DAE média.
+
+
+<h5> *Teste de Kolomogorov-Smirnov* </h5>
+
+<h5>*Cobertura vegetal e outras variáveis operacionais para fragmentação*</h5>
+
+<h5> *Regressão linear* </h5>
+
+<h5> *Predições* </h5>
+
+<p style="text-align:justify;"> 
+As expectativas teóricas 
+</p>
+
+
+<div align="center"> 
+  Estatística de Kolmogorv-Smirnov ~ Cobertura Vegetal
+
+```{r predicoes, fig.width = 6, fig.height = 3}
+a<-ggplot(data.frame(cobertura = c(0,1) ), aes(cobertura) ) + 
+       stat_function(fun = function(x) 1-x, geom = "line", colour = "darkblue", size = 2) +
+       labs(list(x = "cobertura vegetal", y = "Estatística de Kolomogorov-Smirnov")) +
+       theme_bw() + 
+       theme(axis.line = element_line(colour = "black", size = 1, linetype = "solid"),
+             axis.ticks = element_blank(),
+             axis.text.x = element_blank(), axis.text.y = element_blank()
+             )
+b<-ggplot(data.frame(cobertura = c(0,1) ), aes(cobertura) ) + 
+       stat_function(fun = function(x) 1-x, geom = "line", colour = "darkgreen", size = 2) +
+       labs(list(x = "cobertura vegetal", y = "Taxa de imigração estimada")) +
+       theme_bw() + 
+       theme(axis.line = element_line(colour = "black", size = 1, linetype = "solid"),
+             axis.ticks = element_blank(),
+             axis.text.x = element_blank(), axis.text.y = element_blank()
+             )
+#grid.arrange(a,b,ncol=2)
+a
+```
+  <font size="1.5">
+    <p>Figura X-1. Predições da relação entre *Estatística de Kolmogorov-Smirnov* (KS) X *Cobertura Vegetal*.</p>
+  </font>
+</div> 
+
+<h4> Resultados Parciais</h4>
+-paragrafo resumo dos resulados
+
+<p style="text-align:justify;"> 
+Segue alguns gráficos que desenvolvi até agora. Os primeiros gráficos que mostro são de riqueza tanto por refID quanto por cobertura vegetal (fig X e X+1), esses gráficos ao meu ver são bons para avaliar se as simulações estão funcionando pois a taxa de imigração estimada é calculada usando a riqueza observada. Na figura X há dois gráficos de riqueza, um deles é da bateria de simulações onde cada simulação possui 30 replicas e outra sem replicas.
+</p>
+
+```{r riqueza por refID}
+S_refID_c.rep <- ggplot(data = df_resultados, aes(x = refID, y = riqueza)) + 
+                geom_point(aes(colour = range), size = 2.5) + 
+                scale_colour_manual(values=c("#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7", "#000000")) + 
+                scale_y_continuous(limits = c(50,310) ) + 
+                labs(title = "30 replicas") +
+                theme(axis.text = element_text(size=14), axis.title = element_text(size=14), legend.position = "none")
+  
+S_refID_s.rep <- ggplot(data = df_dados_geral, aes(x = refID, y = riqueza)) + 
+                  geom_point(aes(colour = range), size = 2.5) + 
+                  scale_colour_manual(values=c("#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7", "#000000")) + 
+                  scale_y_continuous(limits = c(50,310) ) + 
+                  labs(title = "sem replicas") +
+                  theme(axis.text = element_text(size=14), axis.title = element_text(size=14),
+                        axis.text.y=element_blank(),axis.ticks=element_blank(), axis.title.y=element_blank(),
+                        legend.text=element_text(size=14),
+                        legend.title=element_text(size=14)
+                        )
+grid.arrange(S_refID_c.rep,S_refID_s.rep, ncol = 2)
+```
+
+<div align="center"> 
+  <font size="1.5">
+    <p style="text-align:justify;">Figura X. Riqueza observada e simulada para cada um dos valores de dispersão média (valores retirados de Clark et al. 1999) e para cada levantamento fitossociologico selecionado. </p>
+  </font>
+</div>
+
+```{r riqueza por cobertura}
+S_tree_cover_c.rep <- ggplot(data = df_resultados, aes(x = tree_cover, y = riqueza)) + 
+                      geom_point(aes(colour = range), size = 2.5) + 
+                      scale_colour_manual(values=c("#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7", "#000000")) + 
+                      scale_y_continuous(limits = c(50,310) ) + 
+                      labs(title = "30 replicas")+
+                      theme(axis.text = element_text(size=14), axis.title = element_text(size=14), legend.position = "none")
+
+S_tree_cover_s.rep <-  ggplot(data = df_dados_geral, aes(x = tree_cover, y = riqueza)) + 
+                       geom_point(aes(colour = range), size = 2.5) + 
+                       scale_colour_manual(values=c("#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7", "#000000")) + 
+                       scale_y_continuous(limits = c(50,310) ) + 
+                       labs(title = "sem replicas") +
+                       theme(axis.text = element_text(size=14), axis.title = element_text(size=14),
+                             axis.text.y=element_blank(),axis.ticks=element_blank(), axis.title.y=element_blank(),
+                             legend.text=element_text(size=14),
+                             legend.title=element_text(size=14)
+                             )
+grid.arrange(S_tree_cover_c.rep, S_tree_cover_s.rep, ncol = 2)
+```
+<div align="center"> 
+  <font size="1.5">
+    <p style="text-align:justify;">Figura X+1. Riqueza observada e simulada para cada um dos valores de dispersão média (valores retirados de Clark et al. 1999) e por cobertura vegetal da paisagem onde o levantamento fitossociologico selecionado está situado. </p>
+  </font>
+</div>
+
+<!--KS~Cobertura Vegetal-->
+<p style="text-align:justify;"> <!-- descrição do padrão e comparação entre a bateria de dados com e sem réplicas -->
+A relação KS ~ cobertura vegetal parece seguir o mesmo padrão predito (fig predições): quanto maior a cobertura vegetal menor o valor de KS (figura gráfico KS ~ cobertura com e sem rep.). Apesar de apresentarem padrões similares, as simulações com e sem réplica diferem em termos qualitativos. A partir de uma análise visual, nota-se que na simulação com réplicas os pontos estão menos dispersos e as simulações com valores de ranges próximos (fig X+2 range = c(7.82, 17.4) ) apresentam valores praticamente identicos de KS por cobertura. Ainda nas simulações com réplicas, ao aumentar a distância entre os valores de range as simulações apresentam valores que vão aos poucos se distânciando (fig X+2 *e.g* ranges 163 e 195). 
+</p>
+
+```{r KS cobertura}
+KS_c.rep <- ggplot(data = df_resultados, aes(x = tree_cover, y = KS, colour = range)) +  
+           geom_point() +   
+           geom_smooth(method = lm, fill = NA) +  
+           facet_wrap(~ range, ncol=4) + labs(title = "30 replicas")
+KS_s.rep <- ggplot(data = df_dados_geral, aes(x = tree_cover, y = KS, colour = range)) +  
+             geom_point() +   
+             geom_smooth(method = lm, fill = NA) + 
+             facet_wrap(~ range, ncol=4) + 
+             labs(title = "sem replicas")
+KS_c.rep
+KS_s.rep
+```
+<div align="center"> <!-- legenda figura KS~cobertura -->
+  <font size="1.5">
+    <p style="text-align:justify;">Figura KS com rep. Riqueza observada e simulada para cada um dos valores de dispersão média (valores retirados de Clark et al. 1999) e por cobertura vegetal da paisagem onde o levantamento fitossociologico selecionado está situado. </p>
+  </font>
+</div>
+
+
+<p style="text-align:justify;"> <!-- range e fragmentação: efeito contrário? -->
+Na bateria de simulações sem réplicas, a inclinação da regressão linear diminui com o aumento do *range* usado na simulação (fig gráfico KS ~ cobertura sem rep, de forma mais clara os ranges 5378 e 6104 em comparação com os outros). Esse padrão pode indicar que o aumento da variância do kernel de dispersão mitiga o efeito da fragmentação. Não observa-se esse efeito na bateria de simulações com réplicas, todas as simulações, com exceção daquelas com *range* igual a 996, apresentam relação negativa, sem aparente sinal de mitigação. Nas simulações com valores de range igual a 996 a relação KS ~ cobertura vegetal é positiva (fig X KS com rep), isso pode de fato indicar uma relação real entre as variáveis, contudo, dado a maior dispersão dos pontos nas simulações com *range* igual a 996, 5378 e 6104 a presença de um valor discrepante, como no painel 996 da fig KS com rep, tem grande efeito na inclinação da reta, portanto a relação observada pode ser simplesmente efeito do acaso. 
+</p>
+<p style="text-align:justify;"> <!-- quando a cobertura vegetal é baixa, KS pode ter valores baixos e altos, quando a cobertura vegetal é alta KS tem valores sempre menores -->
+Considerando apenas a bateria de simulações com réplicas e excluindo as simulações com *range* 996, a relação negativa entre KS e cobertura vegetal parece ser resultado dos valores pequenos de KS quando a cobertura vegetal é grande (fig X KS com rep.). Assim, um possível padrão é quando a cobertura vegetal é baixa, KS pode ter valores baixos ou altos, com o aumento da cobertura vegetal os valores de KS tendem a ser sempre baixos. 
+</p>
+
+<p style="text-align:justify;"> <!-- especulações KS e cobertura vegetal -->
+Padrão: i) relação negativa entre KS e cobertura ii) cobertura vegetal baixa => KS alto ou baixo, cobertura vegetal alta => KS baixo
+Especulação:i) corrobora o predito, ii) debito de extinção e/ou efeito da fragmentação per se?
+</p>
+
+

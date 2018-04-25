@@ -1,0 +1,52 @@
+> Mat. Met
+
+#RASCUNHO:#
+
+	A partir de valores empíricos, extimamos taxas de imigração e dinâmicas ecológicas neutras usando um algoritmo coalescente. Selecionamos trabalhos fitossociológicos que amostraram comunidades em fragmentos florestais em um gradiente natural de cobertura vegetal. Para cada fragmento, simulamos 8 cenários neutros considerando diferentes médias de kernel, que são as médias da movimentação de espécies de uma mesma sindrome de dispersão. Sumarizamos os resultados da simulação em duas predições: taxa de imigração U e distribuição de abundância de espécies (SAD). Contabilizamos a proporção de SADs réplicas que são boas aproximações do observado por simulação utilizando um teste frequentista não parâmetrico na variável GOF. Para explicar a relação entre as variáveis criamos modelos generalizados mistos que consideram correlação entre grupos de amostras, agrupamos os resultados de modo a permitir que cada conjunto de simulações por fragmento possa ter intercepto e inclinação próprios. Sigo descrevendo como preparamos as simulações baseadas em parâmetros observados, depois descrevo a ideia geral da simulação, sigo apresentando a comparação da predição com o observado e analiso os dados. 
+
+
+>Construção da paisagem<
+
+	Alimentamos a simulação com dados extraídos de um banco de trabalhos fitossociológicos (TreeCo). Os trabalhos selecionados amostraram fragmentos florestais de forma contigua (em bloco único) e considerou apenas indivíduos arbóreos com diâmetro à altura do peito (DBH) >= 4.80 cm (Lima et al. 2015). Usamos imagens da Mata Atlântica presente no banco de imagens descrito em Hansel et al. (2013) para criar recortes de paisagem de 5 km^2 centrados na coordenada central da área amostrada (MATERIAL SUPLEMENTAR: mais detalhes?).
+	
+	Ajustamos a resolução do recorte de paisagem para o produto da densidade de indivíduos na área amostrada (número de indivíduos/ha) e da área do recorte de paisagem (5 ha) usando o programa Image Magick [REFERENCIA]. CONVERSÃO DE PIXEL: ifelse(>0.7,1,0) - cada pixel representa uma unidade de espaço que pode estar ou não disponível para colonização, habitat e não habitat, respectivamente. Como proxy de fragmentação usamos a cobertura vegetal que é o número de pixels de habitat sob o número total de pixels na paisagem.
+
+	Para representar a comunidade amostrada, J (número de indivíduos amostrados) unidades de habitat foram convertidas em unidades de habitat da dinâmica local. A partir do pixel central estalece-se a ordem de conversão seguindo uma espiral quadrada divergente. Criando agregados de habitats no centro da paisagem onde a dinâmica local vai ser monitorada durante a simulação coalescente (MATERIAL SUPLEMENTAR). Assim, estabelecemos o recorte de paisagem onde a simulação coalescente vai ocorrer (Rosindell et al. 2008, Campos et al. 2013).
+
+>Simulação Coalescente<
+
+	Na simulação coalescente constroí-se árvores genealogicas de comunidades no espaço estruturado segundo os pressupostos do modelo neutro (Rosindell et al. 2008). Quando em isolamento (U=0), a árvore da comunidade é influênciada apenas por deriva ecológica. Nesse sistema a dinâmica local resulta do acoplamento da dinâmica neutra de nascimento e mortes com a movimentação dos indivíduos na paisagem. A movimentação dos indivíduos na paisagem é modelada usando funções que permitem relacionar a proabilidade de colonizar uma unidade de habitat com a distância entre a unidade de habitat vaga e a planta progenitora [REESCREVER]. Essa função descreve a movimentação dos indivíduos no espaço bidimensional da paisagem. Com a árvore genealógica da comunidade gerada sob o cenário de isolamento, estimamos a taxa de imigração (U) necessária para que a riqueza no equilíbrio seja igual a riqueza observada no fragmento florestal (S) (MATERIAL SUPLEMENTAR).
+
+	Quando há fluxo de indivíduos com a metacomunidade (U>0), a árvore da comunidade resulta do balanço entre a perda de espécies por deriva ecológica e pela chegada de novas espécies, descrito por U. O modelo distingue dois tipos de movimentos no espaço: aquele que ocorre explicitamente em nível de paisagem, e aquele que ocorre implicitamente em forma de uma taxa de troca de indivíduos com a metacomunidade. No equilíbrio a taxa de entrada de novas espécies se iguala a taxa de perdas de espécies. Simulamos a identidade dos indivíduos presentes na comunidade local em um instante do equilíbrio dinâmico e sumarizamos essa informação em forma de SADs (MATERIAL SUPLEMENTAR). 
+
+	Para modelar kernel assumimos uma distribuição de Laplace com parâmetro escalar, K, a distância média de um indivíduo e seus progenitores (MATERIAL SUPLEMENTAR). Para K usamos estimativas da distância média de espécies arbóreas que apresentam o mesmo tipo de sindrome de dispersão (tabela 1 Seidler et al. 2006) [REESCREVER]. K tem  8 níveis: 1 - ballistic, 31.1 m; 2 - gravity, 47.4 m; 3 - gyration, 54.5 m; 4 - wind, 64.5 m; 5 - média das sindromes, 82.17 m; 6 - animal_fruit<2cm, 99.3 m; 7 - animal_fruit2-5cm, 120.6 m; 8 - animal_fruit>5cm, 157.8 m. Para cada nível de K e recorte de paisagem, estimamos 20 taxas de imigração, cuja média (U) foi usada para gerar 100 SADs réplicas.
+
+>Comparação com o observado e análise dos dados<
+
+	Para comparar as SADs réplicas com a SAD amostrada no fragmento florestal utilizamos o teste de Kolmogorov-Smirnov (teste KS). No teste KS utiliza-se a maior distância entre as curvas acumuladas de dois vetores númericos (SAD observada e SAD réplicas) para gerar uma distribuição nula de distâncias máximas entre as curvas acumuladas. Usando a distância observada e a distribuição nula de distâncias estimamos a probabilidade de errarmos ao afirmar que os vetores são amostras de uma mesma distribuição (p valor). Tomando p valor crítico > 0.05, contabilizamos a proporção de SADs réplicas que são boas aproximações do observado na variável GOF (Goodness-of-fit), que varia entre 0 e 1.
+
+	Para cada um dos 86 fragmentos florestais (Site) que preparamos o recorte de paisagem (ANEXO: tabela 1) realizamos 8 simulações, uma para cada nível de K. Os resultados das simulações foram sumarizados em taxa de imigração média (U) e GOF, totalizando 688 observações para cada variável. Para estimar o efeito da cobertura vegetal e de kernel de dispersão nas variáveis respostas construímos modelos generalizaos mistos. Esse tipo de modelo estatístico permitem levar em conta a relação que observações de um mesmo Site podem ter entre si. Consideramos dois tipos de estruturas aleatórias, ou formas de agrupar os dados: i) considerando que todos os fragmentos compartilham a mesma relação com a variação do kernel, ou seja, apresentam um intercepto livre e compartilham a mesma inclinação nas diferentes simulações - (1 | Site); ii) possuem intercepto e inclinação livre, ou seja, cada fragmento pode ter uma relação própria com kernel - (K | Site).
+
+	Primeiro modelamos GOF para avaliar o efeito da cobertura vegetal na qualidade da predição do modelo neutro espacialmente explícito. Avaliamos U ponderando o achado em GOF. Para modelar GOF estabelecemos duas variáveis preditoras candidatas cobertura vegetal (p) e kernel de dispersão, variável com 8 níveis que foi interpretado como variável contínua. A estrutura completo do modelo misto cheio pode ser representada por:
+
+	GOF ~ p * K + (K | Site)  
+
+	Um protocolo de validação visual foi adaptado de Bolker et al. (2008) para avaliar o modelo misto cheio. Para seleção dos modelos mais plausível utilizamos um protocolo de seleção similar ao de Zurr et al. (2009). Comparamos os modelor usando AICc [REFERÊNCIA], e como critério de plausibilidade deltaAICc menor que 2. Primeiro comparamos qual a estrutura aleatória mais plausível considerando a estrutura fixa do modelo misto cheio. Seguimos selecionando as variáveis da estrutura fixa, comparando diferentes relações entre as variáveis p e K: com interação (p * K), com efeito aditivo (p * K), sem efeito de alguma das variáveis e nula.
+
+	Utilizamos um protocolo similar para modelar U. Como U é estimado para modelar a riqueza observada esperamos que exista uma relação entre essas variáveis. Consideramos o seguinte modelo cheio para U:
+
+	U ~ p * K + S * K + (K | Site)
+	
+	Usamos cinco combinações de distribuições de erro/função de ligação: 1) normal/identidade; 2) normal/log; 3) Gamma/identidade; 4) Gamma/inversa; 5) Gamma/log. Para modelar U, usamos um protocolo parecido, contudo consideramos 5 diferentes combinações de distribuição de erros e função de ligação: normal com função identidade, normal com função log, Gamma com função identidade, Gamma com função inversa e Gamma com função log. Usando a estrutura fixa do modelo misto cheio selecionamos a melhor combinação. Os modelos que considerarm a distribuição Gammas ficaram dentro do critério de plausibilidade mas não foi possível modelar os dados com nenhuma das distribuições pois houveram problemas de convergência usando a função glmer (pacote lme4  REFERÊNCIA). Obtamos por usar a quarta combinação mais plausível, distribuição normal com função de ligação identidade.
+
+### ANEXO ###
+## Material Suplementar ##
+- critérios TreeCo e Hansen et al. 2013.
+- preparação das imagens
+- recortes de paisagem usados na simulação
+- Curva acumulada das SADs réplicas para cada simulação e a SAD observada
+
+#:RASCUNHO#
+
+
+

@@ -1,0 +1,256 @@
+---
+title: <h4> Resultados Parciais - Danilo P. Mori
+author: "Danilo Pereira Mori"
+output: html_document
+---
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(fig.width=14, 
+                      fig.height=7, 
+                      echo=FALSE, 
+                      message=FALSE, 
+                      warning=FALSE,
+                      cache=TRUE)
+```
+
+```{r global packages and data}
+require(magrittr)
+require(ggplot2)
+require(gridExtra)
+require(dplyr)
+require(xtable)
+
+load("~/resultados_parciais_danilo.Rdata")
+
+refID_reference <- df_resultados$refID %>% levels %>% as.numeric #definindo os refIDs em comum com a ultima bateria de simulacoes
+df_dados_geral %<>% filter(config == 1, refID %in% refID_reference) %>% select(refID,range,U_est,riqueza,KS,p_value,tree_cover) #filtrando a bateria de sim sem replicas
+df_dados_geral$refID %<>% factor #retirando os levels desnecessários
+```
+<br>
+<h4> Introducão </h4>
+
+* teoria neutra
+    - descrição do modelo neutro
+    - teoria neutra e teoria de nicho? (ou teoria neutra e ecologia de comunidades?)
+* fragmentação
+    - efeitos nas comunidades
+* comunidades + paisagens ~> uso de modelos de eco de comu em eco de paisagens 
+    - modelos espacialmente explicitos 
+
+
+<h5> *Objetivo, premissas e hipótese* </h5>
+
+<p style="text-align:justify;"> 
+O objetivo dessse trabalho é avaliar as predições de um modelo de dinâmica neutral espacialmente explícita para comunidades arbóreas em paisagens fragmentadas. A hipótese de trabalho é que quanto maior a fragmentação menor o poder de predição do modelo neutro. Essa hipótese baseia-se no fato de que o processo de fragmentação e perda de habitat aumenta o isolamento das comunidades ecológicas (os fragmentos florestais). O isolamento das comunidades tem impacto na taxa de imigração, processo fundamental na manutenção da diversidade dentro do modelo neutro.
+</p>
+
+<br>
+
+<h4> Metolodologia </h4>
+<br>
+
+<h5> *Dados* </h5>
+
+* treeco
+    - descrição do treeco
+    - filtros e justificativa de cada filtro
+    - estatística descritiva dos levantamentos selecionados do treeco
+* Hansen et al.
+    - descrição breve da metodologia
+<br>
+
+<h5>*Simulação*</h5>
+
+* breve descrição do algoritmo
+* descrição de como é feito o calculo do U est [ajuda do Coutinho]
+* inputs
+    - tipo de kernel de dispersão
+    - ranges 
+* outputs
+* número de réplicas de cada simulação e DAE média.
+<br>
+
+<h5> *Teste de Kolomogorov-Smirnov* </h5>
+* descrição do teste e da estatística que estamos utilizando
+<br>
+
+<h5>*Cobertura vegetal e outras variáveis operacionais para fragmentação*</h5>
+* descrição de como é feito o calculo das variáveis operacionais da fragmentação
+<br>
+
+<h5> *Regressão linear* </h5>
+* descrição da estatística que testa a relação entre as variáveis
+* seleção de modelos para o U_est??? 
+<br>
+
+<h5> *Predições* </h5>
+
+* KS ~ cobertura vegetal
+<div align="center">
+```{r predicao KS e cobertura, fig.width = 4.5, fig.height = 3}
+pred_KS <-ggplot(data.frame(cobertura = c(0,1) ), aes(cobertura) ) + 
+                stat_function(fun = function(x) 1-x, geom = "line", colour = "darkblue", size = 2) +
+                labs(list(x = "cobertura vegetal", y = "Estatística de Kolomogorov-Smirnov")) +
+                theme_bw() + 
+                theme(axis.line = element_line(colour = "black", size = 1, linetype = "solid"),
+                      axis.ticks = element_blank(),
+                      axis.text.x = element_blank(), axis.text.y = element_blank()
+                      )
+pred_KS
+```
+  <font size="1.5">
+    <p style="text-align:justify;">Figura 1. Expectativa teórica da relação entre a estatística de Kolmogorov-Smirnov (KS) e a cobertura vegetal. Espera-se que os valores de KS sejam menores naquelas comunidades com maior cobertura vegetal, ou seja, quanto menor a fragmentação melhor a predição do modelo neutro.</p>
+  </font>
+</div>
+
+* U_est ~ riqueza * fragmentação e perda de habitat
+
+<p style="text-align:justify;"> <!--predição U_est~riqueza-->
+Nos modelos neutros espacialmente implícitos (*e.g.* Hubbell 2001) a deriva ecológica, que leva a monodominância, é compensada pela imigração (que aqui se traduz em uma taxa, taxa de imigração U), criando os padrões de diversidade das comunidades locais (riqueza, abundância, composição). Assim, considerando um determinado sítio, com suas características espaciais de distribuição de habitat e não habitat, quanto maior a riqueza nesse sítio, maior a taxa de imigração estimada necessária para gerar a riqueza observada (fig. 2 painel da esquerda).
+</p>
+
+<p style="text-align:justify;"> <!--predição U_est ~ cobertura vegetal -->
+No modelo coalescente, quanto maior a cobertura vegetal (ou seja, mais habitat), mais tempo leva a coalescência, pois há mais indivíduos disponíveis para produzir prole para ocupar um sítio vago. Quanto mais tempo a coalescer, mais eventos de morte e reposição dos mortos ocorrem na simulação. Como a taxa de imigração traduz-se na probabilidade de um indivíduo de fora da comunidade substituir um indivíduo recém morto, quanto mais eventos de morte e reposição mais eventos de imigração podem ocorrer. Portanto, considerando uma determinada riqueza e um determinado *kernel* de dispersão, quanto maior a cobertura vegetal menor a taxa de imigração necessária para compensar a deriva ecológica e criar os padrões de diversidade, como a riqueza (fig 2 painel da direita).   
+</p>
+
+<div align="center">
+```{r predicoes U e cobertura, fig.width = 9, fig.height = 3}
+pred_u_S <- ggplot(data.frame(cobertura = c(0,1) ), aes(cobertura) ) + 
+                   stat_function(fun = function(x) x, geom = "line", colour = "darkgreen", size = 2) +
+                   labs(list(x = "Riqueza", y = "Taxa de imigração estimada")) +
+                   theme_bw() + 
+                   theme(axis.line = element_line(colour = "black", size = 1, linetype = "solid"),
+                         axis.ticks = element_blank(),
+                         axis.text.x = element_blank(), axis.text.y = element_blank()
+                         )
+pred_u_cob <- ggplot(data.frame(cobertura = c(0,1) ), aes(cobertura) ) + 
+                    stat_function(fun = function(x) 1-x, geom = "line", colour = "darkgreen", size = 2) +
+                    labs(list(x = "Cobertura Vegetal", y = "Taxa de imigração estimada")) +
+                    theme_bw() + 
+                    theme(axis.line = element_line(colour = "black", size = 1, linetype = "solid"),
+                          axis.ticks = element_blank(),
+                          axis.text.x = element_blank(), axis.text.y = element_blank()
+                          )
+grid.arrange(pred_u_S, pred_u_cob, ncol = 2)
+```
+<font size="1.5">
+    <p style="text-align:justify;">Figura 2. Painel da esquerda - expectativa teórica da relação entre taxa de imigração e riqueza, dado uma cobertura vegetal fixa. Painel da direita - expectativa teórica da relação entre taxa de imigração e cobertura vegetal, dado uma riqueza fixa.</p>
+  </font>
+</div>
+
+<br>
+
+<h4> Resultados Parciais </h4>
+
+<br>
+
+<p style="text-align:justify;"> <!--parágrafo introdutorio dos resultados parciais-->
+Segue alguns gráficos que desenvolvi até agora. Os primeiros gráficos que mostro são de riqueza tanto por refID quanto por cobertura vegetal (fig 3), esses gráficos ao meu ver são bons para avaliar se as simulações estão funcionando pois a taxa de imigração estimada é calculada usando a riqueza observada. Sigo mostrando os gráficos que mostram a relação entre a estatística de KS e cobertura vegetal. Por último apresento apresento a relação entre taxa de imigração estimada e a cobertura vegetal, contudo, sinto que abordei da maneira errada nos gráficos, eu acredito que preciso controlar pela riqueza quando for usar a cobertura como variável resposta e vice e versa. Todos os gráficos apresentam os resultados gerados pelas simulações sem réplicas e com 30 réplicas.
+</p>
+<br>
+<h5> *Riqueza* </h5>
+<p style="text-align:justify;"> <!--paragrafo riqueza: diferença entre as baterias de simulaçao, riqueza superestimada em ambas simulações--> 
+As baterias de simulações com réplicas geram DAEs com riqueza maior do que as simulações sem réplicas, exceto pelos refIDs 89 e 887. Esse padrão era esperado, uma vez que a DAE média possui abundâncias médias e não riqueza média, a riqueza é igual a maior gerada entre as réplicas. Apesar dessa diferença, em ambas baterias de simulação a riqueza é superestimada na maioria dos refIDs (notem, entretanto, o refID 89 nas simulações com réplicas e o refID 246 em ambas baterias) (fig 3). 
+</p>
+
+<div align="center"> <!--figura e legenda riqueza por refID-->
+```{r riqueza por refID}
+S_refID_c.rep <- ggplot(data = df_resultados, aes(x = refID, y = riqueza)) + 
+                  geom_point(aes(colour = range), size = 2.5) + 
+                  scale_colour_manual(values=c("#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7", "#000000")) + 
+                  scale_y_continuous(limits = c(50,310) ) + 
+                  labs(title = "30 replicas") +
+                  theme(axis.text = element_text(size=14), axis.title = element_text(size=14), legend.position = "none")
+  
+S_refID_s.rep <- ggplot(data = df_dados_geral, aes(x = refID, y = riqueza)) + 
+                  geom_point(aes(colour = range), size = 2.5) + 
+                  scale_colour_manual(values=c("#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7", "#000000")) + 
+                  scale_y_continuous(limits = c(50,310) ) + 
+                  labs(title = "sem replicas") +
+                  theme(axis.text = element_text(size=14), axis.title = element_text(size=14),
+                        axis.text.y=element_blank(),axis.ticks=element_blank(), axis.title.y=element_blank(),
+                        legend.text=element_text(size=14),
+                        legend.title=element_text(size=14)
+                        )
+grid.arrange(S_refID_c.rep,S_refID_s.rep, ncol = 2)
+```
+  <font size="1.5">
+    <p style="text-align:justify;">Figura 3. Riqueza observada e simulada para cada um dos valores de dispersão média (valores retirados de Clark et al. 1999) e para cada levantamento fitossociologico selecionado. No painel da esquerda há a bateria de simulações com 30 réplicas, onde foi calculado a DAE média, no painel da direita bateria de simulação sem réplicas. </p>
+  </font>
+</div>
+
+<br>
+<h5> *Estatística de Kolomogorov-Smirnov e Cobertura Vegetal* </h5>
+<p style="text-align:justify;"> <!-- descrição do padrão e comparação entre a bateria de dados com e sem réplicas -->
+A relação KS e cobertura vegetal parece seguir o mesmo padrão predito (fig 1): quanto maior a cobertura vegetal menor o valor de KS (fig 4 e 5). Apesar de apresentarem padrões similares, as simulações com e sem réplica diferem em termos qualitativos. A partir de uma análise visual, nota-se que na simulação com réplicas os pontos estão menos dispersos e as simulações com valores de ranges próximos (fig X+2 range = c(7.82, 17.4) ) apresentam valores praticamente identicos de KS por cobertura. Essa similaridade entre os valores de KS diminui com o aumento do *range* usado nas simulações (fig KS com rep *e.g* ranges 163 e 195).  
+</p>
+
+<div align="center"> <!-- legenda e figura KS~cobertura com rep -->
+```{r KS cobertura c rep}
+dados_ks_c_rep <- df_resultados %>% filter(range != "obs")
+KS_c.rep <- ggplot(data = dados_ks_c_rep, aes(x = tree_cover, y = KS, colour = range)) +  
+           geom_point() +   
+           geom_smooth(method = lm, fill = NA) +  
+           facet_wrap(~ range, ncol=4) + labs(title = "30 replicas")
+KS_c.rep
+```
+  <font size="1.5">
+    <p style="text-align:justify;">Figura 4. Riqueza observada e simulada para cada um dos valores de dispersão média (valores retirados de Clark et al. 1999) e por cobertura vegetal da paisagem onde o levantamento fitossociologico selecionado está situado. Dados oriundos da simulação com 30 réplicas. </p>
+  </font>
+</div>
+
+<br>
+<div align="center"> <!-- legenda e figura KS~cobertura sem rep-->
+```{r KS cobertura s rep}
+dados_ks_s_rep <- df_dados_geral %>% filter(range != "obs")
+KS_s.rep <- ggplot(data = dados_ks_s_rep, aes(x = tree_cover, y = KS, colour = range)) +  
+             geom_point() +   
+             geom_smooth(method = lm, fill = NA) + 
+             facet_wrap(~ range, ncol=4) + 
+             labs(title = "sem replicas")
+KS_s.rep
+```
+  <font size="1.5">
+    <p style="text-align:justify;">Figura 5. Riqueza observada e simulada para cada um dos valores de dispersão média (valores retirados de Clark et al. 1999) e por cobertura vegetal da paisagem onde o levantamento fitossociologico selecionado está situado. Dados oriundos da simulação sem réplicas. </p>
+  </font>
+</div>
+<br>
+
+<p style="text-align:justify;"> <!-- range e fragmentação: efeito contrário? -->
+Na bateria de simulações sem réplicas, a inclinação da regressão linear diminui com o aumento do *range* (fig 5, de forma mais clara os ranges 5378 e 6104 em comparação com os outros). Esse padrão pode indicar que o aumento da variância do *kernel* de dispersão mitiga o efeito da fragmentação. Não observa-se esse efeito na bateria de simulações com réplicas, todas as simulações, com exceção daquelas com *range* igual a 996, apresentam relação negativa, sem aparente sinal de mitigação. Nas simulações com valores de range igual a 996 a relação KS ~ cobertura vegetal é positiva (fig 4), isso pode de fato indicar uma relação real entre as variáveis, contudo, dado a maior dispersão dos pontos nas simulações com *range* igual a 996, 5378 e 6104 a presença de um valor discrepante, como no painel 996 da figura 4, tem grande efeito na inclinação da reta, portanto a relação observada pode ser simplesmente efeito do acaso. 
+</p>
+<p style="text-align:justify;"> <!-- quando a cobertura vegetal é baixa, KS pode ter valores baixos e altos, quando a cobertura vegetal é alta KS tem valores sempre menores? -->
+Considerando apenas a bateria de simulações com réplicas e excluindo as simulações com *range* 996, a relação negativa entre KS e cobertura vegetal parece ser resultado dos valores pequenos de KS quando a cobertura vegetal é alta (fig 4). Assim, um possível padrão é quando a cobertura vegetal é baixa KS pode ter valores baixos ou altos, com o aumento da cobertura vegetal os valores de KS tendem a ser sempre baixos. Essa padrão pode ser explicado pelo debito de extinção, ou seja, ainda não se observa o efeito da fragmentação nas comunidades ecológicas.
+</p> 
+
+<h5> *Taxa de Imigração Estimada* </h5>
+
+<p style="text-align:justify;">
+Eu não soube como abordar essa questão, me parece que eu preciso usar seleção de modelos aqui. Se eu fosse fazer como na figura 2 eu teria que controlar por riqueza e por cobertura vegetal, não sei se isso será possível fazer. De qualquer maneira, segue os gráficos que mostrei para o PI na minha última reunião (fig 6).
+</p> 
+
+```{r U cob, fig.height=14}
+U_tree_cover_c.rep <- ggplot(data = df_resultados, aes(x = tree_cover, y = U_est)) + 
+                     geom_point(aes(colour = range), size = 2.5) + 
+                     scale_colour_manual(values=c("#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7", "#000000")) + 
+                     geom_smooth(method = lm, fill = NA) +  
+                     facet_wrap(~ range, ncol=4) + 
+                     labs(title = "30 replicas")
+U_tree_cover_s.rep <- ggplot(data = df_dados_geral, aes(x = tree_cover, y = U_est)) + 
+                       geom_point(aes(colour = range), size = 2.5) + 
+                       scale_colour_manual(values=c("#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7", "#000000")) + 
+                       geom_smooth(method = lm, fill = NA) +                       
+                       facet_wrap(~ range, ncol=4) + 
+                       labs(title = "sem replicas")
+grid.arrange(U_tree_cover_c.rep,U_tree_cover_s.rep, nrow=2)
+```
+
+
+
+<h4> Próximos passos </h4>
+- **ler, ler e escrever**: acredito que esses resultados me permitem investir na ideia que levantamos no comitê
+- **conseguir extrair recorte de paisagens que estão entre raster**: há paisagens que estão entre arquivos de raster, como eles são muito grandes não é possível carregar mais de um por vez; minha ideia é criar "tiras" de rasters consecutivos e fundi-los
+- **usar a funcao focal para retirar os monopontos de não habitat de grandes fragmentos e retirar os monopontos de habitat da matriz**: não consegui usar algumas paisagens pois não havia "habitat" suficiente para comportar o número de indivíduos na simulação - a função focal do pacote raster pode ser usada para preencher os espaço em grandes fragmentos
+- **pensar como trabalhar com o kernel de dispersão [eu e de Lima]**: aqui tem chão
+- **utilizar outras métricas de fragmentação**: procurar
+- **adaptar as rotinas para simulação sem fragmentação e sem espaço explicito**: sem fragmentação OK, sem espaço explicito PROCURAR
+- **rodar todas as paisagens!**

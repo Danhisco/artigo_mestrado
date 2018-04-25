@@ -1,0 +1,43 @@
+---
+title: "reuniao_06abril2017"
+author: "Danilo Pereira Mori"
+date: "6 de abril de 2017"
+output: pdf_document
+---
+
+```{r global_options, echo=FALSE}
+knitr::opts_chunk$set(echo=F, warning=FALSE, message=FALSE, cache = TRUE, tidy = TRUE, fig.width = 5, fig.height = 10)
+```
+
+```{r global packages and data, echo=F, message=FALSE, warning=FALSE}
+library(gridExtra) 
+library(ggplot2) 
+library(tidyr)
+library(broom)
+library(purrr)
+library(lme4)
+library(sads)
+library(magrittr)
+library(plyr)
+library(dplyr)
+load("/home/danilo/Desktop/dados_DaniloPMori.Rdata")
+
+# preparação dos dados
+names(df_ad)[1] <- "Site"
+df_temp <- df_ad %>% 
+    mutate(p.z = (p - mean(p))/sd(p),
+                    S.z = (S - mean(S))/sd(S),
+                    log.J.z = (log(J) - mean(log(J)) )/sd(log(J)),
+                    kernel.z = (kernel - mean(kernel))/sd(kernel)) %>% 
+    select(Site, Sindrome, GOF, p.z, S, J, kernel.z, p, kernel, fitofisio, succession) 
+
+# Modelo de trabalho #
+md_GOF <- glmer(cbind(GOF,100-GOF) ~ p.z * kernel.z + (kernel.z | Site), 
+                    family = binomial, data = df_temp)
+```
+
+## Prólogo ##
+
+  Na reunião do dia 03 de abril minha meta era me assegurar de que o modelo de trabalho estava fazendo boas estimativas do observado, para tal realizamos diversas inspeções gráficas, donde concluímos que, apesar do estranho padrão de resíduos, o modelo apresenta "bom ajuste".  
+  
+ Alguns gráficos que permitiram essa conclusão são apresentados na figura 1. 

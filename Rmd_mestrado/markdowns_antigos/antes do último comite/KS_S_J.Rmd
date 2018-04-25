@@ -1,0 +1,460 @@
+---
+output: pdf_document
+---
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(echo=T, warning=FALSE, message=FALSE, cache = TRUE, tidy = TRUE, fig.width = 5, fig.height = 5)
+```
+
+```{r global packages and data, echo=F}
+library(gridExtra) 
+library(ggplot2) 
+library(bbmle)
+library(car)
+library(magrittr)
+library(plyr)
+library(dplyr)
+library(sads)
+```
+
+## Sensibilidade das métricas do teste de Kolmogorov Smirnov ao número de indivíduos na amostra (J) e à riqueza de espécies (S) ##
+*Renato Lima e Damilo Pereira Mori*
+
+
+  Aqui avaliamos se existe algum vies no uso do teste KS quando há variação no número de classes do vetor de abundância (riqueza - S) e a soma do vetor (número de indivíduos - J). Para isso realizamos uma regressão entre o número de indivíduos e a riqueza: 3 classes de J (pequeno, medio, grande) e 4 classes de riqueza (c(50,100,200,400)). O teste de KS será usado com vetores de abundância com tamanhos simiares, porem, não exatos, como foi feito para compara as SADs simuladas e observadas. Vou começar simulando 501 SADs de tamanhos similares, de uma mesma distribuição (lognormal(meanlog=5,sdlog=5)), variando a riqueza. Para cada conjunto de SADs compararei a primeira SAD simulada com as demais par a par utilizando o teste de Kolmogorov-Smirnov.
+
+```{r echo=T}
+# Simulação de SADs #
+s = c(50,100,200,400) #riqueza
+f = vector("list",4)
+f[[1]] = c(0.15,0.25,0.5)
+f[[2]] = c(0.075,0.12,0.25)
+f[[3]] = c(0.04,0.06,0.125)
+f[[4]] = c(0.02,0.03,0.065)
+rslt = vector("list",4)
+for(i in 1:4) { rslt[[i]] = vector("list",3) }
+for(i in 1:4) {
+	for (j in 1:3) {
+	rslt[[i]][[j]] = replicate(501,rsad(S = s[i], frac=f[[i]][j], sad="lnorm", list(meanlog=5, sdlog=2)))
+	}
+}
+```
+
+
+  `f` é a fração da metacomunidade que é amostrada, isso implica que estou aumentando o número de indivíduos, contudo, quanto maior o número de espécies maior o número de indivíduos, pois aumenta o número de singletons e espécies com poucos indivíduos. Então afim de balancear esse efeito o Renato desenvolveu esse protocolo para criar as SADs. 
+`rslt` é uma lista que contêm 4 listas (para cada nível de s); em cada uma dessas listas, há 3 listas com 501 SADs sabidamentes de uma mesma distribuição. Assim terei 12 subconjuntos dentro dos dados, um para cada combinação de riqueza e número de indivíduos. Em cada subconjunto aplicarei o teste de KS entre pares de todas as SADs combinadas com a primeira SAD da lista. Como a produção das SADs é aleatório não vi necessidade de aleatorizar o processo de escolha da SAD referência. Primeiro analisaremos os outputs de `ks.test` e na última parte os outputs da função do arquivo `posicao_KS.R`.
+
+## ks.test ##
+
+   `ks.test` (REFERÊNCIA) 
+
+```{r echo = F}
+# tamanho médio #
+for(i in 1:4) {
+	print(paste(" '", i, "' ", sep=""))
+  for(j in 1:3){
+    print(mean(sapply(rslt[[i]][[j]],sum)))
+  }
+}
+
+
+# teste de KS #
+#função para calculo do KS 
+func_KS<-function(X){
+            sad1<-X[[1]]
+            sads<-X[-1]
+            df_ks<-suppressWarnings(ldply(sads,function(a) as.numeric(ks.test(x=sad1,y=a)[1:2])) )
+            return(df_ks)
+}
+# calculo e armazenamento dos valores de KS e KS.p
+df_KS<- ldply(rslt, function(A) suppressWarnings(ldply(A,func_KS) ) )
+names(df_KS) <- c("KS", "KS.p")
+df_KS %<>% mutate(S = factor(rep(c(50,100,200,400),each=1500), levels = c("50","100","200","400")), 
+                  J = factor(rep(rep(c("peq","med","grd"),each=500),4), levels = c("peq","med","grd")) ) %>% dplyr::select(S,J,KS,KS.p)
+```
+
+  Existem pelo menos quatro hipóteses da influência de S e J em KS: i) nula (`KS ~ 1`), ii) J está relacionada com KS (`KS ~ J`), iii) S está relacionada com KS (`KS ~ S`), iv) ambas estão relacionadas (`KS ~ S + J`), v) ambas contribuem e interagem (`KS ~ S * J`). Essas hipóteses serão traduzidas em modelos estatísticos e serão selecionados os modelos mais plausíveis utilizando AIC. Das análises gráficas (não mostradas mas comentadas no código) notamos que as distribuições de KS e KS.p são assimétricas para a esquerda e direita, respectivamente. A maioria das ferramentas estatísticas são construidas para distribuições com assimétria para a esquerda, então para facilitar as análises irei trabalhar com a variável `KS.p_1 = 1-KS.p`.
+
+## Estatística de KS ##
+
+  A estatística de KS mede a maior distância entre as curvas acumuladas de dois vetores númericos, seu valor é dado em percentil. Primeiro vou fazer uma inspeção gráfica da distribuição de KS nos 12 grupos.
+
+```{r echo = F }
+# avaliação gráfica das variáveis #
+# par(mfrow=c(1,2))
+# hist(df_KS$KS)
+# hist(df_KS$KS.p)
+# par(mfrow=c(1,2))
+# a distribuição de KS é assimétrica para a esquerda, tem cara de lognormal, gamma, vou tentar as mesmas q eu tentei nos modelos de cima
+# a distribuição de KS.p é assimétrica para a direita; utilizando a tática que o Renato Lima me cantou vou subtrair 1 de todos os valores
+df_KS %<>% mutate(KS.p_1 = 1-KS.p) # mudando a assimétria da distribuição 
+# par(mfrow=c(1,2))
+# hist(df_KS$KS.p)
+# hist(df_KS$KS.p_1)
+# par(mfrow=c(1,2))
+
+df_KS %>% ddply(.,c("S","J"), summarize, GOF = length(KS.p >= 0.05))
+```
+
+```{r echo=F}
+# influência de S e J em KS #
+#inspeção gráfica:
+# x11()
+(a<-ggplot(df_KS,aes(x=J,y=KS)) + geom_jitter() + geom_boxplot() + facet_wrap(~S))
+```
+
+__figura 1.__ Estatística de KS, riqueza (S) e número de indivíduos (J).
+  
+  A variância e a média parecem diminui com o aumento da riqueza. Parece existir um efeito de J que depende da riqueza: para riquezas pequenas a inclinação é positiva, com o aumento da riqueza esse efeito atenua-se e parece reverter. De maneira geral parece que S influencia na variância, no intercepto e no efeito de J (ou seja em sua inclinação). Vou realizar uma seleção de modelos utilizando AIC como critério de seleção para avaliar quais das 5 hipóteses são mais plausíveis. O modelo que considera que as variáveis interagem foi o único a ficar na região de plausibilidade (tabela de AIC no código).
+
+```{r echo=T}
+# Seleção da distribuição de erros #
+#vou considerar o modelo cheio para escolher a melhor distribuição, escolhi 5 distribuições para começar #
+l_md1 <- vector("list", length = 5) 
+l_md1[[1]] <- glm(KS ~ J * S, data = df_KS) #norm
+l_md1[[2]] <- glm(KS ~ J * S, family = gaussian(link = "log"), data = df_KS) #lognorm
+l_md1[[3]] <- glm(KS ~ J * S, family = Gamma(link = "identity"), data = df_KS) #Gamma; identity
+l_md1[[4]] <- glm(KS ~ J * S, family = Gamma(link = "log"), data = df_KS) #Gamma; log
+l_md1[[5]] <- glm(KS ~ J * S, family = Gamma(link = "inverse"), data = df_KS) #Gamma; inverse
+AICtab(l_md1, weights = TRUE)
+```
+
+  Como as 3 gammas estão com o mesmo valor de AIC, vou utilizar a gamma com função de ligação identity pois não é necessária transformar para a escala da função de ligação.
+
+```{r echo=T}
+# avaliando o efeito das variáveis #
+l_md2 <- vector("list", length = 5) 
+l_md2[[1]] <- glm(KS ~ 1, family = Gamma(link = "identity"), data = df_KS) #nulo
+l_md2[[2]] <- glm(KS ~ J, family = Gamma(link = "identity"), data = df_KS) #responde a J
+l_md2[[3]] <- glm(KS ~ S, family = Gamma(link = "identity"), data = df_KS) #responde a S
+l_md2[[4]] <- glm(KS ~ S + J, family = Gamma(link = "identity"), data = df_KS) #ambas sem interação
+l_md2[[5]] <- glm(KS ~ S * J, family = Gamma(link = "identity"), data = df_KS) #ambas com interação
+AICtab(l_md2, weights = TRUE) 
+# summary(l_md2[[5]]) 
+```
+
+  O modelo com interação apresentou o menor AIC. Segue os gráficos diagnósticos do modelo.
+
+```{r echo=F, fig.width=7,fig.height=7}
+par(mfrow=c(2,2))
+plot(l_md2[[5]])
+par(mfrow=c(1,1))
+```
+
+__figura 2.__ Gráficos diagnósticos do modelo selecionado KS ~ S * J e os valores observados de cada variável
+
+  Parece que o modelo descreve bem os dados. Segue combinações par a par das variáveis  
+  
+```{r echo=F, fig.height=9, fig.width=10}
+df_coef <- expand.grid(S =rep(c("50","100","200","400")), J = c("peq","med","grd"))
+df_coef %<>% cbind(.,coef = unname(coef(l_md2[[5]])) )
+b<-ggplot(df_coef,aes(x=J,y=S, fill=coef)) + geom_tile()
+c<-ggplot(df_coef,aes(x=J,y=coef,group=S)) + geom_line(aes(colour=S))
+d<-ggplot(df_coef,aes(x=S,y=coef,group=J)) + geom_line(aes(colour=J))
+lay<-rbind(c(2,2,1,1),
+           c(2,2,1,1),
+           c(3,3,4,4),
+           c(3,3,4,4))
+grid.arrange(a,b,c,d,ncol=4,layout_matrix = lay)
+```
+
+__figura 3.__ Coeficientes do modelo KS ~ S * J e os valores observados de KS. 
+
+  Então, incluirei essa interação na construção dos modelos.
+
+
+## p valor da Estatística de KS ##
+
+  Cada valor de KS está associado com um p valor que pode ser interpretado como a probabilidade de rejeitarmos a hipótese nula dado que ela é verdadeira. No teste de KS a hipótese nula postula que os vetores são amostras de uma mesma distribuição teórica. Assumindo um valor crítico de p onde a partir desse valor rejeitamos a hipótese nula, podemos usar o teste de KS como critério para avaliar se a SAD simulada foi um bom ajuste à respectiva SAD observada. Contabilizei todas as vezes que uma SAD simulada teve um p valor maior do que 0.05 e armanzei na variável `GOF` ("Goodness-of-fit"). Eu não irei analisar GOF aqui pois ela é correlacionada com KS.p (ver análise exploratória), então, vou expandir as conclusões de KS.p para ela.
+
+```{r}
+# influência de S e J em KS #
+#inspeção gráfica:
+(e<-ggplot(df_KS,aes(x=J,y=KS.p_1)) + geom_jitter() + geom_boxplot() + facet_wrap(~S))
+```
+
+__figura 4.__ p valor da Estatística de KS, riqueza (S) e número de indivíduos (J).
+  
+  KS.p apresenta uma variância muito maior. Parece que existe uma interação entre S e J, mas ela começa a manifestar após valores de S maiores que 100, parece que de 200 para 400 o efeito de J mudou de sinal. 
+
+```{r}
+# Seleção da distribuição de erros #
+#vou considerar o modelo cheio para escolher a melhor distribuição, escolhi 5 distribuições para começar #
+l_md3 <- vector("list", length = 5) 
+l_md3[[1]] <- glm(KS.p ~ J * S, data = df_KS) #norm
+l_md3[[2]] <- glm(KS.p ~ J * S, family = gaussian(link = "log"), data = df_KS) #lognorm
+l_md3[[3]] <- glm(KS.p ~ J * S, family = Gamma(link = "identity"), data = df_KS) #Gamma; identity
+l_md3[[4]] <- glm(KS.p ~ J * S, family = Gamma(link = "log"), data = df_KS) #Gamma; log
+l_md3[[5]] <- glm(KS.p ~ J * S, family = Gamma(link = "inverse"), data = df_KS) #Gamma; inverse
+AICtab(l_md3, weights = TRUE)
+```
+
+  Como o modelo com a distribuição normal e lognormal foram igualmente plausíveis vou utilizar a distribuição normal (com função de ligação 'identity').
+
+```{r , fig.width=7,fig.height=7}
+# avaliando o efeito das variáveis #
+l_md4 <- vector("list", length = 5) 
+l_md4[[1]] <- glm(KS.p ~ 1, data = df_KS) #nulo
+l_md4[[2]] <- glm(KS.p ~ J, data = df_KS) #responde a J
+l_md4[[3]] <- glm(KS.p ~ S, data = df_KS) #responde a S
+l_md4[[4]] <- glm(KS.p ~ S + J, data = df_KS) #ambas sem interação
+l_md4[[5]] <- glm(KS.p ~ S * J, data = df_KS) #ambas com interação
+# l_md4[[6]] <- glm(KS ~ 1, family = gaussian(link = "log"), data = df_KS) #nulo
+# l_md4[[7]] <- glm(KS ~ J, family = gaussian(link = "log"), data = df_KS) #responde a J
+# l_md4[[8]] <- glm(KS ~ S, family = gaussian(link = "log"), data = df_KS) #responde a S
+# l_md4[[9]] <- glm(KS ~ S + J, family = gaussian(link = "log"), data = df_KS) #ambas sem interação
+# l_md4[[10]] <- glm(KS ~ S * J, family = gaussian(link = "log"), data = df_KS) #ambas com interação
+
+AICtab(l_md4, weights = TRUE) 
+# summary(l_md4[[5]]) 
+```
+
+  O modelo com interação foi aquele com menor AIC. Segue os gráficos diagnósticos.
+
+```{r , fig.width=7,fig.height=7}
+par(mfrow=c(2,2))
+plot(l_md4[[5]])
+par(mfrow=c(1,1))
+```
+
+__figura 5.__ Gráficos diagnósticos do modelo selecionado KS.p ~ S * J e os valores observados de cada variável
+
+  O modelo não é uma descrição muito boa dos dados, nao há incremento da qualidade do modelo quando utilizo a lognormal como distribuição de erros (gráfico não mostrado). Diferente de `KS`, `KS.p` possui muita variação para testes realizados entre SADs amostradas de uma mesma distribuição. Isso pode indicar que `KS.p` é muio
+
+```{r echo=F, fig.height=9, fig.width=9.5}
+df_coef <- expand.grid(S =rep(c("50","100","200","400")), J = c("peq","med","grd"))
+df_coef %<>% cbind(.,coef = unname(coef(l_md4[[5]])) )
+f<-ggplot(df_coef,aes(x=J,y=S, fill=coef)) + geom_tile()
+g<-ggplot(df_coef,aes(x=J,y=coef,group=S)) + geom_line(aes(colour=S))
+h<-ggplot(df_coef,aes(x=S,y=coef,group=J)) + geom_line(aes(colour=J))
+lay<-rbind(c(2,2,1,1),
+           c(2,2,1,1),
+           c(3,3,4,4),
+           c(3,3,4,4))
+grid.arrange(e,f,g,h,ncol=4,layout_matrix = lay)
+```
+
+__figura 6.__ Coeficientes do modelo KS.p ~ S * J e os valores observados de KS. 
+
+  Parece que a interação entre as variáveis é até mais forte em KS.p do que em KS. O efeito de S e J muda com a variação do outro reciprocamente.
+
+
+### Variaveis sobre as SADs observadas ###
+
+-explicação sobre o teste de KS
+- explicação do que é com figura ai já fica em anexo [RECUPERAR A IMAGEM]
+  
+  Para complementar os outputs da função `ks.test` construímos uma função para obter informações sobre como as SADs testadas estão divergindo. Nossa função calcula a estatística de Kolmogorov-Smirnov e retorna i) a abundância (`KS.abund`), ii) o rank da SAD observada (`KS.obs`) e iii) o rank da acumulada da observada menos o rank da simulada ou seja, mantendo o sinal de KS (`KS.diff`). Segue o código da função.
+  
+```{r funcao KS.SAD}
+#INPUT: dois vetores numericos em escala log (duas SADs)
+#OUTPUT: i) c.data = valor de abundância em que ocorreu a maior divergência
+#        ii) c.data.e = exp(c.data)
+#        iii) acumulada.obs = valor da acumulada da curva obs q ocorreu a maior divergência entre as curvas
+#        iv) acumulada.sim = valor da acumulada da curva sim q ocorreu a maior divergência entre as curvas
+#        v) diff.acumulada = valor da estatística de KS
+KS.sad <- function(X.obs, X.sim)
+{
+  #sad observada
+  sad.obs <- X.obs 
+  #sad simulada
+  sad.sim <- X.sim 
+  #os dados concatenados e ordenados
+  c_obs.sim <- sort(c(sad.obs,sad.sim)) 
+  df_KS_st <- data.frame(c.data = c_obs.sim, 
+    #exp dos valores para tirar da escala log
+    c.data.e = exp(c_obs.sim), 
+    #valor da acumulada obs
+    acumulada.obs = sapply(c_obs.sim, FUN = function(x) length(sad.obs[sad.obs<x])/length(sad.obs)), 
+    #valor da acumulada sim
+    acumulada.sim = sapply(c_obs.sim, FUN = function(x) length(sad.sim[sad.sim<x])/length(sad.sim)) 
+    )
+  #obtendo a diferença não absoluta
+  df_KS_st %<>% mutate(diff.acumulada = abs(df_KS_st$acumulada.obs-df_KS_st$acumulada.sim)) 
+  KS_posicao <- unique(df_KS_st[df_KS_st$diff.acumulada == max(df_KS_st$diff.acumulada),]) 
+  #a função retorna o valor de X onde ocorre a maior divergência e os dois valores da acumulada que levam a maior divergência
+  return(KS_posicao) 
+}
+```
+
+  
+ESCREVER Função
+  A função concatena os elementos dos vetores de abundância e os ordena, cada elemento é ordenado
+
+
+```{r echo = FALSE}
+# Calculo de KS.SAD #
+#função para calculo do KS 
+func_KS.SAD<-function(X){
+                      sad1<-X[[1]]
+                      sads<-X[-1]
+                      # colocar o apply(,2,mean) na função KS.sad
+                      df_ks<-suppressWarnings(ldply(sads,function(a) apply(KS.sad(X.obs = log(sort(sad1)), X.sim= log(sort(a)) ),2, mean) ) )
+                      return(df_ks)
+}
+# calculo e armazenamento dos valores de KS e KS.p
+df_KS.SAD<- ldply(rslt, function(A) suppressWarnings(ldply(A,func_KS.SAD) ) )
+names(df_KS.SAD) <- c("KS.log.ab", "KS.ab", "KS.obs", "KS.sim", "KS.diff")
+df_KS.SAD %<>% mutate(S = factor(rep(c(50,100,200,400),each=1500), levels = c("50","100","200","400")), 
+                  J = factor(rep(rep(c("peq","med","grd"),each=500),4), levels = c("peq","med","grd")) ) %>% dplyr::select(S,J,KS.ab,KS.log.ab,KS.obs,KS.sim,KS.diff) #
+df_KS.SAD <- cbind(df_KS.SAD,df_KS[,-(1:2)])
+```
+
+REESCREVER
+  Existem pelo menos quatro hipóteses da influência de S e J em KS: i) nula, ii) J é a variável relacionada com o vies, iii) S é a variável relacionada com o vies, iv) ambas, v) ambas contribuem e interagem. Essas hipóteses serão traduzidas em modelos estatísticos e serão selecionados os modelos mais plausíveis utilizando AIC. Das análises gráficas (não mostradas mas comentadas no código) notamos que as distribuições de KS e KS.p são assimétricas para a esquerda e direita, respectivamente. A maioria das ferramentas estatísticas são construidas para distribuições com assimétria para a esquerda, então para facilitar as análises irei trabalhar com a variável `KS.p_1 = 1-KS.p`.
+
+
+REESCREVER
+  A estatística de KS mede a maior distância entre as curvas acumuladas de dois vetores númericos, seu valor é dado em percentil. Primeiro vou fazer uma inspeção gráfica da distribuição de KS nos 12 grupos.
+
+```{r echo=F, fig.width=8,fig.height=8 }
+scatterplotMatrix(~ KS + KS.log.ab + KS.obs + KS.sim + KS.diff, df_KS.SAD)
+```
+
+__Figura 7__ Métricas relacionadas com o teste de Kolmogorovo Smirnov. KS.log.ab = logaritmo da abundância, KS.obs/sim  = percentil da SAD observada/simulada associada à KS, KS.diff diferença entre o percentil da SAD observada e simulada, ou seja, KS com sinal.  
+
+
+# descrever os histogramas
+# usar KS.ab ao inves de KS.log.ab
+
+ANALISAR APENAS LOG.AB E OBS
+
+```{r echo = FALSE, fig.width=8.2,fig.height=5}
+# influência de S e J em KS #
+#inspeção gráfica:
+i<-ggplot(df_KS.SAD,aes(x=J,y=KS.log.ab)) + geom_jitter() + geom_boxplot() + facet_wrap(~S)
+j<-ggplot(df_KS.SAD,aes(x=J,y=KS.obs)) + geom_jitter() + geom_boxplot() + facet_wrap(~S)
+#k<-ggplot(df_KS.SAD,aes(x=J,y=KS.sim)) + geom_jitter() + geom_boxplot() + facet_wrap(~S)
+#l<-ggplot(df_KS.SAD,aes(x=J,y=KS.diff)) + geom_jitter() + geom_boxplot() + facet_wrap(~S)
+grid.arrange(i,j,ncol=2)
+```
+
+__figura 8.__ Métricas agrupadas segundo o valor de riqueza (`S`, valor do título de cada gráfico) e tamanho da comunidade (`J`, eixo x): pequeno (`peq`), médio (`med`) e grande (`gdr`)
+
+REESCREVER
+  J parece ter um efeito na média e na variância de`KS.log.ab`, com exceção do quadro na direita superior do primeiro (riqueza = 100) onde parece haver apenas diminuição na variância. O efeito de S parece se manifestar em riquezas altas (<=100) diminuindo os valores médios de `KS.log.ab`. Acredito que não existe interação entre as variáveis pois o sentido do efeito de cada uma não se cruza.
+  Com exceção de KS.diff, todas as variáveis parecem compartilhar alguns padrões em certas classes: i) s = 50, j = grd
+  
+  ter pouco efeito na variável, assim, acredito que não deve existir uma interação entre as variáveis. Contudo, acho provável que o modelo selecionado seja aquele que considera interação, uma vez que mesmo entre 
+  
+  Como era esperado `KS.diff` tem um padrão parecido com o de `KS` (figura 1), as demais variáveis parecem ter o mesmo padrão de variância 
+
+
+## KS.ab ##
+  
+  
+```{r echo=T}
+# Seleção da distribuição de erros #
+#vou considerar o modelo cheio para escolher a melhor distribuição, escolhi 5 distribuições para começar #
+l_md5 <- vector("list", length = 5) 
+l_md5[[1]] <- glm(KS.ab ~ J * S, data = df_KS.SAD) #norm
+l_md5[[2]] <- glm(KS.ab ~ J * S, family = gaussian(link = "log"), data = df_KS.SAD) #lognorm
+l_md5[[3]] <- glm(KS.ab ~ J * S, family = Gamma(link = "identity"), data = df_KS.SAD) #Gamma; identity
+l_md5[[4]] <- glm(KS.ab ~ J * S, family = Gamma(link = "log"), data = df_KS.SAD) #Gamma; log
+l_md5[[5]] <- glm(KS.ab ~ J * S, family = Gamma(link = "inverse"), data = df_KS.SAD) #Gamma; inverse
+AICtab(l_md5, weights = TRUE)
+```
+
+REESCREVER
+  Como as 3 gammas estão com o mesmo valor de AIC, vou utilizar a gamma com função de ligação identity pois não é necessária transformar para a escala da função de ligação.
+
+```{r echo=T}
+# avaliando o efeito das variáveis #
+l_md6 <- vector("list", length = 5) 
+l_md6[[1]] <- glm(KS.ab ~ 1, family = Gamma(link = "identity"), data = df_KS.SAD) #nulo
+l_md6[[2]] <- glm(KS.ab ~ J, family = Gamma(link = "identity"), data = df_KS.SAD) #responde a J
+l_md6[[3]] <- glm(KS.ab ~ S, family = Gamma(link = "identity"), data = df_KS.SAD) #responde a S
+l_md6[[4]] <- glm(KS.ab ~ S + J, family = Gamma(link = "identity"), data = df_KS.SAD) #ambas sem interação
+l_md6[[5]] <- glm(KS.ab ~ S * J, family = Gamma(link = "identity"), data = df_KS.SAD) #ambas com interação
+AICtab(l_md6, weights = TRUE) 
+# summary(l_md6[[5]]) 
+```
+
+REESCREVER
+  O modelo com interação apresentou o menor AIC. Segue os gráficos diagnósticos do modelo.
+
+```{r echo=F, fig.width=7,fig.height=7}
+par(mfrow=c(2,2))
+plot(l_md6[[5]])
+par(mfrow=c(1,1))
+```
+
+__figura 9__ Gráficos diagnósticos do modelo selecionado KS.ab ~ S * J
+REESCREVER
+  Parece que o modelo descreve bem os dados. Segue combinações par a par das variáveis  
+  
+```{r echo=F, fig.height=9, fig.width=10}
+df_coef <- expand.grid(S =rep(c("50","100","200","400")), J = c("peq","med","grd"))
+df_coef %<>% cbind(.,coef = unname(coef(l_md6[[5]])) )
+i1<-ggplot(df_coef,aes(x=J,y=S, fill=coef)) + geom_tile()
+i2<-ggplot(df_coef,aes(x=J,y=coef,group=S)) + geom_line(aes(colour=S))
+i3<-ggplot(df_coef,aes(x=S,y=coef,group=J)) + geom_line(aes(colour=J))
+lay<-rbind(c(2,2,1,1),
+           c(2,2,1,1),
+           c(3,3,4,4),
+           c(3,3,4,4))
+grid.arrange(i,i1,i2,i3,ncol=4,layout_matrix = lay)
+```
+
+__figura 10.__ Coeficientes do modelo KS.ab ~ S * J
+REESCREVER
+  Então, incluirei essa interação na construção dos modelos.
+
+
+  
+
+## KS.obs ## 
+```{r echo=T}
+# Seleção da distribuição de erros #
+#vou considerar o modelo cheio para escolher a melhor distribuição, escolhi 5 distribuições para começar #
+l_md7 <- vector("list", length = 5) 
+l_md7[[1]] <- glm(KS.obs ~ J * S, data = df_KS.SAD) #norm
+l_md7[[2]] <- glm(KS.obs ~ J * S, family = gaussian(link = "log"), data = df_KS.SAD) #lognorm
+l_md7[[3]] <- glm(KS.obs ~ J * S, family = Gamma(link = "identity"), data = df_KS.SAD) #Gamma; identity
+l_md7[[4]] <- glm(KS.obs ~ J * S, family = Gamma(link = "log"), data = df_KS.SAD) #Gamma; log
+l_md7[[5]] <- glm(KS.obs ~ J * S, family = Gamma(link = "inverse"), data = df_KS.SAD) #Gamma; inverse
+AICtab(l_md7, weights = TRUE)
+```
+
+ESCREVER
+
+```{r echo=T}
+# avaliando o efeito das variáveis #
+l_md8 <- vector("list", length = 5) 
+l_md8[[1]] <- glm(KS.obs ~ 1, data = df_KS.SAD) #nulo
+l_md8[[2]] <- glm(KS.obs ~ J, data = df_KS.SAD) #responde a J
+l_md8[[3]] <- glm(KS.obs ~ S, data = df_KS.SAD) #responde a S
+l_md8[[4]] <- glm(KS.obs ~ S + J, data = df_KS.SAD) #ambas sem interação
+l_md8[[5]] <- glm(KS.obs ~ S * J, data = df_KS.SAD) #ambas com interação
+AICtab(l_md8, weights = TRUE) 
+# summary(l_md8[[5]]) 
+```
+
+ESCREVER
+
+```{r echo=F, fig.width=7,fig.height=7}
+par(mfrow=c(2,2))
+plot(l_md8[[5]])
+par(mfrow=c(1,1))
+```
+
+__figura 11__ Gráficos diagnósticos do modelo selecionado KS.obs ~ S * J
+
+ESCREVER
+  
+```{r echo=F, fig.height=9, fig.width=10}
+df_coef <- expand.grid(S =rep(c("50","100","200","400")), J = c("peq","med","grd"))
+df_coef %<>% cbind(.,coef = unname(coef(l_md8[[5]])) )
+b<-ggplot(df_coef,aes(x=J,y=S, fill=coef)) + geom_tile()
+c<-ggplot(df_coef,aes(x=J,y=coef,group=S)) + geom_line(aes(colour=S))
+d<-ggplot(df_coef,aes(x=S,y=coef,group=J)) + geom_line(aes(colour=J))
+lay<-rbind(c(2,2,1,1),
+           c(2,2,1,1),
+           c(3,3,4,4),
+           c(3,3,4,4))
+grid.arrange(a,b,c,d,ncol=4,layout_matrix = lay)
+```
+
+__figura 12.__ Coeficientes do modelo KS.obs ~ S * J
+
+  Então, incluirei essa interação na construção dos modelos.

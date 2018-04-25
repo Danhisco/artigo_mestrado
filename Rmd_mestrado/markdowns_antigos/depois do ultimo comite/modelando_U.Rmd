@@ -1,0 +1,442 @@
+---
+title: "Modelando a taxa de imigração estimada por um modelo neutro espacialmente explicito"
+author: "Danilo Pereira Mori"
+date: "6 de abril de 2017"
+output: pdf_document
+---
+
+
+```{r global_options, echo=FALSE}
+knitr::opts_chunk$set(echo=F, warning=FALSE, message=FALSE, cache = TRUE, tidy = TRUE)
+```
+
+```{r global packages and data, echo=F, message=FALSE, warning=FALSE}
+library(gridExtra) 
+library(sjPlot)
+library(ggplot2) 
+library(tidyr)
+library(broom)
+library(purrr)
+library(lme4)
+library(sads)
+library(magrittr)
+library(plyr)
+library(dplyr)
+load("/home/danilo/Desktop/l_dados.Rdata")
+# names(l_dados)
+
+# preparação dos dados
+df_U <- l_dados[[1]] %>% select(SiteCode, p, kernel, U, S, GOF) %>%
+  mutate(p.z = (p - mean(p))/sd(p), kernel.z = (kernel - mean(kernel))/sd(kernel),S.z = (S - mean(S))/sd(S))
+names(df_U)[1] <- "Site"
+rm(l_dados)
+```
+
+## Introdução ##
+
+- apresentação das variáveis
+- justificativa da estrutura aleatória candidata básica: interação ou não interação com kernel
+- protocolo de Zuur et al. 2009 e Ben Bolker et al. 2008
+
+
+## Seleção da distribuição de erros e função de ligação ##
+
+  A variável parece ser leventemente assimétrica para a esquerda, vou usar 5 combinações de distribuições com funções de ligação como candidatas para a construção do modelo: normal, lognormal (normal com função de ligação log), e Gamma com três funções de ligação - identity, log e inverse. 
+  
+__Janela de código 1__ Seleção da distribuição de erros e função de ligação
+
+```{r}
+l_md <- vector("list", length = 5)
+names(l_md) <- c("norm","lognorm","gamma_id","gamma_log","gamma_inv")
+l_md[[1]] <- glm(U ~ p.z * kernel.z, data = df_U)
+l_md[[2]] <- glm(U ~ p.z * kernel.z, family = gaussian(link = "log"), data = df_U)
+l_md[[3]] <- glm(U ~ p.z * kernel.z, family = Gamma(link = "identity"), data = df_U)
+l_md[[4]] <- glm(U ~ p.z * kernel.z, family = Gamma(link = "log"), data = df_U)
+l_md[[5]] <- glm(U ~ p.z * kernel.z, family = Gamma(link = "inverse"), data = df_U)
+AICctab(l_md, weights = TRUE)
+```
+
+  A distribuição Gamma com função de ligação identidade foi a distribuição de probabilidade mais plausível. Contudo, por conta de problemas de convergência com a função glmer do pacote lme4 (em código) usando a distribuição Gamma (ver [esse post] https://github.com/lme4/lme4/issues/179), vou utilizar a distribuição normal. Caso o modelo apresente problemas de ajuste eu buscarei alternativas (pelo o que li a função glmmPQL do pacote MASS não é adequado para ajustar modelos mistos cruzados - e sim para modelos mistos aninhados REFERÊNCIA). Seguirei utilizando a função "lmer" do pacote lme4 [REFERÊNCIA].
+
+ Avisos: 
+
+Aviso 1:
+Error in eval(substitute(expr), envir, enclos) : 
+(maxstephalfit) PIRLS step-halvings failed to reduce deviance in pwrssUpdate
+O modelo apresenta valores negativos para ambos os parâmetros - criando "NaN"
+
+
+## Seleção da estrutura aleatória ##
+
+ As duas estruturas aleatórias candidatas são: (1 | Site) - ou seja, para cada sítio há um intercepto próprio; e (kernel | Site) - cada sítio possui um intercepto e inclinação próprios.
+  
+```{r}
+l_md <- vector("list",length=2)
+names(l_md) <- c("(kernel.z | Site)", "(1 | Site)")
+l_md[[1]] <- lmer(U ~ p.z * kernel.z + (kernel.z | Site), data = df_U)
+l_md[[2]] <- lmer(U ~ p.z * kernel.z + (1 | Site), data = df_U)
+AICctab(l_md, weights = TRUE)
+```
+
+  Como esperado o efeito da estrutura fixa depende da relação de da taxa de imigração por site (figura em código)
+  
+```{r}
+# range(df_U$U)
+df_U %>% ggplot(aes(x=kernel,y=U,group=Site)) + 
+  geom_line(col="red") +
+  geom_point() +
+  facet_wrap(~cut(df_U$p.z,10),ncol=5)
+# plot(p ~ p.z, df_U)
+df_U$kernel %>% unique
+```
+
+ __Figura 1__ U ~ kernel + (kernel | Site) (~cut(p.z,10))
+
+
+
+ Os valores de U são levemente positivos em valores baixos de cobertura vegetal, com o aumento da inclinação há o aumento do efeito de kernel em U (figura 2 [1:6~7]) e seguem para um padrão de aumento seguido de efeito negativo (figura 2 [8:10]). Contudo há grande variação entre os sites principalmente nas classes com maior cobertura (figura 2 [10]).
+
+
+  
+## Seleção da estrutura fixa ##
+
+
+```{r}
+l_md <- vector("list",length=5)
+names(l_md) <- c("p * k", "p + k", "p", "k", "1")
+l_md[[1]] <- lmer(U ~ p.z * kernel.z + (kernel.z | Site), data = df_U)
+l_md[[2]] <- lmer(U ~ p.z + kernel.z + (kernel.z | Site), data = df_U)
+l_md[[3]] <- lmer(U ~ p.z + (kernel.z | Site), data = df_U)
+l_md[[4]] <- lmer(U ~ kernel.z + (kernel.z | Site), data = df_U)
+l_md[[5]] <- lmer(U ~ 1 + (kernel.z | Site), data = df_U)
+AICctab(l_md, weights = TRUE)
+```
+
+
+O modelo selecionado pelo protocolo de Zuur et al. 2009 para a variável U foi lmer(`U ~ p.z * kernel.z + (kernel.z | Site)`). Nenhum outro modelo esteve perto do critério de plausabilidade. 
+
+
+## Diagnostico do modelo U ~ p.z * kernel.z + (kernel.z | Site) ##
+
+- gráficos diagnosticos padrão # FEITO
+- distribuição dos coef da estrutura aleatória # FEITO
+- comparação resíduos contra modelo por nível da estrutura aleatória # FEITO
+- gráficos resíduos pelas variáveis preditoras da estrutura fixa # FEITO
+- gráficos resíduos pela co-variável riqueza # FEITO
+
+
+```{r}
+md_U1<- l_md[[1]]
+RVAideMemoire::plotresid(md_U1)
+```
+
+__Figura 2__ Gráficos diagnósticos do modelo selecionado
+
+
+  O modelo selecionado apresenta um padrão de resíduos que assemelha-se a um cone aumentando sua variância com o aumento dos valores preditos (figura 3). 
+
+
+  Antes de investigar o padrão dos resíduos, vou avaliar se a estrutura aleatória está sendo bem ajustada. Uma possível abordagem é subdividir o conjunto de dados pela variável categórica da estrutura aleatória e ajustar um modelo para cada subconjunto de dados e comparar com o modelo misto original, que considera relação entre os subconjuntos de dados. Para avaliar a diferença entre as abordagens utilizei uma regressão linear entre os resíduos, se as abordagens forem congruentes esperamos que o intercepto, inclinação e R quadrado sejam próximos de 0, 1 e 1, respectivamente.
+
+
+```{r echo=}
+  # Modelo linear na estrutura aleatória #
+fun_map <- function(df){
+  lm(U ~ kernel.z, data = df)
+}
+
+# agrupando os dados em um novo df #
+df_temp <- df_U %>% group_by(Site) %>% nest %>% 
+  mutate(md = map(data, fun_map),
+         tidy = map(md,tidy),
+         glance = map(md,glance),
+         augment_lm = map(md,augment))
+
+df_temp1 <- df_temp %>% select(-c(md,tidy,glance)) %>% unnest() %>% as.data.frame()
+df_temp1[,-c(9:10)] %>% inner_join(x=.,y=augment(md_U1), by=c("Site","kernel.z")) -> df_temp1 
+
+lm(.resid.x ~ .resid.y, df_temp1) %>% summary
+```
+
+
+
+  A regressão linear entre os resíduos apresenta intercepto = 0, inclinação = 1  e R quadrado igual a 0.89 (janela de código acima). Indica que a estimativa da estrutura aleatória está próxima da melhor estimativa possível dado a distribuição de erros e função de ligação. Em código o gráfico do modelo linear ajustado para cada subconjunto de Site. Assim, o padrão em forma de cone dos resíduos parece não se decorrer de algum mal ajuste do modelo misto. 
+  
+  
+  Segundo Bolker et al. (2008), os coeficientes dos modelos ajustados por subgrupo de dados deve apresentar distribuição normal.
+  
+
+```{r}
+df_temp %>% select(Site, tidy) %>% unnest() %>% as.data.frame() %>% 
+  select(Site, term, estimate) %>% ggplot(aes(x=estimate)) + geom_histogram(bins=40) + facet_wrap(~term,scales="free")
+```
+
+
+__Figura 3__ Distribuição dos coeficientes de lm(U ~ kernel, subset=Site)
+
+  
+  
+  Os coeficientes não parecem se distribuir de maneira normmal, em ambos há uma tendência para assimetria para a esquerda (figura 3). Talvez a distribuição de erros normal com função de ligação identidade não sejam as melhores escolhas para modelar esse conjunto de dados.
+  
+  
+  Outro procedimento para avaliar a qualidade do ajuste do modelo é plotar os resíduos contra as variáveis da estrutura aleatória (figura 4).  
+
+```{r echo=F,fig.width=10,fig.height=5}
+df_temp1 <- inner_join(x=df_U,y=augment(md_U1)[,-c(1:2)],by=c("Site","kernel.z"))
+
+l_p <- vector("list",length = 2)
+l_p[[1]] <-  ggplot(df_temp1,aes(x=p.z,y=.resid)) + 
+  geom_line(aes(group=Site),colour="green") +
+  geom_point() + #geom_point(aes(colour=kernel.z))
+  geom_hline(yintercept=0,colour="red") +
+  geom_smooth(se=F) + 
+  theme(legend.position = "none")
+l_p[[2]] <-  ggplot(df_temp1,aes(x=kernel.z,y=.resid)) + 
+  geom_hline(yintercept=0,colour="red") + 
+  geom_jitter(aes(colour=Site)) +
+  geom_smooth(se=F,col="black",method="lm") +
+  geom_boxplot(aes(group=kernel.z)) +
+  labs(y="") +
+  theme(legend.position = "none")
+do.call("grid.arrange",c(l_p,ncol=2,nrow=1))
+```
+
+__Figura 4__ Resíduos do modelo `U ~ p.z * kernel.z + (kernel.z | Site)` pelas variáveis da estrutura fixa, cobertura vegetal (`p.z`) e kernel de dispersão (`kernel.z`), em vermelho o zero.
+
+  
+  No primeiro painel da figura 4, há os resíduos do modelo por `p.z`, as linhas verdes conectam um mesmo sítio, em azul uma linha de tendência (ggplto2::geom_smooth). Notem como a linha de tendência é coincidente com a linha (y=0). Apesar de existir uma tendência ao aumento da variância dos resíduos com o aumento de `p.z`, a linha de tendência é praticamente coincidente com a linha vermelha (y=0) (figura 4, primeiro painel).
+
+  No segundo painel há os resíduos por `kernel.z`, as linas horizontais são os boxplots dos resíduos por nível de kernel.z, os pontos estão coloridos por Site e a curva negra é uma curva de tendência (ggplot2::geom_smooth). Tanto a média quanto a variância mudam entre as classes de `kernel.z`, a variância é menor em valores intermediários, a média dos valores aumenta e diminui (figura 4, segundo painel).
+  
+
+  Para avaliar se existe alguma relação entre os resíduos do modelo e as variáveis da estrutura aleatória irei fazer uma seleção de modelos lineares:  
+
+```{r}
+l_md <- vector("list",length=5)
+names(l_md) <- c("p * k", "p + k", "p", "k", "1")
+l_md[[1]] <- lm(.resid ~ p.z * kernel.z, data = df_temp1)
+l_md[[2]] <- lm(.resid ~ p.z + kernel.z, data = df_temp1)
+l_md[[3]] <- lm(.resid ~ p.z, data = df_temp1)
+l_md[[4]] <- lm(.resid ~ kernel.z, data = df_temp1)
+l_md[[5]] <- lm(.resid ~ 1, data = df_temp1)
+AICtab(l_md, weights = TRUE)
+```
+
+
+  Considerando o valor crítico de plausíbilidade igual a 2, apenas os modelos que consideram as duas variáveis não são plausíveis. Mostrando que o modelo está captando bem a variação relacionada com o efeito aditivo e multiplicativo das variáveis cobertura vegetal e kernel. O modelo nulo apresentou menor AIC e aqueles que consideram as duas variáveis o efeito das variáveis isoladamente são igualmente plausíveis, contudo, mais da metade do peso de evidências dos dados suporta o modelo nulo em detrimento dos outros dois modelos igualmente plausíveis. 
+
+
+  A análise dos resíduos mostrou que:
+
+
+i) o padrão de distribuição dos resíduos é em forma de cone, aumentando a sua variância com o aumento dos valores preditos (figura 2);  
+ii) a estrutura aleatória não apresenta ótimo ajuste - esperava que o R quadrado da regressão entre as abordagens (lmer e lm(subset=Site)) fosse maior que 0.90;  
+iii) talvez a distribuição de erro normal e função de ligação identidade não sejam as melhores escolhas para modelar o conjunto de dados (figura 3);  
+iv) a inspeção gráfica dos resíduos mostra que provavelmente existe variação associada com kernel.z que não está sendo explicada pelo modelo (figura 4);  
+v) a seleção de modelos lineares dos resíduos contra as variáveis da estrutura fixa mostrou que os resíduos são melhor explicados pelo modelo nulo, contudo, os modelos que pressupõem efeito das variáveis preditoras isoladamente também são plausíveis, dado o intervalo de plausibilidade de 2.  
+
+
+  Há pelo menos duas alternativas não excludentes para melhorar a qualidade do ajuste do modelo i) modificar a distribuição de erros/funçaõ de ligação e ii) considerar uma covariável, provavelmente, alguma que se relacione com kernel.z. Como a função "glmer" apresentou problemas de convergência quando usada a distribuição Gamma (parâmetros com valores negativos), vou optar por adicionar uma covariável.  
+  
+  
+  As covariáveis candidatas são provavelmente aquelas relacionadas com as características que variam entre Sites: J (número de indivíduos na comunidade local), S (riqueza observada) e densidade de indivídos - usado para determinar o número de unidades de habitat em cada paisagem (5 ha * número de indivíduos/ha = sum(habitat, não habitat)) . A taxa de imigração é estimada afim de gerar riquezas simuladas que sejam em média próximas a riqueza observada, assim, ela deve ser uma covariável importante para entender o comportamente de U. 
+
+## Relação entre a Taxa de Imigração e a Riqueza ##
+  
+
+  A taxa de imigração é calculada a partir da árvore da comunidade considerando que todos os indivíduos são oriundos de um mesmo indivíduo e, portanto, são todos de uma mesma espécie. Esse seria o caso em que a taxa de imigração é nula e a comunidade está isolada. Cada nó na árvore da comunidade representa um evento de colonização e estabelecimento de um indivíduo em uma unidade de habitat na comunidade local. Novas espécies são adicionadas no sistema apenas quando o indivíduo que se se estabelece na unidade de habitat é de uma espécie presente na metacomunidade e não presente na comunidade local [REESCREVER]. A probabilidade de um indivíduo de uma espécie da metacomunidade se estabelecer na comunidade local por evento de morte é definida como taxa de imigração (U). No modelo coalescente calcula-se a taxa de imigração resolvendo o polinômio que descreve a probabilidade média de um no, na árvore da comunidade, ser substituido por um imigrante de uma nova espécie para uma dada riqueza observada. Em resumo, i) na abordagem coalescente utiliza-se o modelo neutro para criar uma arvore genealógica da comunidade, considerando que ela é fechada; ii) da onde se calcula um polinômio que descreve a probabilidade média de cada nó ser substituido por um indivíduo de fora; iii) a partir desse polinômio pode se estimar a taxa de imigração, dado uma riqueza observada e a interação entre a estrutura espacial, kernel de dispersão e configuração espacial (medida em cobertura vegetal).
+  
+    
+    
+  O modelo estatístico atual não contempla a relação entre a taxa de imigração e a riqueza. Uma maneira de lidar com essa relação é adicionar a variável riqueza na estrutura fixa, vou considerar que kernel interage com cobertura vegetal e riqueza (também na escala Z score). Antes de criar os novos modelos vou plotar os resíduos do modelo contra a riqueza por kernel (figura 4)
+
+
+```{r echo=FALSE}
+df_temp1 %>% ggplot(aes(y=.resid,x=S)) + 
+  geom_point() + 
+  geom_smooth(se=F) + 
+  facet_wrap(~df_U$kernel,ncol=4)
+```
+
+
+__Figura 5__ Resíduos do modelo selecionado lmer(U ~ p.z * kernel.z + (kernel.z | Site)) por riqueza e kernel
+
+
+  A riqueza parece ter algum efeito nos resíduos e esse efeito parece interagir com kernel (figura 5). O efeito de riqueza é negativo para o menor kernel (figura 5, painel 1), mudando para positivo e diminuindo nos kernels subsequentes (figura 5, paineis 2:7); o último kernel apresenta uma leve tendência a um efeito negativo de S nos resíduos (figura 5, painel 8).
+
+
+
+## Atualizando do modelo estatístico cheio ##
+
+### Seleção de distribuição e funçaõ de ligação ###
+
+```{r}
+l_md <- vector("list", length = 5)
+names(l_md) <- c("norm","lognorm","gamma_id","gamma_log","gamma_inv")
+l_md[[1]] <- glm(U ~ p.z * kernel.z + S.z * kernel.z, data = df_U)
+l_md[[2]] <- glm(U ~ p.z * kernel.z + S.z * kernel.z, family = gaussian(link = "log"), data = df_U)
+l_md[[3]] <- glm(U ~ p.z * kernel.z + S.z * kernel.z, family = Gamma(link = "identity"), data = df_U)
+l_md[[4]] <- glm(U ~ p.z * kernel.z + S.z * kernel.z, family = Gamma(link = "log"), data = df_U)
+l_md[[5]] <- glm(U ~ p.z * kernel.z + S.z * kernel.z, family = Gamma(link = "inverse"), data = df_U)
+AICtab(l_md, weights = TRUE)
+```
+
+  A distribuição de erros e função de ligação selecionasdas foram a Gamma e identidade. Optei pela distribuição normal com função de ligação identidade pois a função glmer apresentou problemas de convergência utilizando a distribuição de erros Gamma (em código).
+  
+
+
+```{r}
+l_md <- vector("list",length=3)
+names(l_md) <- c("(kernel.z | Site)", "(1 | Site)","sem EA")
+l_md[[1]] <- lmer(U ~ p.z * kernel.z + S.z * kernel.z +  (kernel.z | Site), data = df_U)
+l_md[[2]] <- lmer(U ~ p.z * kernel.z + S.z * kernel.z + (1 | Site), data = df_U)
+l_md[[3]] <- lm(U ~ p.z * kernel.z + S.z * kernel.z, data = df_U)
+AICtab(l_md, weights = TRUE)
+```
+
+
+ Como no outro modelo o modelo mais plausível considera que existe interação entre kernel e Site (figura 2). Vou comparar 9 modelos derivados do modelo cheio para determinar qual a estrutura aleatória mais adequada:
+
+
+```{r}
+l_md <- vector("list",length = 10)
+names(l_md) <- c("(p + S) * k", "p * k", "S * k", "p * k + S", "p + S + k", "p + S", "p", "S", "k", "1")
+l_md[[1]] <- lmer(U ~ p.z * kernel.z + S.z * kernel.z + (kernel.z | Site), data = df_U)
+l_md[[2]] <- lmer(U ~ p.z * kernel.z + (kernel.z | Site), data = df_U)
+l_md[[3]] <- lmer(U ~ S.z * kernel.z + (kernel.z | Site), data = df_U)
+l_md[[4]] <- lmer(U ~ p.z * kernel.z + S.z + (kernel.z | Site), data = df_U)
+l_md[[5]] <- lmer(U ~ p.z + S.z * kernel.z + (kernel.z | Site), data = df_U)
+l_md[[6]] <- lmer(U ~ p.z + S.z + (kernel.z | Site), data = df_U)
+l_md[[7]] <- lmer(U ~ p.z + (kernel.z | Site), data = df_U)
+l_md[[8]] <- lmer(U ~ S.z + (kernel.z | Site), data = df_U)
+l_md[[9]] <- lmer(U ~ kernel.z + (kernel.z | Site), data = df_U)
+l_md[[10]] <- lmer(U ~ 1 + (kernel.z | Site), data = df_U)
+AICctab(l_md, weights=T)
+```
+
+
+  O modelo que considera a interação de p com kernel e o efeito aditivo de S foi o único dentro do intervalo de plausabilidade, o modelo que considera apenas a interação entre cobertura vegetal e kernel de dispersão foi o quarto modelo com uma diferença de 28.2 dAICc para o modelo mais plausível. Apesar do modelo ser mais adequado, o padrão de distribuição dos resíduos não teve grandes mudanças (figura 6)  
+
+
+```{r}
+md_U2 <- l_md[[4]]
+md_U2 %>% RVAideMemoire::plotresid()
+```
+
+
+__Figura 6__ Gráficos diagnóstico do modelo lmer(U ~ p.z * kernel.z + (kernel.z | Site), data = df_U)
+
+
+  Antes de avaliar o padrão de resíduos vou realizar o mesmo protocolo que fiz anteriorimente subdivindo os dados pelos níveis de Site e comparando os resíduos com uma regressão linear:
+
+  
+```{r echo=T}
+df_temp1 <- df_temp %>% select(-c(md,tidy,glance)) %>% unnest() %>% as.data.frame()
+df_temp1[,-c(9:10)] %>% inner_join(x=.,y=augment(md_U2), by=c("Site","kernel.z")) -> df_temp1
+
+lm(.resid.x ~ .resid.y, df_temp1) %>% summary
+```
+
+
+  A adição da variável S no modelo não levou ao aumento da congruência dos resíduos com os resíduos de modelos lineares ajustados por nível de Site (figura em código). A regressão linear de ambos os resíduos teve intercepto = 0, inclinação = 0.895 e R^2 = 0.8949.
+
+  
+  Vou comparar os resíduos com as variáveis preditoras da estrutura fixa:
+  
+  
+```{r}
+df_temp1 <- inner_join(x=df_U,y=augment(md_U2)[,-c(1:2,4)],by=c("Site","kernel.z"))
+
+l_p <- vector("list",length = 4)
+l_p[[1]] <- ggplot(df_temp1,aes(x=.fitted,y=.resid)) +
+  geom_point(aes(colour=kernel)) +
+  geom_smooth(se=F) +
+  theme(legend.position = "none")
+l_p[[2]] <- ggplot(df_temp1,aes(x=p.z,y=.resid)) + 
+  geom_line(aes(group=Site),colour="green") +
+  geom_point() +
+  geom_hline(yintercept=0,colour="red") +
+  geom_smooth(se=F) + 
+  theme(legend.position = "none")
+l_p[[3]] <- ggplot(df_temp1,aes(x=kernel.z,y=.resid)) + 
+  geom_hline(yintercept=0,colour="red") + 
+  geom_jitter(aes(colour=Site)) +
+  geom_smooth(se=F,col="black",method="lm") +
+  geom_boxplot(aes(group=kernel.z)) +
+  labs(y="") +
+  theme(legend.position = "none")
+l_p[[4]] <- ggplot(df_temp1,aes(x=S.z,y=.resid)) + 
+  geom_line(aes(group=Site),colour="green") +
+  geom_point() +
+  geom_hline(yintercept=0,colour="red") +
+  geom_smooth(se=F) + 
+  theme(legend.position = "none")
+do.call("grid.arrange",c(l_p,ncol=2,nrow=2))
+```
+
+
+__Figura 7__ Resíduos do modelo U ~ p * k + S + (k | Site) pelos valores fitados. (1,1) - quanto mais escuro o tom de azul menor o valor de kernel, pela variável cobertura vegetal (1,2), kernel de dispersão (2,1) e riqueza (2,2)
+
+  
+
+  Mantendo o protocolo vou realizar uma seleção de modelos lineares contr os resíduoos deste novo modelo:
+  
+```{r}
+l_md <- vector("list",length = 10)
+names(l_md) <- c("(p + S) * k", "p * k", "S * k", "p * k + S", "p + S + k", "p + S", "p", "S", "k", "1")
+l_md[[1]] <- lm(.resid ~ p.z * kernel.z + S.z * kernel.z, data = df_temp1)
+l_md[[2]] <- lm(.resid ~ p.z * kernel.z, data = df_temp1)
+l_md[[3]] <- lm(.resid ~ S.z * kernel.z, data = df_temp1)
+l_md[[4]] <- lm(.resid ~ p.z * kernel.z + S.z, data = df_temp1)
+l_md[[5]] <- lm(.resid ~ p.z + S.z * kernel.z, data = df_temp1)
+l_md[[6]] <- lm(.resid ~ p.z + S.z, data = df_temp1)
+l_md[[7]] <- lm(.resid ~ p.z, data = df_temp1)
+l_md[[8]] <- lm(.resid ~ S.z, data = df_temp1)
+l_md[[9]] <- lm(.resid ~ kernel.z, data = df_temp1)
+l_md[[10]] <- lm(.resid ~ 1, data = df_temp1)
+AICctab(l_md, weights=T)
+```
+
+
+  O resultado foi muito similar ao do modelo anterior e não houve melhorar aparente dos resíduos. Vou manter este modelo pois ele foi o único dentro do critério de plausabilidade quando comparado aos demais. Mas acredito que o padrão dos resíduos decorre principalmente da escolha da distribuição de erros e função de ligação. Segue o sumário do modelo:
+  
+```{r echo=F}
+md_U2 %>% summary
+```
+
+  
+  Parece que o principal efeito do sistema é a riqueza, que possui efeito positivo em U, seguido pela cobertura que possui efeito negativo. Aqui vale lembrar que os valores baixos dos coeficientes devem-se aos valores baixos da variável resposta que varia no intervalo: `r range(df_U$U)`. Existe correlação perfeita entre kernel e o intercepto na sua estrutura aleatória, essa correlação provavelmente se deve ao fato da função de ligação não ser adequada, então, quando o intercepto aumenta a inclinação também acompanha esse aumento. Outro ponto notável é a correlação negativa entre riqueza e cobertura vegetal na estrutura aleatória -0,616, correlação que pode ser considerada moderada. 
+
+  Para finalizar segue o gráfico do observado contra o estimado pelo sistema. Como o modelo depende de duas variáveis contínuas não irei plotar uma curva mas os valores preditos:
+
+
+```{r fig.height=13, fig.width=6.5, echo=F}
+names(df_temp1)[10:12] <- c("md2.fit","md2.resid","md2.fixed")
+
+df_temp1 <- inner_join(x=df_temp1[,1:12],y=augment(md_U1)[,1:7], by=c("U","p.z","kernel.z","Site"))
+
+names(df_temp1)[13:15] <- c("md1.fit","md1.resid","md1.fixed")
+
+df_temp1 %>% ggplot(aes(x=p.z,y=U)) + 
+  geom_point(aes(x=p.z,y=md2.fixed),colour="red") +
+  geom_point() +
+  facet_wrap(~kernel.z,ncol = 2)
+
+# df_temp1 %>% ggplot(aes(x=S.z,y=U)) + 
+#   geom_point() +
+#   geom_point(aes(x=S.z,y=.fixed),colour="red") +
+#   # geom_point(aes(x=p.z,y=.fitted),colour="green") +
+#   facet_wrap(~kernel.z,ncol = 4)
+```
+
+__Figura 8__ Valores observados e valores preditos pelo modelo U ~ p * k + S + (k | Site). Em vermelho os valores preditos pelo modelo, a curva vermelha representa a tendência linear dos valores preditos
+
+  O modelo parece não apresentar bom ajuste, o padrão geral dos pontos depende principalmente da riqueza observada, assim observar a tendência geral dos dados é pouco informativo do efeito da cobertura vegetal.
+
+
+### Anexo ###
+
+- 86 gráficos da estrutura aleatória considerando 3 modelos: 
+lm(U ~ kernel, subset=Site), 
+U ~ p * k + (k | site) e 
+U ~ p * k + S + (k | site)

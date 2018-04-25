@@ -1,0 +1,866 @@
+---
+title: "Dados Brutos"
+author: "Danilo Pereira Mori"
+date: "25 de outubro de 2016"
+output: pdf_document
+---
+```{r global packages}
+library(sp)
+library(squash)
+library(raster)
+library(rgdal)
+library(sads)
+library(magrittr)
+library(plyr)
+library(dplyr)
+library(reshape2)
+#setwd("/home/danilo/Documents/dissertacao/dados/")
+```
+
+  Esse documento reune todas as sessões de código que usei para obter os dados. A pasta R source/ contêm os códigos originais e as funções usadas nesse arquivo. Todas as sessões estão auditadas aqui ou em seus arquivos originais (em geral funções estão com os comentários e sessão de auditoria em seu código fonte). Juntamente com dados_DaniloPMori.tar.gz, esse .Rmd gerará todos os dados que obtive.     
+  Nas primeiras sessões trato as imagens baseando-se nos valores da planilha de SAD observadas (dos trabalhos fitossociológicos) e na planilha de referência do TreeCo. Sigo realizando as simulações que estão divididas em duas partes: i) obter as réplicas da taxa de imigração/perda de espécies no equilíbrio e ii) obter as SADs réplicas para cada par (SiteCode, Sindrome). Sigo calculando as métricas relacionadas com a estatística de Kolmogorov-Smirnov por réplica e depois calculo a média e variância de cada valor por par (SiteCode, Sindrome). No final ploto as SADobs e SAD réplicas com os valores calculados. Salvo dois arquivos .Rdata contendo os valores brutos das simulações por réplica e contendos as tabelas para a análise dos dados. 
+
+####  Dados para realizar as simulações ####
+TreeCo -> seleção de paisagens: >1ha, amostragem em bloco único.
+```{r selecao de trabalhos}
+df_treeco <- read.csv(file = "~/Documents/dissertacao/dados/refIDs_selecionados.csv", head =T, sep = "\t",as.is = FALSE, na.strings = c("","NA")) #yes, >= 1ha
+#df_treeco %>% names
+df_treeco <- df_treeco[,c(80,1,86,7,23,24,28,29,30,26,45,46,49,50)] #selecionando as colunas de interesse
+df_treeco$arrangement %>% table %>% as.data.frame() # levantamentos por tipo de arranjo amostral
+df_treeco %<>% filter(arrangement == "contiguous") #apenas levantamentos realizados em bloco único
+#df_treeco %>% str #são ao todo 113 SiteCode
+```
+
+######## valores para a simulação obtidas a partir de df_SAD.obs ########
+
+```{r df_simulacao: dados para conversão de paisagens}
+### N, DA, S para cada SiteCode a partir de df_SAD.obs ###
+df_SAD.obs0 <- read.csv(file = "/home/danilo/Pasta sem título/dissertacao/dados/data_para_PI_new.csv", header = TRUE, sep = ",") #versão atualizada da planilha com as abundâncias; email: Renato mandou novo .Rdata 22dez
+df_SAD.obs0 %<>% select(SiteCode, sp, N, ha, area_ha, Ntotal, method, forest_type, forest_subtype, state) #organizando e selecionando colunas
+##Vou criar uma planilha de referência para consulta a partir desta aqui
+df_SAD.obs0$SiteCode %<>% factor
+df_SAD.obs0 %<>% filter(N != 0, sp != "morta") # filtrando as espécies mortas e aquelas presentes apenas nos trabalhos florísticos (observou-se a espécie mas não sua abund)
+df_ref0 <- df_SAD.obs0 %>% ddply(., "SiteCode", summarise, S = length(sp), #sumario de df_SAD.obs0, informações de referências de todas os sitecodes
+                                                           N = sum(N), #número total de indivíduos amostradso
+                                                           ha = mean(area_ha), #todos os valores de "area_ha" são os mesmo, portanto média = head(.,n=1)
+                                                           Ntotal_treeco = mean(Ntotal), #número total de indivíduos segundo o TreeCo
+                                                           method = head(method,n=1), #quando tiver internet pesquisar melhor maneira
+                                                           fitofisio_type = head(forest_type,n=1),
+                                                           fitofisio_subtype = head(forest_subtype,n=1),
+                                                           estado = head(state,n=1))
+df_ref0 %>% mutate(N.true = N == Ntotal_treeco) %>% filter(N.true != TRUE) %>% dim #N OK
+df_ref0 %<>% mutate(DA = N/ha) %>% select(SiteCode, S,N,DA,ha,method,fitofisio_type,fitofisio_subtype,estado) #retirando Ntotal_treeco e colocando DA
+#write.table(df_ref0, file = "~/Documents/dissertacao/dados/df_ref0.csv", row.names = FALSE, col.names = TRUE)
+df_ref0 %>% filter(SiteCode %in% df_treeco$SiteCode) -> df_ref # informações de refererência
+df_SAD.obs0 %>% filter(SiteCode %in% df_treeco$SiteCode) -> df_SAD.obs # SADsobs de trabalho
+
+#acoplando df_ref com df_treeco (informações de referência dos levantamentos com as informações sumarizadas de suas SADS)
+df_ref$SiteCode %<>% factor
+df_treeco$SiteCode %<>% factor
+df_ref %>% inner_join(x = df_treeco,y = ., by = "SiteCode") %>% select(refID, ordem, SiteCode, S, N, DA) -> df_simulacao #apenas as informações para ajustar
+#a resolução e realizar a simulação
+#df_simulacao %>% str #ao todo são 113 sitecodes que podem ser usados
+```
+
+
+### Raster - matrix trinária ###
+Etapas: i) converter tifs selecionados para png, ii) ajustar a resolução, ii.b)auditoria das imagens,  iii) converter para matriz binária, iv) converter para matriz trinária (função 'area simulada'), iv.b) auditoria das imagens, v) cobertura vegetal
+
+```{r conversao tif mat_tri e cobertura}
+# tabulando os arquivos de imagem para uso de ferramentos de acoplamento de dados #
+tif.file <- Sys.glob("*.tif") #substituir pela pasta onde os recortes de paisagems estão (.tif)
+tif.file %<>% sapply(., function(x) unname( unlist( strsplit(x, "_", fixed = TRUE) ) ) ) #separando o vetor em 3: refID, estado e ordem segundo a planilha do treeco
+tif.file <- data.frame(row.names = NULL,
+                       refID = unname(sapply(unname(tif.file[1,]), function(x) gsub("ref","",x))), #extraindo o padrão numerico do refID
+                       ordem = unname(sapply(unname(tif.file[3,]), function(x) gsub(".tif","",x))), #extraindo o padrão numerico da ordem
+                       tif.file = colnames(tif.file)) #nome do arquivo
+tif.file %<>% arrange(ordem)
+tif.file %<>% filter(ordem %in% df_simulacao$ordem) #pegando os arquivos em comum aos dois
+tif.file %>% str #dos 113 SiteCodes selecionados, 106 possuem recorte de paisagem
+tif.file$tif.file %<>% as.character()
+
+#acoplando df_simulação com tif.file
+#df_simulacao %>% str
+df_simulacao$ordem %<>% factor #drop levels
+df_simulacao$refID %<>% factor
+df_simulacao %<>% inner_join(x = tif.file, y =. , by = c("ordem", "refID")) %>% select(refID, ordem, SiteCode, S, N, DA, tif.file) #acoplando e colocando em ordem
+
+# funcao tif -> png ajustado #
+func_tif.png <- function(file){
+  raster <- raster(file) #leitura do raster
+  mat_raster <- matrix(data = getValues(raster)/100, ncol=200) #convertendo para matrix
+  savemat(x = mat_raster, filename = gsub(".tif",".png", file)) #salvando como png
+}
+sapply(df_simulacao$tif.file, func_tif.png ) #gera 113 .png, oriundos dos .tif
+
+# repetindo o procedimento para *.png #
+png.file <- Sys.glob("*.png") #os arquivos png
+png.file %<>% sapply(., function(x) unname( unlist( strsplit(x, "_", fixed = TRUE) ) ) ) #separando o vetor em 3: refID, estado e ordem segundo a planilha do treeco
+png.file <- data.frame(row.names = NULL,
+                       refID = unname(sapply(unname(png.file[1,]), function(x) gsub("ref","",x))), #extraindo o padrão numerico do refID
+                       ordem = unname(sapply(unname(png.file[3,]), function(x) gsub(".png","",x))), #extraindo o padrão numerico da ordem
+                       png.file = colnames(png.file)) #nome do arquivo
+png.file %<>% arrange(ordem)
+#png.file %>% str 
+png.file$png.file %<>% as.character()
+df_simulacao %<>% inner_join(x = png.file, y =. , by = c("ordem", "refID")) %>% select(refID, ordem, SiteCode, S, N, DA, tif.file,png.file)
+#df_simulacao %>% str
+df_simulacao$SiteCode %<>% factor
+# funcao png -> png ajustado #
+func_png.ajust <- function(file, densidade){ #utilizo o image magick
+  system(paste(
+    "convert ",file, " -resize ", densidade*500,"@ ", file,  
+    sep = ""
+  ))
+}
+df_simulacao %>% select(SiteCode) %>% table %>% as.data.frame()
+d_ply(df_simulacao, "SiteCode",function(x) func_png.ajust(file = x$png.file, densidade = x$DA) ) # produzindo .png com resolução ajustada e mantendo o nome
+
+# auditoria visual - direto na pasta#
+# apenas ref601_RJ_942.png teve problemas na conversão, acredito que seja algum problema na leitura desse arquivo. Vou seguir desconsiderando essa paisagem
+#df_simulacao %<>% filter(png.file != "ref601_RJ_942.png")
+#df_simulacao$SiteCode %<>% factor #drop level
+#df_simulacao %>% str
+rm(func_tif.png,func_png.ajust)
+
+
+# png ajustado -> matriz trinária #
+source("/home/danilo/Documents/dissertacao/R_source/func_mat.tri.R")
+source("/home/danilo/Documents/dissertacao/R_source/area_simulada_beta.R")
+d_ply(df_simulacao, "SiteCode",function(x) func_mat.tri(png = x$png.file, abund = x$N)) # para cada .png produz um arquivo .txt com 3 valores(0,1,2), detalhes olhar na função
+
+# colocando na planilha
+txt.file <- Sys.glob("*.txt") #os arquivos .txt
+txt.file %<>% sapply(., function(x) unname( unlist( strsplit(x, "_", fixed = TRUE) ) ) ) #separando o vetor em 3: refID, estado e ordem segundo a planilha do treeco
+txt.file <- data.frame(row.names = NULL,
+                       refID = unname(sapply(unname(txt.file[1,]), function(x) gsub("ref","",x))), #extraindo o padrão numerico do refID
+                       ordem = unname(sapply(unname(txt.file[3,]), function(x) gsub(".txt","",x))), #extraindo o padrão numerico da ordem
+                       txt.file = colnames(txt.file)) #nome do arquivo
+txt.file %<>% arrange(ordem)
+#txt.file %>% str
+txt.file$txt.file %<>% as.character()
+#acoplando com df_simulação
+df_simulacao %<>% inner_join(x = txt.file, y =. , by = c("ordem", "refID")) %>% select(refID, ordem, SiteCode, S, N, DA, tif.file, png.file, txt.file)
+#df_simulacao %>% str
+df_simulacao$SiteCode %<>% factor
+rm(func_mat.tri, area_simulada)
+
+#ver 'comparação visual' em 'auditoria_imagens(tif-png-txt).R'
+#possíveis txt.file com problemas: 
+#ref1425_BA_2296.txt - falha na passagem png_ajustado -> .txt. Vou tentar fazer na mão
+
+individuos <- df_simulacao %>% filter(txt.file == "ref1425_BA_2296.txt") %>% .$N
+func_focal <- function(x) ifelse(length(x[x==1]) >= 5, 1, x[5])
+janela <- matrix(1,3,3)
+raster <- df_simulacao %>% filter(txt.file == "ref1425_BA_2296.txt") %>% .$png.file %>% raster
+mat <- as.matrix(raster)/255 #única paisagem que dá problemas com a forma usual - o único efeito é a mudança na orientação da imagem, a sua
+raster_binario <- raster( matrix(nrow = nrow(mat), ncol = ncol(mat), sapply(mat, function(x) ifelse(x >= 0.7, 1, 0)) ) )
+binario.focal <- as.matrix( focal(raster_binario, janela, func_focal, pad=TRUE, padvalues = 0))
+mat_tri <- try(area_simulada(matriz = binario.focal, N = individuos))
+
+try(write.table(x = mat_tri, 
+file = gsub(".png",".txt", "ref1425_BA_2296.txt"),
+sep = " ", row.names = FALSE, col.names = FALSE))
+
+############ cobertura vegetal ############  
+fun_cobertura <- function(X){
+  matriz <- as.matrix(read.table(file = X, header = FALSE, sep = " "))
+  cobertura <- 1-length(matriz[matriz==0])/length(matriz) #cobertura total
+  return(cobertura)
+}
+df_simulacao %<>% mutate(.,cobertura = unname(sapply(.$txt.file,fun_cobertura)) )
+df_simulacao %<>% select(refID, ordem, SiteCode, S, N, DA, cobertura, txt.file)
+#df_simulacao %>% str
+
+rm(png.file,tif.file,txt.file, fun_cobertura)
+```
+
+### Kernel de Dispersão ###
+  Com as imagens processadas e as informações extraidas do TreeCo resta apenas estabelecer os valores de kernel de dispersão para rodas as simulações. Aqui vou utilizar os valores de dispersão apresentados em **Seidler, T. G., & Plotkin, J. B. (2006). Seed dispersal and spatial pattern in tropical trees. PLoS Biology, 4(11), 2132–2137. http://doi.org/10.1371/journal.pbio.0040344**. Os dados são de espécies arbóreas da Malasya, eles apresentam os dados por sindrome de dispersão e faz correções pela distância filogenetica, então me senti confortável de usar esses dados nesse momento (ler melhor). Eu não encontrei o mesmo tipo de pesquisa para arbóreas da Mata Atlântica, acredito que uma pesquisa mais cuidadosa pode resolver isso. Os dados que utilizo aqui são os de *"cluster size"* (tabela 1 de Seidler & Plotkin 2006), que os autores encontraram ajustando uma *"Poisson cluster process"* e obteram cluster size médios para cada tipo de sindrome de dispersão.
+```{r df_dispersal}
+library(reshape2)
+#tabela 1 de Seidler & Plotkin 2006
+df_dispersal <- data.frame(Sindrome = c("ballistic","gravity","gyration","wind","animal_fruit<2cm","animal_fruit2-5cm","animal_fruit>5cm", "media_sin"),
+                           cluster_medio = c(31.1, 47.4, 54.5, 64.5, 99.3, 120.6, 157.8, 82.17),
+                           SE = c(4.7, 4.9, 6.2, 13.4, 7.7, 10.6, 17.0, 45.43))
+df_temp <- as.data.frame(matrix(NA,98,8))
+names(df_temp) <- c("ballistic","gravity","gyration","wind","animal_fruit<2cm","animal_fruit2-5cm","animal_fruit>5cm", "media_sin")
+df_temp <- cbind(df_simulacao$SiteCode, df_temp)
+names(df_temp)[1] <- "SiteCode"
+df_temp %<>% melt(., id.vars = "SiteCode") %>% select(-value)
+names(df_temp)[-1] <- "Sindrome" 
+#df_temp %>% str
+df_temp %<>% inner_join(.,y = df_dispersal, by = "Sindrome")
+#df_simulacao %>% str
+# Acoplando
+df_simulacao %<>% inner_join(x = df_temp, y = ., by = "SiteCode") %>% select(refID, ordem, SiteCode ,Sindrome, cluster_medio, cobertura, txt.file, N, DA, S)
+```
+
+### Simulações ### 
+Todas as informações necessárias para rodar as simulações estão presentes em df simulacao, além desse data frame é necessário ter na pasta as matriz trinárias, onde as simulações ocorrem (*.txt) e o programa 'dinamica coalescente' em uma mesma pasta. Utilizei uma semente aleatória que nunca se repete ('as.numeric(Sys.time())') em todas as simulações.
+
+As simulações são feitas em duas etapas. Na primeira etapa obtêm-se os valores de U para cada (SiteCode, Sindrome), há 20 réplicas para cada par. Utiliza-se os valores médios de U para a segunda etapa da simulação. Nesse etapa gera-se 100 SADs para cada par (SiteCode, Sindrome).
+
+NOTA:
+- CLUSTER MEDIO E KERNEL DE DISPERSÃO: Na metodologia de Seidler & Plotkin 2006 há a descrição da metodologia para estimar o cluster médio: "Estimating spatial cluster size. A Poisson cluster process consists of randomly located cluster centers; around each cluster center, trees are positioned according to a radially symmetric Gaussian distribution. For each species, the cluster model is defined by two parameters: q, the density of cluster centers, and r, where 2r2 denotes the mean squared distance of a tree from the center of its cluster. For an observed spatial distribution of a species, q and r were chosen to best fit the Ripley’s k curve, as previously described [5]. Forty-six species exhibit nearly random spatial distributions, resulting in fitted r values larger than the width of the 50-ha plot, or fitted q values greater than the density of trees. Such species were assigned r¼500 m, although the choice of the upper bound on r does not affect the results of our (nonparametric) analyses."
+**NOTA:** Eu vou considerar que o cluster médio é analogo à variância da Laplaciana. Eu preciso ler e ver se esse uso é correto, mas eu pensei que provavelmente esse cluster médio é o valor do lambda da poisson e portanto é tanto a sua média quanto a sua variância.
+```{r simulacoes}
+source("/home/danilo/Documents/dissertacao/R_source/dinamica_coalescente_beta.R") #função para rodar a simulação
+df_simulacao %<>% mutate(conversao_1m = sqrt(DA*500)/5000) #obtendo o que equivalente a metros em cada paisagem
+#df_simulacao %>% str
+
+#####################################################################################################
+#####################################################################################################
+################################# simulação para obter 20 rep U.est #################################
+#####################################################################################################
+#####################################################################################################
+                            ###### PULAR - quando tiver df_rep.U ######
+#preparação dos dados
+df_simulacao %>% select(SiteCode, Sindrome) -> df_rep.U #df que vai armazenar todos os valores das réplicas de U 
+df_temp <- as.data.frame( matrix(nrow = dim(df_rep.U)[1], ncol = 20) ) #preparando os dados
+names(df_temp) <- 1:20
+df_rep.U %<>% cbind(.,df_temp)
+df_rep.U %<>% melt(.,c("SiteCode", "Sindrome"))
+names(df_rep.U)[3:4] <- c("rep","U")
+df_rep.U %<>% inner_join(.,y = df_simulacao[,c(3:5,7,10,11)], by = c("SiteCode","Sindrome"))
+#df_rep.U %>% str #todas as info necessárias para executar a simulação
+
+###Retirei esse refID pois ele havia dado problemas
+##invocation: ./dinamica_coalescente 1043 1043 1.5e-05 29 1 1482533294.36784 6.49238105782463 2 ref795_RS_1193.txt /tmp/Rtmpu7aZbj/file8fa58d914cd 
+#Erro! Taxa de especiação mínima grande demais. A diferença de riqueza foi de -1.98671
+#[1] "Decreasing value of U to 7.5e-06"
+#[1] "Richness value too low, giving up..."
+#Vou retirar esse refID, ele tem cobertura de 0.3. Existe um refID com riqueza menor
+df_rep.U %<>% filter(SiteCode != "RScris")
+df_simulacao %>% filter(S < 30) %>% str #por algum motivo o refID com menor riqueza não deu problema em nenhuma das simulações até agora
+
+# Simulação U #
+op <- options(digits.secs=6)
+aviao <- list()
+for(i in 1:dim(df_rep.U)[1]){
+  aviao <- dinamica_coalescente(U = 2.5e-06, 
+                                S = df_rep.U[i,"S"], 
+                                N_simul = 1, 
+                                seed = as.numeric(Sys.time()), 
+                                disp_range = df_rep.U[i,"conversao_1m"] * df_rep.U[i,"cluster_medio"], 
+                                disp_kernel = 2, 
+                                landscape = df_rep.U[i,"txt.file"])
+  df_rep.U[i,"U"] <- aviao$U_est #valor da taxa de imigração estimada
+}
+
+#load("df_repU.Rdata")
+#write.table(df_rep.U, file = "df_repU.csv", row.names = FALSE, col.names = TRUE, sep = ";")
+#save(df_rep.U, df_SAD.obs0, df_simulacao, file = "dados_brutos.Rdata")
+
+# sumarizando os dados de df_rep.U e acoplando com os dados de df_simulação para criar df_resultados #
+df_rep.U %>% select(SiteCode, Sindrome, rep, U) %>% ddply(.,c("SiteCode","Sindrome"), summarise, U.medio = mean(U), U.var = var(U)) -> df_temp
+#df_simulacao %>% str
+#df_temp %>% str
+#acoplando df_temp e df_simulacao
+inner_join(df_temp, df_simulacao, by = c("SiteCode","Sindrome")) -> df_resultados
+df_resultados %<>% select(txt.file, refID, ordem, SiteCode, cobertura, Sindrome, cluster_medio, conversao_1m, N, DA, S, U.medio, U.var)
+#df_resultados %>% str
+df_resultados$SiteCode %<>% factor
+df_resultados$Sindrome %<>% factor
+names(df_resultados)[11] <- "S.obs"
+#Esses dois data frames difererem em 8 linhas, que são das 8 sindormes para o refID "RScris", que em 1 simulação não havia conseguido taxa de especiação suficiente para rodar.
+#Estranho que justamente o refID com a segunda menor riqueza deu prolema e o primeiro não...efeito da fragmentação per se? O fragmento com menor riqueza apresenta cobertura muito menor do que esse...
+
+#####################################################################################################
+#####################################################################################################
+################################# simulação para obter 100 rep SAD ##################################
+#####################################################################################################
+#####################################################################################################
+                            ###### PULAR - quando tiver l_SAD.sim ######
+
+
+# simulações #
+l_SAD.sim <- vector("list", dim(df_resultados)[1]) #lista que vai conter 97*8 matrizes cada uma com 100 SAD rep uma por linha)
+names(l_SAD.sim) <- paste(df_resultados$SiteCode, "_", df_resultados$cluster_medio, sep = "") #nomeando os elementos segundo a sindrome de dispersão
+
+op <- options(digits.secs=6)
+for(i in 1:dim(df_resultados)[1]){
+  l_SAD.sim[[i]] <- dinamica_coalescente(U = df_resultados[i,"U.medio"], 
+                                S = 0, 
+                                N_simul = 100, 
+                                seed = as.numeric(Sys.time()), 
+                                disp_range = df_resultados[i,"conversao_1m"] * df_resultados[i,"cluster_medio"], 
+                                disp_kernel = 2, 
+                                landscape = df_resultados[i,"txt.file"])
+}
+df_ref %<>% inner_join(.,df_treeco[,-c(2:4, 11:14)], by = "SiteCode")
+#save(df_ref, df_resultados, df_rep.U, df_SAD.obs0, df_simulacao, l_SAD.sim, file = "dados_brutos.Rdata")
+```
+
+# Processamento bruto dos Dados#
+  Para cada uma das 100 réplicas do par (SiteCode, Sindrome) eu irei calcular a estatística de Kolmogorov-Smirnov, onde a maior distância entre as acumuladas é obtido. O teste retorna a maior distância ente as acumuladas entre a SAD réplica e a SAD observada ('KS.D' [0;1]) e um p valor associado ('KS.p'). 'KS.p' mede a probabilidade de rejeitar a hipótese nula de que ambas distribuições são amostras de uma mesma distribuição quando está é verdadeira. A posição na curva acumulada de ambas SAD obs e SAD réplica ('KS.ac.*') e o valor de abundância ('KS.logN') onde KS.D ocorre também foi tomado. Do conjunto de réplicas calculou-se a média, assim cada par (SiteCode, Sindrome) possui apenas 1 valor de cada umas das variáveis mencionadas acima (e não 100). KS.D e KS.p são obtidos a partir da função ks.test ('stats') e os demais da função KSposition (R_source/posicao_KS.R), todos os calculos foram realizados no ambiente de programação R versão 3.3.2.
+  Os códigos a seguir: i) calculam a riqueza simulada por réplica, ii) sumarizam a informação por (siteCode, Sindrome) e acoplam a df resultados, iii) convertem o resultado bruto da simulação(matrix cujas linhas são as réplicas e as colunas são as posições onde o indivíduo está, detalhes olhar função e código a seguir) em um data frame único de SADs em um formato similar ao que o Renato Lima usa (abundance.csv), iv) calculam KS.* para cada réplica e guardar os valores em df_resultados.rep, v) sumarizar df resultados.rep e acoplar a df resultados.
+
+```{r organizando os dados brutos}
+library(stringr)
+#load("simulaca_24dez2016.Rdata")
+#### Riqueza Simulada ####
+# PENSAR EM JEITO MELHOR #
+df_S.sim <- as.data.frame( sapply(l_SAD.sim, function(x) apply(x,1, function (y) dim( as.data.frame(table(y)) )[1] ) ) ) #riqueza
+df_S.sim %<>% cbind(.,rep = 1:100) # adicionando o rótulo de réplica
+df_S.sim %<>% melt(., id.vars = "rep") # convertendo o fortmato do df
+names(df_S.sim)[3] <- "S"
+#df_S.sim %>% str
+df_S.sim$variable %<>% as.character()
+variable <- sapply(df_S.sim$variable, function(x) unname( unlist( strsplit(x, "_", fixed = TRUE) ) ) ) # obtendo as informações de referência
+df_S.sim <- data.frame( #acho que poderia usar um ddply(.,"variable", func)
+  rep = df_S.sim$rep,
+  SiteCode = unname(variable[1,]),
+  cluster_medio = unname(variable[2,]),
+  S = df_S.sim$S
+)
+df_S.sim %>% ddply(., c("SiteCode", "cluster_medio"), summarize, S.medio = mean(S), S.var = var(S)) -> df_temp # df para acoplar com df_resultados
+#df_temp %>% str 
+#df_resultados %>% str
+df_temp$cluster_medio %<>% as.character %>% as.numeric
+# acoplando df_temp com df_resultados
+df_resultados %<>% inner_join(.,y = df_temp, by =c("SiteCode", "cluster_medio"))
+
+#write.table(df_S.sim, file = "df_Ssim.csv", col.names = TRUE, row.names = FALSE, sep = ";", dec = ".")
+
+
+#### SAD Simulada ####
+# i) criar df com  as SADs réplicas, rotuladas por SiteCode, Sindrome, replica
+# PENSAR EM JEITO MUITO MELHOR #
+func_apply <-function(X){
+  X %<>% table %>% as.data.frame() %>% arrange(desc(Freq)) #transformo cada linha da matrix em um SAD
+  data.frame(N = X$Freq)
+}
+
+l_SAD.sim0 <- l_SAD.sim #lista com as matrizes (produto bruto da simulação)
+fator <- sapply(names(l_SAD.sim), function(x) unname( unlist( strsplit((x), "_", fixed = TRUE) ) ) ) #cada uma é nomeada com pelo par SiteCode, Sindrome
+
+for(i in 1:length(l_SAD.sim) ){
+  mat <- l_SAD.sim[[i]]  #pegando apenas um par (SiteCode, Sindrome)
+  l_SAD.rep <- mat %>% apply(., 1, func_apply) #uma matriz é transformada em uma lista de 100 dfs
+  names(l_SAD.rep) <- as.character(1:100)
+  for(j in 1:length(l_SAD.rep)){
+    rep <- rep(names(l_SAD.rep)[j], dim(l_SAD.rep[[j]] )[1] )
+    l_SAD.rep[[j]] %<>% arrange(N) %>% cbind(.,rep)
+  }
+  l_SAD.sim[[i]] <- l_SAD.rep %>% rbind.fill
+}
+
+
+variable <- sapply(names(l_SAD.sim), function(x) unname( unlist( strsplit(x, "_", fixed = TRUE) ) ) )
+for(i in 1:length(l_SAD.sim)){
+    SiteCode <- rep(variable[1,i])
+    cluster_medio <- rep(variable[2,i])
+    l_SAD.sim[[i]] %<>% cbind(.,SiteCode) %>% cbind(.,cluster_medio)
+}
+l_SAD.sim %>% rbind.fill -> df_SAD.sim
+
+df_resultados$SiteCode %>% levels %>%  as.character -> SiteCodes
+df_SAD.obs0 %>% filter(SiteCode %in% SiteCodes) -> df_SAD.obs
+df_SAD.obs$SiteCode %<>% factor
+#df_SAD.sim %>%str
+df_SAD.sim$rep %<>% factor
+df_SAD.sim$cluster_medio %<>% factor
+
+#write.table(df_SAD.sim, file = "df_SADsim.csv", col.names = TRUE, row.names = FALSE, sep = ";", dec = ".")
+#save(l_SAD.sim, df_rep.U,file = "simulaca_24dez2016.Rdata")
+#save(df_resultados, df_ref, df_SAD.obs, df_SAD.sim, file = "dados_brutos.Rdata")
+```
+
+
+
+```{r metricas da dinamica local}
+#load("dados_brutos.Rdata")
+source("~/Documents/dissertacao/R_source/posicao_KS.R")
+#objetivo: para cada pont(rep,SiteCode, cluster_medio) irei extrair a SAD sim, vou compara-la com a respectiva SAD obs usando ks.test e position_KS
+#input: df_SAD.ob e df_SAD.sim
+## criando objetos para o for ##
+df_SAD.obs %>% filter(N.obs < 1) # a SADobs do SiteCode MGlavr7 contem espécies com abundância menor que zero, vou retirar esse SiteCode NOTA: falar com o Renato Lima
+
+sitecodes <- df_resultados$SiteCode %>% levels %>% as.character #armazenando os nomes dos sitecodes
+sitecodes <- sitecodes[sitecodes != "MGlavr7"]
+l_KS.rep <- vector("list", length(sitecodes)) #lista que irá armazenar as informações geradas no for da função KS position
+names(l_KS.rep) <- sitecodes #colocando o nome
+
+
+func_ddply <- function(x){
+  a <- suppressWarnings(ks.test(x = log(sort(sad.obs)), y = log(sort(x$N)) ) )
+  a <- data.frame(KS.D = a$statistic, KS.p = a$p.value)
+  return(a)
+}
+
+for(i in 1:length(sitecodes)){
+  df_sim <- df_SAD.sim[df_SAD.sim$SiteCode == sitecodes[i], ] #definindo o df de trabalho para um mesmo SiteCode
+  sad.obs <- df_SAD.obs %>% filter(SiteCode == sitecodes[i]) %>% .$N.obs #SAD obs do respectivo SiteCode
+  a <-  ddply(df_sim, c("rep","SiteCode", "cluster_medio"), function(x) KS_position(X.obs = log(sort(sad.obs)), X.sim = log(sort(x$N)) ) )
+  b <- ddply(df_sim, c("rep","SiteCode", "cluster_medio"), func_ddply) 
+  l_KS.rep[[i]] <- inner_join(a, b, by = c("rep","SiteCode", "cluster_medio"))
+}
+
+df_KS.rep <- l_KS.rep %>% rbind.fill
+df_KS.rep %>% mutate(KS.D.true = diff.acumulada - KS.D) %>% .$KS.D.true %>% summary 
+df_KS.rep %>% mutate(c.data.true = exp(c.data) == c.data.e) %>% filter(c.data.true != TRUE) %>% dim
+#x11()
+#df_KS.rep %>% mutate(KS.obs.sim = acumulada.obs - acumulada.sim) %>% .$KS.obs.sim %>% hist
+df_KS.rep %<>% mutate(KS.obs_sim = acumulada.obs - acumulada.sim)
+names(df_KS.rep)[10] <- "KS.pvalue"
+
+df_resultados.rep <- ddply(df_KS.rep, c("SiteCode", "cluster_medio"), summarise, 
+                           KS = mean(KS.D),
+                           KS.p = mean(KS.pvalue),
+                           KS.abund = mean(c.data.e), 
+                           KS.ac.obs = mean(acumulada.obs),
+                           KS.ac.sim = mean(acumulada.sim),
+                           KS.obs.sim = mean(KS.obs_sim),
+                           KS.v = var(KS.D),
+                           KS.p.v = var(KS.pvalue),
+                           KS.abund.v = var(c.data.e), 
+                           KS.ac.obs.v = var(acumulada.obs),
+                           KS.ac.sim.v = var(acumulada.sim),
+                           KS.obs.sim.v = var(KS.obs_sim)
+                           )
+
+
+df_resultados.rep %>% summary
+
+df_KS.rep %>% summary
+df_S.rep <- read.table(file = "df_Ssim.csv", sep = ";", dec = ".", header = TRUE)
+df_S.rep$cluster_medio %<>% factor
+df_S.rep$rep %<>% factor
+df_resultados.rep0 <- inner_join(x = df_KS.rep, y = df_S.rep, by = c("rep", "SiteCode", "cluster_medio"))
+df_resultados$cluster_medio %<>% factor
+df_resultados.rep0 %<>% inner_join(., y = df_resultados[,c(4:7,9:13)], by = c("SiteCode", "cluster_medio"))
+
+#write.table(df_resultados.rep0, file = "df_resultados_rep.txt", col.names = TRUE, row.names = FALSE, sep = ";", dec = ".")
+
+#df_resultados.rep %>% str
+#df_resultados %>% str
+df_resultados.rep %>% inner_join(., y = df_resultados, by = c("SiteCode", "cluster_medio")) -> df_resultados
+df_resultados %<>% select(SiteCode, cluster_medio, U.medio, KS, KS.p, KS.abund, KS.ac.obs, KS.ac.sim, KS.obs.sim, 
+                         U.var, KS.v, KS.p.v, KS.abund.v, KS.ac.obs.v, KS.ac.sim.v, KS.obs.sim.v, cobertura, 
+                         Sindrome, conversao_1m, N, DA, S.obs, S.medio, S.var, txt.file, refID, ordem)
+
+save(df_resultados, df_resultados.rep, df_ref, df_SAD.obs, df_SAD.sim, df_KS.rep, file = "dados_brutos.Rdata")
+save(df_resultados, df_ref, file = "resultados_DaniloPMori.Rdata")
+#load("dados_brutos.Rdata")
+```
+
+### Plotando os dados brutos: SADobs, SADrep, U, KS.*, cobertura e S.obs ###
+
+```{r}
+df_temp <- df_resultados[,c(1:9,17,18,20:22)] %>% arrange(cobertura, cluster_medio)
+sitecode <- unique(as.character(df_temp$SiteCode))
+cluster <- as.character(sort(as.numeric(unique(df_temp$cluster_medio)) ) )
+df_temp$legendas <- paste("U =", round(df_temp[,"U.medio"], digits = 4), ";\n",
+                          "KS =", round(df_temp[,"KS"], digits = 4), ";\n",
+                          "KS.p =", round(df_temp[,"KS.p"], digits = 4), ";\n",
+                          "KS.abund =",round(df_temp[,"KS.abund"], digits = 4), ";\n",
+                          "KS.ac.obs =",round(df_temp[,"KS.ac.obs"], digits = 4), ";\n",
+                          "KS.ac.sim =",round(df_temp[,"KS.ac.sim"], digits = 4), ";\n",
+                          "cobertura =",round(df_temp[,"cobertura"], digits = 4), ";\n",
+                          "S.obs =",df_temp[,"S.obs"],
+                          sep=" ")
+
+### Criando os arquivos .pdf ###
+for(a in 1:length(sitecode)){
+  pdf(file = paste(sitecode[a], ".pdf", sep =""), width = 11.69*2, height = 7)
+  par(mfrow = c(1,8))
+  par(mar = c(4,4,2.3,0.8))
+  sad.obs <- df_SAD.obs %>% filter(SiteCode == sitecode[a]) %>% .$N.obs %>% sort(., decreasing = TRUE) %>% rad
+  df_for1 <- df_SAD.sim %>% filter(SiteCode == sitecode[a]) %>% select(N, rep, cluster_medio)
+  for(b in 1:8){
+    df_for1 %>% filter(cluster_medio == cluster[b]) -> df_for2
+    plot(sad.obs, main = paste(sitecode[a], ", ", cluster[b], "m", sep = ""), type = "n")
+    legenda <- df_temp %>% filter(SiteCode == sitecode[a], cluster_medio == cluster[b]) %>% .$legendas
+    text(par("usr")[2]*0.5, par("usr")[4]*35,legenda, cex = 0.9)
+    for(c in 1:100){
+      df_for2 %>% filter(rep == as.character(c)) %>% .$N %>% rad -> sad.sim
+      lines(sad.sim, col = "red")
+    }
+    lines(sad.obs, col = "black")
+    KS_abund <- df_temp %>% filter(SiteCode == sitecode[a], cluster_medio == cluster[b]) %>% .$KS.abund
+    abline(h=KS_abund, col = "blue")
+  }
+  dev.off()
+}
+rm(a,b,c,sad.obs, cluster,sitecode, df_for1, df_for2,legenda,sad.sim,KS_abund)
+
+# armazendo as informações em um df e concatenando todos os .pdf #
+pdf.files <- Sys.glob("*.pdf")
+pdf.files <- data.frame(SiteCode = gsub(".pdf","",pdf.files), pdf = pdf.files)
+df_temp %<>% filter(SiteCode %in% pdf.files$SiteCode)
+pdf.files %<>% inner_join(.,y = df_temp[,-15], by = "SiteCode") %>% arrange(cobertura) %>% filter(Sindrome == "media_sin")
+pdf.files$pdf %<>% as.character
+#pdf.files %<>% arrange(col interesse)
+system( paste("pdfjoin --landscape ", paste(pdf.files$pdf, collapse = " "), " -o SAD_cobertura.pdf", sep = ""))
+```
+
+### Implementando métrica de qualidade de ajuste (GOF, Etienne & Rosindell. 2011. The spatial limitations of current neutral models of biodiversity) ###
+Vou contar quantas SADs réplicas podem ser considerados como bem ajustadas às SADobs dado o teste de Kolmogorov-Smirnov e chama-las de GOF, número de SADs bem ajustadas. Dividir as SADS em classes segundo o GOF para analisar U.
+
+```{r contabilizando numero de vezes que ma distribuicao foi bem ajustada}
+load("dados_brutos.Rdata")
+df_resultados %<>% inner_join(., 
+                              y = ddply(df_KS.rep, c("SiteCode", "cluster_medio"), function(x) nrow(x[unique(x$KS.pvalue > 0.05),])), 
+                              by = c("SiteCode", "cluster_medio"))
+names(df_resultados)[28] <- "GOF" # número de SADs "bem ajustadas"
+df_resultados[df_resultados$GOF > 100,"GOF"] <- 100 # algumas réplicas possuem mais de um valor de KS* pois em alguma curvas acumuladas a maior distância ocorre em mais de um ponto
+save(df_ref,df_resultados, file = "resultados_DaniloPMori.Rdata")
+```
+
+### Possível variável de efeito aleatório: estado
+
+```{r adicionando o estado }
+#df_resultados %<>% mutate(estado = substr(SiteCode, start = 0, stop = 2))
+#save(df_ref,df_resultados, file = "resultados_DaniloPMori.Rdata")
+```
+
+
+Arrumando df_ref
+```{r}
+
+df_resultados$SiteCode %<>% factor
+names(df_resultados)[c(2:3,17,20)] <- c("kernel","U", "p", "J")
+df_resultados$kernel %<>% as.numeric 
+df_resultados %<>% filter(SiteCode != "SPeea1" & SiteCode != "SPeec1" & SiteCode != "SPpecb1")
+
+
+df_ae <- inner_join(y = unique(df_resultados[,c(1,17)]), x = df_ref[,c(1,5,9:10,12:15)], by = "SiteCode" )
+for(i in 3:8) {
+  df_ae[,i] %<>% factor #drop levels
+}
+# df_ae %>% str
+# df_ae %>% summary # as variáveis forest_disturbance e forest_age apresentam muitos NAs, vou retira-las e considerar apenas as demais variáveis. 'ha' não será considerado
+names(df_ae)[4:8] <- c("forest","succession","age","disturbance","UC")
+df_ae %<>% select(SiteCode, estado, UC, succession, forest) %>% melt(.,c("SiteCode"))
+names(df_ae)[2:3] <- c("var.aleatoria", "nivel")
+for(i in 2:3) {
+  df_ae[,i] %<>% as.character #transformando para facilitar manipulação
+}
+df_ae %<>% mutate(sigla.va.nivel = nivel)
+df_ae$SiteCode %>% levels %>% length
+# df_ae %>% filter(var.aleatoria == "estado") %>% .$nivel %>% table
+# df_ae %>% filter(var.aleatoria == "UC") %>% .$nivel %>% table
+df_ae[df_ae$var.aleatoria == "UC" & df_ae$nivel == "UC Protecao Integral" & !is.na(df_ae$nivel), 4] <- rep("PI",37)
+df_ae[df_ae$var.aleatoria == "UC" & df_ae$nivel == "UC Uso Sustentavel" & !is.na(df_ae$nivel), 4] <- rep("US", 24)
+df_ae[df_ae$var.aleatoria == "UC" & df_ae$nivel == "universities and research center" & !is.na(df_ae$nivel), 4] <- "pesquisa"
+df_ae[df_ae$var.aleatoria == "UC" & df_ae$nivel == "universities and research centers" & !is.na(df_ae$nivel), 4] <- rep("pesquisa", 4)
+# df_ae %>% filter(var.aleatoria == "succession") %>% .$nivel %>% table
+# df_ae %>% filter(var.aleatoria == "forest") %>% .$nivel %>% table
+df_ae[df_ae$var.aleatoria == "forest" & df_ae$nivel == "Cerradao (Savana florestada)" & !is.na(df_ae$nivel), 4] <- rep("cer",3)
+df_ae[df_ae$var.aleatoria == "forest" & df_ae$nivel == "Contato FES/FOM" & !is.na(df_ae$nivel), 4] <- "FES/FOM"
+df_ae[df_ae$var.aleatoria == "forest" & df_ae$nivel == "Contato FOD/FES" & !is.na(df_ae$nivel), 4] <- "FES/FOD"
+df_ae[df_ae$var.aleatoria == "forest" & df_ae$nivel == "Floresta de galeria" & !is.na(df_ae$nivel), 4] <- "FG"
+df_ae[df_ae$var.aleatoria == "forest" & df_ae$nivel == "FOM plantada" & !is.na(df_ae$nivel), 4] <- "FOM.plant"
+df_ae[df_ae$var.aleatoria == "forest" & df_ae$nivel == "Formacao pioneira sob influencia marinha" & !is.na(df_ae$nivel), 4] <- rep("f1.IM",4)
+
+
+
+
+```
+
+######### Verificando se há algum problema com os sitecodes 'capoeiras' #########
+
+```{r}
+# Auditando as imagens
+df_ae <- inner_join(df_resultados[,c(1,17,25)], df_ref[,c(1,12)], by = "SiteCode") %>% unique %>% filter(forest_succession == "capoeira") 
+df_ae %<>% mutate(png.file = gsub(".txt",".png",txt.file),
+                  tif.file = gsub(".txt",".tif",txt.file))
+pdf("~/Desktop/image_capoeira.pdf", width = 15, height = 15)
+par(mfrow=c(3,3))
+for(i in 1:3){
+  image(raster(df_ae[i,6]), main = df_ae[i,6], axes = FALSE) #tif
+  image(t(as.matrix(raster(df_ae[i,5]))), main = df_ae[i,5], axes = FALSE) #png
+  image(as.matrix(read.table(df_ae[i,3], header = FALSE, sep = " ")), main = df_ae[i,3], axes = FALSE) #txt
+}
+par(mfrow=c(1,1))
+dev.off()
+```
+
+
+
+##### Incluindo informações sobre U ##### 20fev2016
+
+
+```{r}
+load("/home/danilo/Documents/dissertacao/dados/dados_brutos.Rdata") # df_resultados - df com os dados originais
+load("/home/danilo/Documents/dissertacao/dados/dados_DaniloPMori.Rdata") # df_ad - df com as variáveis selecionadas
+
+df_ad %<>% mutate(KS.diff_1=1-KS.diff) # mudando a assimétria e tornando tudo positivo
+# df_ad$KS.diff_1 %>% hist(.,n=40)
+df_ad %<>% mutate(logJ.sc = as.numeric(scale(log(J)) ) ) #pelo otimizador
+
+df_ad %<>% inner_join(., y=df_resultados[,c(1,3,18)], c("SiteCode","Sindrome"))
+names(df_ad)[19] <- "U"
+
+df_ad %<>% inner_join(.,y=df_resultados[,c(1,18,5,28)],by=c("SiteCode","Sindrome") )
+df_ad <- df_ad[,c(1:2,20:21,3:5,17,19,6:16,18)]
+
+save(df_ad, df_SAD.sim, df_SAD.obs,file="/home/danilo/Desktop/dados_DaniloPMori.Rdata")
+```
+
+
+##### Criando df_U ##### 09abril2017
+
+*CONTEXTO:*  
+Estou adaptando o protocolo de análise desenvolvido para a variável GOF para a variável U, taxa de imigração. Decidimos analisar essa variável pois a variável GOF, que descreve o número de SADs réplicas que apresentam bom ajuste segundo o teste KS e tomando p valor crítico como 0.05, mostra que o modelo neutro espacialmente explícito gera boas predições do observado.
+
+O modelo selecionado pelo protocolo de Zuur et al. 2009 para a variável U foi lmer(U ~ p.z * kernel.z + (kernel.z | Site)) esse modelo apresentou um padrão de resíduos que assemelha-se a um cone aumentando sua variância com o aumento dos valores preditos. Assumindo que o modelo está realizando a melhor estimativa (isso inclui fazer boas estimativas da estrutura aleatória), levanto algumas hipóteses (não excludentes) sobre o motivo: 
+
+_i) a distribuição de erros não é apropriada_ - as três distribuições mais plausíveis foram Gamma com as três funções de ligação, contudo, a função glmer apresentava erros de convergência (parâmetros negativos) então optei pela quarta melhor distribuição (Normal); 
+
+"the major difference between glmer (which is provided by the package lme4) and glmmPQL (which relies on function lme, from the nlme pacakge) is that the parameter estimation algorithm used in nlme is not optimized for dealing with crossed random effects, which are associated with a sparse design matrix, while lme4 takes advantage of this structure; see, e.g., Pinheiro & Bates, "Mixed-Effects Models in S and S-PLUS", Springer, 2000, pp. 163."
+
+_ii) é necessário levar em conta as variáveis de controle_ - além da cobertura vegetal outras dois parâmetros variam entre os sítios: riqueza (S) e tamanho do vetor de abundância (J), talvez seja necessário incluir pelo menos algumas dessas variáveis.  
+
+
+Para prosseguir na avaliação vou primeiramente avaliar se as variáveis de controle estão influenciando em `U`.
+
+
+
+```{r}
+load("/home/danilo/Desktop/dados_DaniloPMori.Rdata")
+load("/home/danilo/Documents/dissertacao/dados/Rdata_antigos/dados_brutos.Rdata")
+ls()
+df_ad %>% names
+df_resultados %>% names
+names(df_resultados)[2] <- kernel
+df_ad %<>% inner_join(x=.,y=df_resultados[,c(1,18,23)], by = c("SiteCode","Sindrome"))
+
+ls()
+l_dados <- vector("list",length=6)
+names(l_dados) <- c("df_dados.geral", "df_a.visual_GOF", "df_resultados.rep","df_SAD.obs","df_SAD.sim","df_resultados com todos os SiteCodes simulados")
+l_dados[[1]] <- df_ad
+l_dados[[2]] <- df_a.visual_GOF
+l_dados[[3]] <- df_resultados.rep
+l_dados[[4]] <- df_SAD.obs
+l_dados[[5]] <- df_SAD.sim
+l_dados[[6]] <- df_resultados
+
+save(l_dados,file="/home/danilo/Desktop/l_dados.Rdata")
+```
+
+
+### Pós Terceiro Comitê ### Danilo 23maio2017
+
+  Em discussão, durante a reunião do terceiro comitê, achamos que seria interessante investigar mais algumas regiões de kernel. Entre 31.10m e 47.30m há um brusco aumento nos valores de U (figuras 5 e 7 Material Suplementar::Analise dos dados). Decidimos investigar melhor a região em que ocorre o salto, vamos usar um valor médio entre os kernels 39.25m. Há sítios em que a saturação já ocorre no primeiro nível de kernel, não levando ao aumento, mas resolvemos aproveitar para investigar um valor abaixo de 31.10m, 22.95m. 
+  
+  Então irei rodar nova bateria de simulações usando os valores de kernel 22.95m e 39.25m, valores de vizinhança (vv1, vv2). Irei utilizar os 86 sítios selecionados até o momento, talvez esse número mude pois ainda não apliquei o filtro proposto por Lima para selecionar os fragmentos onde a amostragem e a foto da paisagem foram tiradas em momentos próximos. Primeiro fazemos 20 arvores da comunidade assumindo uma taxa de imigração muito baixa, aproximação para considerar o caso de U = 0, onde estimamos 20 taxas de imigração necessárias para se obter a riqueza observada. Com a média dos 20 Us, realizamos 100 simulações para gerar SAD réplicas. Cada réplica então é comparada com a SAD observada usando o teste de Kolmogorov-Smirnov, contabilizamos a proporção de SADs réplicas com p valor > 0.05 ma variável GOF.
+
+>Etapas<
+input: i) paisagens (.txt), ii) riqueza observada, iii) SAD observada
+funções: i) dinamica_coalescente, ks_test
+output: i) SADs réplicas, taxa de imigração média (U), data frame com os dados por réplica
+
+```{r}
+## Preparando os dados ##
+
+# selecionando as informações necessárias
+df_simulacao <- df_ad[,1:5] %>% filter(kernel %in% c(31.1,47.4))
+# adicionando os novos valores de kernel e seus respectivos nomes códigos
+df_simulacao[df_simulacao$Sindrome == "ballistic","kernel"] <- 22.95
+df_simulacao[df_simulacao$Sindrome == "ballistic","Sindrome"] <- "vv1"
+df_simulacao[df_simulacao$Sindrome == "gravity","kernel"] <- 39.25
+df_simulacao[df_simulacao$Sindrome == "gravity","Sindrome"] <- "vv2"
+# transformando Site em fator par fazer o inner_join
+df_simulacao %<>% mutate(SiteCode = factor(Site))
+# inner_join de df_simulacao com df referência
+df_simulacao <- l_dados[[6]][,c(1,25,22:19)] %>% unique %>% 
+  mutate(Site = as.character(SiteCode)) %>% 
+  inner_join(x=df_simulacao,y=.,by=c("SiteCode","Site"))
+
+#df que irão armazenar os dados da simulação
+df_rep.U <- df_simulacao %>% select(SiteCode, Sindrome) 
+# espaço onde ficarão cada valor de replica
+df_temp <- as.data.frame( matrix(nrow = dim(df_rep.U)[1], ncol = 20) ) #preparando os dados
+names(df_temp) <- 1:20
+df_rep.U %<>% cbind(.,df_temp)
+#acoplando as informações para rodar a simulação
+df_rep.U %<>% reshape2::melt(.,c("SiteCode", "Sindrome"))
+names(df_rep.U)[3:4] <- c("rep","U")
+df_rep.U %<>% inner_join(.,y = df_simulacao, by = c("SiteCode","Sindrome"))
+
+# carregando função e mudando o diretorio de trabalho
+source("/home/danilo/Documents/dissertacao/R_source/dinamica_coalescente_beta.R") #função para rodar a simulação
+setwd("/home/danilo/Documents/dissertacao/dados/imagens/1_imagens_usadas_na_simulacao") # diretorio com as imagens usadas na simulação
+#NOTA: colocar o programa coalescente na mesma pasta
+
+## Estimando 20 U para cada fragmento e kernel de dispersão ##
+# Simulação U #
+op <- options(digits.secs=6)
+aviao <- list()
+for(i in 1:dim(df_rep.U)[1]){
+  aviao <- dinamica_coalescente(U = 1.25e-06, 
+                                S = df_rep.U[i,"S"], 
+                                N_simul = 1, 
+                                seed = as.numeric(Sys.time()), 
+                                disp_range = df_rep.U[i,"conversao_1m"] * df_rep.U[i,"kernel"], 
+                                disp_kernel = 2, 
+                                landscape = df_rep.U[i,"txt.file"])
+  df_rep.U[i,"U"] <- aviao$U_est #valor da taxa de imigração estimada
+}
+
+# sumarizando os dados de df_rep.U e acoplando com os dados de df_simulação para criar df_resultados #
+df_temp <- df_rep.U %>% select(SiteCode, Sindrome, rep, U) %>% ddply(.,c("SiteCode","Sindrome"), summarise, U.medio = mean(U), U.var = var(U))
+
+## Gerando 100 SAD réplicas para cada fragmento e kernel ##
+
+#criando df com os resutados para armazenar riqueza média e GOF 
+df_resultados <- inner_join(df_temp, df_simulacao, by = c("SiteCode","Sindrome"))
+
+# simulações #
+l_SAD.sim <- vector("list", dim(df_resultados)[1]) #lista que vai conter 86*2 matrizes cada uma com 100 SAD rep, uma por linha
+names(l_SAD.sim) <- paste(df_resultados$SiteCode, "_", df_resultados$kernel, sep = "") #nomeando os elementos segundo a sindrome de dispersão
+
+op <- options(digits.secs=6)
+for(i in 1:dim(df_resultados)[1]){
+  l_SAD.sim[[i]] <- dinamica_coalescente(U = df_resultados[i,"U.medio"], 
+                                         S = 0, 
+                                         N_simul = 100, 
+                                         seed = as.numeric(Sys.time()), 
+                                         disp_range = df_resultados[i,"conversao_1m"] * df_resultados[i,"kernel"], 
+                                         disp_kernel = 2, 
+                                         landscape = df_resultados[i,"txt.file"])
+}
+
+# df_ref %<>% inner_join(.,df_treeco[,-c(2:4, 11:14)], by = "SiteCode")
+
+
+# save(df_rep.U,l_SAD.sim, df_ad, df_resultados, df_simulacao,l_dados, file = "/home/danilo/Desktop/dados_pos3o_comite.Rdata")
+
+## Preparação dos Dados ##
+
+# load("/home/danilo/Desktop/dados_pos3o_comite.Rdata")
+# names(l_SAD.sim) <- paste(df_resultados$SiteCode, "_", df_resultados$kernel, sep = "")
+
+library(stringr)
+
+# Riqueza Simulada #
+
+df_S.sim <- as.data.frame( sapply(l_SAD.sim, function(x) apply(x,1, function (y) dim( as.data.frame(table(y)) )[1] ) ) ) #riqueza
+df_S.sim %<>% cbind(.,rep = 1:100) # adicionando o rótulo de réplica
+df_S.sim %<>% melt(., id.vars = "rep") # convertendo o fortmato do df
+names(df_S.sim)[3] <- "S"
+#df_S.sim %>% str
+df_S.sim$variable %<>% as.character()
+variable <- sapply(df_S.sim$variable, function(x) unname( unlist( strsplit(x, "_", fixed = TRUE) ) ) ) # obtendo as informações de referência
+df_S.sim <- data.frame( #acho que poderia usar um ddply(.,"variable", func)
+  rep = df_S.sim$rep,
+  SiteCode = unname(variable[1,]),
+  kernel = unname(variable[2,]),
+  S = df_S.sim$S
+)
+df_S.sim %>% ddply(., c("SiteCode", "kernel"), summarize, S.medio = mean(S), S.var = var(S)) -> df_temp # df para acoplar com df_resultados
+#df_temp %>% str 
+#df_resultados %>% str
+df_temp$kernel %<>% as.character %>% as.numeric
+# acoplando df_temp com df_resultados
+df_resultados %<>% inner_join(.,y = df_temp, by =c("SiteCode", "kernel"))
+
+
+
+
+#### SAD Simulada ####
+# i) criar df com  as SADs réplicas, rotuladas por SiteCode, Sindrome, replica
+# PENSAR EM JEITO MUITO MELHOR #
+func_apply <-function(X){
+  a <- X %>% table %>% as.data.frame() %>% arrange(desc(Freq)) #transformo cada linha da matrix em um SAD
+  data.frame(N = a$Freq)
+}
+
+l_SAD.sim0 <- l_SAD.sim #lista com as matrizes (produto bruto da simulação)
+fator <- sapply(names(l_SAD.sim), function(x) unname( unlist( strsplit((x), "_", fixed = TRUE) ) ) ) #cada uma é nomeada com pelo par SiteCode, Sindrome
+
+
+# Cada elemento de l_SAD.sim é uma matriz com 100 linhas e J colunas. J é o número de indivíduos amostrados no fragmento florestal
+# Cada matriz é transformada em data frames com as SADs réplicas "empilhadas"
+for(i in 1:length(l_SAD.sim) ){
+  mat <- l_SAD.sim[[i]]  #pegando apenas um par (SiteCode, Sindrome)
+  l_SAD.rep <- mat %>% apply(., 1, func_apply) #uma matriz é transformada em uma lista de 100 dfs
+  names(l_SAD.rep) <- as.character(1:100)
+  for(j in 1:100){
+    rep <- rep(names(l_SAD.rep)[j], dim(l_SAD.rep[[j]] )[1] )
+    l_SAD.rep[[j]] %<>% arrange(N) %>% cbind(.,rep)
+  }
+  l_SAD.sim[[i]] <- l_SAD.rep %>% rbind.fill
+}
+
+# Agora cada elemento de l_SAD.sim é um df com todas as SADs réplicas para uma mesma simulação
+# vou agrupar todas em um único df para comparar
+variable <- sapply(names(l_SAD.sim), function(x) unname( unlist( strsplit(x, "_", fixed = TRUE) ) ) )
+for(i in 1:length(l_SAD.sim)){
+    SiteCode <- rep(variable[1,i])
+    kernel <- rep(variable[2,i])
+    l_SAD.sim[[i]] %<>% cbind(.,SiteCode) %>% cbind(.,kernel)
+}
+l_SAD.sim %>% rbind.fill -> df_SAD.sim
+
+save(df_SAD.sim,backup_l_SAD.sim, file = "/home/danilo/Desktop/dados_pos3o_comite_815.Rdata")
+
+############## 25amio2017 ############### 
+
+load("/home/danilo/Desktop/dados_pos3o_comite_815.Rdata")
+
+### Carregando SADs observadas ###
+
+#versão atualizada da planilha com as abundâncias; email: Renato mandou novo .Rdata 22dez
+df_SAD.obs <- read.csv(file = "/home/danilo/Pasta sem título/dissertacao/dados/data_para_PI_new.csv", header = TRUE, sep = ",")
+#organizando e selecionando colunas 
+df_SAD.obs %<>% select(SiteCode, sp, N, ha, area_ha, Ntotal, method, forest_type, forest_subtype, state)
+df_SAD.obs$SiteCode %<>% factor
+df_SAD.obs %<>% filter(N != 0, sp != "morta") # filtrando as espécies mortas e aquelas presentes apenas nos trabalhos florísticos (observou-se a espécie mas não sua abund)
+
+# Pegando apenas os fragmentos usados #
+lvs_SiteCode <- df_SAD.sim$SiteCode %>% levels %>%  as.character
+df_SAD.obs %<>% filter(SiteCode %in% lvs_SiteCode)
+
+###################################
+### Teste de Kolmogorov Smirnov ###
+##################################
+
+#lista que irá armazenar as informações geradas no for da função KS position#
+l_KS.rep <- vector("list", length(lvs_SiteCode)) 
+#colocando o nome
+names(l_KS.rep) <- lvs_SiteCode
+
+# Funcao para usar dentro do loop #
+# Acho que posso usar o loop para variar em kernel e um __ply para variar entre fragmentos #
+# Talvez dois __ply #
+func_ddply <- function(x){
+  a <- suppressWarnings(ks.test(x = log(sort(sad.obs)), y = log(sort(x$N)) ) )
+  a <- data.frame(KS.D = a$statistic, KS.p = a$p.value)
+  return(a)
+}
+
+for(i in 1:length(lvs_SiteCode)){
+  df_sim <- df_SAD.sim[df_SAD.sim$SiteCode == lvs_SiteCode[i], ] #definindo o df de trabalho para um mesmo SiteCode
+  sad.obs <- df_SAD.obs %>% filter(SiteCode == lvs_SiteCode[i]) %>% .$N #SAD obs do respectivo SiteCode
+  l_KS.rep[[i]] <- ddply(df_sim, c("rep","SiteCode", "kernel"), func_ddply) 
+}
+l_KS.rep %<>% rbind.fill() #esqueci de mudar o nome
+
+## Sumarizando ##
+df_temp <- l_KS.rep %>% ddply(c("SiteCode","kernel"),summarise,
+                   KS = mean(KS.D),
+                   KS.var = var(KS.D),
+                   KS_p = mean(KS.p),
+                   KS_p.var = var(KS.p)) 
+
+df_temp %<>% inner_join(.,y = ddply(l_KS.rep, c("SiteCode", "kernel"), function(x) nrow(x[x$KS.p > 0.05,]) ), by = c("SiteCode", "kernel"))
+# df_temp %>% ggplot(aes(x=p,y=V1)) + geom_point()
+# Preparando os dados #
+names(df_temp)[c(1,7)] <- c("Site","GOF")
+df_temp$Site %<>% as.character()
+df_temp$kernel %<>% as.character() %>% as.numeric()
+
+# Acoplando com os resultados gerais da bateria de simulacoes #
+df_resultados %<>% inner_join(x=.,y=df_temp, by = c("Site", "kernel"))
+df_temp <- df_resultados %>% select(Site,Sindrome, kernel, p, S, GOF, U.medio)
+names(df_temp)[7] <- "U"
+df_ad <- rbind(df_ad[,1:7],df_temp)
+
+# Salvando #
+save(df_ad, l_dados, l_SAD.sim, df_resultados, df_rep.U, file="/home/danilo/Desktop/l_dados.Rdata")
+
+# Obs: falta acoplar o df com as SAD.sim, o df com valores por réplica #
+```

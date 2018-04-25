@@ -1,0 +1,921 @@
+---
+title: "Analise Modelos"
+author: "Danilo Pereira Mori"
+date: "18 de janeiro de 2017"
+output: pdf_document
+---
+```{r global options, echo=FALSE, include=FALSE}
+knitr::opts_chunk$set(
+                      #fig.width=20, 
+                      #fig.height=10, 
+                      echo=FALSE, 
+                      message=FALSE, 
+                      warning=FALSE,
+                      cache=TRUE,
+                      tidy=FALSE,
+                      root.dir = '/home/danilo/Documents/dissertacao/dados/'
+                      )
+```
+ 
+```{r global packages and data}
+library(gridExtra) 
+library(ggplot2) 
+# library(fitdistrplus)
+library(MASS)
+# library(RVAideMemoire)
+library(car)
+library(bbmle)
+library(nlme)
+library(lme4)
+#library(sads)
+library(magrittr)
+library(plyr)
+library(dplyr)
+load("/home/danilo/Documents/dissertacao/dados/resultados_DaniloPMori.Rdata")
+#arrumando os dados#
+rm(df_va)
+df_resultados$cluster_medio %<>% as.numeric 
+df_resultados$SiteCode %<>% as.character()
+names(df_resultados)[c(2:3,17,20)] <- c("kernel","U", "p", "J")
+df_resultados %<>% mutate(Jl = DA * 500, Jl.p = DA * 500 * p)
+df_resultados %<>% arrange(p, kernel)
+df_resultados$Sindrome %<>% factor(.,levels=c("ballistic","gravity","gyration","wind","media_sin","animal_fruit<2cm","animal_fruit2-5cm","animal_fruit>5cm"))
+
+names(df_ref)[c(7,12,15)] <- c("fitofisio","succession","UC")
+df_ref %<>% filter(succession != "capoeira")
+df_ref$succession %<>% factor(.,levels=c("secondary","primary/secondary","primary"))
+
+## preparação do data frame a ser comparado ##
+df_md <- inner_join(df_resultados[,c(1,18,4,6:9,17,22,20,29,30,2)],df_ref[,c(1,7,12)], by = "SiteCode")
+df_md$fitofisio %<>% as.character()
+df_md %<>% filter(fitofisio != "Cerradao (Savana florestada)" & fitofisio != "FOA" & fitofisio != "Floresta de galeria" & fitofisio != "FOM plantada")
+# df_md %>% filter(Sindrome == "wind") %>% .$fitofisio %>% table
+df_md[df_md$fitofisio=="Contato FES/FOM","fitofisio"] <- "FES"
+df_md[df_md$fitofisio=="Contato FOD/FES","fitofisio"] <- "FOD"
+df_md[df_md$fitofisio=="Formacao pioneira sob influencia marinha","fitofisio"] <- rep("f1M",40)
+# vendo o número de observações por classe
+# df_md %>% filter(Sindrome == "wind") %>% .$fitofisio %>% table
+# df_md %>% filter(Sindrome == "wind") %>% dim # pelo o que eles falam ter menos de 2 níveis é problemático... se retirar Cerradao e FOA ficaremos com 87 observações
+# de maneira geral a amostra está bem mal balanceada. Vou retirar cerradão e FOA. Quero ver o que o Renato fala. 
+df_md$fitofisio %<>% factor()
+df_md$succession %<>% factor()
+names(df_md)[c(4:7,9)] <- c("KS.ab", "KS.obs", "KS.sim","KS.diff","S")
+# Vou reescalonar a variável por conta dos avisos
+df_md %<>% mutate(S.sc = as.numeric(scale(S, center = FALSE)))
+df_ad <- df_md
+
+
+
+save(df_ad,file="/home/danilo/Documents/dissertacao/dados/dados_DaniloPMori.Rdata")
+```
+
+
+
+
+
+
+
+################################################# rascunho #################################################
+
+  Para realizar a simulação coalescente é necessário oferecer um valor de kernel de dispersão, que é o mesmo para todos os indivíduos da comunidade. Assim, a simulação utiliza o que equivalente a um kernel médio da comunidade. Afim de contornar essa questão da maneira mais simples, simulamos 8 diferentes kerneis, cada um sendo a média de uma sindrome de dispersão (Seidler, T. G., & Plotkin, J. B. 2006). Simulamos 8 diferentes versões de um modelo neutro para cada levantamento fitossociológico. Assim, os modelos que construimos levam enquanto o agrupamento 
+  Poderíamos alimentar as simulações com 
+  Assim, para alimentar uma simulação coalescente com dados é necessário estimar um kernel médio da comunidade
+  O funcionamento do algoritmo coalescente requer um kernel de dispersão, que é o mesmo para todos os indivíduos da comunidade.
+  
+  Para investigar o efeito da fragmentação na qualiadado do ajuste entre as SADs observadas e simuladas segundo o modelo neutro, transcrevemos (REESCREVER) a relação entre as variáveis em uma estrutura de 
+
+
+  Em reunião com o Renato, concluimos que o melhor modelo dado nosso objetivo é:
+  
+VR ~ p + S * log(J) + (p|kernel) + (1|fitofisio).
+
+Onde VR = variáveis resposta (KS, KS.p, GOF), p = cobertura vegtal (% habitat), S = riqueza observada, log(J) = log do número de indivíduos, kernel = distância média entre a plântula e a planta progenitora, fitofisio = fitofisionomia. 
+  
+  
+  
+  
+  Nosso interesse está na relação VR ~ p, as demais variáveis são de controle. Existem dois motivos para a inclução
+  Riqueza observada, S, e tamanho da comunidade, J, são parâmetros da simulação. Espera-se que indiretamente elas estejam influênciando o resultado da simulação e como elas não estão igualmente distribuidas ao longo do gradiente de fragmentação, contro
+  `S` determina a taxa de imigração U em que a simulação foi rodada e também o número de classes do teste de Kolmogorov-Smirnov. Da análise exploratória, observa-se que S apresenta correlação positiva com p e negativa com KS (OLHAR OS GRÁFICOS DAS OUTRAS VARIÁVEIS). O tamanho populacional (J) é um parâmetro da simulação e está relacionado com o teste KS. <!--(o teste de KS é sensível ao tamanho dos vetores de abundância (riqueza) e ao tamanho total dos vetores, não? De qualquer maneira, os vetores que são comparados no teste de KS têm mais ou menos o mesmo número de spp e o exato número de indivíduos).--> Ao utilizarmos um modelo espacialmente explicíto de uma dinâmica ecológica baseada em indivíduo é necessário oferecermos o kernel de dispersão, que na simulação coalescente é o mesmo para todos os indivíduos. Optamos por escolher 7 valores médios de kernel considerando um tipo de sindrome de dispersão (retirados do trabalho REFERÊNCIA), mais a média desses valores, totalizando 8 kernels diferentes. Esperamos que o efeito do kernel na relação entre KS e p varia ao longo de p, nos extremos do gradiente de 'p' acreditamos que a variação do kernel tenha pouco efeito na dinâmica: quando p é muito pequeno a variação do kernel é indiferente, assim como....[REESCREVER E CONTINUAR]
+
+## Bateria de modelos: VR ~ p + S.obs + log(J) + (p|kernel) + (1|fitofisio) ##
+
+```{r}
+# preparacao dos dados #
+df_md <- inner_join(df_resultados[,c(1,18,4,6:9,17,22,20,29,30,2)],df_ref[,c(1,7,12)], by = "SiteCode")
+df_md$fitofisio %<>% as.character()
+df_md %<>% filter(fitofisio != "Cerradao (Savana florestada)" & fitofisio != "FOA" & fitofisio != "Floresta de galeria" & fitofisio != "FOM plantada")
+# df_md %>% filter(Sindrome == "wind") %>% .$fitofisio %>% table
+df_md[df_md$fitofisio=="Contato FES/FOM","fitofisio"] <- "FES"
+df_md[df_md$fitofisio=="Contato FOD/FES","fitofisio"] <- "FOD"
+# vendo o número de observações por classe
+# df_md %>% filter(Sindrome == "wind") %>% .$fitofisio %>% table
+# df_md %>% filter(Sindrome == "wind") %>% dim # pelo o que eles falam ter menos de 2 níveis é problemático... se retirar Cerradao e FOA ficaremos com 87 observações
+# de maneira geral a amostra está bem mal balanceada. Vou retirar cerradão e FOA. Quero ver o que o Renato fala. 
+df_md$fitofisio %<>% factor()
+df_md$succession %<>% factor()
+names(df_md)[5] <- "S"
+# Vou reescalonar a variável por conta dos avisos
+df_md %<>% mutate(S.sc = as.numeric(scale(S, center = FALSE)))
+# Deixando na escala da função de ligação
+df_md %<>% mutate(KS.inv = I(1/KS))
+# Start #
+a <- glm(KS ~ p + S.sc * log(J), family = Gamma(link="inverse"), data = df_md )
+# l_md[[1]] <- glmer(KS ~ p + S.sc * log(J) + (p|kernel) + (S.sc|fitofisio), family = Gamma(link="inverse"), 
+#                   REML=F,data = df_md, control=glmerControl(optimizer="bobyqa", optCtrl=list(maxfun=2e5)) ) # colocar start
+
+coef(a)
+l_md <- vector("list",length = 1)
+l_md[[1]] <- glmer(KS ~ p + S.sc * log(J) + (p|kernel) + (1|fitofisio), family = Gamma(link="inverse"), 
+                   data = df_md, start=list(fixef = coef(a)), control=glmerControl(optimizer="bobyqa", optCtrl=list(maxfun=2e5)) ) # aviso 1
+# AICctab(l_md,weights=T)
+# summary(l_md[[2]]) # como o 2 não teve aviso eu vou usa-lo para ver
+fixed.effects(l_md[[1]])
+df_md$md_res <- residuals(l_md[[1]])
+df_md$md_fit <- fitted(l_md[[1]])
+df_coef.random <- as.data.frame(ranef(l_md[[1]])[1]) #kernel
+
+##############################################
+
+
+ggplot(df_md, aes(x=p,y=KS, group=kernel)) + geom_point() + geom_smooth(method="lm", se=F) + facet_wrap(~kernel*fitofisio)
+
+
+ggplot(data = df_md, aes(x = p, y = KS)) + # dados e eixos
+  geom_point(size = 3, shape = 19) +  # plotando os pontos das praias 
+  geom_line(aes(y = df_md$md_fit, x = NAP, 
+                            col = as.factor(Beach))) + # retas de cada praia
+  stat_function(fun = funi, col = "black", size = 2) +  # reta do modelo fixo 
+  scale_color_brewer(palette = "Set1") + # a partir daqui estética do gráfico
+  theme_bw() +
+  theme(axis.text = element_text(size = 13), 
+        axis.title = element_text(size = 15),
+        axis.text.x = element_text(size = 11),
+        axis.text.y = element_text(size = 11),
+        legend.key.size = unit(0.6, "cm"),
+        legend.text = element_text(size = 12),
+        legend.title = element_text(size = 13)) +
+  xlab("NAP") +
+  ylab("Riqueza")
+
+
+
+plot(KS ~ p, df_md)
+plot(KS ~ S.sc, df_md)
+
+
+a<-ranef(l_md[[1]])
+a$kernel
+
+colvec <- c("#ff1111","#007eff") ## second colour matches lattice default
+grid.arrange(plot(l_md[[2]],type=c("p","smooth")),
+             plot(l_md[[2]],sqrt(abs(resid(.)))~fitted(.),
+                  type=c("p","smooth"),ylab=expression(sqrt(abs(resid)))),
+                                       ## "sqrt(abs(resid(x)))"),
+             plot(l_md[[2]],resid(.,type="pearson")~p,
+                  type=c("p","smooth")),
+             qqnorm(l_md[[2]],abline=c(0,1)) )
+
+
+
+
+anova(l_md[[1]])
+
+par(mfrow=c(2,2))
+plot(l_md[[1]])
+par(mfrow=c(1,1))
+
+df_md$res <- resid(l_md[[1]])
+df_md$fit <- fitted(l_md[[1]])
+plot(fit ~ p, df_md)
+# Avisos: 
+#
+# 1) - Warning messages:
+# 1: extra argument(s) ‘REML’ disregarded 
+# 2: In checkConv(attr(opt, "derivs"), opt$par, ctrl = control$checkConv,  :
+#   Model failed to converge with max|grad| = 0.0176975 (tol = 0.001, component 1)
+
+########################
+# l_md <- vector("list",length = 7)
+# l_md[[1]] <- glmer(KS ~ p + S.sc * log(J) + (p|kernel) + (1|fitofisio), family = Gamma(link="inverse"), REML=F,data = df_md) # aviso 1
+# l_md[[2]] <- glmer(KS ~ p + S.sc * log(J) + (p|kernel), family = Gamma(link="inverse"), REML=F,data = df_md) # aviso 1
+# l_md[[3]] <- glmer(KS ~ p + (p|kernel) + (1|fitofisio), family = Gamma(link="inverse"), REML=F,data = df_md) # aviso 2
+# l_md[[4]] <- glmer(KS ~ p + (p|kernel), family = Gamma(link="inverse"), REML=F,data = df_md) # aviso 2
+# l_md[[5]] <- glmer(KS ~ 1 + (p|kernel), family = Gamma(link="inverse"), REML=F,data = df_md) # aviso 2
+# l_md[[6]] <- glm(KS ~ p, family = Gamma(link="inverse"), data = df_md) 
+# l_md[[7]] <- glm(KS ~ 1, family = Gamma(link="inverse"), data = df_md) 
+# l_md[[8]] <- glmer(KS ~ p + S.sc * log(J) + (p|kernel) + (S.sc|fitofisio), family = Gamma(link="inverse"), REML=F,data = df_md) # aviso 1
+# AICctab(l_md,weights=T)
+
+
+
+```
+
+
+### Outras variáveis ###
+```{r}
+df_md <- inner_join(df_resultados,df_ref[,c(1,7,12)], by = "SiteCode")
+df_md <- inner_join(df_resultados[,c(1,18,6,28,17,22,20,29,30,2)],df_ref[,c(1,7,12)], by = "SiteCode")
+df_md$fitofisio %<>% as.character()
+df_md %<>% filter(fitofisio != "Cerradao (Savana florestada)" & fitofisio != "FOA" & fitofisio != "Floresta de galeria" & fitofisio != "FOM plantada")
+# df_md %>% filter(Sindrome == "wind") %>% .$fitofisio %>% table
+df_md[df_md$fitofisio=="Contato FES/FOM","fitofisio"] <- "FES"
+df_md[df_md$fitofisio=="Contato FOD/FES","fitofisio"] <- "FOD"
+# vendo o número de observações por classe
+# df_md %>% filter(Sindrome == "wind") %>% .$fitofisio %>% table
+# df_md %>% filter(Sindrome == "wind") %>% dim # pelo o que eles falam ter menos de 2 níveis é problemático... se retirar Cerradao e FOA ficaremos com 87 observações
+# de maneira geral a amostra está bem mal balanceada. Vou retirar cerradão e FOA. Quero ver o que o Renato fala. 
+df_md$fitofisio %<>% factor()
+df_md$succession %<>% factor()
+names(df_md)[5] <- "S"
+# Vou reescalonar a variável por conta dos avisos
+df_md %<>% mutate(S.sc = as.numeric(scale(S, center = FALSE)))
+par(mfrow=c(1,2))
+hist(log(df_md$KS.abund),breaks=40)
+hist(100-df_md$GOF, breaks=c(1,100))
+par(mfrow=c(1,1))
+
+df_resultados$Sindrome %>% levels
+df_ae <- df_resultados %>% filter(Sindrome == "animal_fruit>5cm")
+
+plot(KS ~ KS.obs.sim, df_ae)
+df_ae$KS.obs.sim %>% hist(.,breaks=40)
+abline(v=0,col="red",lwd=2)
+
+
+
+########### KS.abund ###########
+df_md$KS.abund %>% hist(.,n=40)
+l_md_dist <- vector("list", length = 5) #lista com os modelos para selecionar a distribuição de KS
+names(l_md_dist) <- c("norm","lognorm","gamma_id","gamma_log","gamma_inv")
+l_md_dist[[1]] <- glm(KS.abund ~ p + S.sc + log(J) + log(Jl) + succession, data = df_md) #norm
+l_md_dist[[2]] <- glm(KS.abund ~ p + S.sc + log(J) + log(Jl) + succession, family = gaussian(link = "log"), data = df_md) #lognorm
+l_md_dist[[3]] <- glm(KS.abund ~ p + S.sc + log(J) + log(Jl) + succession, family = Gamma(link = "identity"), data = df_md) #Gamma; identity
+l_md_dist[[4]] <- glm(KS.abund ~ p + S.sc + log(J) + log(Jl) + succession, family = Gamma(link = "log"), data = df_md) #Gamma; log
+l_md_dist[[5]] <- glm(KS.abund ~ p + S.sc + log(J) + log(Jl) + succession, family = Gamma(link = "inverse"), data = df_md) #Gamma; inverse
+AICtab(l_md_dist, weights = TRUE)
+
+a <- glmer(KS.abund ~ p + S.sc*log(J) + (p|kernel) + (1|fitofisio), family = Gamma(link = "log"), data = df_md)
+summary(a)
+
+
+########### GOF ###########
+df_md$GOF_1 %>% hist(.,n=40)
+df_md %<>% mutate(GOF_1 = 100-GOF)
+
+l_md_dist <- vector("list", length = 3) #lista com os modelos para selecionar a distribuição de KS
+names(l_md_dist) <- c("pois","lognorm","gamma_id","gamma_log","gamma_inv")
+l_md_dist[[1]] <- glm(KS.abund ~ p + S.sc + log(J) + log(Jl) + succession, family = poisson,data = df_md) #pois
+l_md_dist[[2]] <- glm(KS.abund ~ p + S.sc + log(J) + log(Jl) + succession, family = quasipoisson, data = df_md) #quasipois
+l_md_dist[[3]] <- glm.nb(KS.abund ~ p + S.sc + log(J) + log(Jl) + succession, data = df_md) #bin neg
+
+
+b <- glmer(KS.abund ~ p + S.sc*log(J) + (p|kernel) + (1|fitofisio), family = quasipoisson, data = df_md)
+summary(a)
+
+plot(GOF ~ p, df_md)
+
+########### KS.ac.obs ###########
+df_md$KS.ac.obs %>% hist(.,n=40)
+
+l_md_dist <- vector("list", length = 3) #lista com os modelos para selecionar a distribuição de KS
+names(l_md_dist) <- c("pois","lognorm","gamma_id","gamma_log","gamma_inv")
+l_md_dist[[1]] <- glm(KS.ac.obs ~ p + S.sc + log(J) + log(Jl) + succession, family = poisson,data = df_md) #pois
+l_md_dist[[1]] <- glm(KS.ac.obs ~ p + S.sc + log(J) + log(Jl) + succession, family = poisson,data = df_md) #pois
+
+c <- lmer(KS.ac.obs ~ p + S.sc*log(J) + (p|kernel) + (1|fitofisio), data = df_md)
+summary(c)
+plot(c)
+plot(KS.ac.obs ~ p, df_md)
+curve(fixef(c)[1] + fixef(c)[2] * x, add =T)
+par(mfrow=c(1,1))
+
+
+########### KS.obs.sim ###########
+df_md$KS.obs.sim %>% hist(.,n=40)
+d <- lmer(KS.obs.sim ~ p + S.sc*log(J) + (p|kernel) + (1|fitofisio), data = df_md)
+summary(d)
+plot(d)
+plot(KS ~ p, df_md, ylim=c(-0.35,0.5),col=as.factor(df_md$kernel))
+plot(KS.obs.sim ~ p, df_md, ylim=c(-0.35,0.5),col=as.factor(df_md$kernel))
+plot(KS.obs.sim ~ p, df_md, ylim=c(-0.35,0.5),col=as.factor(df_md$kernel))
+plot(KS.obs.sim ~ p, df_md, ylim=c(-0.35,0.5),col=as.factor(df_md$kernel))
+
+
+ggplot(df_md,as(x=p,y=KS.obs.sim, group=Sindrome)) + geom_point(aes(colour=Sindrome)) + geom_smooth(method="lm",aes(colour=Sindrome)) +face
+
+curve(fixef(d)[1] + fixef(d)[2]*x, add =T)
+par(mfrow=c(1,1))
+
+
+
+summary(a)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ANEXO:
+
+
+
+*Objetivo:* criação e seleção de modelos para as principais variáveis: "KS". Vou misturar o protocolo proposto por Bolker et al 2008 com algumas práticas propostas por Zuur et al (e.g escolha da distribuição e escolha da melhor estrutura fixa e aleatoria). Segue sumário do protocolo proposta por ambos grupos de pesquisadores
+
+### Protocol presente em Zuur et al. ###
+
+1)"Start with a model where the fixed component contains all explanatory variables" - the beyond optimal model
+
+2)"Using the beyond optimal model, find the optimal structure of the random component" - aqui eu vou confrontar todas as opções da estrutura aleatória
+
+3)"Once the optimal random structure has benn found, it is time to find the optimal fixed structure."
+
+4)"Present the final model using REML estimation"
+
+### Protocol presente em Bolker et al 2008 BOX 4: Procedures - creating a full model ###
+*1)"Specify fixed and random effects; only important interactions"*
+
+*2)"Choose an error distribution and link function"*
+
+*3)"Graphical checking: are variances of data (transformed by the link function) homogeneous across categories? Are responses of transformed data linear with respect to continuous predictors? Are there outlier individuals or groups? Do distributions within groups match the assumed distribution?"*
+
+*4)"Fit fixed-effect GLMs both to the full (pooled) data set and within each level of the random factors [28,50]. Estimated parameters should be approximately normally distributed across groups (group-level parameters can have large uncertainties, especially for groups with small sample sizes). Adjust model as necessary (e.g. change link function or add covariates)."*
+
+*5)"Fit the full GLMM."*
+
+*6)"Recheck assumptions for the final model (as in step 3) and check that parameter estimates and confidence intervals are reasonable (gigantic confidence intervals could indicate fitting problems). The magnitude of the standardized residuals should be independent of the fitted values. Assess overdispersion (the sum of the squared Pearson residuals should be x2 distributed [66,67]). If necessary, change distributions or estimate a scale parameter. Check that a full model that includes dropped random effects with small standard deviations gives similar results to the final model. If different models lead to substantially different parameter esti- mates, consider model averaging."*
+
+###########################################################################################################################################################################
+
+```{r preparacao dos dados}
+df_md <- inner_join(df_resultados[,c(1,18,4,17,22,20,29,30,2)],df_ref[,c(1,7,12)], by = "SiteCode")
+df_md$fitofisio %<>% factor
+df_md$succession %<>% factor
+
+# x11()
+ggplot(df_md,aes(x=p,y=S.obs, colour = fitofisio)) + geom_point()
+
+#plot(KS ~ p, df_md.media)
+#abline(lm(KS ~ p, df_md.media))
+# df_md %>% head(.,n=10)
+# df_md %>% str
+#df_md.media <- ddply(df_md, c("SiteCode", "p", "S.obs", "J", "Jl", "Jl.p", "succession", "UC"), summarise, Sindrome = "media", kernel = NA, KS = mean(KS))
+#ggplot(df_md.media, aes(x=p, y=KS) ) + geom_point(aes(colour=S.obs))  + theme_bw() + geom_smooth(se = FALSE, colour = "red")
+```
+
+**1)"Specify fixed and random effects; only important interactions"**
+
+-VR: KS  
+
+-fixed: i) cobertura, ii) S, iii) log(J), iv) log(Jl) v) I(log(Jl*p))
+
+-random: i) kernel, ii) succession (random or fixed?) , iii) fitofisio, iv) unidade de conservação
+
+-possíveis interações: 
+
+   #efeito fixo
+
+  - log(J) : log(Jl) <!-- questão da variável de exposição: ver email-->
+
+   #efeito aleatório
+
+  - p : kernel <!-- # da análise exploratória eu vi que parece haver uma interação entre cobertura e kernel -->
+
+  - S.obs : kernel <!-- # preciso reler, mas acredito que pode existir uma interação entre fragmentação e débito de extinção (reler os artigos do Campos) -->
+ 
+
+**2)"Choose an error distribution and link function"**
+
+ KS é uma variável contínua cuja escala é percentil, portanto, varia de 0 a 1. A distribuição da variável é assimétrica para a direita, na escala log a variável torna-se um pouco mais simétrica. Vou avaliar qual a melhor distribuição comparando modelos com toda estrutura fixa variando em sua distribuição de erros: normal, lognormal, Gamma (identity), Gamma (log), Gamma (inverse). Nesse momento eu estou considerando que succession é uma variável de efeito fixo, pois eu não estou interessado na variância, mas sim no efeito da variável. 
+
+```{r selecionando distribuicao de erros e link function, echo=TRUE}
+# para escolher a melhor distribuição eu vou usar todas as variáveis de efeito fixo e para tal foi ajustar o modelo "cheio" utilizando a função glm
+l_md_dist <- vector("list", length = 5) #lista com os modelos para selecionar a distribuição de KS
+names(l_md_dist) <- c("norm","lognorm","gamma_id","gamma_log","gamma_inv")
+l_md_dist[[1]] <- glm(KS ~ p + S.obs + log(J) + log(Jl) + succession, data = df_md) #norm
+l_md_dist[[2]] <- glm(KS ~ p + S.obs + log(J) + log(Jl) + succession, family = gaussian(link = "log"), data = df_md) #lognorm
+l_md_dist[[3]] <- glm(KS ~ p + S.obs + log(J) + log(Jl) + succession, family = Gamma(link = "identity"), data = df_md) #Gamma; identity
+l_md_dist[[4]] <- glm(KS ~ p + S.obs + log(J) + log(Jl) + succession, family = Gamma(link = "log"), data = df_md) #Gamma; log
+l_md_dist[[5]] <- glm(KS ~ p + S.obs + log(J) + log(Jl) + succession, family = Gamma(link = "inverse"), data = df_md) #Gamma; inverse
+AICtab(l_md_dist, weights = TRUE)
+```
+  
+  O único modelo dentro do intervalo de plausabilidade (REESCREVER: quais os termos corretos?) é o modelo 5, que utiliza a distribuição Gamma e a função de ligação 'inverse'. Por curiosidade, eu apliquei o mesmo protocolo adicionando 'kernel' como covariável interagindo com cobertura e depois segui retirando 'succession' e 'kernel'. O resultado desta seleção foi robusto às modificações que fiz em anexo.
+
+
+**3)"Graphical checking: are variances of data (transformed by the link function) homogeneous across categories? Are responses of transformed data linear with respect to continuous predictors? Are there outlier individuals or groups? Do distributions within groups match the assumed distribution?"**
+
+```{r avaliacao grafica, echo=FALSE}
+# are variances of data (transformed by the link function) homogeneous across categories? #
+# x11()
+l_p_KS.categ <- vector("list",4)
+l_p_KS.categ[[1]] <- ggplot(df_md, aes(x = fitofisio, y =I(1/KS)) ) + geom_boxplot() + geom_jitter(size=0.7)
+l_p_KS.categ[[2]] <- ggplot(df_md, aes(x = succession, y =I(1/KS)) ) + geom_boxplot() + geom_jitter(size=0.7)
+l_p_KS.categ[[3]] <- ggplot(df_md, aes(x = UC, y =I(1/KS)) ) + geom_boxplot() + geom_jitter(size=0.7)
+l_p_KS.categ[[4]] <- ggplot(df_md, aes(x = Sindrome, y =I(1/KS)) ) + geom_boxplot() + geom_jitter(size=0.7)
+do.call(grid.arrange,l_p_KS.categ)
+# df_md[,c("SiteCode","fitofisio")] %>% unique %>% .$fitofisio %>% table
+```
+
+Figura 1. I(1/KS) ~ variáveis categórias. 
+
+
+  A única variável que parece apresentar variância homogenea entre seus níveis é 'succession' (fig ). Unidade de conservação não é uma variável categória que está relacionada com o objetivo, assim ela será usada apenas se acharmos pertinente, provavelmente irei retira-la das próximas versões da análise. Fitofisionomia é um fator que apresenta algums níveis com poucas observações (<5), em alguns casos é possível agregar níveis(e.g. levantamentos entre fitofisionomias?), contudo outros não (e.g. Cerradao). Por conta disso não pretendo utilizar fitofisionomia na estrutura aleatória. Contudo, questiono se não pode existir interação entre fitofisionomia e S.obs. Cada fitofisionomia foi moldada por processos biogeograficas particulares (REFERÊNCIA), me parece razoável assumir que cada fitofisionomia deve compartilha um conjunto de mecanismos ecológicos que interagem de maneira similar. Diferentes comunidades que são similares em processos, devem ser similares em sua dinâmica ecológica e em seus padrões de diversidade (Roughgarden 2009). Assim, especulo se fitofisionomia não deve ter uma interação com S.obs. De qualquer maneira, nesse primeiro momento vou construir modelos sem fitofisionomia como covariável. Se for necessário utiliza-la ela entra como variável de efeito aleatório. (?)
+
+```{r removendo categoricas}
+df_md %<>% select(-c(fitofisio, UC))
+```
+
+**Are responses of transformed data linear with respect to continuous predictors?**
+
+```{r, fig.height=4.5, fig.width= 7, echo=FALSE}
+#plot(I(1/KS) ~ p, df_md)
+#abline(lm(I(1/KS) ~ p, df_md))
+p_inv.KS.p<-ggplot(df_md, aes(x = p, y =I(1/KS)) ) + geom_point() + geom_smooth(method = "lm", se = FALSE)
+p_inv.KS.p
+```
+
+Figura 2. I(1/KS) ~ cobertura.
+
+
+  Existe uma tendência positiva na escala de link function. Parece que existe uma onda cujo valor médio aumenta linearmente. Pela exploração gráfica acredito que esse efeito deve-se à riqueza (analise_explroratoria[DaniloPMori] - sessão ). O kernel vai ser considerado como variável de efeito aleatório.  
+
+
+**Are there outlier individuals or groups?** NÂO, considerando como variáveis categoricas apenas succession e kernel estamos com os dados bem comportados. 
+
+**Do distributions within groups match the assumed distribution?**
+
+```{r, fig.height=3, , echo=FALSE}
+p_KS.categ1 <- fitdist(1/df_md$KS[df_md$succession == "primary"], "gamma")
+p_KS.categ2 <- fitdist(1/df_md$KS[df_md$succession == "primary/secondary"], "gamma")
+p_KS.categ3 <- fitdist(1/df_md$KS[df_md$succession == "secondary"], "gamma")
+par(mfrow=c(1,3))
+denscomp(p_KS.categ1, main = "Primary", addlegend =  FALSE, xlab = "1/KS", ylab = "")
+denscomp(p_KS.categ2, main = "Primary/secondary", addlegend =  FALSE, xlab = "1/KS", ylab = "")
+denscomp(p_KS.categ3, main = "Secondary", addlegend =  FALSE, xlab = "1/KS", ylab = "")
+par(mfrow=c(1,1))
+```
+
+Figura 2. I(1/KS) ~ succesion. 
+
+  Gamma não parece ser um boa distribuição para os níveis de succession na escala invertida de KS. Parece existir uma tendência à bimodalidade, mas ela deve estar sendo influenciada pelas outras variáveis (ver gráfico anterior).
+  
+**Do distributions within groups match the assumed distribution?**
+
+```{r, echo=FALSE}
+levels_sindrome <- levels(df_md$Sindrome)
+par(mfrow=c(2,4))
+for(i in 1:8){
+  temp<-fitdist(1/df_md$KS[df_md$Sindrome == levels_sindrome[i]], "gamma")
+  denscomp(temp, main = levels_sindrome[i], addlegend =  FALSE, xlab = "1/KS", ylab = "")
+}
+par(mfrow=c(1,1))
+```
+
+Figura 3. I(1/KS) ~ kernel. 
+
+  Parece que a distribuição Gamma oferece um bom ajuste aos dados intra Sindrome (figura 3). <!-- NOTA: será que não era mais apropriada deixar kernel na mesma escala que J? -->
+
+**4)"Fit fixed-effect GLMs both to the full (pooled) data set and within each level of the random factors [28,50]. Estimated parameters should be approximately normally distributed across groups (group-level parameters can have large uncertainties, especially for groups with small sample sizes). Adjust model as necessary (e.g. change link function or add covariates)."**
+  
+  Vou considerar que succession não é efeito aleatório. Assim, a estrutura aleatória fica apenas com a variável kernel. Penso em colocar interação de kernel com cobertura por conta da minha interpretação da análise exploratória (COLOCAR O CONTEÚDO DO EMAIL AQUI).
+
+```{r glm full and within kernel level}
+l_md_glm <- vector("list", length=(1+8))
+# full glm -> full data
+l_md_glm[[1]] <- glm(KS ~ p + S.obs + log(J) + log(Jl) + succession, family = Gamma(link = "inverse"), data = df_md)
+# full glm -> each level of kernel
+for(i in 2:9){
+  l_md_glm[[i]] <- glm(KS ~ p + S.obs + log(J) + log(Jl) + succession, family = Gamma(link = "inverse"), data = subset(df_md, Sindrome == levels_sindrome[i-1]))
+}
+# pegando os coeficientes e armazenando em um df
+df_coef <- l_md_glm %>% ldply(.,function(X) X$coefficients)
+# plotando os coeficientes e comparando com a distribuição normal
+par(mfrow=c(2,4))
+for(i in 1:dim(df_coef)[2]){
+  temp<-fitdist(df_coef[,i], "norm")
+  denscomp(temp, main = names(df_coef)[i], addlegend =  FALSE, xlab = "", ylab = "")
+  abline(v=df_coef[i,i], col = "red")
+}
+par(mfrow=c(1,1))
+```
+
+Figura 4. Distribuição dos coeficiefentes do modelo glm(KS ~ p + S.obs + log(J) + log(Jl) + succession, family = Gamma(link = "inverse") ) considerando o conjunto de dados completo e divido por kernel de dispersão. A reta vermelha marca o valor do parâmetro estimado considerando o conjunto completo de dados.
+
+  Não parece que os valores de parâmetros estão distribuidos de maneira normal, em geral as distribuições parecem ser assimétricas.
+
+
+**5)"Fit the full GLMM."**
+
+  A única variável aleatória que irei utilizar é kernel. Pela análise exploratória, parece que existe uma possível interação entre kernel e cobertura e entre kernel e S.obs. Assim vou criar modelos que consideram essa interação.
+
+```{r}
+# Objetivo: encontrar a melhor estrutura aleatória: 1, 1|kernel, p|kernel, S.obs|kernel, S.obs||kernel
+# vou usar a estratégia de Zuur e primeiramente encontrar a melhor estrutura randômica usando o modelo cheio e depois vou selecionar a melhor estrutura fixa. Contudo me preocupo com a influência de S.obs na relação. Ao colocar kernel na estrutura randômica em interação com 
+l_md_va <- vector("list", 4)
+# 1 | kernel - modela-se a variância do intercepto associado com a variável 'kernel' na relação das preditoraas com KS. Uma mesma inclinação, interceptos diferentes
+l_md_va[[1]] <- glmer(KS ~ p + S.obs + log(J) + log(Jl) + succession + (1|kernel), family = Gamma(link = "inverse"), data = df_md) # aviso 1
+# p | kernel - modela-se a variância tanto do intercepto quanto da inclinação associado com a variável 'kernel'. Aqui cada kernel pode ter inclinação e intercepto em 'p'
+l_md_va[[2]] <- glmer(KS ~ p + S.obs + log(J) + log(Jl) + succession + (p|kernel), family = Gamma(link = "inverse"), data = df_md) # aviso 1
+# S.obs | kernel - Preciso ver se essa construção faz sentido. Mas pela análise exploratória S.obs e kernel tem algum tipo de interação, vou testar algumas
+# Aqui kernel pode ter intercepto e inclinação em S.obs
+l_md_va[[3]] <- glmer(KS ~ p + S.obs + log(J) + log(Jl) + succession + (S.obs|kernel), family = Gamma(link = "inverse"), data = df_md) # aviso 1
+# S.obs || kernel - Preciso ver se essa construção faz sentido. Mas pela análise exploratória S.obs e kernel tem algum tipo de interação, vou testar algumas
+# Aqui o intercepto e inclinação não são estimados juntos ocasionando na independência das estimativas (é isso mesmo?)
+l_md_va[[4]] <- glmer(KS ~ p + S.obs + log(J) + log(Jl) + succession + (S.obs||kernel), family = Gamma(link = "inverse"), data = df_md) # aviso 1
+# colocando interação com os preditores contínuos  
+
+AICtab(l_md_va, weights=TRUE)
+
+
+#aviso:
+#1) - Warning messages:
+# 1: In checkConv(attr(opt, "derivs"), opt$par, ctrl = control$checkConv,  :
+#   Model failed to converge with max|grad| = 0.00250204 (tol = 0.001, component 1)
+# 2: In checkConv(attr(opt, "derivs"), opt$par, ctrl = control$checkConv,  :
+#   Model is nearly unidentifiable: very large eigenvalue
+#  - Rescale variables?;Model is nearly unidentifiable: large eigenvalue ratio
+#  - Rescale variables?
+```
+  
+  O modelo mais plausível, considerando um intervalo de plausabilidade de 2, foi o modelo 2. Avisos de problema com a escala de variáveis e de convergência foram emitidos durante o ajuste de todos os modelos.
+
+```{r}
+df_md %>% mutate(log.J = log(J), log.Jl = log(Jl)) %>% select(p,S.obs,log.J,log.Jl) %>% summary 
+```
+  
+  Na estrutura fixa, S.obs distoa em escala. Vou escalonar a variável utilizando a função 'scale' e refazer a bateria de modelos.
+  
+```{r}
+df_md %<>% mutate(S.scale = scale(S.obs, center = FALSE))
+
+l_md_va <- vector("list", 4)
+# 1 | kernel - modela-se a variância do intercepto associado com a variável 'kernel' na relação das preditoraas com KS. Uma mesma inclinação, interceptos diferentes
+l_md_va[[1]] <- glmer(KS ~ p + S.scale + log(J) + log(Jl) + succession + (1|kernel), family = Gamma(link = "inverse"), data = df_md) # aviso 1
+# p | kernel - modela-se a variância tanto do intercepto quanto da inclinação associado com a variável 'kernel'. Aqui cada kernel pode ter inclinação e intercepto em 'p'
+l_md_va[[2]] <- glmer(KS ~ p + S.scale + log(J) + log(Jl) + succession + (p|kernel), family = Gamma(link = "inverse"), data = df_md) # aviso 1
+# S.scale | kernel - Preciso ver se essa construção faz sentido. Mas pela análise exploratória S.scale e kernel tem algum tipo de interação, vou testar algumas
+# Aqui kernel pode ter intercepto e inclinação em S.scale
+l_md_va[[3]] <- glmer(KS ~ p + S.scale + log(J) + log(Jl) + succession + (S.scale|kernel), family = Gamma(link = "inverse"), data = df_md)
+# S.scale || kernel - Preciso ver se essa construção faz sentido. Mas pela análise exploratória S.scale e kernel tem algum tipo de interação, vou testar algumas
+# Aqui o intercepto e inclinação não são estimados juntos ocasionando na independência das estimativas (é isso mesmo?)
+l_md_va[[4]] <- glmer(KS ~ p + S.scale + log(J) + log(Jl) + succession + (S.scale||kernel), family = Gamma(link = "inverse"), data = df_md) # aviso 1
+
+AICctab(l_md_va, weights=TRUE)
+
+summary(l_md_va[[2]])
+# Warnings #
+#
+#1) - Warning message:
+# In checkConv(attr(opt, "derivs"), opt$par, ctrl = control$checkConv,  :
+#   Model failed to converge with max|grad| = 0.00587232 (tol = 0.001, component 1)
+```
+
+  Agora o único aviso que recebo é o de falha na convergência. Isso quer dizer que a estimativa parou antes de encontrar o ponto ótimo? Acredito que seja algo nessa linha. Vou seguir o protocolo desse post: [https://rstudio-pubs-static.s3.amazonaws.com/33653_57fc7b8e5d484c909b615d8633c01d51.html]. Contudo, ele não ensina muito o que está por trás do protocolo, apenas como se livrar dos avisos. O resultado se mantêm.
+
+```{r}
+l_md_va[[1]] <- update(l_md_va[[1]],control=glmerControl(optimizer="bobyqa", optCtrl=list(maxfun=2e5)) )
+l_md_va[[2]] <- update(l_md_va[[2]],control=glmerControl(optimizer="bobyqa", optCtrl=list(maxfun=2e5)) )
+l_md_va[[3]] <- update(l_md_va[[3]],control=glmerControl(optimizer="bobyqa", optCtrl=list(maxfun=2e5)) )
+l_md_va[[4]] <- update(l_md_va[[4]],control=glmerControl(optimizer="bobyqa", optCtrl=list(maxfun=2e5)) )
+
+AICctab(l_md_va, weights=TRUE)
+
+summary(l_md_va[[2]])
+# Warnings #
+#
+#1) - Warning message:
+# In checkConv(attr(opt, "derivs"), opt$par, ctrl = control$checkConv,  :
+#   Model failed to converge with max|grad| = 0.00587232 (tol = 0.001, component 1)
+```
+
+  Com a modificação do otimizador
+
+ 
+**6)"Recheck assumptions for the final model (as in step 3) and check that parameter estimates and confidence intervals are reasonable (gigantic confidence intervals could indicate fitting problems). The magnitude of the standardized residuals should be independent of the fitted values. Assess overdispersion (the sum of the squared Pearson residuals should be x2 distributed [66,67]). If necessary, change distributions or estimate a scale parameter. Check that a full model that includes dropped random effects with small standard deviations gives similar results to the final model. If different models lead to substantially different parameter esti- mates, consider model averaging."**
+- KS
+
+
+
+Anexo
+a) gráficos das possíveis distribuições subjacentes
+- KS
+b) GLM
+# full glm com kernel #
+```{r include=FALSE}
+# para escolher a melhor distribuição eu vou usar todas as variáveis de efeito fixo e para tal foi ajustar o modelo "cheio" utilizando a função glm
+md_1 <- glm(KS ~ p*kernel + S.obs + log(J) + log(Jl) + succession, data = df_md) #norm
+md_2 <- glm(KS ~ p*kernel + S.obs + log(J) + log(Jl) + succession, family = gaussian(link = "log"), data = df_md) #lognorm
+md_3 <- glm(KS ~ p*kernel + S.obs + log(J) + log(Jl) + succession, family = Gamma(link = "identity"), data = df_md) #Gamma; identity
+md_4 <- glm(KS ~ p*kernel + S.obs + log(J) + log(Jl) + succession, family = Gamma(link = "log"), data = df_md) #Gamma; log
+md_5 <- glm(KS ~ p*kernel + S.obs + log(J) + log(Jl) + succession, family = Gamma(link = "inverse"), data = df_md) #Gamma; inverse
+AICctab(md_1,md_2,md_3,md_4,md_5, weights = TRUE)
+# summary(md_5)
+```
+
+# full glm sem succession #
+```{r include=FALSE}
+# para escolher a melhor distribuição eu vou usar todas as variáveis de efeito fixo e para tal foi ajustar o modelo "cheio" utilizando a função glm
+md_1 <- glm(KS ~ p*kernel + S.obs + log(J) + log(Jl), data = df_md) #norm
+md_2 <- glm(KS ~ p*kernel + S.obs + log(J) + log(Jl), family = gaussian(link = "log"), data = df_md) #lognorm
+md_3 <- glm(KS ~ p*kernel + S.obs + log(J) + log(Jl), family = Gamma(link = "identity"), data = df_md) #Gamma; identity
+md_4 <- glm(KS ~ p*kernel + S.obs + log(J) + log(Jl), family = Gamma(link = "log"), data = df_md) #Gamma; log
+md_5 <- glm(KS ~ p*kernel + S.obs + log(J) + log(Jl), family = Gamma(link = "inverse"), data = df_md) #Gamma; inverse
+AICctab(md_1,md_2,md_3,md_4,md_5, weights = TRUE)
+# summary(md_5)
+```
+
+# full glm sem succession e kernel #
+```{r include=FALSE}
+# para escolher a melhor distribuição eu vou usar todas as variáveis de efeito fixo e para tal foi ajustar o modelo "cheio" utilizando a função glm
+md_1 <- glm(KS ~ p + S.obs + log(J) + log(Jl), data = df_md) #norm
+md_2 <- glm(KS ~ p + S.obs + log(J) + log(Jl), family = gaussian(link = "log"), data = df_md) #lognorm
+md_3 <- glm(KS ~ p + S.obs + log(J) + log(Jl), family = Gamma(link = "identity"), data = df_md) #Gamma; identity
+md_4 <- glm(KS ~ p + S.obs + log(J) + log(Jl), family = Gamma(link = "log"), data = df_md) #Gamma; log
+md_5 <- glm(KS ~ p + S.obs + log(J) + log(Jl), family = Gamma(link = "inverse"), data = df_md) #Gamma; inverse
+AICctab(md_1,md_2,md_3,md_4,md_5, weights = TRUE)
+# summary(md_5)
+```
+
+
+####################
+
+```{r}
+df_md %<>% mutate(S.scale = scale(S.obs, center = FALSE))
+
+l_md_va <- vector("list", 24)
+# 1 | kernel - modela-se a variância do intercepto associado com a variável 'kernel' na relação das preditoraas com KS. Uma mesma inclinação, interceptos diferentes
+l_md_va[[1]] <- glmer(KS ~ p + S.scale + log(J) + log(Jl) + succession + (1|kernel), family = Gamma(link = "inverse"), data = df_md) # aviso 1
+l_md_va[[2]] <- glmer(KS ~ p + S.scale + log(J) + log(Jl) + (1|kernel), family = Gamma(link = "inverse"), data = df_md)
+l_md_va[[3]] <- glmer(KS ~ p + S.scale + log(J) + (1|kernel), family = Gamma(link = "inverse"), data = df_md)
+l_md_va[[4]] <- glmer(KS ~ p + S.scale + (1|kernel), family = Gamma(link = "inverse"), data = df_md)
+l_md_va[[5]] <- glmer(KS ~ p + (1|kernel), family = Gamma(link = "inverse"), data = df_md)
+l_md_va[[6]] <- glmer(KS ~ 1 + (1|kernel), family = Gamma(link = "inverse"), data = df_md)
+# p | kernel - modela-se a variância tanto do intercepto quanto da inclinação associado com a variável 'kernel'. Aqui cada kernel pode ter inclinação e intercepto em 'p'
+l_md_va[[7]] <- glmer(KS ~ p + S.scale + log(J) + log(Jl) + succession + (p|kernel), family = Gamma(link = "inverse"), data = df_md) # aviso 1
+l_md_va[[8]] <- glmer(KS ~ p + S.scale + log(J) + log(Jl) + (p|kernel), family = Gamma(link = "inverse"), data = df_md)
+l_md_va[[9]] <- glmer(KS ~ p + S.scale + log(J) + (p|kernel), family = Gamma(link = "inverse"), data = df_md)
+l_md_va[[10]] <- glmer(KS ~ p + S.scale + (p|kernel), family = Gamma(link = "inverse"), data = df_md)
+l_md_va[[11]] <- glmer(KS ~ p + (p|kernel), family = Gamma(link = "inverse"), data = df_md)
+l_md_va[[12]] <- glmer(KS ~ 1 + (p|kernel), family = Gamma(link = "inverse"), data = df_md)
+# S.scale | kernel - Preciso ver se essa construção faz sentido. Mas pela análise exploratória S.scale e kernel tem algum tipo de interação, vou testar algumas
+# Aqui kernel pode ter intercepto e inclinação em S.scale
+l_md_va[[13]] <- glmer(KS ~ p + S.scale + log(J) + log(Jl) + succession + (S.scale|kernel), family = Gamma(link = "inverse"), data = df_md)
+l_md_va[[14]] <- glmer(KS ~ p + S.scale + log(J) + log(Jl) + (S.scale|kernel), family = Gamma(link = "inverse"), data = df_md)
+l_md_va[[15]] <- glmer(KS ~ p + S.scale + log(J) + (S.scale|kernel), family = Gamma(link = "inverse"), data = df_md)
+l_md_va[[16]] <- glmer(KS ~ p + S.scale + (S.scale|kernel), family = Gamma(link = "inverse"), data = df_md)
+l_md_va[[17]] <- glmer(KS ~ p + (S.scale|kernel), family = Gamma(link = "inverse"), data = df_md)
+l_md_va[[18]] <- glmer(KS ~ 1 + (S.scale|kernel), family = Gamma(link = "inverse"), data = df_md)
+# S.scale || kernel - Preciso ver se essa construção faz sentido. Mas pela análise exploratória S.scale e kernel tem algum tipo de interação, vou testar algumas
+# Aqui o intercepto e inclinação não são estimados juntos ocasionando na independência das estimativas (é isso mesmo?)
+l_md_va[[19]] <- glmer(KS ~ p + S.scale + log(J) + log(Jl) + succession + (S.scale||kernel), family = Gamma(link = "inverse"), data = df_md) # aviso 1
+l_md_va[[20]] <- glmer(KS ~ p + S.scale + log(J) + log(Jl) + (S.scale||kernel), family = Gamma(link = "inverse"), data = df_md) # aviso 1
+l_md_va[[21]] <- glmer(KS ~ p + S.scale + log(J) + (S.scale||kernel), family = Gamma(link = "inverse"), data = df_md) 
+l_md_va[[22]] <- glmer(KS ~ p + S.scale + (S.scale||kernel), family = Gamma(link = "inverse"), data = df_md) 
+l_md_va[[23]] <- glmer(KS ~ p + (S.scale||kernel), family = Gamma(link = "inverse"), data = df_md) 
+l_md_va[[24]] <- glmer(KS ~ 1 + (S.scale||kernel), family = Gamma(link = "inverse"), data = df_md) 
+
+AICctab(l_md_va, weights=TRUE)
+
+# Warnings #
+#
+#1) - Warning message:
+# In checkConv(attr(opt, "derivs"), opt$par, ctrl = control$checkConv,  :
+#   Model failed to converge with max|grad| = 0.00587232 (tol = 0.001, component 1)
+```
+
+
+#####################################################################################################################################
+################################################ Reunião Renato Lima 24/jan #########################################################
+#####################################################################################################################################
+
+## Criação, ajuste e seleção de Modelos ## 
+
+  Em reunião com o Renato, concluimos que o melhor modelo dado nosso objetivo é:
+  
+VR ~ p + S * log(J) + (p|kernel) + (1|fitofisio).
+
+Onde VR = variáveis resposta (KS, KS.p, GOF), p = cobertura vegtal (% habitat), S = riqueza observada, log(J) = log do número de indivíduos, kernel = distância média entre a plântula e a planta progenitora, fitofisio = fitofisionomia. 
+  
+  
+  
+  
+  Nosso interesse está na relação VR ~ p, as demais variáveis são de controle. Existem dois motivos para a inclução
+  Riqueza observada, S, e tamanho da comunidade, J, são parâmetros da simulação. Espera-se que indiretamente elas estejam influênciando o resultado da simulação e como elas não estão igualmente distribuidas ao longo do gradiente de fragmentação, contro
+  `S` determina a taxa de imigração U em que a simulação foi rodada e também o número de classes do teste de Kolmogorov-Smirnov. Da análise exploratória, observa-se que S apresenta correlação positiva com p e negativa com KS (OLHAR OS GRÁFICOS DAS OUTRAS VARIÁVEIS). O tamanho populacional (J) é um parâmetro da simulação e está relacionado com o teste KS. <!--(o teste de KS é sensível ao tamanho dos vetores de abundância (riqueza) e ao tamanho total dos vetores, não? De qualquer maneira, os vetores que são comparados no teste de KS têm mais ou menos o mesmo número de spp e o exato número de indivíduos).--> Ao utilizarmos um modelo espacialmente explicíto de uma dinâmica ecológica baseada em indivíduo é necessário oferecermos o kernel de dispersão, que na simulação coalescente é o mesmo para todos os indivíduos. Optamos por escolher 7 valores médios de kernel considerando um tipo de sindrome de dispersão (retirados do trabalho REFERÊNCIA), mais a média desses valores, totalizando 8 kernels diferentes. Esperamos que o efeito do kernel na relação entre KS e p varia ao longo de p, nos extremos do gradiente de 'p' acreditamos que a variação do kernel tenha pouco efeito na dinâmica: quando p é muito pequeno a variação do kernel é indiferente, assim como....[REESCREVER E CONTINUAR]
+
+## Bateria de modelos: VR ~ p + S.obs + log(J) + (p|kernel) + (1|fitofisio) ##
+
+
+### KS ###
+
+```{r}
+# df_md %<>% mutate(S.scale = scale(S.obs, center = FALSE))
+
+## KS ##
+l_md_KS_p <- vector("list", length=4)
+l_md_KS_p[[1]] <- glmer(KS ~ p + S.scale + log(J) + (p|kernel) + (1|fitofisio), 
+                        family = Gamma(link = "inverse"), control=glmerControl(optimizer="bobyqa", optCtrl=list(maxfun=2e5)),data = df_md)
+l_md_KS_p[[2]] <- glmer(KS ~ p + S.scale + (p|kernel) + (1|fitofisio), 
+                        family = Gamma(link = "inverse"), control=glmerControl(optimizer="bobyqa", optCtrl=list(maxfun=2e5)),data = df_md)
+l_md_KS_p[[3]] <- glmer(KS ~ p + (p|kernel) + (1|fitofisio), 
+                        family = Gamma(link = "inverse"), control=glmerControl(optimizer="bobyqa", optCtrl=list(maxfun=2e5)),data = df_md)
+l_md_KS_p[[4]] <- glmer(KS ~ 1 + (p|kernel) + (1|fitofisio), 
+                        family = Gamma(link = "inverse"), control=glmerControl(optimizer="bobyqa", optCtrl=list(maxfun=2e5)),data = df_md)
+AICtab(l_md_KS.p, weights=T)
+```
+
+
+## KS.p ## 
+
+```{r preparacao dos dados}
+df_md <- inner_join(df_resultados[,c(1,18,5,17,22,20,29,30,2)],df_ref[,c(1,7,12)], by = "SiteCode")
+df_md$fitofisio %<>% factor
+df_md$succession %<>% factor
+```
+
+**1)"Specify fixed and random effects; only important interactions"**
+
+**2)"Choose an error distribution and link function"**
+
+```{r selecionando distribuicao de erros e link function, echo=TRUE}
+# para escolher a melhor distribuição eu vou usar todas as variáveis de efeito fixo e para tal foi ajustar o modelo "cheio" utilizando a função glm
+l_md_dist <- vector("list", length = 5) #lista com os modelos para selecionar a distribuição de KS
+names(l_md_dist) <- c("norm","lognorm","gamma_id","gamma_log","gamma_inv")
+l_md_dist[[1]] <- glm(KS ~ p + S.obs + log(J) + log(Jl) + succession, data = df_md) #norm
+l_md_dist[[2]] <- glm(KS ~ p + S.obs + log(J) + log(Jl) + succession, family = gaussian(link = "log"), data = df_md) #lognorm
+l_md_dist[[3]] <- glm(KS ~ p + S.obs + log(J) + log(Jl) + succession, family = Gamma(link = "identity"), data = df_md) #Gamma; identity
+l_md_dist[[4]] <- glm(KS ~ p + S.obs + log(J) + log(Jl) + succession, family = Gamma(link = "log"), data = df_md) #Gamma; log
+l_md_dist[[5]] <- glm(KS ~ p + S.obs + log(J) + log(Jl) + succession, family = Gamma(link = "inverse"), data = df_md) #Gamma; inverse
+AICtab(l_md_dist, weights = TRUE)
+```
+  
+  O único modelo dentro do intervalo de plausabilidade (REESCREVER: quais os termos corretos?) é o modelo 5, que utiliza a distribuição Gamma e a função de ligação 'inverse'. Por curiosidade, eu apliquei o mesmo protocolo adicionando 'kernel' como covariável interagindo com cobertura e depois segui retirando 'succession' e 'kernel'. O resultado desta seleção foi robusto às modificações que fiz em anexo.
+
+
+**3)"Graphical checking: are variances of data (transformed by the link function) homogeneous across categories? Are responses of transformed data linear with respect to continuous predictors? Are there outlier individuals or groups? Do distributions within groups match the assumed distribution?"**
+
+```{r avaliacao grafica, echo=FALSE}
+# are variances of data (transformed by the link function) homogeneous across categories? #
+# x11()
+l_p_KS.categ <- vector("list",4)
+l_p_KS.categ[[1]] <- ggplot(df_md, aes(x = fitofisio, y =I(1/KS)) ) + geom_boxplot() + geom_jitter(size=0.7)
+l_p_KS.categ[[2]] <- ggplot(df_md, aes(x = succession, y =I(1/KS)) ) + geom_boxplot() + geom_jitter(size=0.7)
+l_p_KS.categ[[3]] <- ggplot(df_md, aes(x = UC, y =I(1/KS)) ) + geom_boxplot() + geom_jitter(size=0.7)
+l_p_KS.categ[[4]] <- ggplot(df_md, aes(x = Sindrome, y =I(1/KS)) ) + geom_boxplot() + geom_jitter(size=0.7)
+do.call(grid.arrange,l_p_KS.categ)
+# df_md[,c("SiteCode","fitofisio")] %>% unique %>% .$fitofisio %>% table
+```
+
+Figura 1. I(1/KS) ~ variáveis categórias. 
+
+
+  A única variável que parece apresentar variância homogenea entre seus níveis é 'succession' (fig ). Unidade de conservação não é uma variável categória que está relacionada com o objetivo, assim ela será usada apenas se acharmos pertinente, provavelmente irei retira-la das próximas versões da análise. Fitofisionomia é um fator que apresenta algums níveis com poucas observações (<5), em alguns casos é possível agregar níveis(e.g. levantamentos entre fitofisionomias?), contudo outros não (e.g. Cerradao). Por conta disso não pretendo utilizar fitofisionomia na estrutura aleatória. Contudo, questiono se não pode existir interação entre fitofisionomia e S.obs. Cada fitofisionomia foi moldada por processos biogeograficas particulares (REFERÊNCIA), me parece razoável assumir que cada fitofisionomia deve compartilha um conjunto de mecanismos ecológicos que interagem de maneira similar. Diferentes comunidades que são similares em processos, devem ser similares em sua dinâmica ecológica e em seus padrões de diversidade (Roughgarden 2009). Assim, especulo se fitofisionomia não deve ter uma interação com S.obs. De qualquer maneira, nesse primeiro momento vou construir modelos sem fitofisionomia como covariável. Se for necessário utiliza-la ela entra como variável de efeito aleatório. (?)
+
+```{r removendo categoricas}
+df_md %<>% select(-c(fitofisio, UC))
+```
+
+**Are responses of transformed data linear with respect to continuous predictors?**
+
+```{r, fig.height=4.5, fig.width= 7, echo=FALSE}
+#plot(I(1/KS) ~ p, df_md)
+#abline(lm(I(1/KS) ~ p, df_md))
+p_inv.KS.p<-ggplot(df_md, aes(x = p, y =I(1/KS)) ) + geom_point() + geom_smooth(method = "lm", se = FALSE)
+p_inv.KS.p
+```
+
+Figura 2. I(1/KS) ~ cobertura.
+
+
+  Existe uma tendência positiva na escala de link function. Parece que existe uma onda cujo valor médio aumenta linearmente. Pela exploração gráfica acredito que esse efeito deve-se à riqueza (analise_explroratoria[DaniloPMori] - sessão ). O kernel vai ser considerado como variável de efeito aleatório.  
+
+
+**Are there outlier individuals or groups?** NÂO, considerando como variáveis categoricas apenas succession e kernel estamos com os dados bem comportados. 
+
+**Do distributions within groups match the assumed distribution?**
+
+```{r, fig.height=3, , echo=FALSE}
+p_KS.categ1 <- fitdist(1/df_md$KS[df_md$succession == "primary"], "gamma")
+p_KS.categ2 <- fitdist(1/df_md$KS[df_md$succession == "primary/secondary"], "gamma")
+p_KS.categ3 <- fitdist(1/df_md$KS[df_md$succession == "secondary"], "gamma")
+par(mfrow=c(1,3))
+denscomp(p_KS.categ1, main = "Primary", addlegend =  FALSE, xlab = "1/KS", ylab = "")
+denscomp(p_KS.categ2, main = "Primary/secondary", addlegend =  FALSE, xlab = "1/KS", ylab = "")
+denscomp(p_KS.categ3, main = "Secondary", addlegend =  FALSE, xlab = "1/KS", ylab = "")
+par(mfrow=c(1,1))
+```
+
+Figura 2. I(1/KS) ~ succesion. 
+
+  Gamma não parece ser um boa distribuição para os níveis de succession na escala invertida de KS. Parece existir uma tendência à bimodalidade, mas ela deve estar sendo influenciada pelas outras variáveis (ver gráfico anterior).
+  
+**Do distributions within groups match the assumed distribution?**
+
+```{r, echo=FALSE}
+levels_sindrome <- levels(df_md$Sindrome)
+par(mfrow=c(2,4))
+for(i in 1:8){
+  temp<-fitdist(1/df_md$KS[df_md$Sindrome == levels_sindrome[i]], "gamma")
+  denscomp(temp, main = levels_sindrome[i], addlegend =  FALSE, xlab = "1/KS", ylab = "")
+}
+par(mfrow=c(1,1))
+```
+
+Figura 3. I(1/KS) ~ kernel. 
+
+  Parece que a distribuição Gamma oferece um bom ajuste aos dados intra Sindrome (figura 3). <!-- NOTA: será que não era mais apropriada deixar kernel na mesma escala que J? -->
+
+**4)"Fit fixed-effect GLMs both to the full (pooled) data set and within each level of the random factors [28,50]. Estimated parameters should be approximately normally distributed across groups (group-level parameters can have large uncertainties, especially for groups with small sample sizes). Adjust model as necessary (e.g. change link function or add covariates)."**
+  
+  Vou considerar que succession não é efeito aleatório. Assim, a estrutura aleatória fica apenas com a variável kernel. Penso em colocar interação de kernel com cobertura por conta da minha interpretação da análise exploratória (COLOCAR O CONTEÚDO DO EMAIL AQUI).
+
+```{r glm full and within kernel level}
+l_md_glm <- vector("list", length=(1+8))
+# full glm -> full data
+l_md_glm[[1]] <- glm(KS ~ p + S.obs + log(J) + log(Jl) + succession, family = Gamma(link = "inverse"), data = df_md)
+# full glm -> each level of kernel
+for(i in 2:9){
+  l_md_glm[[i]] <- glm(KS ~ p + S.obs + log(J) + log(Jl) + succession, family = Gamma(link = "inverse"), data = subset(df_md, Sindrome == levels_sindrome[i-1]))
+}
+# pegando os coeficientes e armazenando em um df
+df_coef <- l_md_glm %>% ldply(.,function(X) X$coefficients)
+# plotando os coeficientes e comparando com a distribuição normal
+par(mfrow=c(2,4))
+for(i in 1:dim(df_coef)[2]){
+  temp<-fitdist(df_coef[,i], "norm")
+  denscomp(temp, main = names(df_coef)[i], addlegend =  FALSE, xlab = "", ylab = "")
+  abline(v=df_coef[i,i], col = "red")
+}
+par(mfrow=c(1,1))
+```
+
+Figura 4. Distribuição dos coeficiefentes do modelo glm(KS ~ p + S.obs + log(J) + log(Jl) + succession, family = Gamma(link = "inverse") ) considerando o conjunto de dados completo e divido por kernel de dispersão. A reta vermelha marca o valor do parâmetro estimado considerando o conjunto completo de dados.
+
+  Não parece que os valores de parâmetros estão distribuidos de maneira normal, em geral as distribuições parecem ser assimétricas.
+
+
+**5)"Fit the full GLMM."**
+
+  Aqui vamos utilziar 
+
+
+  A única variável aleatória que irei utilizar é kernel. Pela análise exploratória, parece que existe uma possível interação entre kernel e cobertura e entre kernel e S.obs. Assim vou criar modelos que consideram essa interação.
+
+```{r}
+# Objetivo: encontrar a melhor estrutura aleatória: 1, 1|kernel, p|kernel, S.obs|kernel, S.obs||kernel
+# vou usar a estratégia de Zuur e primeiramente encontrar a melhor estrutura randômica usando o modelo cheio e depois vou selecionar a melhor estrutura fixa. Contudo me preocupo com a influência de S.obs na relação. Ao colocar kernel na estrutura randômica em interação com 
+l_md_va <- vector("list", 4)
+# 1 | kernel - modela-se a variância do intercepto associado com a variável 'kernel' na relação das preditoraas com KS. Uma mesma inclinação, interceptos diferentes
+l_md_va[[1]] <- glmer(KS ~ p + S.obs + log(J) + log(Jl) + succession + (1|kernel), family = Gamma(link = "inverse"), data = df_md) # aviso 1
+# p | kernel - modela-se a variância tanto do intercepto quanto da inclinação associado com a variável 'kernel'. Aqui cada kernel pode ter inclinação e intercepto em 'p'
+l_md_va[[2]] <- glmer(KS ~ p + S.obs + log(J) + log(Jl) + succession + (p|kernel), family = Gamma(link = "inverse"), data = df_md) # aviso 1
+# S.obs | kernel - Preciso ver se essa construção faz sentido. Mas pela análise exploratória S.obs e kernel tem algum tipo de interação, vou testar algumas
+# Aqui kernel pode ter intercepto e inclinação em S.obs
+l_md_va[[3]] <- glmer(KS ~ p + S.obs + log(J) + log(Jl) + succession + (S.obs|kernel), family = Gamma(link = "inverse"), data = df_md) # aviso 1
+# S.obs || kernel - Preciso ver se essa construção faz sentido. Mas pela análise exploratória S.obs e kernel tem algum tipo de interação, vou testar algumas
+# Aqui o intercepto e inclinação não são estimados juntos ocasionando na independência das estimativas (é isso mesmo?)
+l_md_va[[4]] <- glmer(KS ~ p + S.obs + log(J) + log(Jl) + succession + (S.obs||kernel), family = Gamma(link = "inverse"), data = df_md) # aviso 1
+# colocando interação com os preditores contínuos  
+
+AICtab(l_md_va, weights=TRUE)
+
+
+#aviso:
+#1) - Warning messages:
+# 1: In checkConv(attr(opt, "derivs"), opt$par, ctrl = control$checkConv,  :
+#   Model failed to converge with max|grad| = 0.00250204 (tol = 0.001, component 1)
+# 2: In checkConv(attr(opt, "derivs"), opt$par, ctrl = control$checkConv,  :
+#   Model is nearly unidentifiable: very large eigenvalue
+#  - Rescale variables?;Model is nearly unidentifiable: large eigenvalue ratio
+#  - Rescale variables?
+```
+
+

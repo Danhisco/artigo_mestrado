@@ -1,0 +1,206 @@
+---
+title: "Resultados parciais 30jun2016"
+author: "Danilo Pereira Mori"
+date: "June 29, 2016"
+output: html_document
+---
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(fig.width=20, 
+                      fig.height=10, 
+                      echo=FALSE, 
+                      message=FALSE, 
+                      warning=FALSE,
+                      cache=TRUE)
+```
+
+
+```{r}
+require(magrittr)
+require(ggplot2)
+require(gridExtra)
+require(dplyr)
+require(xtable)
+
+load("~/Documents/dados/mestrado/simulacao/resultados/resultados_sim6jun.Rdata") #config=30
+load("~/Documents/dados/mestrado/simulacao/resultados/df_dados_geral.Rdata") #config=1
+
+refID_reference <- df_resultados$refID %>% levels %>% as.numeric #definindo os refIDs em comum com a ultima bateria de simulacoes
+df_dados_geral %<>% filter(config == 1, refID %in% refID_reference) %>% select(refID,range,U_est,riqueza,KS,p_value,tree_cover) #filtrando a bateria de sim sem replicas
+df_dados_geral$refID %<>% factor #retirando os levels desnecessários
+```
+lista de coisas que precisa fazer: i) aprender a centralizar os títulos, ii) arrumar as dimensões das imagens, ii-b) arrumar o tamanho do texto das imagens, iii)colocar as imagens dos raster, iv) ESCREVER!!!!
+
+  Esse documento tem como objetivo reportar para Renato Lima e Renato Coutinho os principais pontos da minha última reunião com o Paulo Inácio. Eu peço desculpas na demora de criar esse documento, mas tive que desconsiderar algumas simulações pois elas foram geradas a partir de valores errados de parâmetros: a planilha de referência do treeco (que, entre outras coisas, resume as SADs observadas) e as SADs observadas diferiam em valores de riqueza. Então, resolvi auditar os dados dos levantamentos que eu estava usando nas simulações (apenas 16) com os dados do treeco e também os scripts em que eu lia e analisava o *output* das simulações.
+
+#### Prólogo
+
+  Afim de produzir alguns resultados parciais amostrei alguns levantamentos fitossociológicos (tabela 1) para fazer todo o processo: extração do recorte de paisagem, a simulação e comparação do simulado com o observado. Ao longo desse processo encontrei alguns problemas que inclui na sessão "próximos passos" todas relacionadas com a extração da paisagem e tratamento das imagens. 
+  
+
+#### Dados
+  As duas fontes de dados que uso aqui são o TreeCo e o banco de imagens de Hansen *et al* 2013. Do primeiro eu obtenho
+
+
+##### TreeCo
+i)critério de seleção das paisagens, ii) tabela com a amostra das paisagens usadas nesse relatório (refID, reference, N, S, DA, lat, long, unidade de conservacao)
+  
+  O [TreeCo](http://labtrop.ib.usp.br/doku.php?id=projetos:treeco:start) conta hoje com mais de 4 mil levantamentos fitossociológicos. Foram selecionados apenas aqueles levanetamentos que: i) estão localizados nos estados do sul e sudeste; ii) que temos informações de pelo menos o fragmento florestal onde o levantamento fitossociológico ocorreu. Esses dois filtros selecionaram 358 levantamentos. A maioria desses trabalhos ocorre em algum tipo de unidade de conservação (~139), contudo há trabalhos que ocorreram em propriedades privadas (~94). Nesse momento não pretendo desconsiderar os trabalhos realizados fora de unidades de conservação. Na tabela 1 há o número de levantamentos por tipo de local onde eles ocorreram.
+
+```{r, results='asis'}
+df_levantamentos_refID <- data.frame(UC = c("UC protecao integral","sem informacao","propriedade privada","UC uso sustentavel","univ. e centros de pesquisa","APPs","outras terras publicas","terras indigenas"), levantamentos = c(106,97,94,31,24,2,2,2))
+df_print <- xtable(df_levantamentos_refID, digits = 0)
+print(df_print, type="html", include.rownames = FALSE)
+```
+
+```{r, results='asis'}
+treeco <- read.table(file = "~/treeco_paisagens_selecionadas.txt", sep = "\t", dec = ".", header = TRUE)
+treeco %<>% select(refID, Reference, N, S, DA, lat, long, Unidade_de_conservacao) %>% filter(refID %in% refID_reference)
+treeco[,2] <- levels(treeco[,2])[as.numeric(treeco[,2])]
+references_treeco <- treeco[,2]
+treeco[,2][1] <- "Paula & Soares 2010"
+treeco[,2][2] <- "Lopes et al. 2011"
+treeco[,2][3] <- "Gusson et al. 2009"
+treeco[,2][4] <- "Santos et al. 2013"
+treeco[,2][5] <- "Tomé et al. 1999"
+treeco[,2][6] <- "Jurinitz & Jarenkow. 2003"
+treeco[,2][7] <- "Franco 2008"
+treeco[,2][8] <- "Sevegnani 2003"
+treeco[,2][9] <- "Canha 2000"
+treeco[,2][10] <- "Pinheiro & Durigan 2012"
+treeco[,2][11] <- "Fonseca et al. 2000"
+treeco[,2][12] <- "Silva & Soares 2002"
+treeco[,2][13] <- "Medeiros 2010"
+
+treeco_sample <- read.table(file = "~/coord_sample_refID.txt", sep = "\t", dec = ".", header = TRUE)
+treeco_sample %<>% filter(refID %in% refID_reference) 
+
+
+
+df_ <- xtable(cbind(treeco[,-c(6:7)],treeco_sample[,2:3]))
+print(df_print, type="html", include.rownames = FALSE)
+```
+
+##### Banco de imagens
+i) origem das fotos 
+
+#### Metodologia
+Em resumo, comparo distribuições de abundância de espécies (DAE) simuladas segunda uma dinâmica neutra espacialmente explicitas com DAE amostradas em fragmentos florestais. Compilamos levantamentos fitossociológicos realizados em 
+Dos fragmentos florestais, além da DAE, eu utilizo a imagem da paisagem em que esses fragmentos estão localizados para criar matrizes da paisagem, que conservam as posições e distâncias entre *habitat* e *não habitat*.
+  
+##### tratamento das imagens
+i) leitura dos rasters, ii) transformação em matriz binária, trinária
+  
+##### simulações
+i) parâmetros usados (aqueles do TreeCo, do Clark 1999, e da simulação), ii) outputs da simulacao (SAD, U_est)
+  Utilizo o algoritmo coalescente de dinâmicas neutras espacialmente explícitas (Rosindell *et al.* 2008) adaptado de Campos *et al.* (2012) para simular distribuições de abundância de espécies arboreas. Para realizar uma simulação utilizando esse algoritmo é necessário uma matriz binária que indica a posição e distâncias de habitat e não habitat, a riqueza observada e o número de indivíduos da amostra. 
+  
+##### Calculos
+i) KS, ii) riqueza e cobertura vegetal
+
+#### Resultados Parciais
+
+i) riqueza e a questão do confi, ii) U_est, iii) KS X cobertura vegetal
+
+##### riqueza por refID
+
+```{r}
+S_refID_novo <- ggplot(data = df_resultados, aes(x = refID, y = riqueza)) + 
+                geom_point(aes(colour = range), size = 2.5) + 
+                scale_colour_manual(values=c("#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7", "#000000")) + 
+                scale_y_continuous(limits = c(40,320) ) + 
+                labs(title = "30 replicas") +
+                theme(axis.text = element_text(size=20), axis.title = element_text(size=20), legend.position = "none")
+  
+S_refID_antigo <- ggplot(data = df_dados_geral, aes(x = refID, y = riqueza)) + 
+                  geom_point(aes(colour = range), size = 2.5) + 
+                  scale_colour_manual(values=c("#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7", "#000000")) + 
+                  scale_y_continuous(limits = c(40,320) ) + 
+                  labs(title = "sem replicas") +
+                  theme(axis.text = element_text(size=20), axis.title = element_text(size=20),
+                        axis.text.y=element_blank(),axis.ticks=element_blank(), axis.title.y=element_blank(),
+                        legend.text=element_text(size=20))
+      
+grid.arrange(S_refID_novo,S_refID_antigo, ncol = 2)
+```
+
+#### Riqueza por cobertura vegetal
+
+```{r}
+S_tree_cover_novo <- ggplot(data = df_resultados, aes(x = tree_cover, y = riqueza)) + 
+                     geom_point(aes(colour = range), size = 2.5) + 
+                     scale_colour_manual(values=c("#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7", "#000000")) + 
+                     scale_y_continuous(limits = c(40,350) ) + 
+                     geom_smooth(method = lm, fill = NA) +  
+                     facet_wrap(~ range, ncol=4) + 
+                     labs(title = "30 replicas")                   
+                     theme(axis.text = element_text(size=20), axis.title = element_text(size=20), legend.position = "none")
+
+S_tree_cover_antigo <- ggplot(data = df_dados_geral, aes(x = tree_cover, y = riqueza)) + 
+                       geom_point(aes(colour = range), size = 2.5) + 
+                       scale_colour_manual(values=c("#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7", "#000000")) + 
+                       scale_y_continuous(limits = c(40,350) ) + 
+                       labs(title = "sem replicas") +
+                       theme(axis.text = element_text(size=20), axis.title = element_text(size=20),
+                             axis.text.y=element_blank(),axis.ticks=element_blank(), axis.title.y=element_blank(),
+                             legend.text=element_text(size=20))
+
+grid.arrange(S_tree_cover_novo, S_tree_cover_antigo, ncol = 2)
+```
+
+#### Taxa de imigração estimada por refID
+
+```{r}
+U_refID_novo <- ggplot(data = df_resultados, aes(x = refID, y = U_est)) + 
+                geom_point(aes(colour = range), size = 2.5) + 
+                scale_colour_manual(values=c("#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7", "#000000")) + 
+                labs(title = "30 replicas")
+U_refID_antigo <- ggplot(data = df_dados_geral, aes(x = refID, y = U_est)) + 
+                  geom_point(aes(colour = range), size = 2.5) + 
+                  scale_colour_manual(values=c("#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7", "#000000")) + 
+                  labs(title = "sem replicas")
+grid.arrange(U_refID_novo,U_refID_antigo, ncol = 2)
+```
+
+#### Taxa de imigração estimada por cobertura vegetal
+
+```{r}
+U_tree_cover_novo <- ggplot(data = df_resultados, aes(x = tree_cover, y = U_est)) + 
+                     geom_point(aes(colour = range), size = 2.5) + 
+                     scale_colour_manual(values=c("#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7", "#000000")) + 
+                     geom_smooth(method = lm, fill = NA) +  
+                     facet_wrap(~ range, ncol=4) + 
+                     labs(title = "30 replicas")
+U_tree_cover_antigo <- ggplot(data = df_dados_geral, aes(x = tree_cover, y = U_est)) + 
+                       geom_point(aes(colour = range), size = 2.5) + 
+                       scale_colour_manual(values=c("#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7", "#000000")) + 
+                       geom_smooth(method = lm, fill = NA) +                       
+                       facet_wrap(~ range, ncol=4) + 
+                       labs(title = "sem replicas")
+grid.arrange(U_tree_cover_novo, U_tree_cover_antigo, nrow = 2)
+```
+
+#### KS por cobertura vegetal
+
+```{r}
+KS_novo <- ggplot(data = df_resultados, aes(x = tree_cover, y = KS, colour = range)) +  
+           geom_point() +   
+           geom_smooth(method = lm, fill = NA) +  
+           facet_wrap(~ range, ncol=4) + labs(title = "30 replicas")
+KS_antigo <- ggplot(data = df_dados_geral, aes(x = tree_cover, y = KS, colour = range)) +  
+             geom_point() +   
+             geom_smooth(method = lm, fill = NA) + 
+             facet_wrap(~ range, ncol=4) + 
+             labs(title = "sem replicas")
+KS_novo
+KS_antigo
+```
+
+
+
+#### Próximos passos 
+
+i) conseguir extrair recorte de paisagens que estão entre raster
+ii) usar a funcao focal para retirar os monopontos de não habitat de grandes fragmentos e retirar os monopontos de habitat da matriz
+iii) pensar como trabalhar com o kernel de dispersão [eu e Renatones de Lima]
+iv) utilizar outras métricas de fragmentação
+v) rodar todas as paisagens!

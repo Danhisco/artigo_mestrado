@@ -1,0 +1,202 @@
+
+##
+Coisas a fazer:
+>Ordenar por facilidade:<
+- análise completa dos dados: GOF e U
+- completar material e métodos
+- resultados
+- material suplementar 
+- escrever introdução
+
+>Ordenar por prioridade:<
+- resultados
+- completar material e métodos
+- material suplementar 
+- análise completa dos dados: GOF e U
+- escrever introdução
+
+>Notas<
+5,3=8 resultados 70%  
+4,4=8 completar material e métodos 70%
+5,2=7 análise completa dos dados: GOF e U 70%
+2,3=5 material suplementar %30 
+1,1=2 escrever introdução %20 
+
+##############################################################
+		## Pós Comitê ##
+##############################################################
+
+>11Maio2017<
+
+-> tarefas:
+
+- primeira reunião com PI: estipular pontos da discussão. A ideia é criar o esqueleto do artigo para ir trabalhando nele. 
+- sintetizar as críticas do comitê com o artigo
+- sinetizar análise de U feito pelo Paulo na análise
+- simular mais uns kernels de dispersão (acredito que em dois dias eu consigo fazer mais de um, talvez 3; deixando ele rodando de noite é tranquilo)
+- filtros para date e/ou UC = yes; duplo 'no' são os fragmentos que não temos garantia de que a paisagem em que a comunidade foi amostrada mudou até a foto ser tirada
+- atualizar GIT
+- fazer a análise completa dos dados .Rmd
+- pedido de prorrogação
+- fechar resultados e métodos antes de começar a ler artigos para a discussão
+- pensar em fazer em formato para uma revista de ecologia
+
+
+-> ordem (por facilidade ou urgência):
+
+i) pedido de prorrogação: acrescentar um paragrafo explicativo da dissertação (assimilar email de PI) e colocar uma ideia de cronograma - 50%
+ii) atualizar GIT: ver quais arquivos precisam ser atualizados - FEITO
+iii) fazer a análise completa dos dados .Rmd: acrescentar a análise de U que PI fez e fazer o mesmo para GOF - juntar o texto a partir das partes de outros
+iii.b) rodar mais uma rodada de simulações com valores menores para kernel (avaliar quais possíveis candidatos)
+iv) sintetizar os resultados a partir da análise completa dos dados: pensar nos elementos chave
+v) reescrever Mat e Met dado os novos resultados e as críticas do comitê - solicitar revisão p co-orientadores/autores
+vi) iniciar leitura para discussão: resumir artigos pré-selecionados e expandir o texto para quem os citou
+vii) fechar primeiro rascunho da introdução
+viii) fechar primeiro rascunho da discussão
+
+Datas: 
+15maio: i-ii
+18maio: iii-.b
+19maio: iv
+
+>18maio2017<
+
+- a prioridade é estabelecer kernels entre 0 e 30 se tiver motivos é bem bom... 
+- 2 a 3 valores de kernel 
+- explicitar o sigilo do documento
+- mandar o boneco da dissertação: o que eu tenho até agora
+- o cronograma é a parte mais importante, pois é o relato de como o tempo requerido será usado
+
+Próximos passos: 
+
+>Dissertação<
+i) fechar Mat.Sup.::Análise completa dos dados
+ii) rodar bateria de simulações
+iii) fazer texto de pedido de prorrogação - urgente!
+
+>19maio2017<
+i) adição da sessão de U; falta adaptar o bootmer para o GOF
+ii) usar como referência "Forest fragmentation differentially affects seed dispersal of large and small-seeded tropical trees"
+iii) não fiz nada! rs
+
+obs: continuar a ler " Taking a tree’s perspective on forest fragmentation genetics" - pode dar alguma luz no começo da introdução
+
+
+>25maio2017<
+i) Mat.Sup: desenvolvi o texto, mas devo manter em tópicos o texto
+ii) Simulações: usei dois valores (29.95 e 39.25) que flanqueavam os menores kernels (31.10 e 47.40)
+iii) pedido mandado
+iv) Estou fazendo os gráficos com a adição dos resultados da ultima bateria de simulações
+
+Havia um problema no código da simulação e em um calculo de conversão que eu estava fazendo para usar a simulação. A ideia do calculo de conversao era redimensionar a unidade de distância para a unidade de distância da paisagem (que teve a sua resolução ajustada segundo a densidade de indivíduos).
+
+Esses erros faziam com que na simulação o kernel de dispersão fosse muito menor do que de fato ele deveria ser. O Coutinho estimou q os kernels eram cerca de 20 vezes menores do que eram para ser. Dado algumas estimativas que o PI fez, concluímos que os menores valores de kernel faziam com que a maioria dos propagulos não saissem da área da arvore progenitora. Isso explica a saturação em valores baixos de kernel.
+
+Decidimos rodar nova bateria de simulações com os ajustes necessários no código. Aproveitamos para incluir novos valores de kernel afim de manter os valores baixos de kernel: 2 (valor novo), 5(idem), 10 (idem), 22.95(valor para estudar região ao redor de 31.10), 31.10 (ballistic), 39.25 (valor para estudo da região), 47.40 (gravity), 54.50 (gyration), 64.50 (wind), 87.17 (media sindromes), 99.30 (animal_fruit<2cm), 120.60 (animal_fruit2-5cm), 157.80 (animal_fruit>5cm). Ao total serão 13 valores de kernel. Estimamos que levaria muito tempo para rodar em meu computador doméstico, assim, vamos adaptar para rodar no cluster da Eco.
+
+Metas:
+
+i) arrumar códigos: Danilo e Coutinho - FEITO
+ii) preparar código para rodar no cluster: Danilo e Paulo - EM ANDAMENTO - Luísa e Danilo
+
+>TRABALHANDO NO CLUSTER<
+
+i) criar um diretório geral onde 
+
+
+Instruções para uso do abacus:
+
+chamar no terminal: source ~/.bashrc
+
+
+i) é necessário criar .R (scripts)
+ii) 
+
+
+MUDAR O DIRETORIO E O .R
+nohup ssh abacus0001 "cd ~/seudiretorio; R CMD BATCH seucodigo.R &" &
+
+
+
+Quando eu quiser rodar algo no cluster, eu acesso ele via terminar usando (source ~/.bashrc), então digito abacus. Uma vez dentro do sistema o funcionamento é similar ao do terminal do linux. 
+
+Depois de testar o código no abacus, usando piloto de simulação, eu uso o código( nohup ssh abacus0001 "cd ~/seudiretorio; R CMD BATCH seucodigo.R &" )  para rodar o script de interesse no computador de interesse. 
+
+PARA LER O ANDAMENTO DA SIMULACAO
+cat diretorio/arquivo.Rout
+
+
+i) abrir o abacus no terminal: ~$ abacus # aqui eu estou no master, onde não roda nada
+ii) mudar para algum dos computadores do cluster: ~$ ssh abacus 0001 #
+
+# parar processo dentro de loop paralelizado #
+
+
+#piloto#
+-A partir do master: nohup ssh abacus0001 "cd ~/dinamica_coalescente/simulacao; R CMD BATCH piloto.R &" &
+-A partir do abacus0001: nohup R CMD BATCH piloto.R &
+
+#piloto_SAD#
+-A partir do master: nohup ssh abacus0001 "cd ~/dinamica_coalescente/simulacao; R CMD BATCH piloto_SAD.R &" &
+-A partir do abacus0001: nohup R CMD BATCH piloto.R &
+
+
+
+>Simulando BCI<
+Primeiro vou criar a matriz de paisagem com a comunidade local
+Script: paisagem_BCI.R
+abacus: nohup ssh abacus00__ "cd ~/dinamica_coalescente/simulacao_BCI; R CMD BATCH paisagem_BCI.R &" &
+
+## Bateria de simulações teste em BCI ##
+
+# Estimando dispersão de kernel a partir de percentis #
+nohup ssh abacus0002 "cd ~/dinamica_coalescente/estimando_kernel/; R CMD BATCH estimando_kernel.R &" &
+
+
+# Estimando taxa de imigração necessária BCI #
+>laplace (1_cel, hip/2)
+nohup ssh abacus00__ "cd ~/dinamica_coalescente/simulacao_BCI/; R CMD BATCH U_BCI1.R &" &
+nohup ssh abacus00__ "cd ~/dinamica_coalescente/simulacao_BCI/; R CMD BATCH U_BCI2.R &" &
+>uniform (1_cel, hip/2)
+nohup ssh abacus00__ "cd ~/dinamica_coalescente/simulacao_BCI/; R CMD BATCH U_BCI3.R &" &
+nohup ssh abacus00__ "cd ~/dinamica_coalescente/simulacao_BCI/; R CMD BATCH U_BCI4.R &" &
+>normal (1_cel, hip/2)
+nohup ssh abacus00__ "cd ~/dinamica_coalescente/simulacao_BCI/; R CMD BATCH U_BCI5.R &" &
+nohup ssh abacus00__ "cd ~/dinamica_coalescente/simulacao_BCI/; R CMD BATCH U_BCI6.R &" &
+
+>9jun<
+nohup ssh abacus0001 "cd ~/dinamica_coalescente/simulacao_BCI/; R CMD BATCH U_BCI3.R &" &
+nohup ssh abacus0002 "cd ~/dinamica_coalescente/simulacao_BCI/; R CMD BATCH U_BCI5.R &" &
+
+##### Reunião 9jun #####
+a) "a pior paisagem" com maior densidade, maoir cobertura e maior riqueza rodar dois percentis 0.01 e 0.10 para a Laplace
+b) BCI uniform e normal
+
+a)
+i) selecionar a paisagem com maiores DA, p e S
+ii) criar data_frame referência para a simulação
+iii) gerar as estimativas de sigma
+iv) rodar as simulações no abacus
+
+# estimando kernel #
+-9jun- arrumar a função sigkernel para diferentes densidades
+nohup ssh abacus0003 "cd ~/dinamica_coalescente/estimando_kernel/; R CMD BATCH estimando_kernel.R &" &
+
+
+# Abacus #
+nohup ssh abacus0001 "cd ~/dinamica_coalescente/piloto_tempo/; R CMD BATCH df_resultados_U1.R &" &
+nohup ssh abacus0002 "cd ~/dinamica_coalescente/piloto_tempo/; R CMD BATCH df_resultados_U2.R &" &
+nohup ssh abacus0003 "cd ~/dinamica_coalescente/piloto_tempo/; R CMD BATCH df_resultados_U3.R &" &
+nohup ssh abacus0004 "cd ~/dinamica_coalescente/piloto_tempo/; R CMD BATCH df_resultados_U4.R &" &
+nohup ssh abacus0005 "cd ~/dinamica_coalescente/piloto_tempo/; R CMD BATCH df_resultados_U5.R &" &
+nohup ssh abacus0016 "cd ~/dinamica_coalescente/piloto_tempo/; R CMD BATCH df_resultados_U6.R &" &
+nohup ssh abacus0007 "cd ~/dinamica_coalescente/piloto_tempo/; R CMD BATCH df_resultados_U7.R &" &
+nohup ssh abacus0008 "cd ~/dinamica_coalescente/piloto_tempo/; R CMD BATCH df_resultados_U8.R &" &
+nohup ssh abacus0012 "cd ~/dinamica_coalescente/piloto_tempo/; R CMD BATCH df_resultados_U9.R &" &
+nohup ssh abacus0013 "cd ~/dinamica_coalescente/piloto_tempo/; R CMD BATCH df_resultados_U10.R &" &
+nohup ssh abacus0014 "cd ~/dinamica_coalescente/piloto_tempo/; R CMD BATCH df_resultados_U11.R &" &
+nohup ssh abacus0015 "cd ~/dinamica_coalescente/piloto_tempo/; R CMD BATCH df_resultados_U12.R &" &
+
+
+b)
+i) adaptar o código já existente para a normal e uniforme

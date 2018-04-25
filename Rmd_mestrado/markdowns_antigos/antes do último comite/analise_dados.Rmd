@@ -1,0 +1,771 @@
+---
+title: ""
+author: "Pereira Mori, D; Lima, RAF, Coutinho, R; Inacio, PI"
+date: "29 de janeiro de 2017"
+output: pdf_document
+---
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(echo=T, warning=FALSE, message=FALSE, cache = TRUE, tidy = TRUE, fig.width = 10, fig.height = 10)
+```
+
+
+```{r global packages and data, echo=F}
+library(ggfortify)
+library(gridExtra) 
+library(ggplot2) 
+library(MASS)
+library(bbmle)
+library(car)
+library(RVAideMemoire)
+library(sads)
+library(nlme)
+library(lme4)
+library(sjPlot)
+library(magrittr)
+library(plyr)
+library(dplyr)
+load("/home/danilo/Documents/dissertacao/dados/dados_DaniloPMori.Rdata")
+# df_ad %>% str
+df_ad$SiteCode %<>% factor
+```
+
+
+TEXTO COMUM
+# Predições #
+-como a SAD neutra varia no gradiente de fragmentação? (olhar Campos e Alonso se não me engano)
+-discutir a estrutura fixa
+  -variáveis resposta: KS, KS.ab, KS.obs, KS.diff  (figura com o histograma das quatro variáveis) (análise exploratória)
+
+
+Variáveis que precisam ser descritas
+
+S, antes das análises para embasar sua inclusão no modelo: S e J. 
+
+
+# Predições  #
+  Podemos pensar em 3 hipóteses quanto ao efeito da fragmentação: 
+
+H1) A fragmentação e perda de habitat, modifica o habitat remanescente, criando novos gradientes ecológicos, que funcionam como filtros ambientais (Laurence 2008). Assim, as abundâncias das espécies em fragmentos diferem do esperado segundo o modelo neutro. O modelo não considera as diferenças entre as espécies, subestimando o tempo  (Gilbert et al. 2006). Levando 
+
+H2) a fragmentação leva à diminuição dos tamanhos populacionais, levando ao aumento do efeito da estocasticidade demográfica nas populações do fragmento, aproximando o predito pelo modelo neutro do observado.
+
+H3) a hipótese nula, onde a fragmentação não altera a qualidade da predição do modelo neutro.
+
+
+# Exemplo teste de Kolmogorov Smirnov #
+
+```{r}
+sad.obs <- log(rsad(S = 100, frac=0.05, sad="lnorm", list(meanlog=2, sdlog=2)))
+sad.sim <- log(rsad(S = 100, frac=0.05, sad="lnorm", list(meanlog=4, sdlog=2.5)) )
+c_obs.sim <- sort(c(sad.obs,sad.sim)) 
+df_KS_st <- data.frame(c.data = c_obs.sim, 
+  c.data.e = exp(c_obs.sim), 
+  acumulada.obs = sapply(c_obs.sim, FUN = function(x) length(sad.obs[sad.obs<x])/length(sad.obs)), 
+  acumulada.sim = sapply(c_obs.sim, FUN = function(x) length(sad.sim[sad.sim<x])/length(sad.sim)) 
+  )
+
+df_KS_st %<>% mutate(diff.acumulada = abs(df_KS_st$acumulada.obs-df_KS_st$acumulada.sim)) 
+KS_posicao <- unique(df_KS_st[df_KS_st$diff.acumulada == max(df_KS_st$diff.acumulada),]) 
+#a função retorna o valor de X onde ocorre a maior divergência e os dois valores da acumulada que levam a maior divergência
+# png(file = "~/Desktop/KS_exemplo.png", width = 10, height = 10)
+plot(x=df_KS_st$c.data,y=df_KS_st$acumulada.obs,type="n",main="Teste de Kolmogorov-Smirnov",xlab="log(indivíduos)",ylab="percentil")
+lines(x=df_KS_st$c.data,y=df_KS_st$acumulada.obs,type="l", col="darkgreen",lwd=3)
+lines(x=df_KS_st$c.data,y=df_KS_st$acumulada.sim,type="l", col="red",lwd=3)
+abline(v=KS_posicao$c.data,lty=2,lwd=1.5) # KS.ab
+abline(h=KS_posicao$acumulada.obs,lty=2,col="darkgreen",lwd=1.5) # KS.obs
+abline(h=KS_posicao$acumulada.sim,lty=2,col="red",lwd=1.5) # KS.sim
+segments(x0 = KS_posicao$c.data, y0 = KS_posicao$acumulada.obs, y1 = KS_posicao$acumulada.sim,col="darkblue",lwd=2)
+# dev.off()
+```
+
+__Figura 1__ Teste de Kolmogorov-Smirnov.
+
+
+
+
+
+  
+# Predições sobre o ajuste # KS, KS.diff, KS.ab
+
+  Segundo Gilbert et al. (2006), o modelo neutra faz boas predições sobre a dinâmica de espécies raras, provavelmente por serem espécies que estão sujeitas a estocasticidade demográfica. Assim, podemos considerar que quando o modelo neutro faz boas predições, ele deve estar fazendo boas estimativas sobre a abundância das espécies raras, aquelas com poucos indivíduos. O modelo neutro está fazendo boas predições da cauda de espécies raras da SAD observada, onde estão a maioria das espécies, pois a SAD tem um padrão universal de J deitado, muitas espécies com poucos indivíduos. Assim, o teste de KS irá resultar em: i) `KS` e `KS.diff` próximos a zero, ii) altos valores de `KS.ab`, iii) `KS.obs` e `KS.sim` em percentis intermediários.
+  Alternativamente, quando a simulação não produz boas aproximações do observado podemos esperar que o modelo neutro acumule diferenças significativas já nas primeiras espécies, superestimando ou subestimando a abundância do rank. Assim, o teste de KS resultaria em: i) `KS` e `KS.diff` se afastando de zero, `KS` em módulo; ii) `KS.ab` tendendo a valores baixos; iv) `KS.obs` e `KS.sim` tendendo a valores extremos e opostos de percentil.
+
+# predições sobre a forma da SAD, predições sobre a divergência do ajuste #
+
+  Para fazer predições quanto à `KS.obs` e `KS.sim` temos que comparar os mecanismos subjacentes a cada hipótese com o modelo neutro. O modelo neutro pressupõem equivalência ecológica ao nível do indivíduos, todas as espécies estão em caminhadas aleatórias em direção a extinção, exceto por uma, quando assumimos que as comunidades são sistemas fechados o modelo neutro prediz a monodominância. (Rosindell et al. 2011). A manutenção da diversidade nesse sistema é garantida pela constante entrada de espécies no sistema, seja por dispersão do entorno da comunidade local ou por especiação na metacomunidade (Hubbell 2001) [REESCREVER]. No equilíbrio, o modelo prevê a manutenção da riqueza e da abundância por rank com constante troca de espécies (REFERENCIA)
+
+  
+
+
+
+# Análise dos dados #
+
+
+## Criação, Ajuste e Comparação de Modelos Estatísticos ##
+
+  Os dados estão agrupados segundo o kernel de dispersão: i) `ballistic` ( 31.10m ), ii) `gravity` ( 47.40m ), `gyration` ( 54.50m ), `98u9wind` ( 64.50m ),`media_sin` ( 82.17m ), `animal_fruit<2cm` ( 99.30m ), `animal_fruit2-5cm`( 120.60m ), `animal_fruit>5cm`( 157.80m ) (REFERENCIA). Para modelar esse tipo de estrutura vamos utilizar modelos lineares generalizados mistos. Traduzimos essa agrupamento como `(1 | kernel)` na estrutura randomica, isso implica que cada nível de `kernel` pode ter seu próprio intercepto. 
+  O algoritmo coalescente simula uma dinâmica neutra espacialmente explicíta que ocorre em uma matriz de posições concêntrica a uma matriz da paisagem (REFERÊNCIA). A simulação retorna a identidade, i.e., a espécie, de cada indivíduo na matriz de posições em um momento no equilíbrio. Apesar da simulação não acompanhar a identidade dos indivíduos fora da matriz de posições, esses indivíduos podem participam da dinâmica, isso depende da relação entre a cobertura vegetal ao redor da área de interesse e `kernel`. Para exemplificar, consideremos que a paisagem está quase vazia, existe apenas a comunidade local. Nessa situação limite, o incremento no tamanho do kernel influência os padrões de agregamento. A partir de um valor de `p` o incremento de `kernel` implica no aumento dos indivíduos que podem participar da dinâmica local. Aumentando o fluxo de indivíduos para a comunidade local. Esse efeito tende a diminuir com o aumento de `p`, pois toda a paisagem passa a ser acessível mesmo para valores intermediários de `kernel`. Para incorporar esse interação vamos utilizar `(p | kernel)` na estrutura randômica. 
+  Além da variável de interesse, `p`, vamos incluir em nossos modelos o termo `S * log(J)`. Há três motivos para incluir esse termo: 
+ 
+  i) `S` e `J` são parâmetros da simulação e por conta disso, espera-se que as simulações sejam sensíveis à variação de `S` e `J`. 
+  ii) existe um viés na amostra, provavelmente por conta de questões biogeográficas e históricas, que gera uma correlação entre `S`, `log(J)` e `p`.
+
+
+```{r echo=F,include=F}
+l_p3<-vector("list",length = 4)
+l_p3[[1]] <- ggplot(df_ad, aes(x = S, y = KS.diff)) + geom_point()
+l_p3[[2]] <- ggplot(df_ad, aes(x = p, y = S)) + geom_point()
+l_p3[[3]] <- ggplot(df_ad, aes(x = log(J), y = KS.diff)) + geom_point()
+l_p3[[4]] <- ggplot(df_ad, aes(x = p, y = log(J))) + geom_point()
+do.call("grid.arrange",c(l_p3,ncol=2,nrow=2))
+```
+
+```{r echo=F,include=F}
+l_p3<-vector("list",length = 4)
+l_p3[[1]] <- ggplot(df_ad, aes(x = S, y = log(KS.ab))) + geom_point()
+l_p3[[2]] <- ggplot(df_ad, aes(x = p, y = S)) + geom_point()
+l_p3[[3]] <- ggplot(df_ad, aes(x = log(J), y = log(KS.ab))) + geom_point()
+l_p3[[4]] <- ggplot(df_ad, aes(x = p, y = log(J))) + geom_point()
+do.call("grid.arrange",c(l_p3,ncol=2,nrow=2))
+```
+
+```{r echo=F,include=F}
+l_p3<-vector("list",length = 4)
+l_p3[[1]] <- ggplot(df_ad, aes(x = S, y = KS.obs)) + geom_point()
+l_p3[[2]] <- ggplot(df_ad, aes(x = p, y = S)) + geom_point()
+l_p3[[3]] <- ggplot(df_ad, aes(x = log(J), y = KS.obs)) + geom_point()
+l_p3[[4]] <- ggplot(df_ad, aes(x = p, y = log(J))) + geom_point()
+do.call("grid.arrange",c(l_p3,ncol=2,nrow=2))
+```
+
+```{r echo=F,include=F}
+l_p3<-vector("list",length = 4)
+l_p3[[1]] <- ggplot(df_ad, aes(x = S, y = KS.sim)) + geom_point()
+l_p3[[2]] <- ggplot(df_ad, aes(x = p, y = S)) + geom_point()
+l_p3[[3]] <- ggplot(df_ad, aes(x = log(J), y = KS.sim)) + geom_point()
+l_p3[[4]] <- ggplot(df_ad, aes(x = p, y = log(J))) + geom_point()
+do.call("grid.arrange",c(l_p3,ncol=2,nrow=2))
+```
+  
+```{r, echo=F}
+l_p3<-vector("list",length = 4)
+l_p3[[1]] <- ggplot(df_ad, aes(x = S, y = KS)) + geom_point()
+l_p3[[2]] <- ggplot(df_ad, aes(x = p, y = S)) + geom_point()
+l_p3[[3]] <- ggplot(df_ad, aes(x = log(J), y = KS)) + geom_point()
+l_p3[[4]] <- ggplot(df_ad, aes(x = p, y = log(J))) + geom_point()
+do.call("grid.arrange",c(l_p3,ncol=2,nrow=2))
+```
+
+__Figura 4__ `KS ~ S` e `S ~ p`. 
+
+  Para exemplificar o efeito de `S` e `J` vou usar a variável `KS` (figuras 4 e 5), em código as demais variáveis. Existe uma relação negativa entre `KS` e `S` (figura 4, 1o gráfico). Isso mostra que o modelo neutro espacialmente explicíto gera SADs que são boas aproximações das SADs observadas em comunidades com muitas espécies e ruins em comunidades com poucas. `S` também apresenta dependência com outra variável, com `p`(figura 1, 2o gráfico), essa relação pode ter diversas explicações(e.g. ciclos econômicos). Notem que as paisagens com baixa cobertura, também são aqueles em que a riqueza é menor, logo são as paisagens onde o modelo neutro não é um bom descritor do observado. Podemos ver um efeito de `p` que decorre da relação de `p` com `S`. `J` parece ter pouca influência na relação `KS ~ p` (figura 4, 3o e 4o gráficos). A relação de `J` com `KS` e com `p` parecem ser fracas. Contudo, mantivemos `J` para compensar o viés do teste de Kolmogorov - Smirnov (ANEXO).
+  
+## Exploração gráfica das Variáveis Resposta ##
+# comparação KS e KS.diff #
+
+   No conjunto original de dados, das réplicas, os valores de `KS` e `KS.diff` são sempre o mesmo em módulo, diferindo em sinal: se o modelo neutro subestima o observado, `KS.diff` > 0, caso contrário, `KS.diff` < 0. Assim, aqueles grupos que possuem quantidades similares de `KS.diff` positivos e negativos ficam com valores próximos à zero quando realizamos o cálculo da média (figura , segundo e terceiro paineis). Podemos considerar que quando o modelo neutro produz SADs que resultam em `KS` próximos de zero e simulações que subestimam e superestimam em igual quantidade ele faz boas aproximações do observado (Anexo X: SADs simuladas e observadas). Para realizar as análises trabalhamos com os valores médios das réplicas (figura 1)
+
+```{r figura 1, echo = FALSE, fig.width=6}
+colvec <- c("#ff1111","#000000")
+l_p1<-vector("list",length=6)
+l_p1[[1]] <- ggplot(df_ad, aes(x=KS)) + 
+  geom_histogram(aes(y = ..density..), binwidth=density(df_ad$KS)$bw) + 
+  geom_density(col=2)
+l_p1[[2]] <- ggplot(df_ad, aes(x=KS.diff)) + 
+  geom_histogram(aes(y = ..density..), binwidth=density(df_ad$KS.diff)$bw) + 
+  geom_density(col=2)
+l_p1[[3]] <- ggplot(df_ad, aes(x=KS, y = KS.diff)) + geom_point()
+l_p1[[4]] <- ggplot(df_ad, aes(x=log(KS.ab), y=KS) ) + 
+  geom_point(colour=ifelse(df_ad$KS>0.2,colvec[1],colvec[2]))
+l_p1[[5]] <- ggplot(df_ad, aes(x=log(KS.ab), y=KS.diff) ) + 
+  geom_point(colour=ifelse(df_ad$KS>0.2,colvec[1],colvec[2]))
+
+
+lay<-rbind(c(1,1,2,2,3,3),
+           c(1,1,2,2,3,3),
+           c(NA,4,4,5,5,NA),
+           c(NA,4,4,5,5,NA))
+grid.arrange(l_p1[[1]],l_p1[[2]],l_p1[[3]],l_p1[[4]],l_p1[[5]],ncol=6,nrow=4,layout_matrix=lay)
+# do.call("grid.arrange",c(l_p1, ncol=4, nrow=4, layout_matrix=lay))
+```
+
+__Figura 1__ Comparação KS e KS.diff
+
+  
+  `KS` apresenta uma moda e é assimétrica para a esquerda. Varia entre `r round(range(df_ad$KS),digits = 3) ` e há uma tendência a valores próximos à 0.1 (figura 1, primeiro painel). `KS.diff` parece ter uma leve tendência à bimodalidade, é assimétrica para a direita. Varia entre `r round(range(df_ad$KS.diff),digits = 3)`. Para facilitar a criação de modelos estatísticos, aplicamos uma transformação em `KS.diff` afim de mudar a orientação da assimétria e escalonar a distribuição para valores positivos: `KS.diff_1` = (1 - `KS`) + 1. As mesmas distribuições candidatas de `KS` foram usadas para modelar `KS.diff_1`.
+  
+  Da figura 1, nota-se que existe uma tendência ao modelo neutro produzir SADs que são boas aproximações do observado, a moda de KS é em torno de 0.1 (figura 1, 1o gráfico). Contudo, em geral o modelo subestima o observado,`KS.diff` é assimétrico para a direita (figura 1, 2o gráfico). Quanto menor `KS`, `KS.diff` tende a ser próximo de zero e positivo, com o aumento de `KS` há uma polarização - ou sempre subestima ou sempre superestima, notem a ausência de valores intermediários em `KS.diff` a partir de `KS` = 0.2 (figura 1, terceiro painel). No quinto e quarto gráfico da figura 1, a diferença absoluta e a diferença relativa entre as acumuladas da SAD observada e neutra, parece existir uma tendência a ter mais pontos `KS` > 0.2 em `KS.diff` negativo.
+
+
+```{r figura 2, echo = FALSE, fig.height=7, fig.width=7}
+l_p2<-vector("list",length=6)
+l_p2[[1]] <- ggplot(df_ad, aes(x=KS.obs)) + 
+  geom_histogram(aes(y = ..density..), binwidth=density(df_ad$KS.obs)$bw) + 
+  geom_density(col=2) 
+l_p2[[2]] <- ggplot(df_ad, aes(x=log(KS.ab), y=KS.obs) ) + 
+  geom_point(colour=ifelse(df_ad$KS>0.2,colvec[1],colvec[2]))
+l_p2[[3]] <- ggplot(df_ad, aes(x=KS.sim)) + 
+  geom_histogram(aes(y = ..density..), binwidth=density(df_ad$KS.sim)$bw) + 
+  geom_density(col=2)
+l_p2[[4]] <- ggplot(df_ad, aes(x=log(KS.ab), y=KS.sim) ) + 
+  geom_point(colour=ifelse(df_ad$KS>0.2,colvec[1],colvec[2]))
+l_p2[[5]] <- ggplot(df_ad, aes(x=log(KS.ab)) ) + 
+  geom_histogram(aes(y = ..density..), binwidth=density(log(df_ad$KS.ab))$bw) + 
+  geom_density(col=2)
+l_p2[[6]] <- ggplot(df_ad, aes(x=KS.obs, y=KS.sim) ) + 
+  geom_point(colour=ifelse(df_ad$KS>0.2,colvec[1],colvec[2]))
+do.call("grid.arrange",c(l_p2, ncol=2, nrow=3))
+```
+
+__Figura 2.__ Comparação `log(KS.ab)`, `KS.obs`, `KS.sim`. Em vermelho pontos onde `KS` > 0.2.
+  
+  A distribuição de valores de `KS.obs`, `KS.sim` e `log(KS.ab)` estão Na figura X. O pico de percentil associado à estatística de KS é similar tanto para as SAD simuladas quanto para as SADs observados, em torno de 0.6, sendo os valores de `KS.obs` mais aninhados em torno do pico e existe uma leve tendência à assimetria para a direita (figura , linhas 1 e 2, coluna 1). Em termos gerais, `KS.obs` e `KS.sim` variam de maneira similar, considerando que para cada SAD observada há 100 SAD simuladas. 
+  
+  As duas variáveis estão distribuidas de maneira similar em `log(KS.ab)`, indo de próximo de 0 até um pouco mais de 4 log(indivíduos) (figura , linhas 1 e 2, coluna 2). Existe uma tendência de `KS.obs` e `KS.sim` crescerem com o aumento de `log(KS.ab)` independente do valor de `KS`: os pontos em vermelho (`KS` > 0.2) parecem ocorrer em todo `log(KS.ab)` (figura , linhas 1 e 2, coluna 2). A partir 2.5 log(indivíduos), os valores de `KS.sim` com `KS` > 0.2 são sistematicamente maiores que `KS.obs`(figura , linhas 1 e 2, coluna 2). `KS.obs` e `KS.sim` formam um padrão espelhado e aninhado: próximo à reta (1,1) estão a maioria dos valores (`KS` < 0.2) deslocados para valores maiores que zero; afastando-se da reta estão os valores marginais em que a simulação sistematicamente superestima ou subestima o observado (figura ,linha 3, coluna 2).
+  
+__RESUMO__
+  A moda de `KS` é em torno de 0.10 e varia entre 0.00 e 0.35 (fig A, primeiro gráfico). Para valores de `KS` próximos de zero, `KS.diff` tende a zero assimétricamente para valores positivos. Com o aumento de `KS`, as simulações passam a sistematicamente ou superestimar ou subestimar o observado, parece existir uma tendência a ter mais valores que superestimam o observado, ou seja, `KS.diff` < 0. Os percentis das SADs observadas e simuladas associados ao teste de KS (`KS.obs` e `KS.sim`) tem pico próximo do 0.60, mostrando que em geral é necessário muitas unidades de abundância para acumular diferenças até a divergência máxima (Anexo 1: Análise dos Dados).
+  
+
+
+
+
+
+
+
+  Outra aninhamento que decidimos incorporar em nosso modelo é o de fitofisionomia, `(1 | fitofisio)`. Com esse termo esperamos compensar as diferenças biogeográficas e históricas de cada `SiteCode`. Separando os dados pela estrutura randômica temos 40 agrupamentos (5 níveis de `fitofisio` e 8 valores de `kernel`), segue um exemplo usando `KS`, os gráficos das demais variáveis está no código:
+
+```{r echo=F, include=FALSE}
+ggplot(df_ad,aes(x=p,y=KS.diff)) + geom_point() + facet_wrap(~ fitofisio + factor(kernel), ncol = 8, nrow = 5) #+ geom_smooth(method="lm",se=F)
+```
+
+```{r echo=F, include=FALSE}
+ggplot(df_ad,aes(x=p,y=log(KS.ab)) ) + geom_point() + facet_wrap(~ fitofisio + factor(kernel), ncol = 8, nrow = 5) #+ geom_smooth(method="lm",se=F)
+```
+
+```{r echo=F, include=FALSE}
+ggplot(df_ad,aes(x=p,y=KS.obs)) + geom_point() + facet_wrap(~ fitofisio + factor(kernel), ncol = 8, nrow = 5) #+ geom_smooth(method="lm",se=F)
+```
+
+```{r echo=F, include=FALSE}
+ggplot(df_ad,aes(x=p,y=KS.sim)) + geom_point() + facet_wrap(~ fitofisio + factor(kernel), ncol = 8, nrow = 5) #+ geom_smooth(method="lm",se=F)
+```
+
+```{r echo=F, fig.height=8,fig.width=9}
+ggplot(df_ad,aes(x=p,y=KS)) + geom_point() + facet_wrap(~ fitofisio + factor(kernel), ncol = 8, nrow = 5) + geom_smooth(method="lm",se=F)
+```
+
+__Figura 3.__ `KS ~ p` aninhados segundo a estrutura randômica da formula `KS ~ p + S * log(J) + (p | kernel) + (1 | fitofisio)`. Em cima de cada painel os níveis correspondente às variáveis `kernel` e `fitofisio`
+
+  Como esperado, kernel tem um efeito na relação `KS ~ p` termo da estrutura randômica `(p | kernel)`. Contudo, parece que há uma interação `kernel` e `fitofisio` que não era esperada. Acredito que uma possível explicação para essa interação é por conta do kernel médio da comunidade, a diistribuição "média" de propágulos da comunidade que deve variar conforme a composição de espécies de cada comunidade. Especulo que existe uma correlação entre fitofisinomia e a distribuição de abundância de espécies agrupadas pela sindrome de dispersão. A implicação direta dessa possível correlação é na existência de valores ótimos de `kernel` que variam por fitofisionomias, ou seja, talvez exista uma interação entre `kernel` e `fitofisio`.
+
+  PONTOS A DISCUTIR:
+  
+  i) eu acredito que existe uma interação entre `fitofisio` e `kernel`: o valor ótimo de kernel, onde a simulação produz as melhores estimativas depende do kernel médio da comunidade, esse por sua vez depende da composição da comunidade e essa depende da fitofisionomia em que está (ambiente e dispersão). Além disso, pela análise gráfica parece existir interação entre as variáveis.
+  
+  ii) Eu e o Renato Lima, pensamos em colocar `succession`, que classifica segundo o tempo desde a última perturbação, exemplo: corte raso, 80 anos. Isso pode ter alguma influência, pois a simulação cria uma comunidade no equilíbrio no tempo infinito. Também aumentaria o número de observações consideradas, uma vez que a amostra está mais balanceada do que em `fitofisio`.
+  
+  As variáveis respostas, VR, `KS`, `KS.diff`, `KS.obs`, `KS.sim`, `KS.ab`, foram modeladas segunda a formula: 
+  
+  `VR ~ p + S * log(J) + (p | kernel) + (1 | fitofisio)`
+  
+  Seguimos o seguinte protocolo de análise (adaptado de Bolker et al. 2008): 
+  i) selecionamos uma distribuição de erros e uma função de ligação ajustando o glm da estrutura fixa (` ~ p + VC`) aos dados. 
+  ii) ajustamos o modelo com a formula acima 
+  iii) usando AIC, avaliamos se `p` possui efeito relevante nos dados observados comparando com modelos estatísticos que desconsideram seu efeito (REFERÊNCIA)
+  iv) avaliamos os efeitos da estrutura fixa e randômica do modelo ajustdo no item ii.
+
+## Resultados ##
+
+### KS ###
+
+  - escolha da distribuição de erros e função de link
+chunk 1: criação e seleçao de modelos com a estrutura fixa para selecionar a distribuição e função de ligação
+seleção: distribuições e funções de ligação 
+  - protocolo de ajuste do modelo: i) escalonar S, ii) usar os valores de start a partir do glm
+  
+__Janela de Código 1__ Seleção da distribuição de erros e função de ligação
+```{r chunk1, echo = TRUE}
+# df_ad$KS %>% hist(.,n=40)
+l_md1 <- vector("list", length = 5) #lista com os modelos para selecionar a distribuição de KS
+names(l_md1) <- c("norm","lognorm","gamma_id","gamma_log","gamma_inv")
+l_md1[[1]] <- glm(KS ~ p + S.sc * log(J), data = df_ad) #norm
+l_md1[[2]] <- glm(KS ~ p + S.sc * log(J), family = gaussian(link = "log"), data = df_ad) #lognorm
+l_md1[[3]] <- glm(KS ~ p + S.sc * log(J), family = Gamma(link = "identity"), data = df_ad) #Gamma; identity
+l_md1[[4]] <- glm(KS ~ p + S.sc * log(J), family = Gamma(link = "log"), data = df_ad) #Gamma; log
+l_md1[[5]] <- glm(KS ~ p + S.sc * log(J), family = Gamma(link = "inverse"), data = df_ad) #Gamma; inverse
+AICtab(l_md1, weights = TRUE)
+```
+
+  O modelo com a distribuição Gamma e função de ligação invertida foi o mais plausível.
+
+chunk 2: ajuste do modelo a ser estudado e comparação com alternativas
+seleção: VR ~ p + S * log(J) + (p | kernel) + (1 | fitofisio)
+         VR ~ 1 + S * log(J) + (1 | kernel) + (1 | fitofisio)  
+         VR ~ 1 + (1 | kernel) + (1 | fitofisio)  
+
+```{r chunk2, echo = TRUE}
+# df_ad$KS %>% hist(.,n=40)
+l_md2 <- vector("list", length = 3) #lista com os modelos para selecionar a distribuição de KS
+names(l_md2) <- c("KS ~ p + VC","KS ~ 1 + VC","KS ~ 1")
+l_md2[[1]] <- glmer(KS ~ p + S.sc * log(J) + (p | kernel) + (1 | fitofisio), family = Gamma(link = "inverse"), data = df_ad, # KS ~ p 
+                    start=list(fixef = coef(l_md1[[5]])), control=glmerControl(optimizer="bobyqa", optCtrl=list(maxfun=2e5)) )
+l_md2[[2]] <- glmer(KS ~ 1 + S.sc * log(J) + (1 | kernel) + (1 | fitofisio), family = Gamma(link = "inverse"), data = df_ad, # KS ~ Var. Controle
+                    control=glmerControl(optimizer="bobyqa", optCtrl=list(maxfun=2e5)) ) 
+l_md2[[3]] <- glmer(KS ~ 1 + (1 | kernel) + (1 | fitofisio), family = Gamma(link = "inverse"), data = df_ad, # KS ~ 1
+                    control=glmerControl(optimizer="bobyqa", optCtrl=list(maxfun=2e5)) )
+AICtab(l_md2, weights = TRUE)
+```
+__Janela de Código 2__
+
+- sumário e gráficos diagnósticos do modelo 1
+
+```{r chunk 3, echo=F}
+summary(l_md2[[1]])
+```
+__Janela de Código 3__
+
+- qqplot do modelo de trabalho 
+
+```{r echo=F, message=F}
+plotresid(l_md2[[1]], shapiro = T)
+```
+
+__Figura 10__ resíduos do modelo `KS ~ p + S * log(J) + (p | kernel) + (1 | fitofisio)`.
+
+
+### KS.diff ###
+
+  - escolha da distribuição de erros e função de link
+chunk 3: criação e seleçao de modelos com a estrutura fixa para selecionar a distribuição e função de ligação
+seleção: distribuições e funções de ligação 
+  - protocolo de ajuste do modelo: i) escalonar S, ii) usar os valores de start a partir do glm
+
+NOTA: por conta dos avisos de ajuste, vou escalonar log(J), como é uma variável de controle acredito que nãi
+
+  
+__Janela de Código 4__ Seleção da distribuição de erros e da função de ligação 
+```{r chunk 4, echo = TRUE}
+# df_ad$KS.diff_1 %>% hist(.,n=40)
+df_ad %<>% mutate(KS.diff_1=1-KS.diff) # mudando a assimétria e tornando tudo positivo
+df_ad %<>% mutate(logJ.sc = scale(log(J)) ) #pelo otimizador
+l_md3 <- vector("list", length = 5) #lista com os modelos para selecionar a distribuição de KS
+names(l_md3) <- c("norm","lognorm","gamma_id","gamma_log","gamma_inv")
+l_md3[[1]] <- glm(KS.diff_1 ~ p + S.sc * logJ.sc, data = df_ad) #norm
+l_md3[[2]] <- glm(KS.diff_1 ~ p + S.sc * logJ.sc, family = gaussian(link = "log"), data = df_ad) #lognorm
+l_md3[[3]] <- glm(KS.diff_1 ~ p + S.sc * logJ.sc, family = Gamma(link = "identity"), data = df_ad) #Gamma; identity
+l_md3[[4]] <- glm(KS.diff_1 ~ p + S.sc * logJ.sc, family = Gamma(link = "log"), data = df_ad) #Gamma; log
+l_md3[[5]] <- glm(KS.diff_1 ~ p + S.sc * logJ.sc, family = Gamma(link = "inverse"), data = df_ad) #Gamma; inverse
+AICtab(l_md3, weights = TRUE)
+```
+
+  Os modelos com a distribuição gamma são igualmente plausíveis, vou escolher o modelo gamma_id por ter a função de ligação mais simples. 
+
+chunk 4: ajuste do modelo a ser estudado e comparação com alternativas
+seleção: VR ~ p + S * log(J) + (p | kernel) + (1 | fitofisio)
+         VR ~ 1 + S * log(J) + (1 | kernel) + (1 | fitofisio)  
+         VR ~ 1 + (1 | kernel) + (1 | fitofisio)  
+```{r echo=F,include=F}
+ggplot(df_ad,aes(x=p,y=KS.diff_1)) + geom_point() + facet_wrap(~ fitofisio + factor(kernel), ncol = 8, nrow = 5) #+ geom_smooth(method="lm",se=F)
+```
+
+```{r chunk 5 , echo = TRUE}
+# df_ad$KS.diff_1 %>% hist(.,n=40)
+# plot(KS.diff_1 ~ p, df_ad)
+
+l_md4 <- vector("list", length = 3) #lista com os modelos para selecionar a distribuição de KS
+names(l_md4) <- c("KS.diff_1 ~ p + VC","KS.diff_1 ~ 1 + VC","KS.diff_1 ~ 1")
+l_md4[[1]] <- glmer(KS.diff_1 ~ p + S.sc * logJ.sc + (p | kernel) + (1 | fitofisio), family = Gamma(link = "identity"), data = df_ad, # KS.diff_1 ~ p 
+                    start=list(fixef = coef(l_md3[[3]]) ), control=glmerControl(optimizer="bobyqa", optCtrl=list(maxfun=2e5)) )
+l_md4[[2]] <- glmer(KS.diff_1 ~ 1 + S.sc * logJ.sc + (1 | kernel) + (1 | fitofisio), family = Gamma(link = "identity"), data = df_ad, # KS.diff_1 ~ Var. Controle
+                    control=glmerControl(optimizer="bobyqa", optCtrl=list(maxfun=2e5)) ) 
+l_md4[[3]] <- glmer(KS.diff_1 ~ 1 + (1 | kernel) + (1 | fitofisio), family = Gamma(link = "identity"), data = df_ad, # KS.diff_1 ~ 1
+                    control=glmerControl(optimizer="bobyqa", optCtrl=list(maxfun=2e5)) )
+AICtab(l_md4, weights = TRUE)
+```
+__Janela de Código 5__
+
+- sumário e gráficos diagnósticos do modelo de trabalho
+
+```{r chunk 6, echo=F}
+summary(l_md4[[1]])
+```
+__Janela de Código 6__
+
+- qqplot dos residuos
+
+```{r echo=F, message=F}
+plotresid(l_md4[[1]], shapiro = T)
+```
+
+__Figura 10__ resíduos do modelo `KS ~ p + S * log(J) + (p | kernel) + (1 | fitofisio)`.
+
+
+### KS.ab ###
+
+
+  - escolha da distribuição de erros e função de link
+chunk 1: criação e seleçao de modelos com a estrutura fixa para selecionar a distribuição e função de ligação
+seleção: distribuições e funções de ligação 
+  - protocolo de ajuste do modelo: i) escalonar S, ii) usar os valores de start a partir do glm
+  
+```{r echo = TRUE}
+# df_ad$KS.ab %>% hist(.,n=40)
+l_md5 <- vector("list", length = 5) #lista com os modelos para selecionar a distribuição de KS
+names(l_md5) <- c("norm","lognorm","gamma_id","gamma_log","gamma_inv")
+l_md5[[1]] <- glm(KS.ab ~ p + S.sc * log(J), data = df_ad) #norm
+l_md5[[2]] <- glm(KS.ab ~ p + S.sc * log(J), family = gaussian(link = "log"), data = df_ad) #lognorm
+l_md5[[3]] <- glm(KS.ab ~ p + S.sc * log(J), family = Gamma(link = "identity"), data = df_ad) #Gamma; identity
+l_md5[[4]] <- glm(KS.ab ~ p + S.sc * log(J), family = Gamma(link = "log"), data = df_ad) #Gamma; log
+l_md5[[5]] <- glm(KS.ab ~ p + S.sc * log(J), family = Gamma(link = "inverse"), data = df_ad) #Gamma; inverse
+AICtab(l_md5, weights = TRUE)
+```
+__Janela de Código 7__ 
+
+  O modelo com a distribuição Gamma e função de ligação log foi o mais plausível. 
+
+chunk 7: ajuste do modelo a ser estudado e comparação com alternativas
+seleção: VR ~ p + S * log(J) + (p | kernel) + (1 | fitofisio)
+         VR ~ 1 + S * log(J) + (1 | kernel) + (1 | fitofisio)  
+         VR ~ 1 + (1 | kernel) + (1 | fitofisio)  
+
+```{r chunk 7, echo = TRUE}
+# df_ad$KS.ab %>% hist(.,n=40)
+l_md6 <- vector("list", length = 3) #lista com os modelos para selecionar a distribuição de KS.ab
+names(l_md6) <- c("KS.ab ~ p + VC","KS.ab ~ 1 + VC","KS.ab ~ 1")
+l_md6[[1]] <- glmer(KS.ab ~ p + S.sc * log(J) + (p | kernel) + (1 | fitofisio), family = Gamma(link = "log"), data = df_ad, # KS.ab ~ p 
+                    start=list(fixef = coef(l_md5[[4]])), control=glmerControl(optimizer="bobyqa", optCtrl=list(maxfun=2e5)) )
+l_md6[[2]] <- glmer(KS.ab ~ 1 + S.sc * log(J) + (1 | kernel) + (1 | fitofisio), family = Gamma(link = "log"), data = df_ad, # KS.ab ~ Var. Controle
+                    control=glmerControl(optimizer="bobyqa", optCtrl=list(maxfun=2e5)) ) 
+l_md6[[3]] <- glmer(KS.ab ~ 1 + (1 | kernel) + (1 | fitofisio), family = Gamma(link = "log"), data = df_ad, # KS.ab ~ 1
+                    control=glmerControl(optimizer="bobyqa", optCtrl=list(maxfun=2e5)) )
+AICtab(l_md6, weights = TRUE)
+```
+__Janela de Código 8__
+
+- sumário e gráficos diagnósticos do modelo 1
+
+```{r chunk 8, echo=F}
+summary(l_md6[[1]])
+```
+__Janela de Código 9__
+
+- qqplot do modelo de trabalho 
+
+```{r echo=F, message=F}
+plotresid(l_md6[[1]], shapiro = T)
+```
+
+__Figura 11__ resíduos do modelo `KS ~ p + S * log(J) + (p | kernel) + (1 | fitofisio)`.
+
+
+### KS.obs ###
+
+
+  - escolha da distribuição de erros e função de link
+chunk 1: criação e seleçao de modelos com a estrutura fixa para selecionar a distribuição e função de ligação
+seleção: distribuições e funções de ligação 
+  - protocolo de ajuste do modelo: i) escalonar S, ii) usar os valores de start a partir do glm
+  
+```{r chunk 9, echo = TRUE}
+# df_ad$KS.ab %>% hist(.,n=40)
+l_md7 <- vector("list", length = 5) #lista com os modelos para selecionar a distribuição de KS
+names(l_md7) <- c("norm","lognorm","gamma_id","gamma_log","gamma_inv")
+l_md7[[1]] <- glm(KS.obs ~ p + S.sc * log(J), data = df_ad) #norm
+l_md7[[2]] <- glm(KS.obs ~ p + S.sc * log(J), family = gaussian(link = "log"), data = df_ad) #lognorm
+l_md7[[3]] <- glm(KS.obs ~ p + S.sc * log(J), family = Gamma(link = "identity"), data = df_ad) #Gamma; identity
+l_md7[[4]] <- glm(KS.obs ~ p + S.sc * log(J), family = Gamma(link = "log"), data = df_ad) #Gamma; log
+l_md7[[5]] <- glm(KS.obs ~ p + S.sc * log(J), family = Gamma(link = "inverse"), data = df_ad) #Gamma; inverse
+AICtab(l_md7, weights = TRUE)
+```
+__Janela de Código 10__ 
+
+  O modelo com a distribuição Normal foi o mais plausível. 
+
+seleção: VR ~ p + S * log(J) + (p | kernel) + (1 | fitofisio)
+         VR ~ 1 + S * log(J) + (1 | kernel) + (1 | fitofisio)  
+         VR ~ 1 + (1 | kernel) + (1 | fitofisio)  
+
+```{r chunk 10, echo = TRUE}
+# df_ad$KS.ab %>% hist(.,n=40)
+l_md8 <- vector("list", length = 3) #lista com os modelos para selecionar a distribuição de KS.obs
+names(l_md8) <- c("KS.obs ~ p + VC","KS.obs ~ 1 + VC","KS.obs ~ 1")
+l_md8[[1]] <- lmer(KS.obs ~ p + S.sc * log(J) + (p | kernel) + (1 | fitofisio), data = df_ad)
+l_md8[[2]] <- lmer(KS.obs ~ 1 + S.sc * log(J) + (1 | kernel) + (1 | fitofisio), data = df_ad)
+l_md8[[3]] <- lmer(KS.obs ~ 1 + (1 | kernel) + (1 | fitofisio), data = df_ad)
+AICtab(l_md8, weights = TRUE)
+```
+__Janela de Código 111__
+
+- sumário e gráficos diagnósticos do modelo 1
+
+```{r chunk 11, echo=F}
+summary(l_md8[[1]])
+```
+__Janela de Código 11__
+
+- qqplot do modelo de trabalho 
+
+```{r echo=F, message=F}
+plotresid(l_md8[[1]], shapiro = T)
+```
+
+__Figura 12__ resíduos do modelo `KS ~ p + S * log(J) + (p | kernel) + (1 | fitofisio)`.
+
+
+### KS.sim ###
+
+
+  - escolha da distribuição de erros e função de link
+chunk 1: criação e seleçao de modelos com a estrutura fixa para selecionar a distribuição e função de ligação
+seleção: distribuições e funções de ligação 
+  - protocolo de ajuste do modelo: i) escalonar S, ii) usar os valores de start a partir do glm
+  
+```{r chunk 12, echo = TRUE}
+# df_ad$KS.sim %>% hist(.,n=40)
+l_md9 <- vector("list", length = 5) #lista com os modelos para selecionar a distribuição de KS
+names(l_md9) <- c("norm","lognorm","gamma_id","gamma_log","gamma_inv")
+l_md9[[1]] <- glm(KS.sim ~ p + S.sc * log(J), data = df_ad) #norm
+l_md9[[2]] <- glm(KS.sim ~ p + S.sc * log(J), family = gaussian(link = "log"), data = df_ad) #lognorm
+l_md9[[3]] <- glm(KS.sim ~ p + S.sc * log(J), family = Gamma(link = "identity"), data = df_ad) #Gamma; identity
+l_md9[[4]] <- glm(KS.sim ~ p + S.sc * log(J), family = Gamma(link = "log"), data = df_ad) #Gamma; log
+l_md9[[5]] <- glm(KS.sim ~ p + S.sc * log(J), family = Gamma(link = "inverse"), data = df_ad) #Gamma; inverse
+AICtab(l_md9, weights = TRUE)
+```
+__Janela de Código 12__ 
+
+  O modelo com a distribuição Gamma e função de ligação log foi o mais plausível. 
+
+seleção: VR ~ p + S * log(J) + (p | kernel) + (1 | fitofisio)
+         VR ~ 1 + S * log(J) + (1 | kernel) + (1 | fitofisio)  
+         VR ~ 1 + (1 | kernel) + (1 | fitofisio)  
+
+```{r chunk 13, echo = TRUE}
+# df_ad$KS.sim %>% hist(.,n=40)
+l_md10 <- vector("list", length = 3) #lista com os modelos para selecionar a distribuição de KS.sim
+names(l_md10) <- c("KS.sim ~ p + VC","KS.sim ~ 1 + VC","KS.sim ~ 1")
+l_md10[[1]] <- lmer(KS.sim ~ p + S.sc * log(J) + (p | kernel) + (1 | fitofisio), data = df_ad, start=list(fixef = coef(l_md9[[1]]) ) )
+l_md10[[2]] <- lmer(KS.sim ~ 1 + S.sc * log(J) + (1 | kernel) + (1 | fitofisio), data = df_ad)
+l_md10[[3]] <- lmer(KS.sim ~ 1 + (1 | kernel) + (1 | fitofisio), data = df_ad)
+AICtab(l_md10, weights = TRUE)
+```
+__Janela de Código 13__
+
+- sumário e gráficos diagnósticos do modelo de trabalho
+
+```{r chunk 14, echo=F}
+summary(l_md10[[1]])
+```
+__Janela de Código 14__
+
+- qqplot do modelo de trabalho 
+
+```{r echo=F, message=F}
+plotresid(l_md10[[1]], shapiro = T)
+```
+
+__Figura 13__ resíduos do modelo `KS ~ p + S * log(J) + (p | kernel) + (1 | fitofisio)`.
+
+
+
+TEXTO COMUM
+# Resumo dos resultados #
+- Em conjunto o que os dados estão falando? KS - divergência absoluta, KS.diff - divergência mantendo o sinal, KS.ab - abundância onde ocorreu a divergência, KS.obs - percentil da SAD observada associada à KS.
+
+
+## Efeitos fixos e aleatórios dos modelos ajustados ##
+-gráfico dos efeitos aleatórios de `VR ~ p` considerando a estrutura fixa e aleatória
+-descrição da figura: 40 gráficos mostrando a tendência do efeito fixo e aleatório de p, 8 linhas e 5 colunas, para cada nível de `kernel` e `VR`
+
+
+
+
+
+
+
+# Figuras texto comitê #
+
+```{r}
+colvec <- c("#ff1111","#000000")
+l_p<-vector("list",length=7)
+l_p[[1]] <- ggplot(df_ad, aes(x=KS)) + 
+  geom_histogram(aes(y = ..density..), binwidth=density(df_ad$KS)$bw) + 
+  geom_density(col=2)
+l_p[[2]] <- ggplot(df_ad, aes(x=KS.diff)) + 
+  geom_histogram(aes(y = ..density..), binwidth=density(df_ad$KS.diff)$bw) + 
+  geom_density(col=2)
+l_p[[3]] <- ggplot(df_ad, aes(x=log(KS.ab)) ) + 
+  geom_histogram(aes(y = ..density..), binwidth=density(log(df_ad$KS.ab))$bw) + 
+  geom_density(col=2)
+l_p[[4]] <- ggplot(df_ad, aes(x=KS.obs)) + 
+  geom_histogram(aes(y = ..density..), binwidth=density(df_ad$KS.obs)$bw) + 
+  geom_density(col=2) 
+l_p[[5]] <- ggplot(df_ad, aes(x=KS.sim)) + 
+  geom_histogram(aes(y = ..density..), binwidth=density(df_ad$KS.sim)$bw) + 
+  geom_density(col=2)
+l_p[[6]] <- ggplot(df_ad, aes(x=KS, y = KS.diff)) + geom_point()
+l_p[[7]] <- ggplot(df_ad, aes(x=KS.obs, y=KS.sim) ) + geom_point(colour=ifelse(df_ad$KS>0.2,colvec[1],colvec[2]))
+lay<-rbind(c(1,2,3,4,5),
+           c(1,2,3,4,5),
+           c(6,6,NA,7,7),
+           c(6,6,NA,7,7))
+grid.arrange(l_p[[1]],l_p[[2]],l_p[[3]],l_p[[4]],l_p[[5]],l_p[[6]],l_p[[7]],ncol=6,nrow=4,layout_matrix=lay)
+
+```
+
+
+```{r echo=F, fig.height=5,fig.width=10}
+# OBJETIVO: plotar efeitos fixos e aleatórios de p por variável 
+# DESCRIÇÂO: figura, 5 colunas, 1 linhas, cada painel é um gráfico de VR na escala da função de ligação por p. 
+# Cada gráfico contêm 9 retas, mostrando o efeito de p na estrutura fixa e em cada nível de kernel
+
+# cada variaável é uma lista com 8 gráficos
+df_graf<-df_ad[,c(1:6,17,8,13)]
+levels_kernel<-unique(df_ad$kernel)
+variaveis <- names(df_graf)[3:7]
+paleta <- heat.colors(8,alpha = 0.5)
+# KS #
+
+# l_md2[[1]] <- glmer(KS ~ p + S.sc * log(J) + (p | kernel) + (1 | fitofisio), family = Gamma(link = "inverse"), data = df_ad, # KS ~ p 
+#                     start=list(fixef = coef(l_md1[[5]])), control=glmerControl(optimizer="bobyqa", optCtrl=list(maxfun=2e5)) )
+l_p_KS.p<-vector("list",length = 2)
+
+l_p_KS.p[[2]]<-as.data.frame(ranef(l_md2[[1]])[1])
+l_p_KS.p[[2]]$fixo.p <- fixef(l_md2[[1]])[2]
+l_p_KS.p[[2]]$int.p <- fixef(l_md2[[1]])[1]
+
+eq_fixo <- function(x){1/(l_p_KS.p[[2]][1,3]) * x}
+l_p_KS.p[[1]] <- ggplot(df_graf,aes(x=p,y=KS)) + scale_x_continuous(limits = c(-1, 1)) +  scale_y_continuous(limits = c(-1, 1)) +
+                   stat_function(fun=function(x){1/(l_p_KS.p[[2]][1,2]) * x},size=2,col=paleta[8]) +
+                   stat_function(fun=function(x){1/(l_p_KS.p[[2]][2,2]) * x},size=2,col=paleta[7]) +
+                   stat_function(fun=function(x){1/(l_p_KS.p[[2]][3,2]) * x},size=2,col=paleta[6]) +
+                   stat_function(fun=function(x){1/(l_p_KS.p[[2]][4,2]) * x},size=2,col=paleta[5]) +
+                   stat_function(fun=function(x){1/(l_p_KS.p[[2]][5,2]) * x},size=2,col=paleta[4]) +
+                   stat_function(fun=function(x){1/(l_p_KS.p[[2]][6,2]) * x},size=2,col=paleta[3]) +
+                   stat_function(fun=function(x){1/(l_p_KS.p[[2]][7,2]) * x},size=2,col=paleta[2]) +
+                   stat_function(fun=function(x){1/(l_p_KS.p[[2]][8,2]) * x},size=2,col=paleta[1]) +
+                   stat_function(fun=eq_fixo,size=2,col="blue") +
+                   theme_dark() + theme(axis.text.x = element_blank(),axis.text.y = element_blank(),axis.ticks = element_blank()) +
+                   ggtitle("KS") + theme(plot.title = element_text(hjust = 0.5)) + labs(x="p",y="")
+# KS.diff
+# l_md4[[1]] <- glmer(KS.diff_1 ~ p + S.sc * logJ.sc + (p | kernel) + (1 | fitofisio), family = Gamma(link = "identity"), data = df_ad, # KS.diff_1 ~ p 
+#                     start=list(fixef = coef(l_md3[[3]]) ), control=glmerControl(optimizer="bobyqa", optCtrl=list(maxfun=2e5)) )
+
+l_p_KS.diff.p<-vector("list",length = 2)
+
+l_p_KS.diff.p[[2]]<-as.data.frame(ranef(l_md4[[1]])[1])
+l_p_KS.diff.p[[2]]$fixo.p <- fixef(l_md4[[1]])[2]
+l_p_KS.diff.p[[2]]$int.p <- fixef(l_md4[[1]])[1]
+
+eq_fixo <- function(x){l_p_KS.diff.p[[2]][1,3] * x * (-1)}
+l_p_KS.diff.p[[1]] <- ggplot(df_graf,aes(x=p,y=KS.diff_1)) + scale_x_continuous(limits = c(-1, 1)) +  scale_y_continuous(limits = c(-0.5, 0.5)) +
+                   stat_function(fun=function(x){l_p_KS.diff.p[[2]][1,2] * x * (-1)},size=2,col=paleta[8]) +
+                   stat_function(fun=function(x){l_p_KS.diff.p[[2]][2,2] * x * (-1)},size=2,col=paleta[7]) +
+                   stat_function(fun=function(x){l_p_KS.diff.p[[2]][3,2] * x * (-1)},size=2,col=paleta[6]) +
+                   stat_function(fun=function(x){l_p_KS.diff.p[[2]][4,2] * x * (-1)},size=2,col=paleta[5]) +
+                   stat_function(fun=function(x){l_p_KS.diff.p[[2]][5,2] * x * (-1)},size=2,col=paleta[4]) +
+                   stat_function(fun=function(x){l_p_KS.diff.p[[2]][6,2] * x * (-1)},size=2,col=paleta[3]) +
+                   stat_function(fun=function(x){l_p_KS.diff.p[[2]][7,2] * x * (-1)},size=2,col=paleta[2]) +
+                   stat_function(fun=function(x){l_p_KS.diff.p[[2]][8,2] * x * (-1)},size=2,col=paleta[1]) +
+                   stat_function(fun=eq_fixo,size=2,col="blue") +
+                   theme_dark() + theme(axis.text.x = element_blank(),axis.text.y = element_blank(),axis.ticks = element_blank())  +
+                   ggtitle("KS.diff") + theme(plot.title = element_text(hjust = 0.5)) + labs(x="p",y="") 
+# +
+#                    ggtitle("KS.diff")  
+
+# KS.ab
+# l_md6[[1]] <- glmer(KS.ab ~ p + S.sc * log(J) + (p | kernel) + (1 | fitofisio), family = Gamma(link = "log"), data = df_ad, # KS.ab ~ p 
+#                     start=list(fixef = coef(l_md5[[4]])), control=glmerControl(optimizer="bobyqa", optCtrl=list(maxfun=2e5)) )
+l_p_KS.ab.p<-vector("list",length = 2)
+
+l_p_KS.ab.p[[2]]<-as.data.frame(ranef(l_md6[[1]])[1])
+l_p_KS.ab.p[[2]]$fixo.p <- fixef(l_md6[[1]])[2]
+l_p_KS.ab.p[[2]]$int.p <- fixef(l_md6[[1]])[1]
+
+eq_fixo <- function(x){l_p_KS.ab.p[[2]][1,3] * x}
+l_p_KS.ab.p[[1]] <- ggplot(df_graf,aes(x=p,y=KS.ab)) + scale_x_continuous(limits = c(-1, 1)) +  scale_y_continuous(limits = c(-0.5, 0.5)) +
+                   stat_function(fun=function(x){l_p_KS.ab.p[[2]][1,2] * x},size=2,col=paleta[8]) +
+                   stat_function(fun=function(x){l_p_KS.ab.p[[2]][2,2] * x},size=2,col=paleta[7]) +
+                   stat_function(fun=function(x){l_p_KS.ab.p[[2]][3,2] * x},size=2,col=paleta[6]) +
+                   stat_function(fun=function(x){l_p_KS.ab.p[[2]][4,2] * x},size=2,col=paleta[5]) +
+                   stat_function(fun=function(x){l_p_KS.ab.p[[2]][5,2] * x},size=2,col=paleta[4]) +
+                   stat_function(fun=function(x){l_p_KS.ab.p[[2]][6,2] * x},size=2,col=paleta[3]) +
+                   stat_function(fun=function(x){l_p_KS.ab.p[[2]][7,2] * x},size=2,col=paleta[2]) +
+                   stat_function(fun=function(x){l_p_KS.ab.p[[2]][8,2] * x},size=2,col=paleta[1]) +
+                   stat_function(fun=eq_fixo,size=2,col="blue") + 
+                   theme_dark() + theme(axis.text.x = element_blank(),axis.text.y = element_blank(),axis.ticks = element_blank())  +
+                   ggtitle("KS.ab") + theme(plot.title = element_text(hjust = 0.5)) + labs(x="p",y="")
+# +
+#                    ggtitle("KS.ab")  
+
+# KS.obs
+# l_md8[[1]] <- lmer(KS.obs ~ p + S.sc * log(J) + (p | kernel) + (1 | fitofisio), data = df_ad)
+l_p_KS.obs.p<-vector("list",length = 2)
+
+l_p_KS.obs.p[[2]]<-as.data.frame(ranef(l_md8[[1]])[1])
+l_p_KS.obs.p[[2]]$fixo.p <- fixef(l_md8[[1]])[2]
+l_p_KS.obs.p[[2]]$int.p <- fixef(l_md8[[1]])[1]
+
+eq_fixo <- function(x){l_p_KS.obs.p[[2]][1,3] * x}
+l_p_KS.obs.p[[1]] <- ggplot(df_graf,aes(x=p,y=KS.obs)) + scale_x_continuous(limits = c(-1, 1)) +  scale_y_continuous(limits = c(-0.5, 0.5)) +
+                   stat_function(fun=function(x){l_p_KS.obs.p[[2]][1,2] * x},size=2,col=paleta[8]) +
+                   stat_function(fun=function(x){l_p_KS.obs.p[[2]][2,2] * x},size=2,col=paleta[7]) +
+                   stat_function(fun=function(x){l_p_KS.obs.p[[2]][3,2] * x},size=2,col=paleta[6]) +
+                   stat_function(fun=function(x){l_p_KS.obs.p[[2]][4,2] * x},size=2,col=paleta[5]) +
+                   stat_function(fun=function(x){l_p_KS.obs.p[[2]][5,2] * x},size=2,col=paleta[4]) +
+                   stat_function(fun=function(x){l_p_KS.obs.p[[2]][6,2] * x},size=2,col=paleta[3]) +
+                   stat_function(fun=function(x){l_p_KS.obs.p[[2]][7,2] * x},size=2,col=paleta[2]) +
+                   stat_function(fun=function(x){l_p_KS.obs.p[[2]][8,2] * x},size=2,col=paleta[1]) +
+                   stat_function(fun=eq_fixo,size=2,col="blue") + 
+                   theme_dark() + theme(axis.text.x = element_blank(),axis.text.y = element_blank(),axis.ticks = element_blank())  +
+                   ggtitle("KS.obs") + theme(plot.title = element_text(hjust = 0.5)) + labs(x="p",y="")
+# +
+#                    ggtitle("KS.obs")  
+
+# KS.sim
+# l_md10[[1]] <- lmer(KS.sim ~ p + S.sc * log(J) + (p | kernel) + (1 | fitofisio), data = df_ad, start=list(fixef = coef(l_md9[[1]]) ) )
+l_p_KS.sim.p<-vector("list",length = 2)
+
+l_p_KS.sim.p[[2]]<-as.data.frame(ranef(l_md10[[1]])[1])
+l_p_KS.sim.p[[2]]$fixo.p <- fixef(l_md10[[1]])[2]
+l_p_KS.sim.p[[2]]$int.p <- fixef(l_md10[[1]])[1]
+
+eq_fixo <- function(x){l_p_KS.sim.p[[2]][1,3] * x}
+l_p_KS.sim.p[[1]] <- ggplot(df_graf,aes(x=p,y=KS.sim)) + scale_x_continuous(limits = c(-1, 1)) +  scale_y_continuous(limits = c(-0.5, 0.5)) +
+                   stat_function(fun=function(x){l_p_KS.sim.p[[2]][1,2] * x},size=2,col=paleta[8]) +
+                   stat_function(fun=function(x){l_p_KS.sim.p[[2]][2,2] * x},size=2,col=paleta[7]) +
+                   stat_function(fun=function(x){l_p_KS.sim.p[[2]][3,2] * x},size=2,col=paleta[6]) +
+                   stat_function(fun=function(x){l_p_KS.sim.p[[2]][4,2] * x},size=2,col=paleta[5]) +
+                   stat_function(fun=function(x){l_p_KS.sim.p[[2]][5,2] * x},size=2,col=paleta[4]) +
+                   stat_function(fun=function(x){l_p_KS.sim.p[[2]][6,2] * x},size=2,col=paleta[3]) +
+                   stat_function(fun=function(x){l_p_KS.sim.p[[2]][7,2] * x},size=2,col=paleta[2]) +
+                   stat_function(fun=function(x){l_p_KS.sim.p[[2]][8,2] * x},size=2,col=paleta[1]) +
+                   stat_function(fun=eq_fixo,size=2,col="blue") + 
+                   theme_dark() + theme(axis.text.x = element_blank(),axis.text.y = element_blank(),axis.ticks = element_blank())  +
+                   ggtitle("KS.sim") + theme(plot.title = element_text(hjust = 0.5)) + labs(x="p",y="")
+# +
+#                    ggtitle("KS.sim")  
+
+suppressWarnings(grid.arrange(l_p_KS.p[[1]],l_p_KS.diff.p[[1]],l_p_KS.ab.p[[1]],l_p_KS.obs.p[[1]],l_p_KS.sim.p[[1]],ncol=5))
+```
+
+
+
+
+
+-como a SAD neutra varia no gradiente de fragmentação? (olhar Campos e Alonso se não me engano)
+-discutir a estrutura fixa
+  -variável de interesse: p scatterplot com as 4 variáveis de interesse (análise exploratória)
+__ Figura 2. __ 4 scatterplots, um para cada uma das variáveis
+  -variáveis de controle: S e J scatterplot com as 4 variáveis de interesse e com os resultados da sensibilidade dos dados a essas variáveis (análise exploratória e anexo)
+__ Figura 3. __ 8 scatterplots, um para cada variável controle e um para cada VR 
+-discutir a estrutura randômica
+  -variável de interesse: (p | kernel) 4 scatterplots com 8 retas, uma para cada kernel de dispersão (análise exploratória)
+__ Figura 4. __ Similar à figura 2 mas uma reta por kernel  
+  -variável de controle amostral: (1 | fitofisio) 4 grupos de boxplots para cada cada fitofisio (análise exploratória)
+__ Figura 5. __ Similar à figura 2 mas uma reta por fitofisionomia  
+
+## ANEXO ##
+
+Figura A1: scatterplotMatrix de todas as variáveis relacionadas com a simulação

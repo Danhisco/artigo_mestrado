@@ -1,0 +1,789 @@
+---
+title: "Análise dos Dados - GOF"
+author: "Danilo Pereira Mori"
+date: "27 de fevereiro de 2017"
+output: pdf_document
+---
+```{r global_options, echo=FALSE}
+knitr::opts_chunk$set(echo=F, warning=FALSE, message=FALSE, cache = TRUE, tidy = TRUE, fig.width = 10, fig.height = 5)
+```
+
+
+<!-- 
+############################################################################################
+############################## ESQUELETO DO TEXTO PRIINCIPAL ###############################
+############################################################################################
+
+
+JUSTIFICATIVA DO USO DE GOF - 
+  a) testes para avaliar o número de vezes que acontecem o erro tipo 1 deram OK; 
+  b) p valor é corrijido por S e J (propriedades do vetor de abundância), em prol de criar o modelo mais simples optamos por não considerar essa
+CONSTRUÇÃO DO MODELO DE TRABALHO - itens: vi e vii
+INFERÊNCIA ESTATÍSTICA - itens: viii -
+ANEXO - itens: i:v
+
+
+############################################################################################
+######################################### TAREFAS ########################################## 
+############################################################################################
+
+status: ESPERA#, PROXIMO , ESTUDO, IMPLEMENTANDO, ANALISANDO, FEITO, ESCRITO
+
+i) mudar a visualização das SADs para as curvas acumuladas - FEITO
+
+ii) classificação visual da relação entre as SADs réplicas e SAD simuladas - FEITO
+
+iii) comparação gráfica do GOF com as outras variáveis (validação "internamente coerente"") - FEITO
+
+iv) comparação gráfica do GOF com os fatores da classificação visual (validação visual) - FEITO
+
+v) 
+  o) número de sítios/GOF ~ GOF * kernel - FEITO 
+  a) plotar o logito de GOF ~ kernel (~ SiteCode) - FEITO
+  b) realizar regressões lineares por Site - FEITO
+  c) regressão dos coeficientes por p, S e log(J) - FEITO
+  d) análise e fechamento - FEITO
+
+vi) Seleção do modelo de trabalho 
+  a) seleção da estrutura fixa e aleatória segundo o protocolo de Zuur et al. 2009 - FEITO
+  
+  b) Avaliação do modelo (adaptação Bolker et al. 2008):
+    > modelos usados: 
+  
+      # Modelo de trabalho: usado para realizar a inferência estatística do efeito da cobertura na qualidade do ajuste
+      - md_GOF <- GOF ~ p * kernel + (kernel | Site) 
+  
+      # Modelo desconsiderando a relação entre sítios dado suas características de paisagem (no caso, cobertura vegetal)
+      - md_GOF.kernel_1site <- GOF ~ kernel + (1 | Site) 
+  
+      # Modelo desconsiderando a estrutura aleatória - ou seja, não considera a variação que existe entre sítios, 
+      há apenas uma tendência geral na relação entre kernel e cobertura vegetal 
+      - md_GOF.kernel <- GOF ~ p * kernel  
+
+      # idem fatiando os dados - só pra compara coeficientes
+      - md_GOF.subKernel <- GOF ~ p, subset = kernel
+
+    NOTA: usar a mesma função de ligação escolhida para o modelo de trabalho em todos os outros
+   
+    > AIC e gráficos:
+      
+      - estrutura aleatória: md_GOF e md_GOF.kernel_1site - PROXIMO1
+      
+      - estrutura fixa: md_GOF, md_GOF.kernel e md_GOF.subKernel - PROXIMO2
+  
+vii) Comparação visual da estimativa do modelo de trabalho:
+  a) estrutura fixa ~ kernel [dados contra modelo]
+  b) estrutura aleatória ~ Site [dados contra modelo]
+  
+viii) Inferência estatística a partir do modelo de trabalho:
+  a) efeitos fixos: estimativa e quantils em torno da estimativa [ GOF ~ p * kernel ]
+  b) efeitos aleatórios: idem, separar por classe de cobertura vegetal [ GOF ~ kernel + (1|Site) ]
+-->
+
+
+
+```{r global packages and data, echo=F, message=FALSE, warning=FALSE}
+library(gridExtra) 
+library(ggplot2) 
+library(MASS)
+library(sads)
+library(magrittr)
+library(plyr)
+library(dplyr)
+load("/home/danilo/Desktop/dados_DaniloPMori.Rdata")
+```
+
+## OBJETIVO ##
+
+<!-- 
+-Apresentação da questão
+  GOF: número de réplicas que foi considerada bem ajustada segundo o critério de p value > 0.05 do teste de Kolmogorov-Smirnov
+-Análise gráfica do GOF
+-GOF e SADs
+-Discussão
+  GOF e KS.p 
+  GOF e outras variáveis.
+-->
+
+simulação modelo neutro espacialmente explícito com 8 diferentes kernels em uma paisagem. Cada bateria de simulação contou com 100 réplicas, onde apliquei o teste de Kolmogorov Smirnov entre a SAD réplica com a respectiva da SAD observada. Contabilizei o número de réplicas onde o p valor associado ao teste KS >= 0.05, ou seja, quando a propabilidade de erro do tipo 1, refutar a hipótese nula de que as duas SADs são amostras de uma mesma distribuição, é maior que 5%. Chamo essa variável de GOF (*Goodness-of-fit*).
+
+
+## Análise Gráfica de GOF ##
+
+<!-- Gráficos Resumos --> 
+
+```{r fig 1, warning=FALSE}
+df_temp <- df_ad
+df_temp$GOF[df_temp$GOF == 0] <- 1
+df_temp$GOF[df_temp$GOF == 100] <- 99
+l_p <- vector("list",length=3)
+l_p[[1]] <- ggplot(df_temp,aes(x="",y=log(GOF/(100-GOF)) ) ) + geom_boxplot() + geom_jitter(aes(colour=kernel)) + theme(legend.position = "none")
+l_p[[2]] <- ggplot(df_temp,aes(x=p,y=log(GOF/(100-GOF)) ) ) + geom_point(aes(colour=kernel)) + geom_smooth(colour="red") + scale_y_continuous(name="")
+l_p[[3]] <- ggplot(df_temp,aes(x=p,y=log(GOF/(100-GOF)) ) ) + geom_point() + geom_smooth(colour="red") +
+  facet_wrap(~factor(df_temp$kernel),ncol=8) + 
+  theme(axis.text.x = element_blank(),axis.text.y = element_blank(),axis.ticks = element_blank())
+lay <- rbind(rep(1:2,each=4),rep(3,8))
+grid.arrange(l_p[[1]],l_p[[2]],l_p[[3]], ncol = 8, nrow = 2, layout_matrix = lay)
+# table(df_ad$GOF) %>% as.data.frame() %>% filter(Freq == max(.$Freq))
+```
+
+**Figura 1.** *Goodness-of-fit* (`GOF`) <!--[ou Qualidade de ajuste (QDA?)] --> Número de réplicas que produziram um bom ajuste por simulação, varia de 0 a 100. As SADs réplicas foram comparadas com suas respectivas SADs observadas utilizando o teste de Kolmogorov-Smirnov, assumimos um p crítico de 0.05 para considerar que a SAD réplica é uma boa reprodução da SAD observada. Primeiroo painel: *Boxpĺot* de `GOF`; segundo painel: *Scatterplot* de `GOF ~ p * kernel`; terceiro painel:  *Scatterplot* de `GOF ~ p (~ kernel)`
+
+<!-- boxplot -->
+  As observações estão aglutinadas em altos valores de `GOF`(figura 1. primeiro painel), o primeiro quartil de `GOF` está entre 0 e 89, contabilizando 170 observações com variância igual a `var(df_ad$GOF[df_ad$GOF<89])`. A variância no primeiro quarto da amostra é `var(df_ad$GOF[df_ad$GOF<89])/var(df_ad$GOF[df_ad$GOF>89])` maior que a variância nas 513 observações restantes. A variável `GOF` é assimétrica para a direita, sua média e mediana são respectivamente 88.51 e 99.00, a moda é 100 ( `paste(round(length(df_ad$GOF[df_ad$GOF==100])*100/length(df_ad$GOF),3),"%",sep="")` da amostra). Parece haver uma leve relação positiva entre `kernel` e a variância de `GOF` (figura 1. primeiro painel).
+<!-- Scatterplot 1 e 2-->  
+  De maneira geral o modelo neutro produz boas simulações ao longo de todo o gradiente de cobertura vegetal (figura 1, segundo painel). Parece haver uma interação entre `kernel` e `p` que está mais associada à variância do que a tendência geral dos dados - a variância aumenta com o aumento do `kernel` em associação ao aumento de `p`: em altos valores de `p` há sempre maior variância, o aumento de kernel mitiga essa relação aumentando a variância mesmo em baixos valores de `p`(figura 1, segunda linha de painéis)[REESCREVER]. Nas próximas sessões analisei 
+
+
+
+
+## ANEXO: Efeito de kernel na qualidade da predição pela simulação neutra  ##
+
+**Qual o efeito de kernel na qualidade da simulação? As classes de kernel diferem no número de sítios que apresentam bons ajustes?**
+
+
+```{r}
+ggplot(ddply(df_ad,c("GOF","kernel"),summarise,n.Site=length(SiteCode) ), 
+       aes(x=desc(GOF), y=log(n.Site)) ) + 
+        geom_point() + facet_wrap(~kernel,ncol=4)
+```
+
+** Figura 4 .** Log do número de sítios por valor de GOF, dividido por kernel [REESCREVER]. 
+
+  Na figura X o número de sítios por valor de GOf (eixo y na escala log), ou seja, quantos sitios apresentam um determinado valor de GOF.Essa relação pode ser descrita como um J invertido, a maioria das simulações produz boas réplicas do observado, o número de simulações por faixa de GOF diminui exponencialmente com a diminuição de GOF [REESCREVER]. Parece que para alguns níveis de kernel a variância é maior (figura X, paineis=[l=1,c=4; l=1,c=8;]). Mudanças no escalar também parecem ocorrer: compare os paineis [(2,1);(2,2)] com [(1,4);(2,8)]. 
+  
+  Os niveis de `kernel` 31.1m, 47.4m, 82.17m (e quase 99.3m), não apresentam nenhuma simulação com menos de 25 boas SADs réplicas (figura 4). Apenas o nível 157.8m apresentou um sítio sem uma réplica boa, o nível 64.5m possui desempenho semelhante (figura 4). Existem alguns pontos que parecem distoar do padrão leptocúrtico da distribuição (paineis (1,1), (1,3) e (2,1:3) ). Como `n.Site` apresenta relação E(X^1) / E(X^2) = `mean(df_temp$n.Site)/var(df_temp$n.Site)` vou utilizar a distribuição binomial negativa como distribuição de erros (em código seleção de distribuição entre binomial negativa e poisson) - distribuição Poisson apresenta relação E(X^1) / E(X^2) próximos de 1.
+  
+```{r include=F, echo=F}
+df_temp <- ddply(df_ad,c("GOF","kernel"),summarise,n.Site=length(SiteCode) ) %>% arrange(desc(GOF),kernel)
+df_temp$kernel %<>% as.factor
+
+# visualização 
+# df_temp$n.Site %>% log %>% hist
+# mean(df_temp$n.Site)/var(df_temp$n.Site)
+
+# seleção da distribuição teórica subjacente #
+l_md <- vector("list",length=2)
+names(l_md) <- c("Poisson", "Binomial Negativa")
+l_md[[1]] <- glm(n.Site ~ GOF * kernel, data = df_temp, family = "poisson")
+l_md[[2]] <- MASS::glm.nb(n.Site ~ GOF * kernel, data = df_temp)
+AICctab(l_md,weights=T)
+```
+
+
+__Janela de código __ Seleção de variáveis regressão número de sítios/GOF ~ GOF 
+```{r echo=T}
+df_temp <- ddply(df_ad, c("GOF","kernel"), summarise, n.Site = length(SiteCode))
+df_temp$kernel %<>% as.factor
+
+# Seleção de variáveis #
+l_md <- vector("list",length=3)
+names(l_md) <- c("Interação entre variáveis", "Efeito médio", "sem efeito de kernel")
+l_md[[1]] <- MASS::glm.nb(n.Site ~ GOF * kernel, data = df_temp)
+l_md[[2]] <- MASS::glm.nb(n.Site ~ GOF + kernel, data = df_temp)
+l_md[[3]] <- MASS::glm.nb(n.Site ~ GOF , data = df_temp)
+AICctab(l_md,weights=T)
+```
+
+
+  O modelo sem efeito de kernel é o único dentro do intervalo de plausibilidade. Como trata-se de uma avaliação exploratória dos dados não irei me aprofundar na avaliação do modleo selecionado, contudo, 
+
+
+  
+  
+  Utilizando essa abordagem não é possível discriminar como os Sites nas faixas de GOF variam em resposta a kernel, ou seja, se o efeito de kernel depende do sítio. Para ter acesso a esse dado vou separar a análise por sítio. Existem grupos de pontos que possuem o mesmo padrão nos gráficos diagnóstico (figura 6 e.g. painel (1,1)). Desses resultados emergem novas questões: como a relação GOF ~ kernel varia por sítio? Existem grupos de sítios que respondem de maneira similar? E qual o papel da cobertura vegetal? 
+
+## GOF ~ kernel (~ Site) ##
+
+  
+
+```{r}
+# Etapas: i) visualização gráfica na escala logito; ii) estimativa dos coeficientes; iii) regressão dos coeficientes #
+# ggplot(df_ad, aes(x=kernel,y=GOF, group=SiteCode)) + geom_point(aes(colour=SiteCode)) + theme(legend.position="none") + facet_wrap(~ as.factor(cut(df_ad$p,10)),ncol=5)
+df_temp <- df_ad
+df_temp[df_temp$GOF==0,"GOF"] <- 1
+df_temp[df_temp$GOF==100,"GOF"] <- rep(99,332)
+
+ggplot(df_temp, aes(x=kernel,y=log(GOF/(100-GOF)), group=SiteCode)) + 
+  geom_line(aes(colour=SiteCode)) +
+  facet_wrap(~ as.factor(cut(df_ad$p,10)),ncol=5) + 
+  theme(legend.position="none") + labs(title="",x = "kernel (m)", y = "logito(GOF)")
+```
+
+**Figura 7 ** `log(GOF/(100-GOF) ~ kernel (~ SiteCode)` Cada linha representa um sítio diferente
+
+```{r include=F}
+df_ad %>% filter(GOF<50) %>% dplyr::select(SiteCode,p, S, J,fitofisio, succession) %>% unique
+```
+
+  Há 17 sítios que nunca ultrapassam GOF > 50 (em código tabela com algumas informações desses sítios). Os sítios compartilham padrões do efeito de kernel: i) `GOF ~ kernel` -> 0, ii) `GOF ~ kernel` < 0, iii) `GOF ~ kernel` > 0. Vou modelar a variável GOF utilizando uma distribuição binomial.
+
+```{r fig.height=6}
+df_temp <- df_ad %>% mutate(GOF.p = GOF/100)
+
+l_md <- vector("list",length = 3)
+l_md[[1]] <- glm(GOF.p ~ kernel * SiteCode, family = "binomial",data=df_temp)
+# l_md[[2]] <- glm(GOF.p ~ kernel + SiteCode, family = "binomial",data=df_temp)
+# l_md[[3]] <- glm(GOF.p ~ kernel, family = "binomial",data=df_temp)
+# AICctab(l_md,weights=T)
+
+df_temp <- data.frame(SiteCode = unique(sort(df_ad$SiteCode)), coef_k.site = unname(coef(l_md[[1]])[c(2,88:172)]), int_site = unname(coef(l_md[[1]])[c(1,3:87)]) )
+df_temp %<>% inner_join(x=.,y=unique(df_ad[,c("SiteCode","p","S","J","fitofisio","succession")]), by="SiteCode") %>% suppressWarnings()
+
+# grid.arrange(ggplot(df_temp,aes(x="",y=coef_k.site)) + geom_boxplot() + geom_jitter(), ggplot(df_temp,aes(x="",y=int_site)) + geom_boxplot() + geom_jitter(), ncol=2,nrow=1)
+l_p <- vector("list",length=10)
+l_p[[1]] <- ggplot(df_temp, aes(y=coef_k.site,x=p)) + geom_point() + geom_smooth() + labs(title="",x = "", y = "coef(GOF ~ kernel")
+l_p[[2]] <- ggplot(df_temp, aes(y=coef_k.site,x=S)) + geom_point() + geom_smooth() + labs(title="",x = "", y = "")
+l_p[[3]] <- ggplot(df_temp, aes(y=coef_k.site,x=log(J))) + geom_point() + geom_smooth() + labs(title="",x = "", y = "")  
+l_p[[4]] <- ggplot(df_temp, aes(y=coef_k.site,x=fitofisio)) + geom_boxplot() + geom_jitter() + labs(title="",x = "", y = "")
+l_p[[5]] <- ggplot(df_temp, aes(y=coef_k.site,x=succession)) + geom_boxplot() + geom_jitter() + labs(title="",x = "", y = "")
+l_p[[6]] <- ggplot(df_temp, aes(y=int_site,x=p)) + geom_point() + geom_smooth() + labs(title="",x = "p", y = "intercepto(GOF ~ kernel")
+l_p[[7]] <- ggplot(df_temp, aes(y=int_site,x=S)) + geom_point() + geom_smooth() + labs(title="",x = "S", y = "")
+l_p[[8]] <- ggplot(df_temp, aes(y=int_site,x=log(J))) + geom_point() + geom_smooth() + labs(title="",x = "log(J)", y = "") 
+l_p[[9]] <- ggplot(df_temp, aes(y=int_site,x=fitofisio)) + geom_boxplot() + geom_jitter() + labs(title="",x = "fitofisio", y = "")
+l_p[[10]] <- ggplot(df_temp, aes(y=int_site,x=succession)) + geom_boxplot() + geom_jitter() + labs(title="",x = "sucession", y = "")
+do.call("grid.arrange",c(l_p,ncol=5,nrow=2))
+coef(l_md[[1]]) %>% length()
+# df_ad %>% head
+```
+
+
+- Não há resposta
+
+
+
+## ANEXP: GOF e SADs ##  
+  
+  Em suma, `GOF` é assimétrico para a direita, com moda em seu valor máximo (100%) em todo o gradiente de `p`. A variância de `GOF` parece ser mais sensível a variação da interação `p : kernel`, apresentando relação positiva: quanto maior `p` e `kernel` maior a variância (fig. 1). As variáveis de controle parecem não criar nenhum fator de confusão quanto a possíveis tendências de `GOF`, mas parecem ter efeito na variância dos dados apresentando variância máxima em valores intermediários das variáveis de controle, esse padrão é válido para todos as classes de `p` e parece interagir com `kernel` (fig. 3).
+  Como o primeiro quarto da amostra varia de 0 até 89 e conta com a maior parte da variação vou avaliar primeiro esse conjunto de dados. Subdivi o primeiro quarto da amostra em 3 classes de igual tamanho de `GOF`. Na tabela 1, os 47 `SiteCodes` que estão no primeiro quarto da amostra, os valores *NA* são aquelas obserações cujo `GOF`está acima do primeiro quartil da amostra
+
+
+*Tabela 1.* `GOF` por `SiteCode`. `p` e `kernel`
+```{r}
+df_temp <- df_ad %>% filter(GOF<=quantile(df_ad$GOF)[2]) %>% arrange(p,GOF) %>% select(SiteCode, kernel, GOF, p) %>% reshape2::dcast(.,p + SiteCode ~ kernel, value.var = "GOF")
+df_temp$GOF.medio <- round(apply(df_temp[,3:10],1,mean,na.rm=T),3)
+df_temp$GOF.var <- round(apply(df_temp[,3:10],1,var,na.rm=T),3)
+df_temp
+```
+
+## Resumo SADs réplicas e observadas ## 
+
+- `GOF` pequeno: alta variância nos valores extremos dos vetores (réplicas superestimam e subestimam em igual quantidade), em valores intermediários há divergência sistemática (ou sub ou superestimam)
+- Com o aumento do GOF a variância em valores intermediários aumenta levando as SADs réplicas a sup e subestimarem em igual quantidade todos os ranks da SAD obs. Nesses casos a variância tende a aumentar com o aumento do rank
+
+### 1o quartil ###
+
+
+*[0;29]*
+
+```{r include=F}
+df_temp <- df_ad %>% filter(GOF<=29) %>% select(SiteCode, kernel, GOF, p, S, J, KS.ab) %>% arrange(GOF) %>% mutate(log.J = log(J))
+
+df_temp$legenda <- paste("GOF =", df_temp[,"GOF"], ";\n",
+                         "p =", round(df_temp[,"p"], digits = 4), ";\n",
+                         sep=" ")
+
+sitecode <- df_temp$SiteCode %>% unique
+
+par(mfrow=c(8,5))
+par(mar = c(0.8,0.8,2.7,0.8))
+
+for(i in 1:length(sitecode)){
+  sad.obs <- df_SAD.obs %>% filter(SiteCode == sitecode[i]) %>% .$N.obs %>% sort(., decreasing = FALSE) %>% log # RAD obs
+  df_temp1 <- df_SAD.sim %>% filter(SiteCode == sitecode[i]) %>% select(N, rep, cluster_medio) # RAD simulada por sitecode
+  kernel <- df_temp %>% filter(SiteCode == sitecode[i]) %>% .$kernel %>% as.character()
+  for(j in 1:length(kernel)){
+    df_temp1 %>% filter(cluster_medio == kernel[j]) -> df_temp2
+    plot(sad.obs, (1:length(sad.obs)/length(sad.obs)), main = paste(sitecode[i], ", ", kernel[j], "m", df_temp[df_temp$SiteCode == sitecode[i] & df_temp$kernel == kernel[j],"GOF"],  sep = " "), type = "n",xlab="",ylab="")
+    # legenda <- df_temp %>% filter(SiteCode == sitecode[i] & kernel == kernel[j]) %>% .$legenda
+    # legend("topright",legenda, cex = 0.9)
+    for(c in 1:100){
+      sad.sim <- df_temp2 %>% filter(rep == as.character(c)) %>% .$N %>% sort %>% log
+      lines(sad.sim, (1:length(sad.sim)/length(sad.sim)),col = "red")
+    }
+    lines(sad.obs, (1:length(sad.obs)/length(sad.obs)), col = "black")
+    # KS_abund <- df_temp %>% filter(SiteCode == sitecode[1], kernel == kernel[j]) %>% .$KS.ab %>% log
+    # abline(h=KS_abund, col = "blue")
+  }
+}
+
+# para visualizar as SADs
+# for(i in 1:length(sitecode)){
+#   sad.obs <- df_SAD.obs %>% filter(SiteCode == sitecode[i]) %>% .$N.obs %>% sort(., decreasing = TRUE) %>% rad # RAD obs
+#   df_temp1 <- df_SAD.sim %>% filter(SiteCode == sitecode[i]) %>% select(N, rep, cluster_medio) # RAD simulada por sitecode
+#   kernel <- df_temp %>% filter(SiteCode == sitecode[i]) %>% .$kernel %>% as.character()
+#   for(j in 1:length(kernel)){
+#     df_temp1 %>% filter(cluster_medio == kernel[j]) -> df_temp2
+#     plot(sad.obs, main = paste(sitecode[i], ", ", kernel[j], "m", df_temp[df_temp$SiteCode == sitecode[i] & df_temp$kernel == kernel[j],"GOF"], sep = " "), type = "n",xlab="",ylab="")
+#     # legenda <- df_temp %>% filter(SiteCode == sitecode[i] & kernel == kernel[j]) %>% .$legenda
+#     # legend("topright",legenda, cex = 0.9)
+#     for(c in 1:100){
+#       df_temp2 %>% filter(rep == as.character(c)) %>% .$N %>% rad -> sad.sim
+#       lines(sad.sim, col = "red")
+#     }
+#     lines(sad.obs, col = "black")
+#     # KS_abund <- df_temp %>% filter(SiteCode == sitecode[1], kernel == kernel[j]) %>% .$KS.ab
+#     # abline(h=KS_abund, col = "blue")
+#   }
+# }
+```
+
+
+
+- 39 Simulações apresentaram `GOF` no intervalo 
+- Em geral há um ponto em que todas as réplicas divergem sistematicamente da SAD obs de uma mesma maneira: ou superestimam ou subestimam;
+- A variância tende a ser maior nos valores extremos dos vetores de abundância;
+
+
+*[30;59]*
+
+```{r include=FALSE}
+df_temp <- df_ad %>% filter(GOF>29 & GOF <=59) %>% select(SiteCode, kernel, GOF, p, S, J, KS.ab) %>% arrange(GOF) %>% mutate(log.J = log(J))
+df_temp$legenda <- paste("GOF =", df_temp[,"GOF"], ";\n",
+                         "p =", round(df_temp[,"p"], digits = 4), ";\n",
+                         sep=" ")
+
+sitecode <- df_temp$SiteCode %>% unique
+
+par(mfrow=c(8,5))
+par(mar = c(0.8,0.8,2.7,0.8))
+
+for(i in 1:length(sitecode)){
+  sad.obs <- df_SAD.obs %>% filter(SiteCode == sitecode[i]) %>% .$N.obs %>% sort(., decreasing = FALSE) %>% log # RAD obs
+  df_temp1 <- df_SAD.sim %>% filter(SiteCode == sitecode[i]) %>% select(N, rep, cluster_medio) # RAD simulada por sitecode
+  kernel <- df_temp %>% filter(SiteCode == sitecode[i]) %>% .$kernel %>% as.character()
+  for(j in 1:length(kernel)){
+    df_temp1 %>% filter(cluster_medio == kernel[j]) -> df_temp2
+    plot(sad.obs, (1:length(sad.obs)/length(sad.obs)), main = paste(sitecode[i], ", ", kernel[j], "m", sep = " "), type = "n",xlab="",ylab="")
+    # legenda <- df_temp %>% filter(SiteCode == sitecode[i] & kernel == kernel[j]) %>% .$legenda
+    # legend("topright",legenda, cex = 0.9)
+    for(c in 1:100){
+      sad.sim <- df_temp2 %>% filter(rep == as.character(c)) %>% .$N %>% sort %>% log
+      lines(sad.sim, (1:length(sad.sim)/length(sad.sim)),col = "red")
+    }
+    lines(sad.obs, (1:length(sad.obs)/length(sad.obs)), col = "black")
+    # KS_abund <- df_temp %>% filter(SiteCode == sitecode[1], kernel == kernel[j]) %>% .$KS.ab %>% log
+    # abline(h=KS_abund, col = "blue")
+  }
+}
+
+# para visualizar 
+# for(i in 1:length(sitecode)){
+#   sad.obs <- df_SAD.obs %>% filter(SiteCode == sitecode[i]) %>% .$N.obs %>% sort(., decreasing = TRUE) %>% rad # RAD obs
+#   df_temp1 <- df_SAD.sim %>% filter(SiteCode == sitecode[i]) %>% select(N, rep, cluster_medio) # RAD simulada por sitecode
+#   kernel <- df_temp %>% filter(SiteCode == sitecode[i]) %>% .$kernel %>% as.character()
+#   for(j in 1:length(kernel)){
+#     df_temp1 %>% filter(cluster_medio == kernel[j]) -> df_temp2
+#     plot(sad.obs, main = paste(sitecode[i], ", ", kernel[j], "m", df_temp[df_temp$SiteCode == sitecode[i] & df_temp$kernel == kernel[j],"GOF"], sep = " "), type = "n",xlab="",ylab="")
+#     # legenda <- df_temp %>% filter(SiteCode == sitecode[i] & kernel == kernel[j]) %>% .$legenda
+#     # legend("topright",legenda, cex = 0.9)
+#     for(c in 1:100){
+#       df_temp2 %>% filter(rep == as.character(c)) %>% .$N %>% rad -> sad.sim
+#       lines(sad.sim, col = "red")
+#     }
+#     lines(sad.obs, col = "black")
+#     # KS_abund <- df_temp %>% filter(SiteCode == sitecode[1], kernel == kernel[j]) %>% .$KS.ab
+#     # abline(h=KS_abund, col = "blue")
+#   }
+# }
+```
+
+- 37 simulações 
+- o padrão é similar ao interior, contudo, nos ranks intermediários há uma maior variância entre as SADs réplicas
+
+
+*[60;89[*
+
+```{r include=F}
+# df_ad %>% filter(GOF>59 & GOF <89) %>% select(SiteCode, Sindrome, GOF, p) %>% arrange(GOF,p) %>% dim
+# df_ad %>% filter(GOF>59 & GOF <89) %>% select(SiteCode,p) %>% arrange(p) %>% unique
+
+df_temp <- df_ad %>% filter(GOF>59 & GOF <89) %>% select(SiteCode, kernel, GOF, p, S, J, KS.ab) %>% arrange(GOF) %>% mutate(log.J = log(J))
+df_temp$legenda <- paste("GOF =", df_temp[,"GOF"], ";\n",
+                         "p =", round(df_temp[,"p"], digits = 4), ";\n",
+                         sep=" ")
+sitecode <- df_temp$SiteCode %>% unique
+
+for(i in 1:length(sitecode)){
+  sad.obs <- df_SAD.obs %>% filter(SiteCode == sitecode[i]) %>% .$N.obs %>% sort(., decreasing = FALSE) %>% log # RAD obs
+  df_temp1 <- df_SAD.sim %>% filter(SiteCode == sitecode[i]) %>% select(N, rep, cluster_medio) # RAD simulada por sitecode
+  kernel <- df_temp %>% filter(SiteCode == sitecode[i]) %>% .$kernel %>% as.character()
+  for(j in 1:length(kernel)){
+    df_temp1 %>% filter(cluster_medio == kernel[j]) -> df_temp2
+    plot(sad.obs, (1:length(sad.obs)/length(sad.obs)), main = paste(sitecode[i], ", ", kernel[j], "m", sep = " "), type = "n",xlab="",ylab="")
+    # legenda <- df_temp %>% filter(SiteCode == sitecode[i] & kernel == kernel[j]) %>% .$legenda
+    # legend("topright",legenda, cex = 0.9)
+    for(c in 1:100){
+      sad.sim <- df_temp2 %>% filter(rep == as.character(c)) %>% .$N %>% sort %>% log
+      lines(sad.sim, (1:length(sad.sim)/length(sad.sim)),col = "red")
+    }
+    lines(sad.obs, (1:length(sad.obs)/length(sad.obs)), col = "black")
+    # KS_abund <- df_temp %>% filter(SiteCode == sitecode[1], kernel == kernel[j]) %>% .$KS.ab %>% log
+    # abline(h=KS_abund, col = "blue")
+  }
+}
+
+# para visualizar 
+# for(i in 1:length(sitecode)){
+#   sad.obs <- df_SAD.obs %>% filter(SiteCode == sitecode[i]) %>% .$N.obs %>% sort(., decreasing = TRUE) %>% rad # RAD obs
+#   df_temp1 <- df_SAD.sim %>% filter(SiteCode == sitecode[i]) %>% select(N, rep, cluster_medio) # RAD simulada por sitecode
+#   kernel <- df_temp %>% filter(SiteCode == sitecode[i]) %>% .$kernel %>% as.character()
+#   for(j in 1:length(kernel)){
+#     df_temp1 %>% filter(cluster_medio == kernel[j]) -> df_temp2
+#     plot(sad.obs, main = paste(sitecode[i], ", ", kernel[j], "m", df_temp[df_temp$SiteCode == sitecode[i] & df_temp$kernel == kernel[j],"GOF"], sep = " "), type = "n",xlab="",ylab="")
+#     # legenda <- df_temp %>% filter(SiteCode == sitecode[i] & kernel == kernel[j]) %>% .$legenda
+#     # legend("topright",legenda, cex = 0.9)
+#     for(c in 1:100){
+#       df_temp2 %>% filter(rep == as.character(c)) %>% .$N %>% rad -> sad.sim
+#       lines(sad.sim, col = "red")
+#     }
+#     lines(sad.obs, col = "black")
+#     # KS_abund <- df_temp %>% filter(SiteCode == sitecode[1], kernel == kernel[j]) %>% .$KS.ab
+#     # abline(h=KS_abund, col = "blue")
+#   }
+# }
+
+```
+
+- 94 simulações
+- idem com aumento na variância
+
+### 2o quartil ###
+
+```{r include=F}
+# df_ad %>% filter(GOF >= as.numeric(quantile(df_ad$GOF)[2]) & GOF < as.numeric(quantile(df_ad$GOF)[3])) %>% select(SiteCode, Sindrome, GOF, p) %>% arrange(GOF,p)
+# df_ad %>% filter(GOF >= as.numeric(quantile(df_ad$GOF)[2]) & GOF < as.numeric(quantile(df_ad$GOF)[3])) %>% dim
+
+df_temp <- df_ad %>% filter(GOF >= as.numeric(quantile(df_ad$GOF)[2]) & GOF < as.numeric(quantile(df_ad$GOF)[3])) %>% select(SiteCode, kernel, GOF, p, S, J, KS.ab) %>% arrange(GOF) %>% mutate(log.J = log(J))
+
+df_temp$legenda <- paste("GOF =", df_temp[,"GOF"], ";\n",
+                         "p =", round(df_temp[,"p"], digits = 4), ";\n",
+                         sep=" ")
+set.seed(1234)
+sitecode <- df_temp$SiteCode %>% unique %>% sample(.,size=20)
+
+par(mfrow=c(4,5))
+par(mar = c(0.8,0.8,2.7,0.8))
+
+for(i in 1:length(sitecode)){
+  sad.obs <- df_SAD.obs %>% filter(SiteCode == sitecode[i]) %>% .$N.obs %>% sort(., decreasing = FALSE) %>% log # RAD obs
+  df_temp1 <- df_SAD.sim %>% filter(SiteCode == sitecode[i]) %>% select(N, rep, cluster_medio) # RAD simulada por sitecode
+  kernel <- df_temp %>% filter(SiteCode == sitecode[i]) %>% .$kernel %>% as.character()
+  for(j in 1:length(kernel)){
+    df_temp1 %>% filter(cluster_medio == kernel[j]) -> df_temp2
+    plot(sad.obs, (1:length(sad.obs)/length(sad.obs)), main = paste(sitecode[i], ", ", kernel[j], "m", sep = " "), type = "n",xlab="",ylab="")
+    # legenda <- df_temp %>% filter(SiteCode == sitecode[i] & kernel == kernel[j]) %>% .$legenda
+    # legend("topright",legenda, cex = 0.9)
+    for(c in 1:100){
+      sad.sim <- df_temp2 %>% filter(rep == as.character(c)) %>% .$N %>% sort %>% log
+      lines(sad.sim, (1:length(sad.sim)/length(sad.sim)),col = "red")
+    }
+    lines(sad.obs, (1:length(sad.obs)/length(sad.obs)), col = "black")
+    # KS_abund <- df_temp %>% filter(SiteCode == sitecode[1], kernel == kernel[j]) %>% .$KS.ab %>% log
+    # abline(h=KS_abund, col = "blue")
+  }
+}
+
+# para visualizar 
+# for(i in 1:length(sitecode)){
+#   sad.obs <- df_SAD.obs %>% filter(SiteCode == sitecode[i]) %>% .$N.obs %>% sort(., decreasing = TRUE) %>% rad # RAD obs
+#   df_temp1 <- df_SAD.sim %>% filter(SiteCode == sitecode[i]) %>% select(N, rep, cluster_medio) # RAD simulada por sitecode
+#   kernel <- df_temp %>% filter(SiteCode == sitecode[i]) %>% .$kernel %>% as.character()
+#   for(j in 1:length(kernel)){
+#     df_temp1 %>% filter(cluster_medio == kernel[j]) -> df_temp2
+#     plot(sad.obs, main = paste(sitecode[i], ", ", kernel[j], "m", df_temp[df_temp$SiteCode == sitecode[i] & df_temp$kernel == kernel[j],"GOF"], sep = " "), type = "n",xlab="",ylab="")
+#     # legenda <- df_temp %>% filter(SiteCode == sitecode[i] & kernel == kernel[j]) %>% .$legenda
+#     # legend("topright",legenda, cex = 0.9)
+#     for(c in 1:100){
+#       df_temp2 %>% filter(rep == as.character(c)) %>% .$N %>% rad -> sad.sim
+#       lines(sad.sim, col = "red")
+#     }
+#     lines(sad.obs, col = "black")
+#     # KS_abund <- df_temp %>% filter(SiteCode == sitecode[1], kernel == kernel[j]) %>% .$KS.ab
+#     # abline(h=KS_abund, col = "blue")
+#   }
+# }
+```
+
+### acima da mediana ###
+
+```{r include=F}
+# df_ad %>% filter(GOF>=median(df_ad$GOF)) %>% select(SiteCode, Sindrome, GOF, p) %>% arrange(GOF,p)
+# df_ad %>% filter(GOF>=median(df_ad$GOF)) %>% dim
+
+df_temp <- df_ad %>% filter(GOF>=median(df_ad$GOF)) %>% select(SiteCode, kernel, GOF, p, S, J, KS.ab) %>% arrange(GOF) %>% mutate(log.J = log(J))
+
+df_temp$legenda <- paste("GOF =", df_temp[,"GOF"], ";\n",
+                         "p =", round(df_temp[,"p"], digits = 4), ";\n",
+                         sep=" ")
+
+set.seed(1234)
+sitecode <- df_temp$SiteCode %>% unique %>% sample(.,size=20)
+
+par(mfrow=c(4,5))
+par(mar = c(0.8,0.8,2.7,0.8))
+
+for(i in 1:length(sitecode)){
+  sad.obs <- df_SAD.obs %>% filter(SiteCode == sitecode[i]) %>% .$N.obs %>% sort(., decreasing = FALSE) %>% log # RAD obs
+  df_temp1 <- df_SAD.sim %>% filter(SiteCode == sitecode[i]) %>% select(N, rep, cluster_medio) # RAD simulada por sitecode
+  kernel <- df_temp %>% filter(SiteCode == sitecode[i]) %>% .$kernel %>% as.character()
+  for(j in 1:length(kernel)){
+    df_temp1 %>% filter(cluster_medio == kernel[j]) -> df_temp2
+    plot(sad.obs, (1:length(sad.obs)/length(sad.obs)), main = paste(sitecode[i], ", ", kernel[j], "m", sep = " "), type = "n",xlab="",ylab="")
+    # legenda <- df_temp %>% filter(SiteCode == sitecode[i] & kernel == kernel[j]) %>% .$legenda
+    # legend("topright",legenda, cex = 0.9)
+    for(c in 1:100){
+      sad.sim <- df_temp2 %>% filter(rep == as.character(c)) %>% .$N %>% sort %>% log
+      lines(sad.sim, (1:length(sad.sim)/length(sad.sim)),col = "red")
+    }
+    lines(sad.obs, (1:length(sad.obs)/length(sad.obs)), col = "black")
+    # KS_abund <- df_temp %>% filter(SiteCode == sitecode[1], kernel == kernel[j]) %>% .$KS.ab %>% log
+    # abline(h=KS_abund, col = "blue")
+  }
+}
+
+# para visualizar 
+# for(i in 1:length(sitecode)){
+#   sad.obs <- df_SAD.obs %>% filter(SiteCode == sitecode[i]) %>% .$N.obs %>% sort(., decreasing = TRUE) %>% rad # RAD obs
+#   df_temp1 <- df_SAD.sim %>% filter(SiteCode == sitecode[i]) %>% select(N, rep, cluster_medio) # RAD simulada por sitecode
+#   kernel <- df_temp %>% filter(SiteCode == sitecode[i]) %>% .$kernel %>% as.character()
+#   for(j in 1:length(kernel)){
+#     df_temp1 %>% filter(cluster_medio == kernel[j]) -> df_temp2
+#     plot(sad.obs, main = paste(sitecode[i], ", ", kernel[j], "m", df_temp[df_temp$SiteCode == sitecode[i] & df_temp$kernel == kernel[j],"GOF"], sep = " "), type = "n",xlab="",ylab="")
+#     # legenda <- df_temp %>% filter(SiteCode == sitecode[i] & kernel == kernel[j]) %>% .$legenda
+#     # legend("topright",legenda, cex = 0.9)
+#     for(c in 1:100){
+#       df_temp2 %>% filter(rep == as.character(c)) %>% .$N %>% rad -> sad.sim
+#       lines(sad.sim, col = "red")
+#     }
+#     lines(sad.obs, col = "black")
+#     # KS_abund <- df_temp %>% filter(SiteCode == sitecode[1], kernel == kernel[j]) %>% .$KS.ab
+#     # abline(h=KS_abund, col = "blue")
+#   }
+# }
+
+```
+
+
+
+
+
+## Anexo: Validação dos dados ##
+
+*Validação 'internamente coerente' dos dados: exploração gráfica de `GOF ~ KS.p + KS + KS.diff + KS.ab + KS.obs`*
+
+<!-- 
+Objetivo: compara GOF com as demais variáveis relacionadas com o teste de Kolmogorov-Smirnov
+Método: exploração gráfica das variáveis com gráficos de dispersão sempre relacionando com GOF `GOF ~ KS.p + KS + KS.diff + KS.ab + KS.obs`
+-->
+
+
+```{r fig.width=10, fig.height=4}
+# exploração gráfica de GOF ~ KS.p + KS + KS.diff + KS.ab + KS.obs #
+OUTLIERS <- c("BAuruc", "SPpecb1", "ESsoor","SPeec1")
+
+l_p <- vector("list",length = 3)
+l_p[[1]] <- ggplot(df_ad,aes(y=GOF,x=KS.p)) + geom_smooth(col="red",se=F) + geom_point(col=ifelse(df_ad$SiteCode %in% OUTLIERS, "green","black"))
+l_p[[2]] <- ggplot(df_ad,aes(y=GOF,x=KS))  + geom_smooth(col="red",se=F) + geom_point(col=ifelse(df_ad$SiteCode %in% OUTLIERS, "green","black"))
+l_p[[3]] <- ggplot(df_ad,aes(y=GOF,x=KS.diff))  + geom_smooth(col="red",se=F) + geom_point(col=ifelse(df_ad$SiteCode %in% OUTLIERS, "green","black"))
+do.call("grid.arrange",c(l_p,ncol=3,nrow=1))
+```
+
+**Figura 4.**. GOF, KS.p, KS e KS.diff
+
+  GOF e a media dos 100 p valores associados ao teste KS (KS.p) apresentam uma relação crescente que se satura em GOF = 100, de modo geral, quanto maior a media do p valor maior o valor de GOF, observa-se saturação em torno de KS.p = 50 (figura 4, primeiro gráfico). GOF e KS (KS médio) apresentam relação negativa, para KS <= 0.1, GOF é sempre alto; em 0.1 < KS < 0.25, há as observações com maior variância de GOF; não se observa GOF maior que 90 para KS > 0.25 (figura 4, segundo gráfico). GOF e KS.diff apresentam relação parabólica negativa centrada em KS.diff = 0, ao se distanciar do vértice da parabola maior a variância e menor o valor médio de GOF - parece existir uma tendência à maior variância em valores positivos (figura 4, terceiro gráfico). Resumindo, as simulações que geram boas reproduções do observado, com a menor distância máxima, relativa e absoluta, entre as curvas acumuladas. 
+  
+  
+```{r fig.width=10, fig.height=4}
+# exploração gráfica de GOF ~ KS.p + KS + KS.diff + KS.ab + KS.obs #
+l_p <- vector("list",length = 3)
+l_p[[1]] <- ggplot(df_ad,aes(y=GOF,x=log(KS.ab))) + geom_smooth(col="red",se=F) + geom_point(col=ifelse(df_ad$SiteCode %in% OUTLIERS, "green","black"))
+l_p[[2]] <- ggplot(df_ad,aes(y=GOF,x=KS.obs)) + 
+  geom_smooth(col="red",se=F) + 
+  geom_point(col=ifelse(df_ad$SiteCode %in% OUTLIERS, "green","black")) + 
+  scale_x_continuous(limits=c(0.15,0.9))
+l_p[[3]] <- ggplot(df_ad,aes(y=GOF,x=KS.sim)) + 
+  geom_smooth(col="red",se=F) + 
+  geom_point(col=ifelse(df_ad$SiteCode %in% OUTLIERS, "green","black")) +
+  scale_x_continuous(limits=c(0.15,0.9))
+do.call("grid.arrange",c(l_p,ncol=3,nrow=1))
+```  
+**Figura 5.**. GOF, log(KS.ab), KS.obs e KS.sim
+
+  A relação de log(KS.ab) e GOF é positiva em sua tendência central e negativa quanto a variância: quanto maior log(KS.ab) maior GOF e menor a sua variância (figura 5 primeiro painel). GOF não parece ter relação com KS.obs e KS.sim (figura 5 segundo e terceiro painel).
+  
+- existe um viés para diferenças que ocorrem em valores baixos de log(KS.ab)? 
+- pelos dois últimos gráficos 
+  
+  
+## Comparação gráfica do GOF com os fatores da classificação visual (validação visual) ##
+
+
+*Padrões gerais observados:*
+
+a) parece que o padrão de dispersão das curvas naõ é simétrico, ou seja, as SADs réplicas não se dispersam de maneira igual ao redor da SAD "média"
+
+b) a variância é maior nas caudas e menor nos ranks dominantes
+
+c) o efeito do kernel no ajuste das SADs réplicas varia entre Sites - "diferentes kerneis se ajustam melhor a certos percentils": 
+  i) 1 região bem ajustada e as demais mal ajustadas;
+  ii) regiões que se intercalam em qualidade do ajuste;
+  iii) var(GOF) ~ kernel (~ Site): a variância de GOF parece responder à variação de kernel; contudo o tipo de relação varia entre sites e para um mesmo site há uma relação de 
+  iv) SADs simuladas tendem a apresentar mudanças mais suaves entre os ranks
+
+e) estimativa da variância e das regiões dominantes é difícil
+
+
+*Classificação visual*
+
+<!-- 
+Objetivo: separar as variáveis de interesse pela classificação 
+Método: inner_join de df_ad e df_GOF
+`GOf_factor`: 1quant_29 (1o quantil, valores entre 0 e 29); 
+              1quant_59 (idem, entre 30 e 59); 
+              1quant_89 (idem, entre 60 e 89); 
+              2quant (entre 90 e 98); 
+              mediana (99 e 100).
+-->
+
+  A classificação foi feita considerando que os vetores de abundância podem ser dividos em três regiões quanto a escala de abundância (log indivíduos): cauda (região com as espécies com abundâncias baixas), inter (regiões com espécies com rank de abundâncias intermediários) e dom (espécies dominantes). Procurei avaliar qual era o padrão geral das SADs réplicas quanto a sua precisão: precisa (em média as SADs réplicas produzem boas reproduções do observado), subestimada (quando as SADs preveem percentil menor do que o observado para a faixa de abundância), superestimada (idem para percentil maior do que o observado).
+
+
+```{r fig.width=10, fig.height=4}
+# lendo e juntando os dados #
+df_a.visual_GOF <- read.csv("/home/danilo/Documents/dissertacao/dados/df_GOF_Avisual.csv", header = T, sep = ",", dec=".")
+df_temp %<>% inner_join(x = df_a.visual_GOF,y = df_ad, by = c("SiteCode","kernel"))
+
+# GOF factor #
+# df_temp$GOF_factor <- NA
+# 
+# mestre, isso não é aqui
+#
+# df_temp[df_temp$GOF<=29,"GOF_factor"] <- "1quant_29"
+# df_temp[df_temp$GOF>29 & df_temp$GOF<=59,"GOF_factor"] <- "1quant_59"
+# df_temp[df_temp$GOF>59 & df_temp$GOF<89,"GOF_factor"] <- "1quant_89"
+# df_temp[df_temp$GOF>=89 & df_temp$GOF<99,"GOF_factor"] <- "2quant"
+# df_temp[df_temp$GOF>=median(df_ad$GOF),"GOF_factor"] <- "median"
+
+# gráficos #
+l_p <- vector("list",length=3)
+l_p[[1]] <- ggplot(df_temp,aes(x=cauda, y=GOF)) + 
+  geom_boxplot() + geom_jitter() + 
+  ggtitle("Cauda") + xlab("") + ylab("GOF")
+l_p[[2]] <- ggplot(df_temp,aes(x=inter, y=GOF)) + 
+  geom_boxplot() + geom_jitter() + 
+  ggtitle("Intermediário") + xlab("") + ylab("")
+l_p[[3]] <- ggplot(df_temp,aes(x=dom, y=GOF)) + 
+  geom_boxplot() + geom_jitter() + 
+  ggtitle("Dominante") + xlab("") + ylab("")
+do.call("grid.arrange",c(l_p,ncol=3,nrow=1))
+
+# l_p <- vector("list",length=3)
+# l_p[[1]] <- ggplot(df_temp,aes(x=cauda.var, y=GOF)) + geom_boxplot() + geom_jitter()
+# l_p[[2]] <- ggplot(df_temp,aes(x=inter.var, y=GOF)) + geom_boxplot() + geom_jitter()
+# l_p[[3]] <- ggplot(df_temp,aes(x=dom.var, y=GOF)) + geom_boxplot() + geom_jitter()
+# do.call("grid.arrange",c(l_p,ncol=3,nrow=1))
+```
+
+**figura 6.** GOF e as variáveis da classificação visual
+
+- Cauda: boa estimativa visual para precisa e grande variância para sub e super
+- Inter: idem
+- Dom: estimativa ruim para todas as classes
+
+
+
+## Anexo: avaliação de observações candidatas a pontos distoantes (**outliers**) ##
+
+
+__cauda, inter e dom: estimativa (i.e. se em média ocorreu acerto)__
+As SADs réplicas: i ) subestimam a SAD observada (ou seja, a SAD observada apresenta rank maior do que pelo predito neutro); ii ) superstimam ( o contrário do anterior); iii ) preciso
+
+
+__cauda, inter e dom: variância__
+variância dos vetores de abundância das réplicas em relação ao observado: baixo, medio, alto
+
+## ANEXO ## 
+
+### Curvas acumuladas dos vetores de abundância observadas e réplicas ###
+Coisa a fazer: inserir informações nos plots (variáveis de interesse (VR e p) e variáveis de controle? Info sobre sucessão e fitofisinomia? (pensar em tabela) )
+
+```{r SADs acumuladas}
+df_temp <- df_ad
+
+df_temp$legenda <- paste("GOF =", df_temp[,"GOF"], ";\n",
+                         "p =", round(df_temp[,"p"], digits = 4), ";\n",
+                         sep=" ")
+
+sitecode <- df_temp$SiteCode %>% unique
+
+par(mfrow=c(86,8))
+par(mar = c(0.8,0.8,2.7,0.8))
+
+for(i in 1:length(sitecode)){
+  sad.obs <- df_SAD.obs %>% filter(SiteCode == sitecode[i]) %>% .$N.obs %>% sort(., decreasing = FALSE) %>% log # RAD obs
+  df_temp1 <- df_SAD.sim %>% filter(SiteCode == sitecode[i]) %>% select(N, rep, cluster_medio) # RAD simulada por sitecode
+  kernel <- df_temp %>% filter(SiteCode == sitecode[i]) %>% .$kernel %>% as.character()
+  for(j in 1:length(kernel)){
+    df_temp1 %>% filter(cluster_medio == kernel[j]) -> df_temp2
+    plot(sad.obs, (1:length(sad.obs)/length(sad.obs)), main = paste(sitecode[i], ", ", kernel[j], "m", sep = " "), type = "n",xlab="",ylab="")
+    # legenda <- df_temp %>% filter(SiteCode == sitecode[i] & kernel == kernel[j]) %>% .$legenda
+    # legend("topright",legenda, cex = 0.9)
+    for(c in 1:100){
+      sad.sim <- df_temp2 %>% filter(rep == as.character(c)) %>% .$N %>% sort %>% log
+      lines(sad.sim, (1:length(sad.sim)/length(sad.sim)),col = "red")
+    }
+    lines(sad.obs, (1:length(sad.obs)/length(sad.obs)), col = "black")
+    # KS_abund <- df_temp %>% filter(SiteCode == sitecode[1], kernel == kernel[j]) %>% .$KS.ab %>% log
+    # abline(h=KS_abund, col = "blue")
+  }
+}
+```
+
+
+
+
+
+## ANEXO: GOF e Variáveis de Controle ##
+
+  Os motivos para incluir as variáveis `S` e `J` como variáveis de controle já foram discutidos em outros documentos, em suma: i) influênciam no teste de Kolmogorov Smirnov, o teste que deriva todas as métricas; ii) são parâmetros da simulação e iii) `S` apresenta leve correlação positiva com `p`, pode ser uma variável de confusão. Antes de investigar como que as SADs se comportam segundo seu GOF, vou avaliar a influência das variáveis de controle no sistema na variação de GOF. 
+  
+
+```{r fig 2, fig.height=3}
+l_p <- vector("list",length = 2)
+l_p[[1]] <- ggplot(subset(df_ad,Sindrome == "wind"),aes(x="",y=S)) + geom_boxplot() + geom_jitter(colour="gray47") + theme_bw()
+l_p[[2]] <- ggplot(subset(df_ad,Sindrome == "wind"),aes(x="",y=log(J))) + geom_boxplot() + geom_jitter(colour="gray47") + theme_bw()
+do.call("grid.arrange",c(l_p,ncol=2,nrow=1))
+# df_ad %>% filter(S > 200) %>% select(SiteCode) %>% unique
+# df_ad %>% filter(log(J) > 9) %>% select(SiteCode) %>% unique
+```
+
+**Figura 2.** Boxplot das variáveis de controle. Os três pontos que apresentam `S` > 200 são: BAuruc, SPecb1 e ESsoor (1o boxplot). Os dois pontos que apresentam log(J) > 9 são SPeec1 e SPeecb1.
+
+
+  `S` tem uma leve assimétria para a esquerda. Apenas 3 pontos apresentam `S` > 200 (fig 2), resultando ao todo em 24 pontos (1 para cada nível de `kernel`). Esses pontos são BAuruc, SPecb1 e ESsoor (1o boxplot, fig 2). Desconsiderando os `SiteCodes` SPeec1 e SPeecb1, que apresentam `log(J)` > 9, parece que os pontos se distribuem de maneira normal (2o boxplot, fig 2)
+
+
+```{r fig 3, fig.width=11,fig2height=4}
+l_p <- vector("list",length=2)
+l_p[[1]] <- ggplot(df_ad,aes(x=S,y=GOF,group=Sindrome)) + 
+  # geom_line(aes(colour=factor(df_ad$kernel)),size=1.2) + 
+  geom_point(aes(colour=factor(df_ad$kernel)),size=1.2) + 
+  # theme(legend.position="none") + 
+  facet_wrap(~cut(df_ad$p,10),ncol=10)
+l_p[[2]] <- ggplot(df_ad,aes(x=log(J),y=GOF)) + 
+  # geom_line(aes(colour=factor(df_ad$kernel)),size=1.2) + 
+  geom_point(aes(colour=factor(df_ad$kernel)),size=1.2) + 
+  # theme(legend.position="none") + 
+  facet_wrap(~cut(df_ad$p,10),ncol=10)
+do.call("grid.arrange",c(l_p,nrow=2,ncol=1))
+```
+
+Figura 3. Variáveis de controle, `p` e `GOF`. Na primeira linha `GOF ~ S * kernel (~ p)`, na segundao `GOF ~ log(J) * kernel (~ p)`. 
+
+  Como já discutido em outros documenos `S` apresenta relação positiva com `p` e `log(J)` está bem distribuido ao longo de `p` com exceção dos dois pontos destacados na figura 2 (SPeec1 e SPeecb1). Vemos que os possíveis outliers, discutidos no parágrafo anterior, ocorrem em `p` > 0.75%. Desconsiderando os pontos extremos (`S` > 200 espécies e `log(J)` > 9 log(indivíduos)), nos valores extremos a variância é baixa e em valores intermediários ela é máxima, esse padrão parece ser válido para todas classes de cobertura vegetal e nos diferentes valores de `kernel` (na figura 3). 
+  
+  A variância entre as classes de `kernel` parece diminuir com o aumento de `p`, até `p < 0.603` quanto maior os valores de `kernel` maior a variância na qualidade do ajuste tanto para `S` quanto para `log(J)` (figura 3). Para `p > 0.603` as variáveis divergem, em `S` a relação inverte, quanto menor `kernel` maior a variância. Em `log(J)` a variância entre kernel se torna similar (figura 3). 
+
+
+

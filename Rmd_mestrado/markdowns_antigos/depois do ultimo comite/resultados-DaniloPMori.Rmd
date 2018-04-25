@@ -1,0 +1,429 @@
+---
+title: "resultados"
+author: ""
+date: "15 de junho de 2017"
+output: pdf_document
+---
+
+```{r global_options, echo=FALSE}
+knitr::opts_chunk$set(echo=F, warning=FALSE, message=FALSE, cache = TRUE, tidy = TRUE)
+```
+
+```{r global packages and data, echo=F, message=FALSE, warning=FALSE}
+library(xtable)
+library(MuMIn)
+library(gridExtra) 
+library(ggplot2) 
+library(sjPlot)
+library(tidyr)
+library(broom)
+library(purrr)
+library(lme4)
+library(sads)
+library(magrittr)
+library(plyr)
+library(dplyr)
+load("/home/danilo/Documents/dissertacao/dados/df_ad.Rdata")
+df_ad %<>% select(SiteCode, kernel_percentil, S.obs, p, U, GOF) %>% mutate(K = 1-kernel_percentil)
+df_ad %<>% mutate(p.z = (p - mean(p))/sd(p),
+                  K.z = (K - mean(K))/sd(K))
+df_ad %<>% mutate(S.log = log(S.obs), # acrescenta log da riqueza
+                  S.z = (S.obs - mean(S.obs))/sd(S.obs),
+                  lS.z = (S.log - mean(S.log))/sd(S.log), ## log da riqueza padronizada
+                  p.GOF = GOF/100)
+names(df_ad)[1:2] <- c("Site","percentil_1cel")
+```
+
+## Material e Métodos ##
+
+### Análise dos dados ###
+
+-ACRESCENTAR: justificativa da diferença na abordagem entre as variáveis
+
+## Resultados ##
+
+### GOF ###
+- estatística resumo
+ ground para: dado a matriz de paisagem e a riqueza observada o modelo neutro espacialmente explicito reproduz bem a SAD observada
+
+```{r}
+df_ad %>% ddply(.variables="Site",summarise, GOF_medio = mean(GOF), GOF_var = var(GOF), GOF_sd = sd(GOF)) %>% ggplot(aes(GOF_medio)) + 
+  geom_histogram() +
+  theme_bw() +
+  labs(x="Média da proporção de SADs simuladas estatisticamente equivalentes a SAD observada por fragmento florestal", y = "")
+```
+  
+  De maneira geral a simulação neutra espacialmente explicita gerou SADs que são boas aproximações da SAD observada para todos os fragmentos florestais, em média a proporção de SADs simuladas estatisticamente equivalentes a SAD observada foi de 87.28 e mediana de 98.00. Agrupando as proporção de SADs simuladas estatisticamente equivalentes à SAD observada, observa-se que os resultados divergem entre fragmentos (figura 1 - boxplot de GOF por site)
+
+```{r}
+df_ad %>% arrange(p) %>%
+  ggplot(aes(x=Site,y=GOF)) +
+  geom_boxplot() +
+  geom_point() +
+  coord_flip() +
+  labs(x="Fragmento Florestal", y="Proporção de SADs simuladas estatisticamente equivalentes à SAD observada")
+```
+
+## Proporção de SADs simuladas estatisticamente equivalentes à SAD observada (GOF) ##
+
+  Um modelo foi selecionado para explicar a variação da proporção de SADs simuladas estatisticamente equivalentes à SAD observada (tabela X), esse modelo considera a interação entre porcentagem de cobertura vegetal e kernel de dispersão. 
+
+
+
+- tabela 1: modelos mais plausíveis
+
+  ground para: contudo a cobertura vegetal e o kernel de dispersão tem efeito em GOF, 
+
+```{r tabela 1}
+l_md1 <- vector("list", length = 5)
+names(l_md1) <- c("p * K", "p + K", "K", "p" ,"1")
+l_md1[[1]] <- glmer(cbind(GOF,100-GOF) ~ p.z * K.z + (K.z | Site), 
+                    family = "binomial", data = df_ad)
+l_md1[[2]] <- glmer(cbind(GOF,100-GOF) ~ p.z + K.z + (K.z | Site),
+                    family = "binomial", data = df_ad)
+l_md1[[3]] <- glmer(cbind(GOF,100-GOF) ~ K.z + (K.z | Site),
+                    family = "binomial", data = df_ad)
+l_md1[[4]] <- glmer(cbind(GOF,100-GOF) ~ p.z + (K.z | Site),
+                    family = "binomial", data = df_ad)
+l_md1[[5]] <- glmer(cbind(GOF,100-GOF) ~ 1 + (K.z | Site),
+                    family = "binomial", data = df_ad)
+teste <- AICctab(l_md1, weights = TRUE) %>% print %>% as.data.frame()
+md_GOF <- l_md1[[1]]
+(r2_GOF <- sapply(l_md1, r.squaredGLMM))
+(r2_GOF[1,]/r2_GOF[2,] * 100) %>% round(3) 
+```
+
+
+
+- figura 1: modelo mais plausível - GOF observado X estimado - 1 painel para cada kernel, 3 colunas, 4 linhas. 
+ ground para: imagem resumo de GOF - "de maneira geral reproduz bem o observado, contudo, seu efeito depende da interação entre cobertura vegetal e kernel de dispersão"
+ 
+__Figura 1__ GOF observado e a estimativa do modelo mais plausível
+
+
+
+```{r estimativa e intervalo de confianaca bootstrap}
+md_GOF <- l_md1[[1]] # modelo mais plausível de GOF
+## novo conjunto de dados ##
+# objetivo: criar todas as combinações entre as preditoras
+df_newdat <- expand.grid(Site = df_ad$Site[1],
+                         K.z = unique(df_ad$K.z),
+                         p.z = seq(min(df_ad$p.z)*1.1,max(df_ad$p.z)*1.1, length=50)) #no código original é length=50, qual a implicação dessa mudança?
+## Funçoes a serem calculadas a cada simulação ##
+# previsto considerando a estrutura fixa e aleatória #
+f1 <- function(.) predict(.,newdata=df_newdat)
+# previsto considerando a estrutura fixa e aleatória #
+f2 <- function(.) predict(.,newdata=df_newdat, re.form=~0)
+## Os dois bootstraps. Ajuste o argumento ncpus para o numero de cores de seu computador
+b1 <- bootMer(md_GOF, FUN = f1, nsim=1000, parallel="multicore", ncpus=4)
+b2 <- bootMer(md_GOF, FUN = f2, nsim=1000, parallel="multicore", ncpus=4)
+## calcula as médias e intervalos de confiança quantílicos para cada combinação de preditoras
+## no novo conjunto de dados
+df_newdat$p <- df_newdat$p.z*sd(df_ad$p) + mean(df_ad$p) #?
+df_newdat$mean <- apply(b1$t,2,mean)
+df_newdat$IC.low <- apply(b1$t,2,quantile, 0.025)
+df_newdat$IC.upp <- apply(b1$t,2,quantile, 0.975)
+df_newdat$mean.fixed <- apply(b2$t,2,mean)
+df_newdat$IC.low.fixed <- apply(b2$t,2,quantile, 0.025)
+df_newdat$IC.upp.fixed <- apply(b2$t,2,quantile, 0.975)
+## Plots de logito(U) x cobertura standardizada com intervalos de predição
+df_ad %>%
+    ggplot(aes(x=p,y=I(GOF/100)) ) + 
+    geom_ribbon(aes(y=mean, ymin=IC.low, ymax=IC.upp), data=df_newdat, col="gray", alpha=0.5) +
+    geom_ribbon(aes(y=mean, ymin=IC.low.fixed, ymax=IC.upp.fixed), data=df_newdat, col="gray", alpha=0.5) +
+    geom_line(aes(x=p, y=mean.fixed), data=df_newdat) +
+    geom_point() +
+    facet_wrap(~K.z)
+```
+
+__Figura 1__ 
+
+### U ###
+Se o modelo neutro está correto, qual a taxa de imigração necessária para manter a divesidade observada em paisagens em um gradiente de fragmentação natural
+- estatística resumo
+  ground para: os valores estimados são biologicamente realistas? comparação com outras florestas
+- tabela 2: modelo mais plausível
+  ground para: efeito da cobertura e kernel de dispersão
+
+  A taxa de especiação estimada para manter a riqueza observada (U) variou de 7.575e-4 até 3.197e-2, com média em 9.070e-3 e mediana em 8.008e-3, a taxa reflete a probabilidade de um propagulo de uma nova espécie colonizar um sitio vago por evento de morte. O modelo selecionado para explicar a taxa de especiação considera a interação entre cobertura vegetal e kernel de dispersão e o efeito aditivo do logaritmo da riqueza observada. 
+  
+```{r}
+df_ad %>% ddply(.variables="Site",summarise, U_medio = mean(U), U_var = var(U), U_sd = sd(U))
+df_ad$U %>% summary
+df_ad %<>% mutate(lU = log(U/(1-U)), K.f = factor(K))
+df_ad %>% arrange(p) %>%
+  ggplot(aes(x=Site,y=lU)) +
+  geom_boxplot() +
+  geom_point() +
+  coord_flip() +
+  labs(x="Fragmento Florestal", y="Logito taxa de especiação necessária para manter a riqueza observada")
+```
+
+  
+```{r tabela 2}
+df_ad %<>% mutate(lU = log(U/(1-U)), K.f = factor(K))
+l_md <- vector("list",length=10)
+names(l_md) <- c("p * K.f + S", "p + K.f + S", "p + S", "K.f + S", "S", "p * K.f", "p + K.f", "p", "K.f", "1")
+l_md[[1]] <- lmer(lU ~ p.z * K.f + lS.z + (1 | Site), data = df_ad)
+l_md[[2]] <- lmer(lU ~ p.z + K.f + lS.z + (1 | Site), data = df_ad)
+l_md[[3]] <- lmer(lU ~ p.z + lS.z + (1 | Site), data = df_ad)
+l_md[[4]] <- lmer(lU ~ K.f + lS.z + (1 | Site), data = df_ad)
+l_md[[5]] <- lmer(lU ~ lS.z + (1 | Site), data = df_ad)
+l_md[[6]] <- lmer(lU ~ p.z * K.f + (1 | Site), data = df_ad)
+l_md[[7]] <- lmer(lU ~ p.z + K.f + (1 | Site), data = df_ad)
+l_md[[8]] <- lmer(lU ~ p.z + (1 | Site), data = df_ad)
+l_md[[9]] <- lmer(lU ~ K.f + (1 | Site), data = df_ad)
+l_md[[10]] <- lmer(lU ~ 1 + (1 | Site), data = df_ad)
+# selecao #
+AICctab(l_md, weights = TRUE)
+# R2 marginal e condicional #
+(r2_U <- sapply(l_md, r.squaredGLMM))
+# porcentagem de variância explicada pelo modelo #
+r2_U[1,]/r2_U[2,]
+```
+
+  O modelo selecionado para explicar a taxa de imigração necessária para manter a riqueza observada considera interação entre cobertura vegetal e kernel de dispersão e o efeito aditivo da riqueza observada. A Variância explicada pelos efeitos fixos do modelo selecionado corresponde a 42.237% da variância explicada pelo modelo como um todo, coeficiente de determinação condicional (R2c) é igual a 0.964 (tabela 2). Assim, cerca de 40% da variância presente na taxa de especiação estimada é explicada pela interação entre cobertura vegetal e kernel de dispersão e riqueza observada, os outros 60% são explicados pelas outras características da matriz de paisagem. Existe um padrão empírico nos fragmentos florestais selecionados, há uma relação linear positiva entre cobertura vegeta e logaritmo da riqueza observada. Essa correlação foi descontada no calculo do intervalo de confiança do modelo selecionado (figura 2). 
+
+
+- figura 2: U observado X estimado - 1 painel para cada kernel, 3 colunas, 4 linhas. 
+  ground para: imagem resumo de U - ""
+
+```{r intervalos de confiança do modelo}
+## Uma regressao entre lSz e pz 
+plot(lS.z ~ p.z, data=df_ad[duplicated(df_ad$Site),]) ## relacao linear em log(S)
+lm1 <- lm(lS.z ~ p.z, data=df_ad[duplicated(df_ad$Site),])
+cf1 <- unname(coef(lm1)) ## guarda os coeficientes dessa regressao para usar no bootstrap
+
+## Intervalo de Confiança Bootstrap ##
+## Comentei o seu códigom original
+## df_newdat <- expand.grid(Site=df_ad$Site[1], 
+##                          K.f=unique(df_ad$K.f), 
+##                          p.z = seq(min(df_ad$p.z)*1.1,max(df_ad$p.z)*1.1, length=50),
+##                          lS.z = seq(min(df_ad$lS.z)*1.1,max(df_ad$lS.z)*1.1, length=50))
+df_newdat <- expand.grid(Site=df_ad$Site[1], 
+                         K.f=unique(df_ad$K.f), 
+                         p.z = seq(min(df_ad$p.z)*1.1,max(df_ad$p.z)*1.1, length=50))
+## Adiciona a média de log(S) padronizado para cada cobertura, estimado pela regrassao Sxp
+df_newdat %<>% mutate(lS.z = cf1[1] + cf1[2]*p.z) %>% as.data.frame()
+## Passo 2: crie as função que devem ser calculadas dos modelos a cada simulação
+## Previstos por efeitos fixos e aleatórios
+f1 <- function(.) predict(., newdata=df_newdat)
+## Previstos por efeitos fixos (argumento re.form=~0)
+f2 <- function(.) predict(., newdata=df_newdat, re.form=~0)
+## Os dois bootstraps. Ajuste o argumento ncpus para o numero de cores de seu computador
+md_U <- l_md[["p * K.f + S"]]
+b3 <- bootMer(md_U, FUN = f1, nsim=1000, parallel="multicore", ncpus=2)
+b4 <- bootMer(md_U, FUN = f2, nsim=1000, parallel="multicore", ncpus=2)
+## calcula as médias e intervalos de confiança quantílicos para cada combinação de preditoras
+## no novo conjunto de dados
+df_newdat$p <- df_newdat$p.z*sd(df_ad$p) + mean(df_ad$p)
+df_newdat$mean <- apply(b3$t,2,mean)
+df_newdat$IC.low <- apply(b3$t,2,quantile, 0.025)
+df_newdat$IC.upp <- apply(b3$t,2,quantile, 0.975)
+df_newdat$mean.fixed <- apply(b4$t,2,mean)
+df_newdat$IC.low.fixed <- apply(b4$t,2,quantile, 0.025)
+df_newdat$IC.upp.fixed <- apply(b4$t,2,quantile, 0.975)
+
+
+## Plots de logito(U) x cobertura standardizada com intervalos de predição ##
+## PI: note que a incerteza total diminuiu um pouco com a adicao da riqueza ao modelo
+## (as faixas cinza claro são mais largas em sua figura antiga, que nao tinha este efeito)
+df_ad %>%
+  ggplot(aes(x=p,y=lU)) + 
+  geom_ribbon(aes(y = mean, ymin=IC.low, ymax=IC.upp), data=df_newdat, col="gray", alpha=0.5) +
+  geom_ribbon(aes(y=mean, ymin=IC.low.fixed, ymax=IC.upp.fixed), data=df_newdat, col="gray", alpha=0.5) +
+  geom_line(aes(x=p, y=mean.fixed), data=df_newdat) +
+  geom_point() +
+  labs(x="% cobertura vegetal", y = "logito(U)") +
+  facet_wrap(~K.f)
+```
+
+
+
+
+
+######################################################################################################
+################################## Código auxiliar  ##################################################
+######################################################################################################
+
+## GOF  ##
+
+__Tabela 1__ Seleção da função de ligação
+
+```{r}
+l_md <- vector("list", length = 3)
+names(l_md) <- c("logit","probit","cloglog")
+l_md[[1]] <- glm(cbind(GOF,100-GOF) ~ p.z * K.z, family = "binomial",df_ad)
+l_md[[2]] <- glm(cbind(GOF,100-GOF) ~ p.z * K.z, family = "binomial"(link=probit),df_ad)
+l_md[[3]] <- glm(cbind(GOF,100-GOF) ~ p.z * K.z, family = "binomial"(link=cloglog),df_ad)
+AICctab(l_md, weights = TRUE)
+```
+
+- complementary log log function: n(p) = ln(-ln(1-p))
+- no conjunto de dados anterior a função de ligação logit havia sido selecionada
+
+__Tabela  2__ Seleção das possíveis estruturas aleatórias
+
+```{r}
+l_md <- vector("list", length = 3)
+names(l_md) <- c("(1 | Site)", "(K | Site)", "1")
+l_md[[1]] <- glmer(cbind(GOF,100-GOF) ~ p.z * K.z + (1 | Site), 
+                    family = "binomial"(link=cloglog), data = df_ad)
+l_md[[2]] <- glmer(cbind(GOF,100-GOF) ~ p.z * K.z + (K.z | Site), 
+                    family = "binomial"(link=cloglog), data = df_ad)
+l_md[[3]] <- glm(cbind(GOF,100-GOF) ~ p.z * K.z, 
+                    family = "binomial"(link=cloglog), data = df_ad)
+AICctab(l_md, weights = TRUE)
+```
+
+- o modelo com a estrutura aletória (K | Site) foi selecionado
+- visualizando os dados no nível da estrutura aleatória: 
+
+```{r fig.height=5}
+df_temp <- df_ad
+df_temp[df_temp$GOF == 0,"GOF"] <- 1
+df_temp[df_temp$GOF == 100,"GOF"] <- 99
+df_temp %<>% mutate(GOF.p = GOF/100,
+  GOF.cloglog = log(-log(1-GOF.p)))
+df_temp %>% ggplot(aes(x=K.z,y=GOF.cloglog,group=Site)) + 
+  geom_point(aes(col=Site)) +
+  geom_line(aes(col=Site)) +
+  facet_wrap(~cut(df_ad$p.z,10),ncol=5) +
+  theme(legend.position="none")
+```
+
+__Figura 1__ GOF por kernel, as linhas ligam pontos de um mesmo SiteCode
+
+
+__Tabela 3__ Comparação da estrutura fixa
+
+```{r}
+l_md1 <- vector("list", length = 5)
+names(l_md1) <- c("p * K", "p + K", "K", "1" ,"p")
+l_md1[[1]] <- glmer(cbind(GOF,100-GOF) ~ p.z * K.z + (K.z | Site), 
+                    family = "binomial"(link=cloglog), data = df_ad)
+l_md1[[2]] <- glmer(cbind(GOF,100-GOF) ~ p.z + K.z + (K.z | Site),
+                    family = "binomial"(link=cloglog), data = df_ad)
+l_md1[[3]] <- glmer(cbind(GOF,100-GOF) ~ K.z + (K.z | Site),
+                    family = "binomial"(link=cloglog), data = df_ad)
+l_md1[[4]] <- glmer(cbind(GOF,100-GOF) ~ p.z + (K.z | Site),
+                    family = "binomial"(link=cloglog), data = df_ad)
+l_md1[[5]] <- glmer(cbind(GOF,100-GOF) ~ 1 + (K.z | Site),
+                    family = "binomial"(link=cloglog), data = df_ad)
+
+AICctab(l_md1, weights = TRUE)
+```
+
+- três modelos ficaram dentro do intervalo de plausabilidade: p * K, K e p, por ordem de dAIC.
+- os valores assemelhança-se ao do conjuntos de dados anteriores
+
+```{r}
+RVAideMemoire::plotresid(l_md1[[1]],shapiro = T)
+```
+
+__Figura 2__ Resíduos contra fitado do modelo mais plausível GOF ~ p * K. SUBSTITUIR: resíduos quantilicos X fitado e um QQplot
+
+
+
+__Tabela 4__
+
+```{r}
+summary(l_md1[[1]])
+```
+
+
+## U ##
+
+
+
+__Tabela 5__ Seleção da distribuição de erros e função de ligação.
+
+```{r}
+l_md <- vector("list", length = 5)
+names(l_md) <- c("norm","lognorm","gamma_id","gamma_log","gamma_inv")
+l_md[[1]] <- glm(U ~ p.z * K.z, data = df_ad)
+l_md[[2]] <- glm(U ~ p.z * K.z, family = gaussian(link = "log"), data = df_ad)
+l_md[[3]] <- glm(U ~ p.z * K.z, family = Gamma(link = "identity"), data = df_ad)
+l_md[[4]] <- glm(U ~ p.z * K.z, family = Gamma(link = "log"), data = df_ad)
+l_md[[5]] <- glm(U ~ p.z * K.z, family = Gamma(link = "inverse"), data = df_ad)
+AICctab(l_md, weights = TRUE)
+```
+
+- a dist. Gamma com função de ligaçao inversa foram selecionadas, contudo, por problemas com a função glmer optamos por transformar a variável e usar a função lmer
+
+
+
+__Tabela 6__ Seleção do modelo cheio
+
+```{r}
+# transformando as variáveis #
+df_ad %<>% mutate(lU = log(U/(1-U)), K.f = factor(K))
+#comparando diferentes abordagens
+l_md <- vector("list",length=3)
+names(l_md) <- c("K + (K | Site)", "K + (1 | Site)","K.f + (1|Site)")
+l_md[[1]] <- lmer(lU ~ p.z * K.z + (K.z | Site), data = df_ad)
+l_md[[2]] <- lmer(lU ~ p.z * K.z + (1 | Site), data = df_ad)
+l_md[[3]] <- lmer(lU ~ p.z * K.f + (1 | Site), data = df_ad)
+AICctab(l_md, weights = TRUE)
+```
+
+- o modelo cheio selecionado considera que kernel como fator, nesse modelo não há graus de liberdade para incluir kernel na estrutura aleatória
+- visualizando U X kernel
+
+```{r fig.height=5.5}
+df_ad %>% ggplot(aes(x=K, y=lU, group=Site)) +
+  geom_point(aes(col=Site))+
+  geom_line(aes(col=Site)) +
+  theme(legend.position = "none") +
+  facet_wrap(~cut(df_ad$p,10),ncol=5,scale="free")
+```
+
+__Figura 3__ logito de U por K, linhas e pontos coloridos por SiteCode
+
+
+
+__Tabela 7__ Seleção da estrutura fixa
+
+```{r}
+l_md <- vector("list",length=5)
+names(l_md) <- c("p * K.f", "p + K.f", "p", "K.f", "1")
+l_md[[1]] <- lmer(lU ~ p.z * K.f + (1 | Site), data = df_ad)
+l_md[[2]] <- lmer(lU ~ p.z + K.f + (1 | Site), data = df_ad)
+l_md[[3]] <- lmer(lU ~ p.z + (1 | Site), data = df_ad)
+l_md[[4]] <- lmer(lU ~ K.f + (1 | Site), data = df_ad)
+l_md[[5]] <- lmer(lU ~ 1 + (1 | Site), data = df_ad)
+AICctab(l_md, weights = TRUE)
+```
+
+
+
+```{r}
+df_ad %<>% mutate(S.z = (S.obs - mean(S.obs))/sd(S.obs))
+df_temp2 <- df_ad %>% inner_join(x=.,y=augment(l_md[[1]]), by=c("lU","p.z","K.f","Site") )
+l_p2 <- vector("list",length=4)
+l_p2[[1]] <- ggplot(df_temp2,aes(x=.fitted,y=.resid))+
+  geom_point() +
+  geom_smooth(se=F,col="red") +
+  labs(x="predito",y="resíduo")
+l_p2[[2]] <- ggplot(df_temp2,aes(x=p.z,y=.resid))+
+  geom_point() +
+  geom_smooth(se=F,col="red") +
+  labs(x="p - cobertura vegetal",y="")
+l_p2[[3]] <- ggplot(df_temp2,aes(x=S.z,y=.resid))+
+  geom_point() +
+  geom_smooth(se=F,col="red") +
+  labs(x="S - riqueza observada",y="residuo")
+l_p2[[4]] <- ggplot(df_temp2,aes(x=K.f,y=.resid))+
+  geom_point() +
+  geom_smooth(se=F,col="red") +
+  labs(x="K - % de propag que saem da área da planta mãe",y="")
+do.call("grid.arrange",c(l_p2,ncol=2,nrow=2))
+```
+
+__Figura 4__ Gráficos diagnósticos do modelo selecionado de U
+
+
+__Tabela 7__ sumário do modelo
+```{r}
+summary(l_md[[1]])
+```

@@ -1,0 +1,429 @@
+---
+title: "MatSup-gerando_dados"
+author: ""
+date: "25 de maio de 2017"
+output: pdf_document
+---
+
+```{r global_options, echo=FALSE}
+knitr::opts_chunk$set(echo=T, warning=FALSE, message=FALSE, cache = TRUE, tidy = TRUE, include = FALSE)
+```
+
+```{r global packages and data, echo=F, message=FALSE, warning=FALSE}
+library(gridExtra)
+library(ggplot2)
+library(reshape2)
+library(magrittr)
+library(plyr)
+library(dplyr)
+# load("/home/danilo/Desktop/l_dados.Rdata")
+# rm(df_ad,df_rep.U,l_dados,l_SAD.sim)
+# df_resultados %<>% select(SiteCode,p,S.obs,DA,N,txt.file) %>% unique
+# setwd("/home/danilo/Documents/dissertacao/dados/imagens/1_imagens_usadas_na_simulacao") # diretorio com as imagens usadas na simulação
+```
+
+
+
+## Simulando comunidades neutras usando o algoritmo coalescente ##
+
+
+  Para realizar as simulações coalescentes é necessário que as matrizes de paisagem (.txt) estejam na mesma pasta que o programa coalescente(dinamica_coalescente). Alimentamos o programa com os valores observados nos respectivos fragmentos florestais e ele simula uma dinâmica neutra espacialmente explicita na matriz de paisagem. Primeiro simulamos 20 taxas de imigração para cada fragmento florestal, nessa fase informamos a riqueza observada e obtemos a taxa de imigração estimada para atingir tal riqueza. Com a média das taxas de imigração simulamos 100 distribuições de abundância de espécies no equilíbrio. 
+
+  
+### Preparando os dados ###
+
+__data frame de referência__
+
+```{r warning=FALSE}
+# df referência: df_resultados #
+# funcao com o data frame com os valores de dispersao
+func_adply <- function(x){
+   df_disp <- data.frame(Sindrome = c(paste("k",1:5,sep=""),"ballistic","gravity","gyration","wind","media_sin","animal_fruit<2cm","animal_fruit2-5cm","animal_fruit>5cm"),
+                         kernel = c(2^(0:4),31.1, 47.4, 54.5, 64.5, 82.17, 99.3, 120.6, 157.8))
+   cbind(x,df_disp)
+}
+# criando o data frame e a variável para deixar as distâncias na mesma unidade
+df_resultados %<>% adply(.,1,func_adply) %>% mutate(conversao_1m = 100/sqrt(DA))
+```
+
+
+__data frame para armazenar U réplicas__
+DANILO: esse formato vem das minhas primeiras tentativas de implementar a simulação em escala, acredito que para melhorar a velocidade eu teria que repensar em como eu fiz o loop.
+
+```{r}
+# df para armazenar U réplicas: df_rep.U #
+df_rep.U <- df_resultados %>% select(SiteCode, Sindrome) #selecionando conteúdo necessário
+df_temp <- as.data.frame( matrix(nrow = dim(df_rep.U)[1], ncol = 20) ) # criando os espaços para Us réplicas
+names(df_temp) <- 1:20 # nomeando as réplicas
+# df com o mesmo numero de linhas que df_resultados com uma coluna para cada réplica
+df_rep.U %<>% cbind(.,df_temp)
+# mudando o formato do data frame #
+df_rep.U %<>% reshape2::melt(.,c("SiteCode", "Sindrome"))
+names(df_rep.U)[3:4] <- c("rep","U")
+df_rep.U %<>% inner_join(.,y = df_resultados, by = c("SiteCode","Sindrome"))
+```
+
+
+### Simulacao Coalescente ###
+
+O programa coalescente precisa dos seguintes inputs:
+i) taxa de imigração (U)
+ii) riqueza observada (S)
+iii) Número de simulações réplicas (N_simul)
+iv) semente aleatória (seed)
+v) parâmetro da função de dispersão (disp_range)
+vi) tipo de kernel (disp_kernel)
+vii) matriz de paisagem (landscape)
+
+
+Para obter as taxa de imigrações réplicas temos que considerar
+
+i) __U -> 0__; estamos usando 1.25e-06 para começar
+ii) __S = S.obs__; a riqueza observada a ser atingida
+iii) __N_simul = 1__ a ideia original era informar uma riqueza e o algoritmo já estimava U e realizava as SADs na sequência. Como vimos que era necessário obter Us réplicas também então usei o loop para dar conta das réplicas
+iv) __seed = as.numeric(Sys.time())__ uso uma semente distinta para cada simulacao
+
+
+__Simulando taxas de imigaçao - U__
+
+```{r}
+# carregando função e mudando o diretorio de trabalho
+source("/home/danilo/Documents/dissertacao/R_source/dinamica_coalescente_beta.R") #função para rodar a simulação
+
+
+# Estimando 20 U para cada fragmento e kernel de dispersão #
+# Simulação U #
+op <- options(digits.secs=6)
+aviao <- list()
+for(i in 1:dim(df_rep.U)[1]){
+  aviao <- dinamica_coalescente(U = 1.25e-06, 
+                                S = df_rep.U[i,"S.obs"], 
+                                N_simul = 1, 
+                                seed = as.numeric(Sys.time()), 
+                                disp_range = df_rep.U[i,"conversao_1m"] * df_rep.U[i,"kernel"], 
+                                disp_kernel = 2, 
+                                landscape = df_rep.U[i,"txt.file"])
+  df_rep.U[i,"U"] <- aviao$U_est #valor da taxa de imigração estimada
+}
+
+aviao <- dinamica_coalescente(U = 1.25e-06, 
+                              S = df_rep.U[1,"S.obs"], 
+                              N_simul = 1, 
+                              seed = as.numeric(Sys.time()), 
+                              disp_range = df_rep.U[1,"conversao_1m"] * df_rep.U[1,"kernel"], 
+                              disp_kernel = 2, 
+                              landscape = df_rep.U[1,"txt.file"])
+```
+
+
+
+__Simulando SADs neutras__
+
+Para obter as SADs réplicas temos que alimentar o sistema com:
+
+i) __U = U.medio__; U médio, obtido das média dos U simulados
+ii) __S = 0__; a riqueza agora não é mais informada
+iii) __N_simul = 100__ número de SAD réplicas
+iv) __seed = as.numeric(Sys.time())__ uso uma semente distinta para cada simulacao - isso implica que as SADs são obtidas considerando uma mesma raiz aleatória, diferente dos U réplicas que consideravam sementes distintas
+
+A simulação tem como output  a lista `l_SAD.sim` com comprimento igual ao produto do número de fragmentos pelo número de kernels. Cada elemento desta lista contem uma matriz com 100 linhas e J colunas, J é igual ao número de indivíduos observado no fragmento. Cada matriz corresponde a uma simulação com as suas 100 réplicas
+
+
+```{r}
+## Criando objetos para a simulacao ##
+# tirando a média de U
+df_temp <- df_rep.U %>% select(SiteCode, Sindrome, rep, U) %>% 
+  ddply(.,c("SiteCode","Sindrome"), summarise, U.medio = mean(U), U.var = var(U))
+# acoplando ao df de referência
+df_resultados %<>% inner_join(df_temp, ., by = c("SiteCode","Sindrome"))
+# objetos para o loop
+l_SAD.sim <- vector("list", dim(df_resultados)[1]) #lista que vai conter as matrizes de SADs
+names(l_SAD.sim) <- paste(df_resultados$SiteCode, "_", df_resultados$kernel, sep = "") #nomeando os elementos segundo o fragmento e kernel
+
+## Gerando 100 SAD réplicas para cada fragmento e kernel ##
+op <- options(digits.secs=6) # ajustando as conf para poder usar "Sys.time()"
+for(i in 1:dim(df_resultados)[1]){
+  l_SAD.sim[[i]] <- dinamica_coalescente(U = df_resultados[i,"U.medio"], 
+                                         S = 0, 
+                                         N_simul = 100, 
+                                         seed = as.numeric(Sys.time()), 
+                                         disp_range = df_resultados[i,"conversao_1m"] * df_resultados[i,"kernel"], 
+                                         disp_kernel = 2, 
+                                         landscape = df_resultados[i,"txt.file"])
+}
+```
+
+
+
+## Sintetizando os resultados brutos da Simulacao ##
+
+### Riqueza Simulada ###
+
+```{r}
+library(stringr)
+df_S.sim <- as.data.frame( sapply(l_SAD.sim, function(x) apply(x,1, function (y) dim( as.data.frame(table(y)) )[1] ) ) ) #riqueza
+df_S.sim %<>% cbind(.,rep = 1:100) # adicionando o rótulo de réplica
+df_S.sim %<>% melt(., id.vars = "rep") # convertendo o fortmato do df
+names(df_S.sim)[3] <- "S"
+#df_S.sim %>% str
+df_S.sim$variable %<>% as.character()
+variable <- sapply(df_S.sim$variable, function(x) unname( unlist( strsplit(x, "_", fixed = TRUE) ) ) ) # obtendo as informações de referência
+df_S.sim <- data.frame( #acho que poderia usar um ddply(.,"variable", func)
+  rep = df_S.sim$rep,
+  SiteCode = unname(variable[1,]),
+  kernel = unname(variable[2,]),
+  S = df_S.sim$S
+)
+df_temp <- df_S.sim %>% ddply(., c("SiteCode", "kernel"), summarize, S.medio = mean(S), S.var = sd(S)) # df para acoplar com df_resultados
+#df_temp %>% str 
+#df_resultados %>% str
+df_temp$kernel %<>% as.character %>% as.numeric
+# acoplando df_temp com df_resultados
+df_resultados %<>% inner_join(.,y = df_temp, by =c("SiteCode", "kernel"))
+```
+
+
+### SADs réplicas ###
+
+```{r}
+#### SAD Simulada ####
+# i) criar df com  as SADs réplicas, rotuladas por SiteCode, Sindrome, replica
+# PENSAR EM JEITO MUITO MELHOR #
+func_apply <-function(X){
+  a <- X %>% table %>% as.data.frame() %>% arrange(desc(Freq)) #transformo cada linha da matrix em um SAD
+  data.frame(N = a$Freq)
+}
+
+l_SAD.sim0 <- l_SAD.sim #lista com as matrizes (produto bruto da simulação)
+fator <- sapply(names(l_SAD.sim), function(x) unname( unlist( strsplit((x), "_", fixed = TRUE) ) ) ) #cada uma é nomeada com pelo par SiteCode, Sindrome
+
+
+# Cada elemento de l_SAD.sim é uma matriz com 100 linhas e J colunas. J é o número de indivíduos amostrados no fragmento florestal
+# Cada matriz é transformada em data frames com as SADs réplicas "empilhadas"
+for(i in 1:length(l_SAD.sim) ){
+  mat <- l_SAD.sim[[i]]  #pegando apenas um par (SiteCode, Sindrome)
+  l_SAD.rep <- mat %>% apply(., 1, func_apply) #uma matriz é transformada em uma lista de 100 dfs
+  names(l_SAD.rep) <- as.character(1:100)
+  for(j in 1:100){
+    rep <- rep(names(l_SAD.rep)[j], dim(l_SAD.rep[[j]] )[1] )
+    l_SAD.rep[[j]] %<>% arrange(N) %>% cbind(.,rep)
+  }
+  l_SAD.sim[[i]] <- l_SAD.rep %>% rbind.fill
+}
+
+# Agora cada elemento de l_SAD.sim é um df com todas as SADs réplicas para uma mesma simulação
+# vou agrupar todas em um único df para comparar
+variable <- sapply(names(l_SAD.sim), function(x) unname( unlist( strsplit(x, "_", fixed = TRUE) ) ) )
+for(i in 1:length(l_SAD.sim)){
+    SiteCode <- rep(variable[1,i])
+    kernel <- rep(variable[2,i])
+    l_SAD.sim[[i]] %<>% cbind(.,SiteCode) %>% cbind(.,kernel)
+}
+l_SAD.sim %>% rbind.fill -> df_SAD.sim
+```
+
+
+## Comparando SAD observada e SAD réplicas usando o teste de Kolmogorov-Smirnov ##
+
+```{r}
+
+#versão atualizada da planilha com as abundâncias; email: Renato mandou novo .Rdata 22dez
+df_SAD.obs <- read.csv(file = "/home/danilo/Pasta sem título/dissertacao/dados/data_para_PI_new.csv", header = TRUE, sep = ",")
+#organizando e selecionando colunas 
+df_SAD.obs %<>% select(SiteCode, sp, N, ha, area_ha, Ntotal, method, forest_type, forest_subtype, state)
+df_SAD.obs$SiteCode %<>% factor
+df_SAD.obs %<>% filter(N != 0, sp != "morta") # filtrando as espécies mortas e aquelas presentes apenas nos trabalhos florísticos (observou-se a espécie mas não sua abund)
+
+# Pegando apenas os fragmentos usados #
+lvs_SiteCode <- df_SAD.sim$SiteCode %>% levels %>%  as.character
+df_SAD.obs %<>% filter(SiteCode %in% lvs_SiteCode)
+
+###################################
+### Teste de Kolmogorov Smirnov ###
+##################################
+
+#lista que irá armazenar as informações geradas no for da função KS position#
+l_KS.rep <- vector("list", length(lvs_SiteCode)) 
+#colocando o nome
+names(l_KS.rep) <- lvs_SiteCode
+
+# Funcao para usar dentro do loop #
+# Acho que posso usar o loop para variar em kernel e um __ply para variar entre fragmentos #
+# Talvez dois __ply #
+func_ddply <- function(x){
+  a <- suppressWarnings(ks.test(x = log(sort(sad.obs)), y = log(sort(x$N)) ) )
+  a <- data.frame(KS.D = a$statistic, KS.p = a$p.value)
+  return(a)
+}
+
+for(i in 1:length(lvs_SiteCode)){
+  df_sim <- df_SAD.sim[df_SAD.sim$SiteCode == lvs_SiteCode[i], ] #definindo o df de trabalho para um mesmo SiteCode
+  sad.obs <- df_SAD.obs %>% filter(SiteCode == lvs_SiteCode[i]) %>% .$N #SAD obs do respectivo SiteCode
+  l_KS.rep[[i]] <- ddply(df_sim, c("rep","SiteCode", "kernel"), func_ddply) 
+}
+l_KS.rep %<>% rbind.fill() #esqueci de mudar o nome
+
+## Sumarizando ##
+df_temp <- l_KS.rep %>% ddply(c("SiteCode","kernel"),summarise,
+                   KS = mean(KS.D),
+                   KS.var = var(KS.D),
+                   KS_p = mean(KS.p),
+                   KS_p.var = var(KS.p)) 
+
+df_temp %<>% inner_join(.,y = ddply(l_KS.rep, c("SiteCode", "kernel"), function(x) nrow(x[x$KS.p > 0.05,]) ), by = c("SiteCode", "kernel"))
+# df_temp %>% ggplot(aes(x=p,y=V1)) + geom_point()
+# Preparando os dados #
+names(df_temp)[c(1,7)] <- c("Site","GOF")
+df_temp$Site %<>% as.character()
+df_temp$kernel %<>% as.character() %>% as.numeric()
+
+# Acoplando com os resultados gerais da bateria de simulacoes #
+df_resultados %<>% inner_join(x=.,y=df_temp, by = c("Site", "kernel"))
+df_temp <- df_resultados %>% select(Site,Sindrome, kernel, p, S, GOF, U.medio)
+names(df_temp)[7] <- "U"
+df_ad <- rbind(df_ad[,1:7],df_temp)
+
+# Salvando #
+save(df_ad, l_dados, l_SAD.sim, df_resultados, df_rep.U, file="/home/danilo/Desktop/l_dados.Rdata")
+
+# Obs: falta acoplar o df com as SAD.sim, o df com valores por réplica #
+```
+
+
+### Testando o kernel laplaciano com os valores de percentis mais baixos na paisagem com maior densidade e riqueza ###
+
+DANILO 9/jun/2017
+
+- explicar motivo das mudanças
+- os kernels serão estimados para cada paisagem, estabelecemos uma distância referência e diferentes valores de percentil da chuva de propagulos para aquela distância, exemplo: até dist_0 10% da amostra da chuva de propagulos (ou para além de dist_0 há 90% da amostra.)
+- testamos diferentes tipos de kernel para os dados de BCI: uniform, normal e laplace. 
+- estimei sigmas para seq(0.01,0.99) percentis
+- usamos duas distâncias referências: dist_0 = 100/sqrt(DA) (lado da célula da simulação) e hip/2 = sqrt(lado_plot^2)/2, lado_plot = sqrt( ((5km^2) * ha_amostra )/ ha_paisagem ) * 1000 metros ( a distância do pixel central até as astes do plot quadrado que é a comunidade local)
+- o PI criou uma função que estima o parâmetro de dispersão necessário para gerar o determinado quantil (distância referência) em determinado percentil (porcentagem da amostra que se encontra até determinado)
+- criamos uma paisagem para simular BCI e comparar com outros trabalhos de Rosindell e cia
+- em estudo_kernel.Rmd há os códigos completos
+- vou criar um script para gerar os percentis para a distribuição laplace para os fragmentos do TreeCo
+
+```{r estimando sigmas para os fragmentos do TreeCo, include=FALSE}
+## Gerandos os Dados ##
+percentil <- rep(seq(0.01,0.99,0.01),dim(df_resultados)[1]) #percentis de interesse
+df_resultados <- df_resultados[rep(1:dim(df_resultados)[1],each=length(seq(0.01,0.99,0.01))),] #duplicando as linhas para ter os mesmos níveis de percentil
+df_resultados$kernel_percentil <- percentil #guardando os níveis de kernel 
+df_resultados$kernel_type <- "laplace"
+df_resultados[rep(1:dim(df_resultados)[1],each=length(seq(0.01,0.99,0.01))),]
+df_resultados$kernel_code <- "2"
+df_resultados %>% str
+df_resultados %<>% mutate(dist_0 = 100/sqrt(DA)) 
+df_resultados$kernel <- NA
+df_resultados$kernel_type <- as.character(df_resultados$kernel_type)
+
+## estimando os sigmas ##
+library(doMC)
+library(plyr)
+source("/home/danilo/Documents/dissertacao/R_source/utility_functions.R")
+# save(df_resultados,file="/home/danilo/Documents/dissertacao/cluster/estimando_kernel/df_resultados.Rdata")
+# load("/home/danilo/Documents/dissertacao/cluster/estimando_kernel/df_resultados.Rdata")
+
+
+# funcao para paralelizar
+func_llply <- function(i,data_frame=df_resultados){
+  df_temp <- data_frame
+  sigma <- sigkernel(kernel = df_temp[i,"kernel_type"], 
+                     p = df_temp[i,"kernel_percentil"], 
+                     distance = df_temp[i,"dist_0"], 
+                     density = df_temp[i,"DA"],
+                     sigma.min=1e-6, 
+                     sigma.max=1e6)$root  
+}
+
+# funcao para paralelizar #
+# paralelizando e armazensando os dados #
+registerDoMC(4)
+replica.sim <- as.list(1:dim(df_resultados)[1])
+resultados <- llply(.data = replica.sim, .fun = func_llply, .parallel = TRUE)
+df_resultados$kernel <- unlist(resultados)
+
+# df_resultados %>% ggplot(aes(x=kernel_percentil,y=kernel)) +
+#   geom_point(aes(colour=SiteCode)) + 
+#   theme(legend.position = "none")
+save(df_resultados,file="df_resultados-kernel_estimado.Rdata")
+```
+
+Utilizamos 86 fragmentos florestais, uma distância de referência (dist_0 = 100/sqrt(DA)) e 99 percentis (seq(0.01,0.99,0.01)). Vou plotar kernel por percentil, agrupado por fragmento no facet_wrap por classe de densidade
+
+```{r}
+df_resultados %>% mutate(f_DA = cut(DA,10)) %>% ggplot(aes(x=kernel_percentil,y=log(kernel), group=SiteCode)) +
+  geom_point() +
+  theme(legend.position = "none") +
+  labs(x="% de propagulos até a distância de uma celula",y="ln(parâmetro de dispersão)") + 
+  facet_wrap(~f_DA,ncol = 5)
+```
+
+__Figura X__ ln do parâmetro de dispersão da Laplace 
+
+## Selecionando os pilotos para a paisagem ##
+
+Vou selecionar 4 paisagens para avaliar o tempo de execução das simulações. Estavamos tendo problemas para rodar simulações com o sigma muito longo, especulamos que o tempo de simulação deve aumentar com o aumento da densidade, para testar outros fatores que podem vir a influenciar vou selecionar as paisagens com maior densidade, maior riqueza, maior N e maior cobertura vegetal 
+
+
+```{r}
+load("/home/danilo/Documents/dissertacao/cluster/estimando_kernel/df_resultados-kernel_estimado.Rdata")
+df_resultados$U <- NA
+
+percentil <- df_resultados$kernel_percentil %>% unique
+DA_max <- df_resultados$DA %>% max
+N_max <- df_resultados$N %>% max
+p_max <- df_resultados$p %>% max
+S_max <- df_resultados$S.obs %>% max
+
+df_piloto_ref <- rbind.fill(df_resultados1,df_resultados2, df_resultados3,df_resultados4, df_resultados5, df_resultados6,df_resultados7,df_resultados8,df_resultados9,df_resultados10,df_resultados11,df_resultados12)
+
+#DA
+df_resultados1 <- df_resultados %>% filter(DA == DA_max, kernel_percentil == 0.01)
+df_resultados2 <- df_resultados %>% filter(DA == DA_max, kernel_percentil == percentil[10])
+df_resultados3 <- df_resultados %>% filter(DA == DA_max, kernel_percentil == 0.90)
+#N
+df_resultados4 <- df_resultados %>% filter(N == N_max, kernel_percentil == 0.01)
+df_resultados5 <- df_resultados %>% filter(N == N_max, kernel_percentil == percentil[10])
+df_resultados6 <- df_resultados %>% filter(N == N_max, kernel_percentil == 0.90)
+#p
+df_resultados7 <- df_resultados %>% filter(p == p_max, kernel_percentil == 0.01)
+df_resultados7 <- df_resultados7[1,]
+df_resultados8 <- df_resultados %>% filter(p == p_max, kernel_percentil == percentil[10])
+df_resultados8 <- df_resultados8[1,]
+df_resultados9 <- df_resultados %>% filter(p == p_max, kernel_percentil == 0.90)
+df_resultados9 <- df_resultados9[1,]
+#S
+df_resultados10 <- df_resultados %>% filter(S.obs == S_max, kernel_percentil == 0.01)
+df_resultados11 <- df_resultados %>% filter(S.obs == S_max, kernel_percentil == percentil[10])
+df_resultados12 <- df_resultados %>% filter(S.obs == S_max, kernel_percentil == 0.90)
+
+
+# funcao para paralelizar o programa #
+op <- options(digits.secs=6)
+funcao_imigracao <- function(i,data_frame=df_resultados){
+  df_temp <- data_frame
+  aviao <- list()
+  aviao <- dinamica_coalescente(U = 1.25e-06, 
+                                S = df_temp[i,"S.obs"], 
+                                N_simul = 1, 
+                                seed = as.numeric(Sys.time()), 
+                                disp_range = df_temp[i,"kernel"], 
+                                disp_kernel = df_temp[i,"kernel_code"], 
+                                landscape = df_temp[i,"txt.file"])
+  return(aviao$U_est)
+}
+
+# paralelizando e armazensando os dados #
+registerDoMC(8)
+replica.sim <- as.list(1:dim(df_rep.U3)[1])
+resultados <- llply(.data = replica.sim, .fun = funcao_imigracao, .parallel = TRUE)
+df_resultados[,"U"] <- unlist(resultados)
+
+save(df_resultados,file="df_resultados-simulado.Rdata")
+```
+
+
+
+
+

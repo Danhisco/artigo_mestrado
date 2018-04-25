@@ -1,0 +1,705 @@
+---
+title: 'Análise dos Dados'
+author: ""
+date: ""
+output: pdf_document
+---
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(
+                      #fig.width=20, 
+                      #fig.height=10, 
+                      echo=TRUE, 
+                      message=FALSE, 
+                      warning=FALSE,
+                      cache=TRUE
+                      )
+```
+
+```{r global packages, echo=FALSE}
+#setwd("/home/danilo/Documents/dissertacao/dados/imagens/paisagens_selecionadas")
+library(car)
+library(ggplot2)
+require(bbmle)
+library(ggfortify)
+library(gridExtra)
+library(reshape2)
+library(magrittr)
+library(plyr)
+library(dplyr)
+setwd("/home/danilo/Documents/dissertacao/dados/")
+load("resultados_DaniloPMori.Rdata")
+```
+
+OBJETIVO: Aqui utilizamos o modelo neutro como uma fonte de predições para avaliar o impacto da fragmentação e perda de habitat nas comunidades arbóreas da Mata Atlântica, Brasil. A abordagem é similar à de Gilbert et al. (2006), contudo investigamos aspectos diferentes da diversidade das comunidades. Os aspectos da diversidade que investigamos são: i) taxa de especiação/imigração/perda de espécies no equilíbrio (U), ii) Distribuição de abundância de espécies (SAD).
+
+Material e métodos
+# treeco #
+# Hansen #
+# modelo neutro e simulação #
+# análise exploratória #
+# protocolo de criação de modelo cheio #
+# criação e seleção de modelos #
+# ajuste dos modelos aos dados, produção de resultados #
+
+# treeco #
+# Hansen #
+# modelo neutro e simulação #
+<!-- essa sessão vai provavelmente para o começo do material e métodos assim com um box resumindo a dinâmica neutra e o algoritmo coalescente-->
+  O modelo neutro pressupõem que a comunidade é regida por processos aleatórios de morte, nascimento, imigração e especiação. Todas as espécies estão sujeitas a estocasticidade demográfica. No tempo infinito, o sistema entra em equilibrio onde a perda de espécies por deriva ecológica é compensada pelos processos de introdução de novas espécies no sistema (imigração para a comunidade local e especiação na metacomunidade). Quando o equilíbrio é alcançado não há variação no número de espécies e na forma com que a abundância se distribui nas espécies. Assim, a manutenção da diversidade depende da taxa de imigração, a probabilidade de um indivíduo de uma espécie presente na metacomunidade, mas não na comunidade local, se estabelecer a cada morte de um indivíduo da comunidade local ("U"). Portanto, entre uma morte e outra, existe uma probabilidade de que um indivíduo de uma espécie nova se estabeleça na comunidade local, substituindo um indivíduo de uma espécie local por uma 'singleton'. No equilíbrio, essa taxa também mede a taxa com que singletons se extinguem por evento de morte na comunidade local.
+<!--aqui poderia ter um box explicando como que funciona o modelo neutro e o algoritmo coalescente. ou seja um resumo da dinâmica no modelo no tempo normal e para trás-->
+  O algoritmo coalescente simula uma dinâmica neutra espacialmente explicíta que ocorre em uma matriz de posições concêntrica a uma matriz da paisagem (BOX explicação modelo e algoritmo). A simulação retorna a identidade, i.e., a espécie, de cada indivíduo na matriz de posições em um momento no equilíbrio. Apesar da simulação não acompanhar a identidade dos indivíduos fora da matriz de posições, esses indivíduos participam da dinâmica. O 'kernel. a distribuição que descreve a probabilidade de um propagulo se estabelecer em função da distância da árvore máe, modula o impacto da paisagem na dinâmica local. Assim, as simulações e seus produtos ('U' e SAD réplica) dependem de duas variáveis de exposição: o tamanho de matriz de posições (J) e o tamanho da matriz de paisagem (Jl; l - landscape). Jl é a soma das unidades de espaço que são habitat  e não habitat, que também pode ser obtido do produto da densidade de indivíduos de cada levantamento (indivíduos/ha) e do número de hectares do recorte de paisagem (500 ha). Assim, obtemos uma estimativa do número de indivíduos que a paisagem suporta se toda ela fosse preenchida por habitat. Nesse contexto, a variável de interesse "cobertura" pode ser entendido como porcentagem remanescente de Jl ('p'). 
+  A seguir uma análise gráfica dos principais inputs da simulação, assim como variáveis de exposição. As respostas foram separadas em duas: primeiro análise da taxa de imigração (U) e suas transformações teóricas (I. U..J)
+```{r U: preparacao dos dados, echo=FALSE}
+### U.media ###
+# preparação dos dados #
+df_res.U <- inner_join(x = df_resultados[,c(1:5,28,17:18,20:23)], y = df_ref[,c(1,7,9)], by = "SiteCode") #df de trabalho para as análises de U
+df_res.U$cluster_medio %<>% as.numeric 
+df_res.U %<>% arrange(cobertura, cluster_medio)
+df_res.U$fitofisio_type %<>% factor #drop levels
+df_res.U$estado %<>% factor
+names(df_res.U)[c(3,7,9,13)] <- c("U","p","J","florest")
+# df_res.U %>% head 
+### criando variável que representa a comunidade presente no recorte de paisagem ###
+df_res.U %<>% mutate(Jl = DA * 500, # tamanho da comunidade da paisagem,produto da densidade de indivíduos (N/ha) pelo número de hectares do recorte de paisagem (500 ha)
+                     I = U*(J-1)/(1-U), # fluxo de imigrantes para a comunidade local (Rosindell et al. 2011)
+                     U..J = U/J, # taxa de imigração per capita; probabilidade de substituição de um individuo da comunidade por um 
+                     KS_factor = cut(KS, 10), # preciso pesquisar se existe alguma preferência em usar variáveis contínuas ou variáveis discretas na construção de GLMM
+                     KS.p_factor = cut(KS.p, 10), # mas certamente ajuda na visualização dos dados
+                     J_factor = cut(J,10),
+                     Jl_factor = cut(Jl,10),
+                     S.obs_factor = cut(S.obs,10),
+                     p_factor = cut(p, 10)) #referência a Hanski 1999
+scatterplotMatrix(~ S.obs + J + Jl + U + S.medio + KS + KS.p + GOF + KS.abund + KS.ac.obs + KS.ac.sim + KS.obs.sim, data = df_res.U)
+lm_S <- lm(S.medio ~ S.obs, data = df_ae)
+```
+  <!--Ao todo foram feitas 96 baterias de simulação, uma para cada levantamento fitossociológico disponível no TreeCo(REFERÊNCIA) e no banco de imagens de Hansel et al.(REFERÊNCIA) que apresentam pelo menos 1 ha amostrado e que o arranjo das amostras é em bloco único.-->
+  Figura 1. Relação entre as variáveis de controle da simulação e e as variáveis respostas. S.obs = riqueza observada; S.medio = S médio das SADs réplicas de cada simulação; KS = média da maior distância entre a SAD observada e a SAD réplica; KS.p = média do p valor associado ao teste de Kolmogovor-Smirnov; GOF (Goodness of fit - adaptado de Etienne & Rosindell 2011) = número de réplicas que obtiveram um bom ajuste (critério de ajuste: p valor > 0.05); KS.abund =  valor de abundância médio onde se observou KS; KS.ac.obs =  percentil da SAD observada acumulada onde se observou KS; KS.ac.sim =  percentil da SAD simulada acumulada onde se observou KS;  KS.obs =  diferença média entre o percentil da SAD observada acumulada e da respectiva SAD répĺica onde se observou KS. As três primeiras variáveis são variáveis de controle da simulação: S,.obs, J e Jp. U.medio estima um valor de taxa de imigração para a paisagem dado. S.medio KS, KS.p, GOF podem ser entendidos como métricas da congruência da SAD simulada com a SAD observada. KS.abund, KS.ac.obs, KS.ac.sim, KS.obs.sim podem revelar qual o padrão de divergência entre as SADs.
+
+
+  A riqueza observada parece apresentar relações com as variáveis que sumarizam as simulações (fig 1 paineis: U.medio ~, S.medio ~, KS ~, GOF ~). O modelo linear S.medio ~ S.obs apresenta: F(1, 766) = 1.255e+06, p-value < 2.2e-166, R² = 0.994  'S.medio = `r round(lm_S$coefficients[1], 4)` + `r round(lm_S$coefficients[2], 4)` * S.obs'. O parâmetro "U" (taxa de imigração) é estimado para obter em média a riqueza observada dado o número de indivíduos ("J") e a matriz de paisagem (cuja soma de habitat e não habitat é "Jp", densidade de indivíduos * número total de hectares do recorte de paisagem(500 ha) ). Assim, esse modelo pode nos dar uma ideia de que as simulações estão funcionando.
+  
+  Além da relação esperada com S.medio, riqueza observada parece ter relação com a maior distância media entre as SADs simuladas e as SADs observadas (fig 1, KS ~ S.obs) e uma possível relação com a variância de GOF (fig 1. GOF ~ S.obs ). Como GOF é obtido pela contabilização do número de SAD répĺicas cujo KS.p > 0.05 (e portanto aceita-se a hipótese nula do teste KS de que os dois vetores de abundâcia são amostras de uma mesma distribuição hipotética de abundâncias de espécies) pode se esperar que S.obs também deve ter algum efeito em KS.p. Assim, a riqueza observada será utilizada como variável preditora tanto da taxa de imigração (U) quanto da qualidade do modelo neutro em predizer a distribuição de abundância de espécies no gradiente de cobertura (teste de KS e relacionados). Considero aqui modelos em que S.obs terá efeito fixo como alatório. Tanto J como Jp não parecem ter relação com a as variáveis respostas, assim serão usadas apenas na construção do modelo cheio ou se os modelos selecionados possuirem pequena qualidade de ajuste.
+  
+  O parâmetro 'U', taxa media de imigração, é usada para simular 100 SADs réplicas por par simulação (Sitecode, kernel) (fig 1 U ~ ). A relação entre U e as demais variáveis respostas da simulação é similar às relações ~ S.obs, sendo U relacionado com S.obs também. Assim, modelos para os valores relacionados com o teste KS serão construidos com ambas S e U como variáveis de controle (provavelmente como efeito aleatório), contudo, nunca no mesmo modelo com exceção dos modelos completos (manter o modelo mais simples possível).
+  
+  KS, KS.p e GOF podem ser entendidas como medidas de qualidade de ajuste. KS mede a maior distância entre as curvas acumuladas. KS.p mede a probabilidade de errar ao assumir que os vetores de abundância não são de uma mesma distribuição de abundância, dado um valor de KS e uma distribuição nula de valores de KS. GOF contabiliza o número de vezes que uma réplica apresentou KS.p > 0.05 por par (SiteCode, cluster_medio). Como era de se esperar essas variáveis apresentam relação, as análises serão feitas paralelamente e comparadas. 
+  
+  Similarmente ao conjunto de variáveis anteriores, KS._, também são medidas relacionadas entre si. KS.abund é o valor de abundância onde foi observado KS, pode ser entendido como a abundância acumulada que gerou a maior distância entre as SADs. KS.ac.obs é a média do valor da curva acumulada onde se observou KS; KS.ac.sim idem para a SAD simulada; KS.obs.sim mede a diferença média entre KS.ac.obs e KS.ac.sim. Espera-se que KS.obs.sim seja descrita por uma distribuição simétrica com média no zero, contudo, ela parece ser assimétrica para a direita, revelando que em média a maior distância entre as curvas acumuladas se deve ao modelo neutro subestimar a abundância onde KS foi observado (KS.abund).
+  
+  As variáveis biogeográficas e históricas são estado/país e fitofisionomia (fig 2)
+```{r}
+df_ae <- inner_join(df_ref[,c(1,10,9,12,15)], unique(df_resultados[,c(1,17)]), by = "SiteCode")
+names(df_ae)[-c(1,3)] <- c("forest", "succession", "UC", "p")
+for(i in 1:5){
+  df_ae[,i] %<>% factor
+}
+df_ae %<>% melt(.,c("SiteCode", "p")) %>% arrange(p)
+names(df_ae)[3:4] <- c("var.aleatoria","nivel")
+df_ae[,4] %<>% as.character()
+# df_ae$var.aleatoria %>% levels
+# df_ae %>% filter(var.aleatoria == "forest") %>% .$nivel %>% table
+df_ae[df_ae$nivel == "Cerradao (Savana florestada)" & !is.na(df_ae$nivel), "nivel"] <- rep("cer", 2)
+df_ae[df_ae$nivel == "Contato FES/FOM" & !is.na(df_ae$nivel), "nivel"] <- "FES/FOM"
+df_ae[df_ae$nivel == "Contato FOD/FES" & !is.na(df_ae$nivel), "nivel"] <- "FES/FOD"
+df_ae[df_ae$nivel == "Floresta de galeria" & !is.na(df_ae$nivel), "nivel"] <- "FG"
+df_ae[df_ae$nivel == "FOM plantada" & !is.na(df_ae$nivel), "nivel"] <- "FOM.pl"
+df_ae[df_ae$nivel == "Formacao pioneira sob influencia marinha" & !is.na(df_ae$nivel), "nivel"] <- rep("f1.IM",4)
+# df_ae %>% filter(var.aleatoria == "estado") %>% .$nivel %>% table
+# df_ae %>% filter(var.aleatoria == "succession") %>% .$nivel %>% table
+# df_ae %>% filter(var.aleatoria == "UC") %>% .$nivel %>% table
+df_ae[df_ae$nivel == "UC Protecao Integral" & !is.na(df_ae$nivel), "nivel"] <- rep("PI", 33)
+df_ae[df_ae$nivel == "UC Uso Sustentavel" & !is.na(df_ae$nivel), "nivel"] <- rep("US", 19)
+df_ae[df_ae$nivel == "universities and research center" & !is.na(df_ae$nivel), "nivel"] <- "pesquisa"
+df_ae[df_ae$nivel == "universities and research centers" & !is.na(df_ae$nivel), "nivel"] <- "pesquisa"
+
+p_p.va <- ggplot(df_ae, aes(x = nivel , y = p) ) + geom_boxplot(aes(fill=nivel)) + geom_jitter()
+p_p.va <- p_p.va + facet_wrap(~var.aleatoria, scales = "free") + labs(x="") + theme_bw()
+p_p.va <- p_p.va + theme(strip.background=element_rect(fill="black")) + theme(strip.text=element_text(color="white", face="bold")) + theme(legend.position='none')
+p_p.va
+```
+  
+  
+  
+  
+## Construção dos modelos ##
+ Vou dividir a construção dos modelos em sessões segundo a variável de interesse. Então primeiro irei criar modelos para 'U' e alguns derivados teóricos dele. Sigo para as variáveis de qualidade do ajuste KS, KS.p e GOF e termino com as variáveis que descrevem como a qualidade do ajuste está variando. As variáveis de interesse são duas: cobertura vegetal ( ou 'p' - porcentagem remanescente de habitat) e o parâmetro escalar da distribuição de probabilidade que descreve a probabilidade de colonização de uma prole como resposta da distância da arvore mãe ('kernel'). Cluster médio apresenta 8 níveis, a média da distância média de espécies de uma mesma estratégia de dispersão (tabela 1  de  REFERÊNCIA). Riqueza observada será usada como variável de efeito aleatório. nos modelos onde p e kernel são as variáveis de interesse. Variáveis que sintetizam aspectos biogeográficos e históricos de cada levantamento também serão usados como variáveis de efeito aleatório apenas nos modelos cheios ou quando for pertinente.
+ A análise de cada variável seguirá um mesmo protocolo de construção de modelos lineares generalizados mistos (GLMM) para criar modelos cheios (Bolker et al. 2008, Box 4 - Procedures: creating a full model). Todos os demais modelos serão submodelos do modelo cheio. Uma breve análise exploratória precede a construção dos modelos. 
+ 
+#taxa de imigração - "U" #
+-Descrição da variável
+-análise exploratória <!--modelo em mente U ~ p * kernel + (U | S) + (1 | estado) + (1 | fitofisio)-->
+-protocolo de construção de modelo cheio
+-construção dos modelos per se: argumentação
+-seleção de modelos e ajuste aos dados
+-produção de resultados: gráficos ilustrativos e descrição
+
+
+-Descrição da variável
+
+ A taxa de imigração ("U") pode ser entendido como o parâmetro de escala de uma distribuição que descreve a probabilidade de substituição de um indivíduo qualquer da comunidade de tamanho 'J' por um indivíduo de uma espécie nova, entre intervalos de morte na comunidade local (REFERÊNCIA). Os eventos de substituição ocorrem de maneira independente, não há correlação temporal. A probabilidade de substituição é constante no tempo e para todo o intervalo das variáveis preditoras. Apenas um evento de substituição ocorre por ciclo. As simulações distinguem em J e em Jl, assim algumas variáveis serão calculadas a partir de U para compensar a diferença de J (Jl será considerada efeito aleatório ou offset). Do modelo clássico com espaço implicito, podemos calcular o fluxo de imigrantes para a comunidade local (I), que leva em conta J: I = U*(J-1)/(1-U) (Rosindell et al. 2011). E tambem vai ser calculado a taxa de imigração per capita U..J: probabilidade de substituição de um indivíduo da comunidade local por um indivíduo de uma espécie nova/(morte * indivívuo) (faz sentido?).
+
+  é uma variável aleatórioa que é descrita por uma distribuição que descreve o processo estatístico de substituição de um indivíduo qualquer da comunidade de tamanho 'J' por um indivíduo de uma espécie com apenas um indivíduo ('singleton'). Os eventos de substituição ocorrem de maneira independenetemente, não há correlação temporal (REFERÊNCIA). A taxa com que as substituições ocorrem é constante no tempo e para todo o intervalo das variáveis preditoras (REFERÊNCIA) e os eventos não ocorrem de maneira simultanea (REFERÊNCIA). Assim, a distribuição exponencial é uma boa escolha para modelar "U", pois a variável foi construida par ter os mesmos pressupostos (REESCREVER) (REFERÊNCIA sobre a teoria neutra do ponto de vista de amostragem, não sei se faz sentido). A distribuição exponencial é descrita por um único parâmetro 'lambda' que mede a taxa com que um evento ocorre em um intervalo de tempo, em nosso caso, por morte na comunidade local de tamanho "J". Um indivíduo morre por ciclo.
+
+<!--ENCONTRAR MELHOR LOCAL PARA DEIXAR ESSA SESSÃO-->
+
+```{r U: preparacao dos dados, echo=FALSE}
+### U.media ###
+# preparação dos dados #
+df_ae <- inner_join(x = df_resultados[,c(1:4,5,28,17:18,20:22)], y = df_ref[,c(1,7,9)], by = "SiteCode") #df de trabalho
+df_ae$cluster_medio %<>% as.numeric 
+df_ae %<>% arrange(cobertura, cluster_medio)
+df_ae$fitofisio_type %<>% factor #drop levels
+df_ae$estado %<>% factor
+names(df_ae)[c(3,7,9,11:12)] <- c("U","p","J","S","fitofisio")
+
+### criando variável que representa a comunidade presente no recorte de paisagem ###
+df_ae %<>% mutate(Jl = DA * 500, # tamanho da comunidade da paisagem,produto da densidade de indivíduos (N/ha) pelo número de hectares do recorte de paisagem (500 ha)
+                  I = U*(J-1)/(1-U), # fluxo de imigrantes para a comunidade local (Rosindell et al. 2011)
+                  U..J = U/J, # taxa de imigração per capita; probabilidade de substituição de um individuo da comunidade por um 
+                  KS_factor = cut(KS, 10), # preciso pesquisar se existe alguma preferência em usar variáveis contínuas ou variáveis discretas na construção de GLMM
+                  KS.p_factor = cut(KS.p, 10), # mas certamente ajuda na visualização dos dados
+                  J_factor = cut(J,10),
+                  Jl_factor = cut(Jl,10),
+                  S_factor = cut(S,10),
+                  p_factor = cut(p, 10)) #referência a Hanski 1999
+```
+
+-Análise exploratória dos dados  <!--modelo em mente U ~ p * kernel + (U | S) + (1 | estado) + (1 | fitofisio)-->
+
+  Segue grupos de gráficos da variável resposta U (taxa de imigração) e de suas transformações I (fluxo de imigrantes para a comunidade local) e U..J (taxa de imigração per capita) com as variaveis de interesse, cobertura vegetal ('p'), porcentagem de habitat na paisagem e kernel de diserpsão. A riqueza será usado como fator de controle, outros possíveis fatores de controle como J, Jl e fatores biogeograficos e históricos serão investigados na sessão da criação de modelos.
+-gráficos U ~ cobertura * S_factor <!--variável ambiental + variável de controle-->
+```{r hist U, echo=FALSE}
+# Objetivo: criar 3 histogramas com 4 curvas ajustadas: Gamma, exponencial, Weibull e normal 
+
+# Criando as funções de log verossimilhança das distribuições subjacentes #
+#função de log verosimilhança da distribuição gama
+func_md.gamma.nulo <- function(forma, escala, vetor){ 
+  -sum(dgamma(vetor, shape=escala, scale=escala, log=TRUE))
+}
+#função de log verosimilhança da distribuição exponencial
+func_md.exp.nulo <- function(lam, vetor){ 
+  -sum(dexp(vetor, rate=lam, log=TRUE))
+}
+#função de log verosimilhança da distribuição Weibull
+func_md.weibull.nulo <- function(forma, escala, vetor){ 
+  -sum(dweibull(vetor, shape=forma, scale=escala, log=TRUE))
+}
+#função de log verosimilhança da distribuição Weibull
+func_md.normal.nulo <- function(media, sd, vetor){ 
+  -sum(dnorm(vetor, mean = media, sd = sd, log=TRUE))
+}
+
+## U ##
+# Gamma #
+md_gamma_U <- vector("list", length = 2)
+names(md_gamma_U) <- c("start", "ajuste")
+md_gamma_U[[1]] <- list(forma=mean(df_ae$U)^2/var(df_ae$U), escala=var(df_ae$U)/mean(df_ae$U)) #metodo dos momentos
+md_gamma_U[[2]] <- mle2(func_md.gamma.nulo , start = md_gamma_U[[1]], method="Nelder-Mead", data=list(vetor=df_ae$U))
+# Exponencial #
+md_exp_U <- vector("list", length = 2)
+names(md_exp_U) <- c("start", "ajuste")
+md_exp_U[[1]] <- list(lam = mean(df_ae$U)) #metodo dos momentos
+md_exp_U[[2]] <- mle2(func_md.exp.nulo , start = md_exp_U[[1]], data=list(vetor=df_ae$U))
+# Weibull #
+md_gamma_U <- vector("list", length = 2)
+names(md_gamma_U) <- c("start", "ajuste")
+md_gamma_U[[1]] <- list(forma=mean(df_ae$U)^2/var(df_ae$U), escala=var(df_ae$U)/mean(df_ae$U)) #metodo dos momentos
+md_gamma_U[[2]] <- mle2(func_md.gamma.nulo , start = md_gamma_U[[1]], method="Nelder-Mead", data=list(vetor=df_ae$U))
+# Normal #
+md_gamma_U <- vector("list", length = 2)
+names(md_gamma_U) <- c("start", "ajuste")
+md_gamma_U[[1]] <- list(forma=mean(df_ae$U)^2/var(df_ae$U), escala=var(df_ae$U)/mean(df_ae$U)) #metodo dos momentos
+md_gamma_U[[2]] <- mle2(func_md.gamma.nulo , start = md_gamma_U[[1]], method="Nelder-Mead", data=list(vetor=df_ae$U))
+
+
+
+
+bat1_gama_nulo <- function(shape,scale){ # funcao que encontra a soma dos valores de log-verossimilhanca negativa referentes aos dados observados, dado que os parametros da distribuicao sao constantes
+  -sum(dgamma(bat1_indice_media, shape=shape, scale=scale, log=TRUE))
+}
+bat1_gama_nulo_start <- list(shape=mean(bat1_indice_media)^2/var(bat1_indice_media),scale=var(bat1_indice_media)/mean(bat1_indice_media)) # valores que serao utilizados como start na funcao mle2, calculados a partir do metodo dos momentos
+bat1_gama_nulo_mle <- mle2(bat1_gama_nulo, start=bat1_gama_nulo_start,method="Nelder-Mead")
+
+
+
+
+md_gamma_U <- glm(U ~ 1, family="Gamma"(link="identity"), data = df_ae) #ajustando uma distribuição Gamma
+md_exp_U <- glm(U ~ 1, family="Gamma"(link="identity"), data = df_ae) #ajustando uma distribuição exponencial 
+md_Weibull_U <- glm(U ~ 1, family="Gamma"(link="identity"), data = df_ae) #ajustando uma distribuição Weibull
+md_normal_U <- glm(U ~ 1, data = df_ae) #ajustando uma distribuição Normal
+
+p_U.ae <- ggplot(df_ae, aes(df_ae$U)) + geom_histogram()  
+
+
+
+par(mfrow=c(1,3))
+hist(df_ae$U, breaks = 20, main = "frequência de U", xlab = "taxa de imigração", ylab = "")
+#hist(log(df_ae$U), breaks = 20, main = "frequência de log(U)", xlab = "log(taxa de imigração)", ylab = "")
+hist(df_ae$I, breaks = 20, main = "frequência de I", xlab = "fluxo de imigrantes da comunidade local", ylab = "")
+#hist(log(df_ae$I), breaks = 20, main = "frequência de log(I)", xlab = "fluxo de imigrantes da comunidade local", ylab = "")
+hist(df_ae$U..J, breaks = 20, main = "frequência de U..J", xlab = "taxa de imigração per capita", ylab = "")
+#hist(log(df_ae$U..J), breaks = 20, main = "frequência de log(U..J)", xlab = "log(taxa de imigração per capita)", ylab = "")
+par(mfrow=c(1,1))
+```
+
+
+
+```{r}
+# U ~ cobertura + kernel + S
+p_U.cobertura <- ggplot(df_ae, aes( y = U, x = cobertura)) + geom_point(size = 1) + geom_smooth(method = "lm", se = FALSE)  + theme_bw()
+p_U.cobertura_S <- ggplot(df_ae, aes( y = U, x = cobertura, colour = S_factor)) + geom_point(size = 1) + geom_smooth(method = "lm", se = FALSE)  + theme_bw()
+p_U.kernel.cobertura_S <- ggplot(df_ae, aes( y = U, x = cluster_medio, group = SiteCode, color = S_factor)) + geom_line() + facet_grid(~ cobertura_factor)  + theme_bw()
+lay <- matrix(c(1,3,2,3), ncol = 2)
+grid.arrange(p_U.cobertura, p_U.cobertura_S, p_U.kernel.cobertura_S, ncol = 2, nrow = 2, layout_matrix = lay)
+```
+  - I
+```{r}
+# log(U) ~ *
+p_I.cobertura <- ggplot(df_ae, aes( y = I, x = cobertura)) + geom_point() + geom_smooth()
+p_I.cobertura_S <- ggplot(df_ae, aes( y = I, x = cobertura, colour = S_factor)) + geom_point() + geom_smooth(method = "lm", se = FALSE)
+p_I.kernel.cobertura_S <- ggplot(df_ae, aes( y = I, x = cluster_medio, group = SiteCode, color = S_factor)) + geom_line() + facet_grid(~ cobertura_factor)
+p_I.cobertura_cluster <- ggplot(df_ae, aes( y = I, x = cobertura, colour = S_factor)) + 
+                            geom_point() + geom_smooth(method = "lm", se = FALSE) + facet_grid(~cluster_medio)
+lay <- matrix(c(1,3,2,3), ncol = 2)
+grid.arrange(p_I.cobertura, p_I.cobertura_S, p_I.kernel.cobertura_S, ncol = 2, nrow = 2, layout_matrix = lay)
+
+```
+  - U..J
+```{r}
+# log(U) ~ *
+p_U..J.cobertura <- ggplot(df_ae, aes( y = U..J, x = cobertura)) + geom_point() + geom_smooth()
+p_U..J.cobertura_S <- ggplot(df_ae, aes( y = U..J, x = cobertura, colour = S_factor)) + geom_point() + geom_smooth(method = "lm", se = FALSE)
+p_U..J.kernel.cobertura_S <- ggplot(df_ae, aes( y = U..J, x = cluster_medio, group = SiteCode, color = S_factor)) + geom_line() + facet_grid(~ cobertura_factor)
+p_U..J.cobertura_cluster <- ggplot(df_ae, aes( y = U..J, x = cobertura, colour = S_factor)) + 
+                            geom_point() + geom_smooth(method = "lm", se = FALSE) + facet_grid(~cluster_medio)
+lay <- matrix(c(1,3,2,3), ncol = 2)
+grid.arrange(p_U..J.cobertura, p_U..J.cobertura_S, p_U..J.kernel.cobertura_S, ncol = 2, nrow = 2, layout_matrix = lay)
+```
+
+
+
+-gráficos U ~ kernel * cobertura_factor <!--variável biológica + variável ambiental + variável de controle-->
+
+### Bolker et al 2008 BOX 4: Procedures - creating a full model ###
+*1)"Specify fixed and random effects; only important interactions"*
+Tipos de variável:
+i) variárel resposta: 'U' - taxa de imigração/ perda de espécies
+ii) variáveis de interesse: 'cobertura' - porcentagem de habitat na paisagem, pode ser entendido como a porcentagem remanescente de habitat 'p'
+                            'cluster_medio' - o parametro scalar da distribuição Laplaciana (ou exponecial, se não me engano o Renato Coutinho havia feito algo como: dado uma
+                                              determinada célula vazia, 1o sortea-se um angulo (0-360) e depois um valor de uma exponencial com lambda igual ao cluster médio)
+                            'medidas de ajuste' - KS, KSP.P, GOF (?) 
+                            'cobertura * cluster_medio' - a estimativa de U é calculada a partir da área de interesse (J), contudo, como os kernels são construidos usando
+                                                          distribuições que não são truncadas, toda a paisagem pode estar participando da dinâmica; baseado em nossas análises
+                                                          preliminares, na construção da simulação e de evidências empirícas (PROCURAR SOBRE SPP PODEM SER SER BENEFICIADAS
+                                                          PELA FRAGMENTAÇÃO DADO SUA SINDROME DE DISPERSÃO) o efeito do kernel parece ser modulado pela cobertura  
+iii) variáveis de controle: 'S' - a simulação estima o 'U' necessário para a simulação produzir SADs com uma riqueza aproximada dada uma configuração espacial e tamanho da   
+                                  área amostrada (J)
+                            'J' - tamanho da área amostrada em unidades de indivíduos
+                            'Jp' - tamanho da paisagem em unidade de indivíduos 
+                            'geohistóricos' - Estado/país; fitofisionomia
+"Restrict the model a priori":
+  a) "> 5-6 random effect levels/random effect". Vou considerar as variáveis de controle como variáveis de efeito aleatório
+```{r}
+df_temp <- df_ae %>% filter(cluster_medio == 31.10) # %>% select(S_factor, cobertura_factor, J_factor, Jp_factor, fitofisio, estado, KS_factor, KS.p_factor)
+x11()
+scatterplotMatrix(~ S + J + Jp + estado + fitofisio + estado + KS + KS.p + GOF, data = df_temp)
+```
+  figura 1 - 'scatterplotMatrix' das variáveis explicativas de controle de "U", taxa de imigração/morte no equilíbrio no tempo infinito. Esse gráfico contêm 96 levantamentos do banco de dados TreeCo (REFERÊNCIA). 'S' - riqueza de espécies; 'J' - número de indivíduos amostrados, o tamanho da comunidade 'local'; 'Jp' - produto da densidade de indivíduos pelo número total de hectares do recorte de paisagens (500 ha), pode ser entendido coo  
+
+
+*2)"Choose an error distribution and link function"*
+
+# Variável operacional - taxa de imigração/ morte no equilíbrio ("U") #
+
+  Podemos entender a taxa de imigração ("U") como o parâmetro de uma distribuição que descreve o processo estatístico de substituição de um indivíduo qualquer da comunidade de tamanho 'J' por um indivíduo de uma espécie com apenas um indivíduo ('singleton'). Os eventos de substituição ocorrem independenetemente um do outro, não há correlação temporal (REFERÊNCIA). A taxa com que as substituições ocorrem é constante no tempo e para todo o intervalo das variáveis preditoras (REFERÊNCIA) e os eventos não ocorrem de maneira simultanea (REFERÊNCIA). Assim, a distribuição exponencial é uma boa escolha para modelar "U", pois a variável foi construida par ter os mesmos pressupostos (REFERÊNCIA sobre a teoria neutra do ponto de vista de amostragem, não sei se faz sentido). A distribuição exponencial é descrita por um único parâmetro 'lambda'  
+
+            
+```{r U: primeira bateria de análise}
+## Análise exploratória ##
+#x11()
+md1 <- lm(U ~ cobertura, data = df_ae) #ajustando um modelo linear com as variáveis de interesse
+summary(md1)
+p_U.cobertura <- ggplot(df_ae, aes(x = cobertura, y = U)) + geom_point() + geom_smooth(method = "lm", se = FALSE) + ggtitle("lm( U ~ cobertura )") + theme_bw()
+a<-autoplot(lm(U ~ cobertura, data = df_ae), data = df_ae, colour = "S_factor", label.sizee = 3)
+lay <- matrix(c(1,1,2,3,4,5), ncol = 2, byrow = TRUE)
+grid.arrange(p_U.cobertura, 
+             a@plots[[1]],a@plots[[2]],a@plots[[3]],a@plots[[4]],  
+             ncol = 2, nrow = 3, layout_matrix = lay)
+# U ~ cobertura + kernel + S
+p_U.cobertura <- ggplot(df_ae, aes( y = U, x = cobertura)) + geom_point(size = 1) + geom_smooth(method = "lm", se = FALSE)  + theme_bw()
+p_U.cobertura_S <- ggplot(df_ae, aes( y = U, x = cobertura, colour = S_factor)) + geom_point(size = 1) + geom_smooth(method = "lm", se = FALSE)  + theme_bw()
+p_U.kernel.cobertura_S <- ggplot(df_ae, aes( y = U, x = cluster_medio, group = SiteCode, color = S_factor)) + geom_line() + facet_grid(~ cobertura_factor)  + theme_bw()
+lay <- matrix(c(1,3,2,3), ncol = 2)
+grid.arrange(p_U.cobertura, p_U.cobertura_S, p_U.kernel.cobertura_S, ncol = 2, nrow = 2, layout_matrix = lay)
+
+# log(U) ~ *
+p_lU.cobertura <- ggplot(df_ae, aes( y = log(U), x = cobertura)) + geom_point() + geom_smooth()
+p_lU.cobertura_S <- ggplot(df_ae, aes( y = log(U), x = cobertura, colour = S_factor)) + geom_point() + geom_smooth(method = "lm", se = FALSE)
+p_lU.kernel.cobertura_S <- ggplot(df_ae, aes( y = log(U), x = cluster_medio, group = SiteCode, color = S_factor)) + geom_line() + facet_grid(~ cobertura_factor)
+p_lU.cobertura_cluster <- ggplot(df_ae, aes( y = log(U), x = cobertura, colour = S_factor)) + 
+                            geom_point() + geom_smooth(method = "lm", se = FALSE) + facet_grid(~cluster_medio)
+lay <- matrix(c(1,3,2,3), ncol = 2)
+grid.arrange(p_lU.cobertura, p_lU.cobertura_S, p_lU.kernel.cobertura_S, ncol = 2, nrow = 2, layout_matrix = lay)
+
+
+# U: taxa de imigração (Que contêm informação de imigração e especiação - leitura minha: Etienne & Rosindell 2011)
+# I: usando a formula de conversao de probabilidade de imigração 
+                              ########################################
+                              ######## CONSTRUÇÃO DE MODELOS #########
+                              ########################################
+## Divido as variáveis em grupos:
+# 0) variáveis de identificação: Sitecode, Sindrome,
+# i) variável resposta: U
+# ii) variáveis de interesse(VI): cobertura - porcentagem de habitat remanescente (similar ao de Hanski 1999); 
+# cluster_medio: media de dispersão de espécies de uma mesma sindrome de dispersão
+# iii) variáveis de exposição: Jpaisagem = 500 * DA (número de elementos na matrix de paisagem, ou seja o tamanho de amostra de paisagem que estamos pegando); J (número de indivíduos na comunidade local)
+# iv) variáveis aleatórias(VA): S?, fito* ?, 
+# Como estou na fase de criar os modelos cheios não irei utilizar J e Jp como offsets
+
+### Padrão do modelo ###
+# md_dist <- 'glmm'(U ~ full, family = "", data = df_ae)
+# md_VI_VA <- lformula(U ~ VI + VA, data = df_ae) # as variáveis de exposição estarão em todos os modelos 
+
+md_gamma <- glm(U ~ cobertura * cluster_medio + S + KS.p + GOF + Jp + J, family = Gamma(link = "log") ,data = df_ae)
+md_expo <- glm(U ~ cobertura * cluster_medio + S + KS.p + Jp + J, family = Gamma(link = "log") ,data = df_ae)
+md_weibull <- glm(U ~ cobertura * cluster_medio + S + KS.p + Jp + J, family = Gamma(link = "log") ,data = df_ae)
+
+AICctab(md_gamma1, md_gamma2)
+
+```
+
+Sobre a influência do número de indivíduos na paisagem
+-> ideia Jp: 
+  O modelo neutro pressupõem que a comunidade é regida por processos aleatórios de morte, nascimento, imigração e especiação. Todas as espécies estão sujeitas a estocasticidade demográfica. No tempo infinito, o sistema entra em equilibrio onde a perda de espécies por deriva ecológica é compensada pelos processos de introdução de novas espécies no sistema (imigração na comunidade local e especiação na metacomunidade). Quando o equilíbrio é alcançado não há variação no número de espécies e na forma com que a abundância se distribui nessas espécies.
+  O algoritmo coalescente simula uma dinâmica neutra espacialmente explicíta que ocorre em uma matriz de posições concentrica a matriz da paisagem. A simulação retorna a identidade, i.e., a espécie, de cada indivíduo na matriz de posições em um momento no equilíbrio. Apesar da simulação não acompanhar a identidade dos indivíduos fora da matriz de posições, esses indivíduos participam da dinâmica, dado o 'kernel' de dispersão. Assim, as simulações e seus produtos ('U' e SAD réplica) dependem de duas variáveis de exposição: o tamanho de matriz de posições (J) e o tamanho da matriz de paisagem (Jp). Jp resulta do produto da densidade de indivíduos de cada levantamento (indivíduos/ha) e do número de hectares do recorte de paisagem (500 ha), assim, obtemos o número de indivíduos médio que poderia estar presente na paisagem se toda ela fosse preenchida por indivíduos. Nesse contexto, a variável de interesse "cobertura" pode ser entendido como porcentagem remanescente da comunidade da paisagem (Jp). 
+  
+  Concentrica à matriz de posições, a matriz do recorte de paisagem contêm elementos que mostram a 
+  inserida em uma matriz maior que corresponde ao recorte de paisagem onde a comunidade local está inserida, e que contêm indivíduos que fazem parte da dinâmica, apesar de suas trajetórias não serem acompanhadas [REESCREVER: ficou confuso, mas a ideia é que a comunidade local é um sistema aberto dentro de sua paisagem]. Cada matriz de posições contêm J elementos e cada matriz de paisagem contêm 500 * DAi elementos (número de hectares do recorte de paisagens * densidade de indivíduos por sitecode (i) ). Duas amostras são feitas para realizar a estimativa da taxa de imigração de novas espécies (m ~ probabilidade de um indivíduo de um espécie presente na metacomunidade substitua o indivíduo da espécie local/morte - o intervalo de tempo é medido em mortes de árvores): J, comunidade local que acompanhamos a dinâmica; 500 X DAi (número de hectares do recorte de paisagem, densidade de indivíduos do levantamento do respectivo recorte de paisagem), Jpaisagem, a comunidade da paisagem, ou número máximo de indivíduos que podem estar presentes na comunidade. Dessa forma, cobertura vegetal passa a ser 'p', proporção remanescente de Jpaisagem. Assim, temos que (U|J|Jpaisagem). Então, temos uma taxa que depende de duas variáveis de exposição. Eu não sei é possível utilizar dois offsets por modelo [PESQUISAR]. Alternativamente, é possível transformar a probabilidade de que um indivíduo da metacomunidade substitua um indivíduo da comunidade local por evento de morte ('U') por I
+  
+  
+  
+  é o número de indivíduos que estão disponíveis para a dinâmica, seja dentro da área de interesse  (J) ou de toda a paisagem (Jp). Então, acredito que se houver alguma influência 
+
+
+```{r KS*: seleção das melhores distribuições}
+### KS ###
+### KS.p ###
+### KS.abund ###
+### KS.ac.obs ###
+### KS.ac.sim ###
+
+# preparação dos dados #
+df_ae <- inner_join(x = df_resultados[,c(1:9,28,17:18,20:22)], y = df_ref[,c(1,7,9)], by = "SiteCode") #df de trabalho
+df_ae$cluster_medio %<>% as.numeric 
+df_ae %<>% arrange(cobertura, cluster_medio)
+df_ae$fitofisio_type %<>% factor #drop levels
+df_ae$estado %<>% factor #drop levels
+df_ae %>% filter(cluster_medio == 31.1) %>% .$fitofisio_type %>% table %>% as.data.frame #retirando as repetições, tabela de contagem dos tipos de fitofisionomias
+names(df_ae)[c(3,13,15:16)] <- c("U","J", "S","fitofisio") # U = taxa de imigração da metacomunidade/taxa de perda de espécies no equilíbrio, 
+
+### criando variável que representa a comunidade presente no recorte de paisagem ###
+df_ae %<>% mutate(Jp = DA * 500, # Jp número de indivíduos 
+#                  I = U*(J-1)/(1-U), # fluxo de imigrantes para a comunidade local (Rosindell et al. 2011)
+#                  U..J = U/J, # 'U' dado a amostra 'J', ou, "A taxa de imigração de novas espécies per capita " 
+                  U_factor = cut(U, 10),
+                  Jp_factor = cut(Jp,10),
+                  S_factor = cut(S,10),
+                  cobertura_factor = cut(cobertura, 10))
+
+## Análise exploratória ##
+#x11()
+# variável resposta
+par(mfrow=c(3,1))
+hist(df_ae$KS, breaks = 20)
+hist(df_ae$KS.p, breaks = 20)
+hist(df_ae$GOF, breaks = 20)
+par(mfrow=c(1,1))
+
+# KS ~ *
+p_KS.cobertura <- ggplot(df_ae, aes( y = KS, x = cobertura)) + geom_point() + geom_smooth()
+p_KS.cobertura_U <- ggplot(df_ae, aes( y = KS, x = cobertura, colour = U_factor)) + geom_point() + geom_smooth(method = "lm", se = FALSE)
+p_KS.kernel.cobertura_U <- ggplot(df_ae, aes( y = KS, x = cluster_medio, group = SiteCode, color = U_factor)) + geom_line() + facet_grid(~ cobertura_factor)
+lay <- matrix(c(1,3,2,3), ncol = 2)
+grid.arrange(p_KS.cobertura, p_KS.cobertura_U, p_KS.kernel.cobertura_U, ncol = 2, nrow = 2, layout_matrix = lay)
+plot(KS ~ U, df_ae)
+# KS.p ~ *
+p_KS.pcobertura <- ggplot(df_ae, aes( y = KS.p, x = cobertura)) + geom_point() + geom_smooth()
+p_KS.pcobertura_U <- ggplot(df_ae, aes( y = KS.p, x = cobertura, colour = U_factor)) + geom_point() + geom_smooth(method = "lm", se = FALSE)
+p_KS.pkernel.cobertura_U <- ggplot(df_ae, aes( y = KS.p, x = cluster_medio, group = SiteCode, color = U_factor)) + geom_line() + facet_grid(~ cobertura_factor)
+lay <- matrix(c(1,3,2,3), ncol = 2)
+grid.arrange(p_KS.pcobertura, p_KS.pcobertura_U, p_KS.pkernel.cobertura_U, ncol = 2, nrow = 2, layout_matrix = lay)
+# GOF ~ *
+p_GOF.cobertura <- ggplot(df_ae, aes( y = GOF, x = cobertura)) + geom_point() + geom_smooth()
+p_GOF.cobertura_U <- ggplot(df_ae, aes( y = GOF, x = cobertura, colour = U_factor)) + geom_point() + geom_smooth(method = "lm", se = FALSE)
+p_GOF.kernel.cobertura_U <- ggplot(df_ae, aes( y = GOF, x = cluster_medio, group = SiteCode, color = U_factor)) + geom_line() + facet_grid(~ cobertura_factor)
+lay <- matrix(c(1,3,2,3), ncol = 2)
+grid.arrange(p_GOF.cobertura, p_GOF.cobertura_U, p_GOF.kernel.cobertura_U, ncol = 2, nrow = 2, layout_matrix = lay)
+# KS.abund ~ *
+p_KS.abund.cobertura <- ggplot(df_ae, aes( y = KS.abund, x = cobertura)) + geom_point() + geom_smooth()
+p_KS.abund.cobertura_U <- ggplot(df_ae, aes( y = KS.abund, x = cobertura, colour = U_factor)) + geom_point() + geom_smooth(method = "lm", se = FALSE)
+p_KS.abund.kernel.cobertura_U <- ggplot(df_ae, aes( y = KS.abund, x = cluster_medio, group = SiteCode, color = U_factor)) + geom_line() + facet_grid(~ cobertura_factor)
+lay <- matrix(c(1,3,2,3), ncol = 2)
+grid.arrange(p_KS.abund.cobertura, p_KS.abund.cobertura_U, p_KS.abund.kernel.cobertura_U, ncol = 2, nrow = 2, layout_matrix = lay)
+# KS.ac.obs ~ *
+p_KS.ac.obs.cobertura <- ggplot(df_ae, aes( y = KS.ac.obs, x = cobertura)) + geom_point() + geom_smooth()
+p_KS.ac.obs.cobertura_U <- ggplot(df_ae, aes( y = KS.ac.obs, x = cobertura, colour = U_factor)) + geom_point() + geom_smooth(method = "lm", se = FALSE)
+p_KS.ac.obs.kernel.cobertura_U <- ggplot(df_ae, aes( y = KS.ac.obs, x = cluster_medio, group = SiteCode, color = U_factor)) + geom_line() + facet_grid(~ cobertura_factor)
+lay <- matrix(c(1,3,2,3), ncol = 2)
+grid.arrange(p_KS.ac.obs.cobertura, p_KS.ac.obs.cobertura_U, p_KS.ac.obs.kernel.cobertura_U, ncol = 2, nrow = 2, layout_matrix = lay)
+# KS.ac.sim ~ *
+p_KS.ac.sim.cobertura <- ggplot(df_ae, aes( y = KS.ac.sim, x = cobertura)) + geom_point() + geom_smooth()
+p_KS.ac.sim.cobertura_U <- ggplot(df_ae, aes( y = KS.ac.sim, x = cobertura, colour = U_factor)) + geom_point() + geom_smooth(method = "lm", se = FALSE)
+p_KS.ac.sim.kernel.cobertura_U <- ggplot(df_ae, aes( y = KS.ac.sim, x = cluster_medio, group = SiteCode, color = U_factor)) + geom_line() + facet_grid(~ cobertura_factor)
+lay <- matrix(c(1,3,2,3), ncol = 2)
+grid.arrange(p_KS.ac.sim.cobertura, p_KS.ac.sim.cobertura_U, p_KS.ac.sim.kernel.cobertura_U, ncol = 2, nrow = 2, layout_matrix = lay)
+
+
+```
+
+-variâncias
+```{r seleção das melhores distribuições}
+### U.var ###
+### KS.v ###
+### KS.p.v ###
+### KS.abund.v ###
+### KS.ac.obs.v ###
+### KS.ac.sim.v ###
+```
+
+
+########### Material e Métodos ###########
+
+  Realizamos simulações espacialmente explicitas de dinâmica neutra de espécies arbóreas utilizando dados de levantamentos fitossociológicos realizados na Mata Atlântica. Utilizamos dois bancos de dados: *TreeCo* (Neotropical tree commuinities database), que possui dados de levantamentos fitossociológicos realizados em comunidades de arbóreas na mata atlântica, e o banco de imagens de Hansel et al. [REFERÊNCIA], que possuem imagens da estrutura espacial da cobertura vegetal (REESCREVER). Para cada levantamento (*SiteCode*) realizamos recortes de paisagem de 5 km^2 concêntricos entre si. Cada recorte de paisagem teve sua resolução ajustada segundo a densidade de indivíduos observada no SiteCode. Assim, o número médio de pixels por unidade de área do recorte de paisagem é igual ao número médio de indivíduos por unidade de área da comunidade arbórea. 
+
+  Para realizar as simulações além da estrutura espacial de cobertura vegetal (habitat e não habitat), conservada no recorte de paisagem, é necessário um valor de taxa de imigração/especiação (*U.est*). No modelo neutro todas as espécies estão sob deriva ecológica, sem uma permanente adição de novas espécies o sistema tende à monodominância (Hubbell 2001). Assim, a manutenção da diversidade depende dessa taxa de adição de novas espécies(*U.est*). Para simular a dinâmica neutra espacialmente explicita, utilizamos o algoritmo coalescente que recria a distribuição de abundância de espécies no equilíbrio (Rosindell et al. 2008) (mais detalhes na descrição da metodologia). Além de ser um método mais eficiente de se produzir distribuições de abundância de espécies no equilíbrio (Rosindell et al. 2008), essa abordagem permite estimar 'U.est' dado uma estrutura espacial, kernel de dispersão e riqueza observada. Por kernel de dispersão eu considero a distribuição de probabilidade de uma planta prduzir propagulos em função da distância a ela, aqui utilizamos a distribuição laplaciana como tipo de kernel [REFERÊNCIA] e oito valores de distância média como valores do escalar da distribuição (distribuição Laplace a media e variância são iguais). Sete valores de distância média foram retirados de Seidler & Plotkin (2006, tabela 1) e são as distâncias médias de espécies arbóreas segundo diferentes tipos de sindrome de dispersão, adicionamos um valor médio entre as sindromes (*Sindrome* = tipo de sindrome de dispersão, *cluster_medio* = valor médio de dispersão daquele tipo de sindrome). Utilizamos a riqueza observada na distribuição de abundância de espécies dos levantamentos fitossociológicos do TreeCo (*S*).
+  Utilizamos dois indices para descrever a estrutura espacial da paisagem: cobertura vegetal, a porcentagem de habitat na paisagem (*cobertura*) e indice de agregação (AI, He et al. 2000), que mede o grau de agregação de habitat com relação à agregação máxima (*aggregation.index*). 
+  A figura 1 mostra a relação entre a riqueza, cobertura e agregação. Os dados completos utilizados nas simulações estão em 'df_simulacao': i) as colunas refID, ordem e paisagens são de controle interno; ii) conversao 1m é o valor usado para converter o cluster medio que está em metros para a escala da paisagem; iii) N, DA, S são informações do TreeCo, como já havia divergido antes, eu fiz uma função que contava o número de espécies de cada levantamento baseado na SAD.obs (*S obs*), utilizei esse valor para realizar as simulações. 
+
+```{r input simulacao}
+library(car)
+scatterplotMatrix(~ N + DA + S.obs + cobertura , data = df_resultados, reg.line = FALSE) #smoother=loessLine 
+```
+  Ao final da simulação obtem-se uma matriz com a estrutura espacial das espécies, dessa matriz obtem-se a distribuição de abundância de espécies simulada (SAD.sim). Foram feitas 744 simulações, uma para cada par (sindrome de dispersão, sitecode). Cada simulação contou com 100 réplicas com sementes aleatórias distintas[PONTO A DISCUTIR], resultando em 100 distribuições de abundância de espécies (SAD.rep) e U.est distintos. Cada uma dessas SAD.rep foi comparada com a respectiva SAD.obs utilizando a estatística de Kolmogorov Smirnov. Desse teste obtemos: i) a maior distância entre as curvas acumuladas das duas SAD (SAD.rep e SAD.obs) (KS, KS_ac_diff - o primeiro calculado segundo 'ks.test' e o segundo usando a função ~/Documents/dissertacao/R_source/posicao_KS.R), ii) o valor p obtido de 'ks.test()', iii) o valor de abundância onde ocorreu a maior divergência entre as acumuladas (log(SAD) = KS_log.N, SAD = KS_N); iv) a posição das respectivas curvas acumuladas onde ocorreu a maior divergência (KS_ac_*). Além das 100 réplicas, cada par (sindrome de dispersão, sitecode) possui as mesmas medidas considerando uma SAD media das SAD.rep (anexo - formulario "/R_source/sad_media.R"). O valor médio e a variância também foram calculados. Esses valores se distinguem pelo fator _rep_. Segue um sumário da tabela:
+```{r S.obs ~ S, fig.width=10, fig.height=4}
+ggplot(data = df_resultados, aes(x = S.obs, y = S.medio)) + geom_point() +  stat_smooth(method = "lm", col = "red") + facet_grid(~Sindrome)
+```
+
+
+
+
+```{r sumario df_resultados.rep}
+df_resultados %>% summary #na.omit para ocultar as linhas com S obs
+```
+  SUGESTÃO: Poderíamos pensar em algo similar para a Riqueza usando testes de permutação (monte carlo).
+
+CONSIDERANDO A SAD MÉDIA
+```{r graficos exploratorios SAD media, include=FALSE}
+#x11()
+### U.est ~ cluster_medio + S_obs  + cobertura + aggregation.index
+df_resultados %>% filter(rep == "sad_media") %>% dplyr::select (-rep) -> df_ae
+scatterplotMatrix( ~ U.est + cluster_medio + S_obs  + cobertura + aggregation.index, data = df_ae, reg.line = FALSE) #smoother=loessLine 
+scatterplotMatrix( ~ log(U.est) + cluster_medio + S_obs  + cobertura + aggregation.index, data = df_ae, reg.line = FALSE) #smoother=loessLine 
+scatterplotMatrix( ~ log(U.est) + cluster_medio + S_obs  + cobertura + log(aggregation.index), data = df_ae, reg.line = FALSE) #smoother=loessLine 
+### Ssim ~ U.est + cluster_medio + S_obs  + cobertura + aggregation.index
+p_S_obs.media <- ggplot(data = df_ae) + geom_point(aes(x = S_obs, y = S, color=Sindrome)) + facet_wrap(~cluster_medio) + geom_abline(slope = 1,intercept = 0)
+scatterplotMatrix( ~ S + U.est + cluster_medio + S_obs  + cobertura + aggregation.index, data = df_ae, reg.line = FALSE) #smoother=loessLine 
+df_ae %<>% mutate(diff.S = S - S_obs)
+p_diff.S_cobertura <- ggplot(df_ae) + geom_point(aes(x = cobertura, y = diff.S, color=Sindrome)) + facet_wrap(~cluster_medio)
+### KS* ~ U.est + cluster_medio + S_obs  + cobertura + aggregation.index
+scatterplotMatrix( ~ KS + U.est + cluster_medio + S_obs  + cobertura + aggregation.index, data = df_ae, reg.line = FALSE) #smoother=loessLine 
+scatterplotMatrix( ~ KS + log(KS_p) + U.est + cluster_medio + S_obs  + cobertura + aggregation.index, data = df_ae, reg.line = FALSE) #smoother=loessLine 
+scatterplotMatrix( ~ KS_log.N + log(KS_p) + U.est + cluster_medio + S_obs  + cobertura + aggregation.index, data = df_ae, reg.line = FALSE) #smoother=loessLine 
+scatterplotMatrix( ~ KS_N + log(KS_p) + U.est + cluster_medio + S_obs  + cobertura + aggregation.index, data = df_ae, reg.line = FALSE) #smoother=loessLine 
+scatterplotMatrix( ~ KS_ac_sim + log(KS_p) + U.est + cluster_medio + S_obs  + cobertura + aggregation.index, data = df_ae, reg.line = FALSE) #smoother=loessLine 
+scatterplotMatrix( ~ KS_ac_obs + log(KS_p) + U.est + cluster_medio + S_obs  + cobertura + aggregation.index, data = df_ae, reg.line = FALSE) #smoother=loessLine  
+```
+
+
+
+
+
+CONSIDERANDO A MÉDIA DAS REPLICAS
+```{r include=FALSE}
+#avaliando se tudo está do jeito que deveria estar
+#a riqueza media tem que ser igual independentemente se é de uma media_rep ou de uma sad_media
+df_resultados %>% filter(rep == "media_rep") -> df_ae1
+df_resultados %>% filter(rep == "sad_media") -> df_ae2
+df_ae1 %>% summary
+df_ae2 %>% summary
+#x11()
+#plot(df_ae1$S ~ df_ae2$S)
+
+# Vou proseguir plotanto a variância com as demais variáveis
+df_resultados[,1:8] %>% filter(rep != "media_rep" & rep != "sad_media") %>% ddply(.,c("SiteCode","Sindrome","cluster_medio","cobertura","aggregation.index"), summarise, S_var = var(S), U.est = mean(U.est)) -> df_ae
+df_ae %<>% mutate(S_sd = sqrt(S_var))
+scatterplotMatrix( ~ S_var + log(U.est) + cluster_medio + cobertura + aggregation.index, data = df_ae, reg.line = FALSE) #smoother=loessLine 
+
+#vou considerar os valores médios de KS e posteriormente a variância 
+df_resultados %>% filter(rep == "media_rep") -> df_ae #somente a media das réplicas
+df_ae %>% head
+scatterplotMatrix( ~ KS + log(U.est) + cluster_medio + cobertura + aggregation.index, data = df_ae, reg.line = FALSE) #smoother=loessLine 
+scatterplotMatrix( ~ KS_p + log(U.est) + cluster_medio + cobertura + aggregation.index, data = df_ae, reg.line = FALSE) #smoother=loessLine 
+scatterplotMatrix( ~ KS_log.N + log(U.est) + cluster_medio + cobertura + aggregation.index, data = df_ae, reg.line = FALSE) #smoother=loessLine 
+scatterplotMatrix( ~ KS_N + log(U.est) + cluster_medio + cobertura + aggregation.index, data = df_ae, reg.line = FALSE) #smoother=loessLine 
+scatterplotMatrix( ~ KS_ac_obs + log(U.est) + cluster_medio + cobertura + aggregation.index, data = df_ae, reg.line = FALSE) #smoother=loessLine 
+scatterplotMatrix( ~ KS_ac_sim + log(U.est) + cluster_medio + cobertura + aggregation.index, data = df_ae, reg.line = FALSE) #smoother=loessLine 
+df_ae %>% filter(KS_p >= 0.05) -> df_ae1
+scatterplotMatrix( ~ KS + log(U.est) + cluster_medio + cobertura + aggregation.index, data = df_ae1, reg.line = FALSE) #smoother=loessLine 
+scatterplotMatrix( ~ KS_p + log(U.est) + cluster_medio + cobertura + aggregation.index, data = df_ae1, reg.line = FALSE) #smoother=loessLine 
+scatterplotMatrix( ~ KS_log.N + log(U.est) + cluster_medio + cobertura + aggregation.index, data = df_ae1, reg.line = FALSE) #smoother=loessLine 
+scatterplotMatrix( ~ KS_N + log(U.est) + cluster_medio + cobertura + aggregation.index, data = df_ae1, reg.line = FALSE) #smoother=loessLine 
+scatterplotMatrix( ~ KS_ac_obs + log(U.est) + cluster_medio + cobertura + aggregation.index, data = df_ae1, reg.line = FALSE) #smoother=loessLine 
+scatterplotMatrix( ~ KS_ac_sim + log(U.est) + cluster_medio + cobertura + aggregation.index, data = df_ae1, reg.line = FALSE) #smoother=loessLine 
+df_ae %>% filter(KS_p < 0.05) -> df_ae2
+scatterplotMatrix( ~ KS + log(U.est) + cluster_medio + cobertura + aggregation.index, data = df_ae2, reg.line = FALSE) #smoother=loessLine 
+scatterplotMatrix( ~ KS_p + log(U.est) + cluster_medio + cobertura + aggregation.index, data = df_ae2, reg.line = FALSE) #smoother=loessLine 
+scatterplotMatrix( ~ KS_log.N + log(U.est) + cluster_medio + cobertura + aggregation.index, data = df_ae2, reg.line = FALSE) #smoother=loessLine 
+scatterplotMatrix( ~ KS_N + log(U.est) + cluster_medio + cobertura + aggregation.index, data = df_ae2, reg.line = FALSE) #smoother=loessLine 
+scatterplotMatrix( ~ KS_ac_obs + log(U.est) + cluster_medio + cobertura + aggregation.index, data = df_ae2, reg.line = FALSE) #smoother=loessLine 
+scatterplotMatrix( ~ KS_ac_sim + log(U.est) + cluster_medio + cobertura + aggregation.index, data = df_ae2, reg.line = FALSE) #smoother=loessLine 
+
+#considerando a variância de KS
+df_resultados[,c(1:6,7:15)] %>% filter(rep != "sad_media" & rep != "media_rep") -> df_ae
+df_ae %<>% ddply(.,c("SiteCode","Sindrome","cluster_medio","cobertura","aggregation.index"), summarise, 
+                KS = var(KS), 
+                KS_p = var(KS_p),
+                KS_log.N = var(KS_log.N),
+                KS_N = var(KS_N),
+                KS_ac_obs = var(KS_ac_obs),
+                KS_ac_sim = var(KS_ac_sim),
+                U.est = mean(U.est))
+df_ae %>% head
+scatterplotMatrix( ~ KS + log(U.est) + cluster_medio + cobertura + aggregation.index, data = df_ae, reg.line = FALSE) #smoother=loessLine 
+scatterplotMatrix( ~ KS_p + log(U.est) + cluster_medio + cobertura + aggregation.index, data = df_ae, reg.line = FALSE) #smoother=loessLine 
+scatterplotMatrix( ~ KS_log.N + log(U.est) + cluster_medio + cobertura + aggregation.index, data = df_ae, reg.line = FALSE) #smoother=loessLine 
+scatterplotMatrix( ~ KS_N + log(U.est) + cluster_medio + cobertura + aggregation.index, data = df_ae, reg.line = FALSE) #smoother=loessLine 
+scatterplotMatrix( ~ KS_ac_obs + log(U.est) + cluster_medio + cobertura + aggregation.index, data = df_ae, reg.line = FALSE) #smoother=loessLine 
+scatterplotMatrix( ~ KS_ac_sim + log(U.est) + cluster_medio + cobertura + aggregation.index, data = df_ae, reg.line = FALSE) #smoother=loessLine 
+df_ae %>% filter(KS_p >= 0.05) -> df_ae1
+scatterplotMatrix( ~ KS + log(U.est) + cluster_medio + cobertura + aggregation.index, data = df_ae1, reg.line = FALSE) #smoother=loessLine 
+scatterplotMatrix( ~ KS_p + log(U.est) + cluster_medio + cobertura + aggregation.index, data = df_ae1, reg.line = FALSE) #smoother=loessLine 
+scatterplotMatrix( ~ KS_log.N + log(U.est) + cluster_medio + cobertura + aggregation.index, data = df_ae1, reg.line = FALSE) #smoother=loessLine 
+scatterplotMatrix( ~ KS_N + log(U.est) + cluster_medio + cobertura + aggregation.index, data = df_ae1, reg.line = FALSE) #smoother=loessLine 
+scatterplotMatrix( ~ KS_ac_obs + log(U.est) + cluster_medio + cobertura + aggregation.index, data = df_ae1, reg.line = FALSE) #smoother=loessLine 
+scatterplotMatrix( ~ KS_ac_sim + log(U.est) + cluster_medio + cobertura + aggregation.index, data = df_ae1, reg.line = FALSE) #smoother=loessLine 
+df_ae %>% filter(KS_p < 0.05) -> df_ae2
+scatterplotMatrix( ~ KS + log(U.est) + cluster_medio + cobertura + aggregation.index, data = df_ae2, reg.line = FALSE) #smoother=loessLine 
+scatterplotMatrix( ~ KS_p + log(U.est) + cluster_medio + cobertura + aggregation.index, data = df_ae2, reg.line = FALSE) #smoother=loessLine 
+scatterplotMatrix( ~ KS_log.N + log(U.est) + cluster_medio + cobertura + aggregation.index, data = df_ae2, reg.line = FALSE) #smoother=loessLine 
+scatterplotMatrix( ~ KS_N + log(U.est) + cluster_medio + cobertura + aggregation.index, data = df_ae2, reg.line = FALSE) #smoother=loessLine 
+scatterplotMatrix( ~ KS_ac_obs + log(U.est) + cluster_medio + cobertura + aggregation.index, data = df_ae2, reg.line = FALSE) #smoother=loessLine 
+scatterplotMatrix( ~ KS_ac_sim + log(U.est) + cluster_medio + cobertura + aggregation.index, data = df_ae2, reg.line = FALSE) #smoother=loessLine 
+```
+
+
+
+Metodologia
+-TreeCo
+  -critério de seleção dos trabalhos: i) >=1ha, ii) amostragem continua (bloco único)
+  -descrição dos SiteCodes: riqueza, cobertura, indice de agregação, 
+-Hansel et al. 
+-Simulação
+  -algoritmo coalescente
+  -estimativa do U.est
+-Kolomogorov Smirnov
+  -valor da estatística
+  -p value
+  -posição da divergência nas acumuladas e na abundância
+Exemplo do calculo:
+```{r exemplo do calculo de KS}
+lista_dispersal[[1]][[1]] -> sad.sim
+sad.sim[1,] %>% table %>% as.data.frame -> sad.sim #uma réplica
+sad.sim %<>% arrange(Freq) %>% .$Freq %>% log #logSAD
+#df_SAD.sim0 %>% filter(SiteCode == "MGperd1", sindrome == "animal_fruit2-5cm") %>% arrange(N) %>% .$N %>% log -> sad.sim #SAD_media
+df_SAD.obs.f %>% filter(SiteCode == "BAjuss") %>% arrange(N) %>% .$N %>% log -> sad.obs #SAD.obs
+c_obs.sim <- sort(c(sad.obs,sad.sim)) #os dados concatenados e ordenados
+df_KS_st <- data.frame(c.data = c_obs.sim, #idem
+                       c.data.e = exp(c_obs.sim), #exp dos valores para tirar da escala log
+                       acumulada.obs = sapply(c_obs.sim, FUN = function(x) length(sad.obs[sad.obs<x])/length(sad.obs)), #valor da acumulada obs
+                       acumulada.sim = sapply(c_obs.sim, FUN = function(x) length(sad.sim[sad.sim<x])/length(sad.sim)) #valor da acumulada sim
+                       ) #ambas são calculadas como o número de observações menores do que o valor de c.data
+df_KS_st %<>% mutate(diff.acumulada = abs(df_KS_st$acumulada.obs-df_KS_st$acumulada.sim)) #diferença entre as acumuladas na coluna acumulada.obs
+KS_posicao <- unique(df_KS_st[df_KS_st$diff.acumulada == max(df_KS_st$diff.acumulada),]) #pegando o primeiro valor de abundância que apresenta 
+#a maior diferença entre as acumuladas. Alguns pares de distribuições possuem a mesma distância máxima para mais de um valor de abundância
+plot(acumulada.obs ~ c.data, data = df_KS_st, col = "red", main = "observada") #plotando a acumulada observada
+points(acumulada.sim ~ c.data, data = df_KS_st, col = "blue", main = "simulada") #adicionando a simulada
+abline(v = KS_posicao$c.data) #abundância em que ocorre a maior diferença entre as observadas
+abline(h = KS_posicao$acumulada.obs) #posição da curva acumulada observada onde ocorreu a maior divergência entre as acumuladas
+abline(h = KS_posicao$acumulada.sim) #posição da curva acumulada simulada onde ocorreu a maior divergência entre as acumuladas
+```
+-métricas de paisagem
+  -cobertura vegetal
+  -AI
+-ANEXO: Formulário
+  -figuras
+  -todas as funções construidas em R
+
+-figuras
+
+Figura A1 - variáveis de controle e as variáveis resposta
+```{r U: preparacao dos dados, echo=FALSE}
+### U.media ###
+# preparação dos dados #
+df_ae <- df_resultados[,c(1,18:17,2:5,28,6:9,20:23)]
+df_ae$cluster_medio %<>% as.numeric 
+df_ae %<>% arrange(cobertura, cluster_medio)
+names(df_ae)[c(3:5,13)] <- c("p","kernel","U","J")
+# df_ae %>% head 
+### criando variável que representa a comunidade presente no recorte de paisagem ###
+df_ae %<>% mutate(Jl = DA * 500, # tamanho da comunidade da paisagem,produto da densidade de indivíduos (N/ha) pelo número de hectares do recorte de paisagem (500 ha)
+                  I = U*(J-1)/(1-U), # fluxo de imigrantes para a comunidade local (Rosindell et al. 2011)
+                  U..J = U/J, # taxa de imigração per capita; probabilidade de substituição de um individuo da comunidade por um 
+                  KS_factor = cut(KS, 10), # preciso pesquisar se existe alguma preferência em usar variáveis contínuas ou variáveis discretas na construção de GLMM
+                  KS.p_factor = cut(KS.p, 10), # mas certamente ajuda na visualização dos dados
+                  J_factor = cut(J,10),
+                  Jl_factor = cut(Jl,10),
+                  S.obs_factor = cut(S.obs,10),
+                  p_factor = cut(p, 10)) #referência a Hanski 1999
+scatterplotMatrix(~ S.obs + J + Jl + U + S.medio + KS + KS.p + GOF + KS.abund + KS.ac.obs + KS.ac.sim + KS.obs.sim, data = df_ae)
+lm_S <- lm(S.medio ~ S.obs, data = df_ae)
+```
+  <!--Ao todo foram feitas 96 baterias de simulação, uma para cada levantamento fitossociológico disponível no TreeCo(REFERÊNCIA) e no banco de imagens de Hansel et al.(REFERÊNCIA) que apresentam pelo menos 1 ha amostrado e que o arranjo das amostras é em bloco único.-->
+  Figura A1. Relação entre as variáveis de controle da simulação e e as variáveis respostas. S.obs = riqueza observada; S.medio = S médio das SADs réplicas de cada simulação; KS = média da maior distância entre a SAD observada e a SAD réplica; KS.p = média do p valor associado ao teste de Kolmogovor-Smirnov; GOF (Goodness of fit - adaptado de Etienne & Rosindell 2011) = número de réplicas que obtiveram um bom ajuste (critério de ajuste: p valor > 0.05); KS.abund =  valor de abundância médio onde se observou KS; KS.ac.obs =  percentil da SAD observada acumulada onde se observou KS; KS.ac.sim =  percentil da SAD simulada acumulada onde se observou KS;  KS.obs =  diferença média entre o percentil da SAD observada acumulada e da respectiva SAD répĺica onde se observou KS. As três primeiras variáveis são variáveis de controle da simulação: S,.obs, J e Jp. U.medio estima um valor de taxa de imigração para a paisagem dado. S.medio KS, KS.p, GOF podem ser entendidos como métricas da congruência da SAD simulada com a SAD observada. KS.abund, KS.ac.obs, KS.ac.sim, KS.obs.sim podem revelar qual o padrão de divergência entre as SADs.
+
+Figura A2 S.obs * p: U ~, KS ~, KS.p ~, GOF ~, KS._ ~
+```{r}
+p_U.S.obs <- ggplot(df_ae, aes( y = U, x = S.obs)) + geom_point() + geom_smooth()
+p_U.S.obs_p <- ggplot(df_ae, aes( y = U, x = S.obs, colour = p_factor)) + geom_point() + geom_smooth(method = "lm", se = FALSE)
+p_U.S.obs_p.kernel <- ggplot(df_ae, aes( y = U, x = S.obs, colour = p_factor)) + geom_point() + geom_smooth(method = "lm", se = FALSE) + facet_wrap(~ p_factor + kernel)
+
+
+lay <- matrix(c(1,3,2,3), ncol = 2)
+grid.arrange(p_KS.cobertura, p_KS.cobertura_U, p_KS.kernel.cobertura_U, ncol = 2, nrow = 2, layout_matrix = lay)
+
+
+
+```
+
+
+
+################ ideais ################
+Ideia 1: usar o U.est para predizer algo sobre a extinção das espécies reais. Segundo Gilbert (2006) o modelo neutro é um bom preditor da taxa de mortalidade das espécies raras, as espécies que provavelmente estão sujeitas ao efeito da estocasticidade demográfica. Considerando que a taxa de especiação/imigração(*U*) é um proxy da taxa com se perde espécies no equilíbrio segundo um modelo neutro. Podemos predizer qual a taxa de extinção das espécies raras segundo uma cobertura vegeta, agregação de habitat, riqueza observada (?sim,mas...), um kernel de dispersão da espécie (ou da "guilda de sindrome de dispersão"). No mestrado eu acredito que possa ser a descrição do padrão da simulação apenas, não preciso ir além nessa parte. Mas uma ideia para o futuro é criar um mapa sob a mata atlântica usando os dados do TreeCo para mapear (interpolando) a taxa de perda de espécies raras, segundo o modelo neutro. Para fazer isso precisariamos aumentar o número de trabalhos analisados, pensar em um jeito de selecionar os valores de 'U' talvez segundo o KS.
+
+
+## ANEXO: SAD - comparação entre as réplicas e a SAD obs + informações resumidas
+mfrow=c(97,8): cada linha será de um SiteCode diferente
+
+```{r}
+for(i in 1:length( levels(df_resultados$SiteCode)) ){ #para cada uma das 94 paisagens NOTA: tem que tirar o refID que não tem .txt ai fica 93
+  pdf(file = gsub(".tif",".pdf",df_simulacao[i,7]), width = 11.69*0.75, height = 8.30*0.75)
+  par(mfrow = c(1,3))
+  image(raster(df_simulacao[i,7]), main = df_simulacao[i,7], axes = FALSE)
+  image(t(as.matrix(raster(df_simulacao[i,8]))), main = df_simulacao[i,8], axes = FALSE)
+  image(as.matrix(read.table(df_simulacao[i,9], header = FALSE, sep = " ")), main = df_simulacao[i,9], axes = FALSE)
+  dev.off()
+}
+
+for(i in 1:length( levels(df_resultados$SiteCode)) ){
+  pdf(file= levels(df_resultados$SiteCode)[i], )
+  par(mfrow = c(1,8))
+  
+}
+
+
+```
+

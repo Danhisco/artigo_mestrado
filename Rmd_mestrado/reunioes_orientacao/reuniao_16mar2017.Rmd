@@ -1,0 +1,224 @@
+---
+title: "reuniao_Danilo_16mar2017"
+author: "Danilo Pereira Mori"
+date: "16 de março de 2017"
+output: pdf_document
+---
+```{r global_options, echo=FALSE}
+knitr::opts_chunk$set(echo=F, warning=FALSE, message=FALSE, cache = TRUE, tidy = TRUE, fig.width = 10, fig.height = 5)
+```
+
+```{r global packages and data, echo=F, message=FALSE, warning=FALSE}
+library(gridExtra) 
+library(ggplot2) 
+library(MASS)
+library(sads)
+library(magrittr)
+library(plyr)
+library(dplyr)
+load("/home/danilo/Desktop/dados_DaniloPMori.Rdata")
+# save(df_ad, df_a.visual_GOF, df_SAD.obs, df_SAD.sim, file = "/home/danilo/Desktop/dados_DaniloPMori.Rdata")
+```
+
+
+# Prólogo # 
+
+  Em minha última reunião com o Paulo, estabelecemos como metas:
+  
+i) a validação dos meus dados: ver se as métricas estão coerentes entre si e se as métricas estão coerentes com a avaliação visual que fiz de cada simulação;
+
+ii) explorar os resultados da análise em duas etapas: primeiro eu faço uma regressão da variável de interesse por kernel e depois faço uma regressão desses coeficientes pela cobertura vegetal.
+
+iii) construção do modelo com a estrura randômica a partir do item ii (resíduos, qqplot, ajuste e tal)
+
+  Entre reuniões eu me mudei para Iguape e não consegui ir até o item iii. 
+
+
+## Validação dos dados ##
+
+
+
+### Validação internamente coerente ###
+
+
+
+
+```{r}
+l_p <- vector("list",length = 3)
+l_p[[1]] <- ggplot(df_ad,aes(y=GOF,x=KS.p)) + geom_smooth(col="red",se=F) + geom_point()
+l_p[[2]] <- ggplot(df_ad,aes(y=GOF,x=KS))  + geom_smooth(col="red",se=F) + geom_point()
+l_p[[3]] <- ggplot(df_ad,aes(y=GOF,x=KS.diff))  + geom_smooth(col="red",se=F) + geom_point()
+do.call("grid.arrange",c(l_p,ncol=3,nrow=1))
+```
+
+**Figura 1** GOF, KS.p, KS e KS.diff.
+
+
+  GOF e a media dos 100 p valores associados ao teste KS (KS.p) apresentam uma relação crescente que se satura em GOF = 100, de modo geral, quanto maior a media do p valor maior o valor de GOF, observa-se saturação em torno de KS.p = 50 (fig 1, primeiro gráfico). GOF e KS (KS médio) apresentam relação negativa, para KS <= 0.1, GOF é sempre alto; em 0.1 < KS < 0.25, há as observações com maior variância de GOF; não se observa GOF maior que 90 para KS > 0.25 (fig 1, segundo gráfico). GOF e KS.diff apresentam relação parabólica negativa centrada em KS.diff = 0, ao se distanciar do vértice da parabola maior a variância e menor o valor médio de GOF - parece existir uma tendência à maior variância em valores positivos (fig 1, terceiro gráfico). Resumindo, as simulações que geram boas reproduções do observado, com a menor distância máxima, relativa e absoluta, entre as curvas acumuladas. 
+  
+
+  
+```{r fig.width=10, fig.height=4}
+# exploração gráfica de GOF ~ KS.p + KS + KS.diff + KS.ab + KS.obs #
+l_p <- vector("list",length = 3)
+l_p[[1]] <- ggplot(df_ad,aes(y=GOF,x=log(KS.ab))) + geom_smooth(col="red",se=F) + geom_point()
+l_p[[2]] <- ggplot(df_ad,aes(y=GOF,x=KS.obs)) + 
+  geom_smooth(col="red",se=F) + 
+  geom_point() +
+  scale_x_continuous(limits=c(0.15,0.9))
+l_p[[3]] <- ggplot(df_ad,aes(y=GOF,x=KS.sim)) + 
+  geom_smooth(col="red",se=F) + 
+  geom_point() +
+  scale_x_continuous(limits=c(0.15,0.9))
+do.call("grid.arrange",c(l_p,ncol=3,nrow=1))
+```  
+
+**Figura 2.**. GOF, log(KS.ab), KS.obs e KS.sim
+
+
+
+  A relação de log(KS.ab) e GOF é positiva em sua tendência central e negativa quanto a variância: quanto maior log(KS.ab) maior GOF e menor a sua variância (fig 2 primeiro painel). GOF não parece ter relação com KS.obs e KS.sim (fig 2 segundo e terceiro painel). 
+
+
+
+### Validação Visual - GOF X SADs acumuladas ###
+
+
+  A classificação foi feita considerando que os vetores de abundância podem ser dividos em três regiões quanto a escala de abundância (log indivíduos): cauda (região com as espécies com abundâncias baixas), inter (regiões com espécies com rank de abundâncias intermediários) e dom (espécies dominantes). Procurei avaliar qual era o padrão geral das SADs réplicas quanto a sua precisão: precisa (em média as SADs réplicas produzem boas reproduções do observado), subestimada (quando as SADs preveem percentil menor do que o observado para a faixa de abundância), superestimada (idem para percentil maior do que o observado).
+
+
+*Padrões gerais observados:*
+
+
+a) parece que o padrão de dispersão das SADs réplicas acumuladas naõ é simétrico, ou seja, as SADs réplicas não se dispersam de maneira igual ao redor da SAD réplica "média"
+
+b) a variância é maior nas caudas e menor nos ranks dominantes
+
+c) o efeito do kernel no ajuste das SADs réplicas varia entre Sites - diferentes kerneis se ajustam melhor a certos percentils e há influência na variância: 
+  i) 1 região bem ajustada e as demais mal ajustadas;
+  ii) regiões que se intercalam em qualidade do ajuste;
+  iii) var(GOF) ~ kernel (~ Site): a variância de GOF parece responder à variação de kernel, contudo o tipo de relação varia entre sites e para um mesmo site não observei; 
+
+e) estimativa da variância e das regiões dominantes é difícil
+
+
+*Classificação visual*
+
+```{r fig.width=10, fig.height=4}
+# lendo e juntando os dados #
+df_a.visual_GOF <- read.csv("/home/danilo/Documents/dissertacao/dados/df_GOF_Avisual.csv", header = T, sep = ",", dec=".")
+df_temp <- inner_join(x = df_a.visual_GOF,y = df_ad, by = c("SiteCode","kernel"))
+
+# gráficos #
+l_p <- vector("list",length=3)
+l_p[[1]] <- ggplot(df_temp,aes(x=cauda, y=GOF)) + 
+  geom_boxplot() + geom_jitter() + 
+  ggtitle("Cauda") + xlab("") + ylab("GOF")
+l_p[[2]] <- ggplot(df_temp,aes(x=inter, y=GOF)) + 
+  geom_boxplot() + geom_jitter() + 
+  ggtitle("Intermediário") + xlab("") + ylab("")
+l_p[[3]] <- ggplot(df_temp,aes(x=dom, y=GOF)) + 
+  geom_boxplot() + geom_jitter() + 
+  ggtitle("Dominante") + xlab("") + ylab("")
+do.call("grid.arrange",c(l_p,ncol=3,nrow=1))
+```
+
+**figura 3.** GOF e as variáveis da classificação visual
+
+- Cauda: boa estimativa visual para precisa e grande variância para sub e super
+- Inter: idem
+- Dom: idem com maior variância na classe `precisa`
+
+
+## Regressão GOF ~ kernel (~ site) ##
+
+
+
+```{r}
+# Etapas: i) visualização gráfica na escala logito; ii) estimativa dos coeficientes; iii) regressão dos coeficientes #
+# ggplot(df_ad, aes(x=kernel,y=GOF, group=SiteCode)) + geom_point(aes(colour=SiteCode)) + theme(legend.position="none") + facet_wrap(~ as.factor(cut(df_ad$p,10)),ncol=5)
+df_temp <- df_ad
+df_temp[df_temp$GOF==0,"GOF"] <- 1
+df_temp[df_temp$GOF==100,"GOF"] <- rep(99,332)
+
+ggplot(df_temp, aes(x=kernel,y=log(GOF/(100-GOF)), group=SiteCode)) + 
+  geom_line(aes(colour=SiteCode)) +
+  facet_wrap(~ as.factor(cut(df_ad$p,10)),ncol=5) + 
+  theme(legend.position="none") + labs(title="",x = "kernel (m)", y = "logito(GOF)")
+```
+
+**Figura 4 ** `log(GOF/(100-GOF) ~ kernel (~ SiteCode)` Cada linha representa um sítio diferente
+
+  Há sites que independente do kernel e da cobertura vegetal apresentam sempre ótimos simulações. Os sítios compartilham padrões do efeito ("a inclinação") de kernel: i) `GOF ~ kernel` -> 0, ii) `GOF ~ kernel` < 0, iii) `GOF ~ kernel` > 0. Para 
+
+## Regressão coef( GOF ~ kernel (~ site) ) ~ p, VC, fatores (fitofisio e sucessão) ##
+
+- gráficos
+
+
+```{r}
+df_temp <- df_ad %>% mutate(GOF.p = GOF/100)
+
+l_md <- vector("list",length = 1)
+l_md[[1]] <- glm(cbind(GOF,100-GOF) ~ kernel * SiteCode, family = "binomial",data=df_temp)
+# par(mfrow=c(2,2))
+# plot(l_md[[1]])
+# summary(l_md[[1]])
+
+```
+
+<!-- 
+**Figura 5** Gráficos diagnósticos do modelo GOF ~ kernel * Site (family = binomial) 
+
+  O modelo está bem estranho, tenho dificuldades de interpretação.
+-->
+
+
+```{r fig.height=6}
+df_temp <- data.frame(SiteCode = unique(sort(df_ad$SiteCode)), coef_k.site = unname(coef(l_md[[1]])[c(2,88:172)]), int_site = unname(coef(l_md[[1]])[c(1,3:87)]) )
+df_temp %<>% inner_join(x=.,y=unique(df_ad[,c("SiteCode","p","S","J","fitofisio","succession")]), by="SiteCode") %>% suppressWarnings()
+
+l_p <- vector("list",length=10)
+l_p[[1]] <- ggplot(df_temp, aes(y=coef_k.site,x=p)) + geom_point() + geom_smooth() + labs(title="",x = "", y = "coef(GOF ~ kernel")
+l_p[[2]] <- ggplot(df_temp, aes(y=coef_k.site,x=S)) + geom_point() + geom_smooth() + labs(title="",x = "", y = "")
+l_p[[3]] <- ggplot(df_temp, aes(y=coef_k.site,x=log(J))) + geom_point() + geom_smooth() + labs(title="",x = "", y = "")  
+l_p[[4]] <- ggplot(df_temp, aes(y=coef_k.site,x=fitofisio)) + geom_boxplot() + geom_jitter() + labs(title="",x = "", y = "")
+l_p[[5]] <- ggplot(df_temp, aes(y=coef_k.site,x=succession)) + geom_boxplot() + geom_jitter() + labs(title="",x = "", y = "")
+l_p[[6]] <- ggplot(df_temp, aes(y=int_site,x=p)) + geom_point() + geom_smooth() + labs(title="",x = "p", y = "intercepto(GOF ~ kernel")
+l_p[[7]] <- ggplot(df_temp, aes(y=int_site,x=S)) + geom_point() + geom_smooth() + labs(title="",x = "S", y = "")
+l_p[[8]] <- ggplot(df_temp, aes(y=int_site,x=log(J))) + geom_point() + geom_smooth() + labs(title="",x = "log(J)", y = "") 
+l_p[[9]] <- ggplot(df_temp, aes(y=int_site,x=fitofisio)) + geom_boxplot() + geom_jitter() + labs(title="",x = "fitofisio", y = "")
+l_p[[10]] <- ggplot(df_temp, aes(y=int_site,x=succession)) + geom_boxplot() + geom_jitter() + labs(title="",x = "sucession", y = "")
+do.call("grid.arrange",c(l_p,ncol=5,nrow=2))
+```
+
+**Figura 6** coef (GOF ~ kernel * Site (family = binomial)) ~ p, S, log(J), fitofisio, sucessao
+
+- Interpretação: parece não haver efeito. O modelo apresentou um ajuste ruim.
+
+
+```{r}
+library(lme4)
+l_md <- vector("list",length=2)
+names("")
+l_md[[1]] <- glmer(cbind(GOF,100-GOF) ~ p * kernel + (kernel | SiteCode), family = "binomial", data=df_ad)
+l_md[[2]] <- glmer(cbind(GOF,100-GOF) ~ p * kernel + (1 | SiteCode), family = "binomial", data=df_ad) # transformação Z
+AICctab(l_md,weights=T)
+
+
+
+l_md[[2]] <- glmer(cbind(GOF,100-GOF) ~ p + kernel + (kernel | SiteCode), family = "binomial", data=df_ad)
+l_md[[3]] <- glmer(cbind(GOF,100-GOF) ~ kernel + (kernel | SiteCode), family = "binomial", data=df_ad)
+
+l_md[[1]] <- glmer(cbind(GOF,100-GOF) ~ p + (p | kernel), family = "binomial", data=df_ad)
+
+
+# subdivir por kernel e utilizar glm
+# for(i in 1:8){
+#   df_temp <- df_ad %>% filter(Sindrome == )
+#   
+# }
+summary(l_md[[1]])
+```
+
+

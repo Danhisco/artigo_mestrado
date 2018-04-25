@@ -1,0 +1,238 @@
+---
+title: "reuniao_03abril2017.Rmd"
+author: "Danilo Pereira Mori"
+date: "2 de abril de 2017"
+output: pdf_document
+---
+
+```{r global_options, echo=FALSE}
+knitr::opts_chunk$set(echo=F, warning=FALSE, message=FALSE, cache = TRUE, tidy = TRUE, fig.width = 5, fig.height = 10)
+```
+
+```{r global packages and data, echo=F, message=FALSE, warning=FALSE}
+library(gridExtra) 
+library(ggplot2) 
+library(tidyr)
+library(broom)
+library(purrr)
+library(lme4)
+library(sads)
+library(magrittr)
+library(plyr)
+library(dplyr)
+load("/home/danilo/Desktop/dados_DaniloPMori.Rdata")
+
+# preparação dos dados
+names(df_ad)[1] <- "Site"
+df_temp <- df_ad %>% 
+    mutate(p.z = (p - mean(p))/sd(p),
+                    S.z = (S - mean(S))/sd(S),
+                    log.J.z = (log(J) - mean(log(J)) )/sd(log(J)),
+                    kernel.z = (kernel - mean(kernel))/sd(kernel)) %>% 
+    select(Site, Sindrome, GOF, p.z, S, J, kernel.z, p, kernel, fitofisio, succession) 
+
+```
+
+
+## Prólogo ##
+
+
+  Durante a reunião do dia 23 de março apresentei o modelo de trabalho obtido através do protocolo de Zurr et al. (2009) (janela de código 1). Os gráficos diagnósticos mostram os resíduos não estão homogeneamente distribuidos ao longo dos valores fitados, o que pode indicar problemas de ajuste (figura 1). 
+
+
+__Janela de Código 1__ Modelo de trabalho e gráficos diagnósticos
+```{r echo=T}
+md_GOF <- glmer(cbind(GOF,100-GOF) ~ p.z * kernel.z + (kernel.z | Site), 
+                    family = binomial, data = df_temp)
+RVAideMemoire::plotresid(md_GOF)
+```
+
+__Figura 1__ Gráficos diagnósticos do modelo de trabalho
+
+
+  Para entendermos melhor o que estava acontencendo passamos a reunião criando gráficos dos dados contra as estimativas do modelo. Decidimos expandir o protocolo e comparar as estimativas de modelos construídos a partir de outras abordagens. Para começar eu irei analisar a estrutura aleatória ajustando para cada conjunto de dados agrupados pelo sitio um modelo binomial GOF ~ kernel, dado que a estrutura aleatória é (kernel | Site). Sigo comparando a estrutura fixa com outros 2 modelos: glm(GOF ~ p.z * kernel.z) - que considera que o pressuposto da independência das observações é verdadeiro (apesar de não ser); e glm(GOF ~ p.z, subset = kernel) - que irá ajustar o melhor modelo desconsiderando que existe efeito de kernel.
+  
+
+
+## Avalaiação da Estrutura aleatória ##
+
+ Para avaliar se a estrutura aleatória do modelo de trabalho está realizando bom ajuste vou comparar a estimativa e resíduos com um modelo que considera que cada sítio é um conjunto de dados único (md_GOF.kernel_1site). Os coeficientes de um modelo linear generalizado misto são estimados considerando tanto a estrutura fixa (`p.z * kernel.z`) quanto aleatória (`(kernel.z | Site)`) [REFERÊNCIA QUESTÂO para tirar dúvida]. Já os coeficientes obtidos no modelo md_GOF.kernel_1site desconsideram qualquer relação entre os sitios obtendo a melhor estimativa para cada sitio isoladamente. Para avaliar a qualidade do modelo de trabalho vou realizar uma regressão linear entre os resíduos obtidos pelos dois modelos, se o modelo de trabalho estiver fazendo boas estimativas do observado espero que o intecepto, inclinação, e R quadrado sejam, respectivamente, próximos de 0, 1 e 1. 
+
+  
+__Janela de código 2__ modelo de comparação (md_GOF.kernel_1site) aplicado aos dados referentes a cada sitio
+
+```{r echo = T}
+## preparação dos dados ##
+# modelo binomial 
+fun_map <- function(df){
+  glm(cbind(GOF,100-GOF) ~ kernel.z, family = binomial, data = df)
+}
+
+# aplicando a função do modelo binomial para cada site e armazendo em um novo data frame
+df_temp1 <- df_temp %>% 
+  select(Site, p, kernel.z, GOF) %>% group_by(Site) %>% nest() %>%
+  mutate(md = map(data, fun_map), # GLM binomial aplicado para cada sítio; 'data' é o nome da coluna que o nest contacena os dados
+         tidy = map(md,tidy), # parametros do modelo e métricas relacionadas
+         glance = map(md,glance), # métricas de qualidade dos modelos
+         augment = map(md,augment)) #info ao nível da observação 
+```
+
+  
+  No data frame df_temp1 há mais informações sobre o modelo md_GOF.kernel_1site.  
+  
+  
+
+
+```{r fig.height=5, fig.width=5}
+df_temp2 <- df_temp1 %>% select(-c(md,tidy,glance)) %>% unnest() %>% as.data.frame() # retornando ao formato data frame 
+# ajeitando as coisas na unha
+df_temp2 <- df_temp2[,c(1:4,7:9)]
+names(df_temp2)[5:7] <- c("glm.fit","glm.se.fit","glm.resid")
+df_temp2 %<>% inner_join(x = ., y = augment(md_GOF)[,3:6], by = c("Site","kernel.z"))
+names(df_temp2)[8:9] <- c("glmer.fit","glmer.resid")
+
+
+# lm(glm.resid ~ glmer.resid, df_temp2) %>% summary
+# x11()
+
+# plotando os valores 
+ggplot(df_temp2,aes(y=glmer.resid, x=glm.resid)) + 
+  # geom_abline(intercept = 0, slope = 1, colour="red") +
+  geom_abline(intercept = -0.07178664, slope = 0.99646013) +
+  geom_point(aes(colour=Site)) +
+  theme(legend.position = "none") +
+  # facet_wrap(~ kernel.z,ncol=4)
+  labs(title = paste("y = ",round(-0.07178664,3), " + ", round(0.99646013,3), " * x", "; R^2 = ", 0.992, sep = "" ),
+       y = "resíduos glmer( GOF ~ p * kernel + (kernel | Site) )", x = "residuos glm( GOF ~ kernel, subset = Site)")
+```
+
+__Figura 2__ Resíduos do modelo (GOF ~ kernel) ajustado a cada sítio (eixo y) e resíduos do modelo de trabalho (eixo x). Cada cor representa um `Site`diferente
+
+- abordagens convergem em seus resultados, como mostra o resultado da regressão linear (figura 2)
+
+- há pontos que distoam do padrão geral dos resíduos (grosseiramente, aqueles que estão na faixa [-5;5]); esses pontos estão próximos à reta, indicando que os possíveis outliers independem da abordagem. Vou inspecionar os sítios com pontos com possíveis outliers
+
+  
+```{r echo=F}
+# preparação dos dados
+sites_ <- df_temp2 %>% filter(glmer.resid < -5 | glmer.resid > 5) %>% .$Site %>% unique %>% as.character()
+# sites_ <- df_temp1$Site
+df_temp3 <- df_temp1 %>% select(Site, tidy) %>% unnest() %>% as.data.frame() %>% 
+  select(Site, term, estimate) %>% reshape2::dcast(Site ~ term) %>% 
+  inner_join(x=., y=(ranef(md_GOF)$Site %>% mutate(Site = rownames(.))), by="Site")
+names(df_temp3)[-1] <- c("glm.a0","glm.a1","glmer.a0","glmer.a1")
+
+# função de ligação logito #
+fun_logit <- function(x,a0,a1){
+  exp(a0 + a1*x)/(1 + exp(a0 + a1*x))
+}
+
+par(mfrow=c(4,3))
+#x11(); par(mfrow=c(1,1))
+par(mar = rep(2.7,4))
+
+for(i in 1:length(sites_)){
+  df_for <- df_temp3[df_temp3$Site==sites_[i],]
+  plot(I(GOF/100) ~ kernel.z, df_temp, 
+       subset = Site == sites_[i],
+       ylim=c(0,1),
+       main = paste(sites_[i], ", % C.V. = ", round(unique(df_temp[df_temp$Site==sites_[i], 8]),4), sep=""),
+       xlab = "", ylab = "") # xlab = "kernel.z", ylab = "número de réplicas (p>0.05) / 100"
+  curve(fun_logit(x, # glm
+                  a0=df_for[,2], 
+                  a1=df_for[,3]),
+        add=T,col="red", lty=6)
+  curve(fun_logit(x, # glmer
+                  #a0 = inter_random + inter_fixa + slope_p.z * p.z (do sítio)
+                  a0=df_for[,4] + fixef(md_GOF)[1] + fixef(md_GOF)[2] * unique(df_temp[df_temp$Site==sites_[i], 4]), 
+                  #a1 = slope_random + slope_kernel.z + slope_interacao * p.z (do sítio)
+                  a1=df_for[,5] + fixef(md_GOF)[3] + fixef(md_GOF)[4] * unique(df_temp[df_temp$Site==sites_[i], 4]) ),
+        add=T,col="black")
+}    
+```
+
+__Figura 3__ GOF ~ kernel.z, por Site. A curva negra representa a estimativa do modelo de trabalho, a vermelha a estimativa do modelo de comparação (md_GOF.kernel_1site)
+
+  As duas abordagens convergem em estimativa (figura 3, linha negra e vermelha coincidem) e mesmo tratando-se de sites com possíveis outliers as estimativas estão fazendo boas previsões, isto é, estão prevendo o padrão geral dos dados (figura 3).
+  
+  Segundo Bolker et al. (2008) (box 4): "Estimated parameters should be approximately normally distributed across groups". Assim, vou plotar os parâmetros estimados pelo modelo md_GOF.kernel_1site
+  
+```{r fig.height=3}
+grid.arrange(qplot(df_temp3$glm.a0, geom = "histogram", bins=40) + labs(x="interceptos", y="", main = "GLM"),
+             qplot(df_temp3$glm.a1, geom = "histogram", bins=40) + labs(x="inclinações", y="", main = "GLM"),
+             # qplot(df_temp3$glmer.a0, geom = "histogram", bins=40) + labs(x="interceptos", y="", main = "GLMER"),
+             # qplot(df_temp3$glmer.a1, geom = "histogram", bins=40) + labs(x="inclinações", y="", main = "GLMER"), 
+             ncol = 2, nrow = 1)
+# df_temp3 %>% filter(glm.a0 > 20)
+# df_temp3 %>% filter(glm.a1 < -20)
+```
+  
+__Figura 4__  Histogramas dos coeficientes do modelos md_GOF.kernel_1site.
+
+  Parece que existe uma tendência geral razoavelmente simétrica na distribuiçãos de ambos os coeficientes com pontos que distoam desse padrão (figura 4). A distribuição dos interceptos é mais variável do que das inclinações. Na tabela 1 os sítios que está fora do padrão central do histograma 
+
+```{r}
+df_temp3 %>% filter(glm.a0 > 20 | glm.a1 < -20) %>% select(-c(glmer.a0,glmer.a1))
+```
+
+
+
+### Conclusão Estrutura Aleatória ###
+
+
+  Pela regressão linear (figura 2) podemos concluir que o modelo está realizando boas estimativas da estrutura aleatória. Contudo, o padrão de distribuição dos coeficientes entre os grupos não parece ser normal.
+
+
+## Avaliação da Estrutura Fixa ##
+
+```{r }
+#lista com os coeficientes
+l_coef <- vector("list",length=3)
+l_coef[[1]] <- fixef(l_md1[[1]]) #modelo de trabalho
+l_coef[[2]] <- coef(glm(cbind(GOF,100-GOF) ~ p.z * kernel.z, family = "binomial",df_temp)) #modeo de trabalho sem a estrutura aleatória
+
+#função de ligação logito
+fun_logit <- function(x,a0,a1){
+  exp(a0 + a1*x)/(1 + exp(a0 + a1*x))
+}
+
+par(mfrow=c(4,2))
+# x11(); par(mfrow=c(2,4)) 
+
+k <- df_temp$kernel.z %>% unique # objeto para o subset
+for(i in 1:8){
+  plot(I(GOF/100) ~ p, df_temp, 
+       subset = kernel.z == k[i], 
+       xlim = c(0,1), ylim = c(0,1),
+       main = paste("kernel =", k[i], "m"), xlab = "cobertura vegetal (%)", ylab = "número de réplicas (p>0.05) / 100",
+       cex.main=0.9)
+  curve(fun_logit(x, 
+                  a0=l_coef[[1]][1] + l_coef[[1]][3]*k[i], 
+                  a1=l_coef[[1]][2] + l_coef[[1]][4]*k[i]),
+        add=T,col="black") # md_GOF
+  curve(fun_logit(x, 
+                  a0=l_coef[[2]][1] + l_coef[[2]][3]*k[i], 
+                  a1=l_coef[[2]][2] + l_coef[[2]][4]*k[i]),
+        add=T,col="red", lty=6) # sem a estrutura aleatória
+  l_coef[[3]] <- coef(glm(cbind(GOF,100-GOF) ~ p.z, family = "binomial",subset = kernel.z == k[i],df_temp))
+  curve(fun_logit(x, 
+                  a0=l_coef[[3]][1], 
+                  a1=l_coef[[3]][2]),
+        add=T,col="blue", lty=2) # subset = kernel
+}
+```
+
+__Figura 5__ Comparação das estimativas de: i)modelo de trabalho (em preto), ii) glm(GOF ~ p.z * kernel.z) (em vermelho) e iii) glm( GOF ~ p.z, subset = kernel) (em azul)
+
+
+
+########################################### Pós Reunião 03 de Abril ###########################################
+
+## Plotando os resíduos do modelo contra as variáveis da estrutura aleatória ##
+
+  A última análise que irei realizar é a avaliação dos resíduos pelas variáveis preditoras. Como trata-se de uma variável contínua (cobertura vegetal) interagindo com uma variável categória (kernel) irei fazer um plot cruzado das variáveis:
+  
+```{r}
+df_temp2 %>% ggplot(aes(x=p, y=glmer.resid)) + geom_point() + geom_smooth() + facet_wrap(~kernel.z,ncol=4)
+df_temp2 %>% head
+```

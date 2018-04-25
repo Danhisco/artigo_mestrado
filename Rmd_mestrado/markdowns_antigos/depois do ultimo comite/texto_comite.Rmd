@@ -1,0 +1,173 @@
+---
+title: "Resultados_3ocomite"
+author: "Danilo Pereira Mori"
+date: "21 de abril de 2017"
+output: pdf_document
+---
+
+
+```{r global_options, echo=FALSE}
+knitr::opts_chunk$set(echo=F, warning=FALSE, message=FALSE, cache = TRUE, tidy = TRUE)
+```
+
+```{r global packages and data, echo=T, message=FALSE, warning=FALSE}
+library(gridExtra) 
+library(ggplot2) 
+library(tidyr)
+library(broom)
+library(purrr)
+library(lme4)
+library(sads)
+library(magrittr)
+library(plyr)
+library(dplyr)
+load("/home/danilo/Desktop/l_dados.Rdata")
+# names(l_dados) # 6 data frames
+## df_dados.geral = todas as variaǘeis mensuradas no trabalho e todas as variáveis preditoras candidatas (a priori ou não)
+## df_a.visual_GOF =
+## df_SAD.obs =
+## df_SAD.sim =
+## df_resultados.rep =
+## df_resultados ...= melhor retirar, essas informações podem ser resumidas de df_resultados.rep [FAZER]
+
+# preparação dos dados
+
+```
+
+## Modelo neutro ##
+
+- uma maneira de se construir teoria: adicionando complexidade ao sistema
+- os principios básicos do modelo neutro: pressupostos, comunidade local e metacomunidade ,dinâmica neutra, equilíbrio dinâmico ( No equilíbrio dinâmico a taxa de perda de espécies por deriva ecológica se iguala a taxa de entrada de novas espécies U (Hubbell 2001).)
+
+ U relaciona a a dinâmica ecológica local com a dinâmica evolutiva que ocorre no conjunto de comunidades com as populações interligados por precessos de migração, onde os processos evolutivos de extinção global e especiação ocorrem [REESCREVER]. Para uma revisão de como o conjunto de comunidades da metacomunidade pode se relacionar olhar Economo & Keitt (2008) [REESCREVER]
+
+- interpretações dele: predições do modelo neutro (descritores da comunidade local, da paisagem) e predições que decorrem da dinâmica neutra( taxa de substituição de espécies, taxa de extinção)
+
+## Modelo neutro X fragmentação ##
+  O modelo neutro já foi usado para estudar as fragmentações em outros contextos. Solé et al. 
+>abordagem, resultados e interpretações<
+- Solé et al. 2004
+- Gilbert et al. 2006
+- Campos et al.
+
+## Abordagem usada aqui ##
+
+  O modelo neutro espacialmente explícito de Rosindell et al. (2008) apresenta uma comunidade local inserida em uma paisagem contínua de tamanho infinito. Assumindo dimensões infinitas, pode-se criar uma paisagem fragmentada periodica [REFERÊNCIA Solé et al. 2004] .Alternativamente, podemos usar uma paisagem de tamanho finito com diferentes cenários de fragmentação avaliando toda a paisagem e assumindo uma taxa de surgimento de novas espécies na paisagem (Campos et al. 2012, Campos et al. 2013, Campos et al. 2015 REFERÊNCIA). Aqui implementamos uma dinâmica neutra que depende de três níveis hierarquicos: uma comunidade local, J, inserida em uma paisagem finita, Jl, que apresentam fluxo de indivíduos com uma fonte externa de espécies, a metacomunidade (figura X).
+  
+  O movimento dos indivíduos na paisagem se da explicitamente no espaço estruturado, a dispersão local é descrita por uma distribuição de probabilidades de colonização segundo a distância do indivíduo progenitor, essa função é o _kernel_ de dispersão e possui média K. O espaço é formado por unidades de habitat colonizáveis por apenas um indivíduo. O movimento de indivíduos entre a paisagem e a metacomunidade é expressa como a propabilidade de colonização de espécies raras por evento de morte de indivíduos da comunidade local, U. A dinâmica neutra de nascimentos e mortes estruturada no espaço gera a deriva ecológica. O modelo prediz a espécie e posição de cada indivíduo da comunidade local em um momento no equilíbrio, informação que é sumarizada em uma distribuição de abundância de espécies (SAD); e estima o U necessário para gerar em média a riqueza observada. 
+
+## kernel de dispersão, fragmentação e espécies de um mesmo grupo trófico ## 
+  
+  Alimentamos a simulação com valores de K que correspondem às médias dos kernels de dispersão para diferentes sindromes de dispersão (Seidler et al. 2006). Sindrome de dispersão classifica as espécies quanto as características relacionadas com a dispersão de propágulos: agente polinizador, tamanho do fruto, morfologia do fruto. 
+  eu considero indivíduos que compartilham características que funcionam de tal maneira que eles apresentam mecanismos similares de dispersão, essas características em gerão são 
+  
+  Em nossa abordagem podemos considerar que cada simulação existe um kernel médio, compartilhado por todos os indivíduos da paisagem. Rosindell & Cornell (2009) comparam diferentes funções para kernel e consideram que aquelas distribuições com longa cauda de raras geram taxas de imigração mais realistas do que aquelas que consideram a distribuição uniforme ou normal. Aqui usamos a distribuição de Laplace para simular o _kernel_ de dispersão. Sabe-se que a perda de cobertura vegetal afeta as espécies diferentemente segundo a sua forma de dispersão (REFERÊNCIA) - EXPLICAR O MECANISMO E DADO QUE A LIMITAÇÃO DE DISPERSÃO TEM TAMANHA IMPORTÂNCIA NO MODELO NEUTRO RESOLVEMOS USAR VALORES DE KERNEL MÉDIO DE SINDROMES DE DISPERSÃO DE ESPÉCIES ARBOREAS DE UMA FLORESTA TROPICAL. Assim podemos avaliar como que o modelo prevê a interação entre cobertura vegetal e sindrome de dispersão, assumindo comunidades neutras compostas apenas por indivíduos de uma mesma sindrome de dispersão. 
+  
+  Cada valor de K corresponde ao kernel médio de uma sindrome de dispersão (Seidler et al. 2006). Cada sindrome de dispersão corresponde a um conjunto de traços ecológicos próprios que permite a interação com os diferentes agentes dispersores (REFERÊNCIA). Sabe-se que a 
+  
+## Objetivo e Hipóteses ##
+  
+  Comparamos as predições do modelo neutro com o observado avaliando a proporção de vezes que uma simulação produziu SADs que são boas aproximações das SADs observadas. Tendo como premissa que em fragmentos florestais 
+  Enquanto construção teórica, o modelo neutro se propõem a buscar criar teória adicionando complexidade ao sistema. O modelo neutro já foi usado para entender o impacto da fragmentação nos sistemas biológicos e se mostrou capaz de gerar boas reproduções do observado. Para Rosindell et al. (2012) o modelo neutro é útil pois sua refutação é informativa, é necessário adicionar complexidade ao sistema. Para fragmentos florestais em um gradiente natural de cobertura vegetal, 
+  Aqui comparamos o predito pelo modelo neutro com o observado em fragmentos observados, partindo da riqueza observada, configuração espacial da paisagem onde a comunidade local está inserida e o número de indivíduos presentes na comunidade local. 
+  
+  O modelo neutro fez predições sobre o colapso de comunidaes em ambientes fragmentados que são similares a modelos mais complexos e ao observado (Solé et al. 2004). Já a taxa de substituição de espécies em fragmentos florestais não foi bem predita pelo modelo neutro, mostrando que essa característica da
+  Diferentes traços da dinâmica ecológica podem ser descritos satisfatóriamente pelo modelo neutro, mostrando que para algumas deriva ecológica e limitação a dispersão interagindo com processos externos a dinâmica ecológica podem 
+  Tomando um gradiente natural de paisagens fragmentadas, simulações neutras espacialmente explicitas foram feitas gerando distribuição de abundância de espécies (SAD) e taxa de imigração (U). Foram contabilizados 
+  neutros foram simuladas nas respec simulações neutras considerando diferentes valores de kernel médio. 
+  Avaliamos se o modelo neutro esta realizando boas reproduções do observado avaliando a porcentagem de SADs réplicas que são boas aproximações da SAD observada em fragmentos florestais
+
+
+  Usando um modelo de dinâmica neutra como ponto de partida para entender os efeitos da variação da cobertura vegetal em um  modelos mais complexos, vamos comparar a proporção de SADs réplicas que são boas aproximações das SADs observadas em fragmentos florestais com diferentes porcentagens de cobertura vegetal (p). Assim, podemos avaliar como que o modelo responde em um gradiente de fragmenção. Se a fragmentação é um processo que leva à criação filtros ambientais que levam à taxas de extinção diferenciadas entre as espécies,
+  segundo o teste de Kolmogorov-Smirnov. Dessa maneira avaliamos se o modelo neutro está realizando boas predições de um parâmetros da dinâmica ecológica: a distribuição de abundância dos ranks da comunidade. Acessamos isso comparando a SAD Avaliamos essa predição ao longo de um gradiente de cobertura vegetal de paisagens da Mata Atlântica, Brasil. Usamos trabalhos fitossociológicos como comunidades locais em paisagens concentricas 
+  Comparamos a proporção de SADs réplicas apresentaram  simuladas tomando como base fragmentos florestais em um gradiente de cobertura vegetal. Aqui usamos 
+
+
+  Aqui simulamo
+
+<!--
+REFERÊNCIA
+Economo, E. P., & Keitt, T. H. (2008). Species diversity in neutral metacommunities: A network approach. Ecology Letters, 11(1), 52–62. http://doi.org/10.1111/j.1461-0248.2007.01126.x
+Rosindell, J., & Cornell, S. J. (2007). Species-area relationships from a spatially explicit neutral model in an infinite landscape. Ecology Letters, 10(7), 586–595. http://doi.org/10.1111/j.1461-0248.2007.01050.x
+-->
+
+
+<!--
+i) adaptação de Rosindell et al. 2011 da imagem da dinâmica local
+ii) perfil do kernel de dispersão, uma curva leptocurtica mostrando o valor médio K, em uma escala de indivíduos 
+-->
+
+Figura X - Esquema do sistema hierarquico usado: J, Jl e metacomunidade; e o kernel de dispersão
+
+<!-- Ideia geral da dinâmica na paisagem  -->  
+  O movimento de indivíduos entre J e Jl ocorre em uma matriz de posições com três tipos de sítios: i) habitat, unidades colonizáveis na paisagem (1); ii) não habitat, unidades não colonizáveis na paisagem (2); e iii) habitat da comunidade local, região de habitat colonizável na paisagem onde acompanhamos a dinâmica atingir o equilíbrio (3). A dinâmica da comunidade local está acoplada à dinâmica da paisagem por conta dos processos de dispersão local. Como estamos modelando indivíduos arbóreos, a dispersão local ocorre apenas quando um indivíduo coloniza um sítio vago. A movimentação dos indivíduos é descrita como a probabilidade de um indivíduo se estabelecer em função da distância da árvore progenitora, essa curva é chamada de _kernel_ de dispersão, e seu valor médio é K. Quando um indivíduo morre em uma unidade de 3, existe a probabilidade U de uma espécie rara (espécie com um indivíduo) colonizar, e 1 - U de uma indivíduo da paisagem colonizar. A chuva de propagulos dos individuos da vizinhança cria um condicionamento espacial à probabilidade de colonização. Como assumimos o mesmo _kernel_ para todos os indivíduos, podemos centra-lo na unidade vaga de habitat para estimar a probabilidade de um indivíduo na paisagem colonizar aquela unidade de habitat vaga (figura X, FIGURA). Assim, a dinâmica da comunidade local está acoplada a dinâmica da paisagem pelo _kernel_ de dispersão. A simulação pressupõem que existe um kernel médio para a comunidade. Usamos valores para K que são a média da dispersão de indivíduos de diferentes síndromes de dispersão, estimados em uma floresta tropical (Seidler et al. 2006). Assim, simulamos dinâmicas neutras espacialmente explicítas de populações que compartilham a mesma sindrome de dispersão em uma paisagem finita. U é a probabilidade de uma espécie rara (espécie com um indivíduo) se estabelecer na comunidade por evento de colonização. Assumimos que a metacomunidade apresenta uma taxa de especiação e fluxo de indivíduos com a comunidade local tal que U é suficiente para manter a riqueza observada na comunidade local no equilíbrio, S.
+  <!-- -->
+  
+
+  
+  Usamos a distribuição de Laplace para simular a movimentação dos indivíduos, uma curva leptocurtica que apresenta pressupostos e resultados mais realistas do que uma distribuição quadrada ou normal (Rosindell & Cornell, 2009). Assim, 
+  Podemos entender a distribuição de Laplace como uma distribuição exponencial dupla, distribuição que pressupõem que a média e variância são descritas pelo mesmo parâmetro, lambda. Utilizamos oito valores de lambda para cada matriz da paisagem. Os valores de lambda são as distâncias médias de indivíduos e seus progenitores segundo a sindrome de dispersão de árvores tropicais (Seidler et al. 2006): SINDROMES DE DISPERSÃO E VALOR DE LAMBDA.
+
+<!-- INTRODUÇÃO
+  O equilíbrio da dinâmica ecológica segundo o modelo neutro é um equilíbrio dinâmica, onde a taxa com que indivíduos de espécies ausentes na comunidade se estabelecem é compensada pela taxa com que espécies raras se extinguem localmente [Hubbell 2001]. 
+-->
+   
+
+
+
+
+  Há três tipos de unidades de habitat na matriz da paisagem: i) não habitat, que não podem ser colonizados; ii) habitat, unidades colonizáveis, e habitat da comunidade local, iii) unidade de habitat que representa a comunidade local, onde a arvore genealógica da comunidade é criada. A partir do elemento central da paisagem, converte-se J unidades de habitat do tipo ii em iii em forma de uma espiral quadrada divergente (????). Assim, a comunidade local é a região central da paisagem.   
+
+
+<!-- 
+## Descrição da figura X+1 ##
+
+
+-->
+Figura X+1 - Exemplos de matrizes de paisagens usadas no trabalho __Cores__ COR1 - i, COR2 - ii,COR3 - iii. __Kernel__  
+
+  
+  Constroí-se a árvore genealogica da comunidade local usando a abordagem coalescente, que permite criar arvores para estimar a taxa de imigração necessária para gerar a riqueza observada, U, e a diversidade da comunidade local no equilíbrio. Sumarizamos a diversidade da comunidade local na distribuições de abundância de espécie, SAD. Realizamos 20 arvores réplicas para cada simulação e usamos a média do U para gerar 100 diferentes SADs amostradas no espaço da comunidade local, com J elementos (figura X+1).
+  
+  
+  O número de elementos na matriz da paisagem, Jl, depende da densidade de indivíduos observado, Jl = 5 ha * DAobs (número de indivíduos/ha). Foram selecionados 86 sítios do banco de trabalhos fitossociológicos descritos em Lima et al. (2015). Jl varia entre [ESTATÍSTICA DESCRITIVA - range, variância e média]. Selecionamos os trabalhos que amostraram áreas contíguas e indivíduos arbóreos com diâmetro à altura do peito (DBH) > 5.00 cm. Os sítios estão distribuídos ao longo da Mata Atlântica e podem apresentar diferentes históricos de perturbações e contextos biogeográficos [REFERÊNCIA Lima et al. 2015]. __Colocar mapa com a coordenada de cada sítio usado__ [CRIAR FIGURA].
+  
+  A coordenada central da área amostrada em cada trabalho fitossociológico foi usada para marcar o elemento central da paisagem. Realizamos recortes de paisagem de 5 km^2 em imagens do banco de imagens descrito em Hansen et al. (2013). Cada imagem teve sua resolução ajustada segundo a densidade de   
+
+A paisagem é um recorte de 5 km^2 de imagens profenientes do banco de dados de imagens descrito em Hansen et al. 2013. A coordenada central da imagem coincide com a coordenada central da área amostrada nos trabalhos fitossociológicos 
+O recorte da paisagem foi feito no ambiente de programação R, usando o pacote "raster" [REFERÊNCIA]. O Ajuste da imagem de 
+
+
+
+### Variáveis de trabalho: GOF e U ###
+
+  Para os 86 sítios selecionados no banco de dado realizou-se 8 simulações, uma para cada nível de K, totalizando 688 simulações. Em cada simulação foram estimadas 20 taxas de imigração, onde a taxa média, `U`, foi usada para gerar 100 SADs réplicas. Cada SAD réplica foi comparada à SAD observada usando o teste de Kolmogorov-Smirnov. O teste de Kolmogorov Smirnov estima a probabilidade de errarmos ao afirmar que dois vetores de abundância são amostras de uma mesma distribuição teórica (p valor). A estatística p valor é estimado a partir da distribuição nula da maior diferença entre as curvas acumuladas de dois vetores de abundância. A variável GOF é a proporção de SADs réplicas que apresentam p valor > 0.05 por simulação. Modelos o efeito da cobertura vegetal (p), média do kernel de dispersão (K) e riqueza observada (S), apenas para U. 
+  
+
+  Como as observações estão agrupadas por sítio, vamos construir modelos generalizados mistos para entender o efeito da cobertura vegetal em GOF e em U. Consideramos duas estruturas aleatórias: (1 | Site), com um intercepto livre por sítio e compartilhando a mesma inclinação; e (K | Site), com intercepto e inclinação. Para modelar GOF usamos a distribuição de erros binomial, ideal para modelar proporções, com função de ligação logito, ligação canônica. Partimos de um modelo cheio que considera a interação entre cobertura vegetal (p) e média de kernel de dispersão (K). Para modelar U partimos de um modelo cheio que considerava 
+  
+  criamos um modelo cheio que considera a interação entre cobertura vegetal (p) e média de kernel (K).
+  o S e J variam entre os sítios, mas no espírito de manter o modelo mais simples possível começamos considerando apenas a cobertura vegetal (p) e média do kernel de dispersão (K) como variáveis preditoras para GOF.  
+  
+  A proporção de SADs réplicas que apresentaram p-valor > 0.05 por simulação a variável `GOF` (goodness-of-fit), que esta definida entre 0 e 1. `GOF` pode ser interpretada como a qualidade da predição do modelo neutro, ou seja, a probabilidade do modelo neutro criar SADs que são boas aproximações do observado.
+  
+
+## Análise do dados ##
+
+-estrutura aleatória
+  
+  Para investigar os efeitos da cobertura vegetal(p) e média de kernel de dispersão(K) na qualidade da predição do modelo neutro (GOF) usamos uma abordagem baseada em seleção de modelos. 
+  Como as observações estão agrupadas por sítio, vamos construir modelos generalizados mistos para entender o efeito da cobertura vegetal em GOF e em U. Modelos mistos permitem separar a variação 
+-estrutura fixa
+-seleção da função de ligação e distribuição de erro
+-seleção da estrutura aleatória
+-seleção de variáveis
+
+  Para cada fragmento florestal foram realizados 8 simulações, cada uma considerando um valor médio de kernel de dispersão. Para cada conjunto de simulações foram contabilizadas o número de réplicas que geram SADs 
+
+  Para avaliar qual o efeito da cobertura vegetal e kernel de dispersão
+
+
+## GOF - qualidade da predição do modelo neutro em um gradiente de cobertura vegetal ##
+
+  

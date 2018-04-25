@@ -1,0 +1,81 @@
+---
+title: "rascunho"
+author: "Danilo Pereira Mori"
+date: "July 13, 2016"
+output: html_document
+---
+```{r include=FALSE}
+require(magrittr)
+require(ggplot2)
+require(gridExtra)
+require(dplyr)
+require(xtable)
+load("~/Documents/dados/mestrado/simulacao/resultados/resultados_sim6jun.Rdata") #config=30
+load("~/Documents/dados/mestrado/simulacao/resultados/df_dados_geral.Rdata") #config=1
+```
+
+<p style="text-align:justify;"> O [TreeCo](http://labtrop.ib.usp.br/doku.php?id=projetos:treeco:start) conta hoje com mais de 4 mil levantamentos fitossociológicos. Foram selecionados apenas aqueles levanetamentos que: i) estão localizados nos estados do sul e sudeste; ii) que temos informações de pelo menos o fragmento florestal onde o levantamento fitossociológico ocorreu. Esses dois filtros selecionaram 358 levantamentos. A maioria desses trabalhos ocorre em algum tipo de unidade de conservação (~139), contudo há trabalhos que ocorreram em propriedades privadas (~94). Nesse momento não pretendo desconsiderar os trabalhos realizados fora de unidades de conservação. Na tabela 1 há o número de levantamentos por tipo de local onde eles ocorreram. </p>
+
+<div align="center"> O [TreeCo](http://labtrop.ib.usp.br/doku.php?id=projetos:treeco:start) conta hoje com mais de 4 mil levantamentos fitossociológicos. Foram selecionados apenas aqueles levanetamentos que: i) estão localizados nos estados do sul e sudeste; ii) que temos informações de pelo menos o fragmento florestal onde o levantamento fitossociológico ocorreu. Esses dois filtros selecionaram 358 levantamentos. A maioria desses trabalhos ocorre em algum tipo de unidade de conservação (~139), contudo há trabalhos que ocorreram em propriedades privadas (~94) </div>
+
+<p>Em resumo, comparo distribuições de abundância de espécies (DAE) simuladas segunda uma dinâmica neutra espacialmente explicitas com DAE amostradas em fragmentos florestais. Compilamos levantamentos fitossociológicos realizados em
+Dos fragmentos florestais, além da DAE, eu utilizo a imagem da paisagem em que esses fragmentos estão localizados para criar matrizes da paisagem, que conservam as posições e distâncias entre *habitat* e *não habitat*.</p>
+
+
+
+$$
+\begin{array}
+{rrr}
+1 & 2 & 3 \\
+4 & 5 & 5 \\
+7 & 8 & 9
+\end{array}
+$$
+
+```{r }
+ggplot(data.frame(cobertura = c(0,1) ), aes(cobertura) ) + 
+  stat_function(fun = function(x) 1-x, geom = "line", colour = "blue", size = 3) +
+  labs(list(title = "Kolomogorov-Smirnov ~ covertura vegetal", x = "cobertura vegetal", y = "Estatística de Kolomogorov-Smirnov")) +
+  theme_bw() + 
+  theme(axis.line = element_line(colour = "black", size = 1, linetype = "solid"),
+        axis.ticks = element_blank(),
+        axis.text.x = element_blank(), axis.text.y = element_blank())
+        
+```
+
+```{r predicao ks_treecover, results='asis'}
+predicao1 <- ggplot(data.frame(cobertura = c(0,1) ), aes(cobertura) ) + 
+             stat_function(fun = function(x) 1-x, geom = "line", colour = "darkblue", size = 3) +
+             labs(list(title = "Kolomogorov-Smirnov ~ covertura vegetal", x = "cobertura vegetal", y = "Estatística de Kolomogorov-Smirnov")) +
+             theme_bw() + 
+             theme(axis.line = element_line(colour = "black", size = 1, linetype = "solid"),
+                   axis.ticks = element_blank(),
+                   axis.text.x = element_blank(), axis.text.y = element_blank())
+predicao1
+```
+
+```{r riqueza por refID}
+S_refID_c.rep <- ggplot(data = df_resultados, aes(x = refID, y = riqueza)) + 
+                geom_point(aes(colour = range), size = 2.5) + 
+                scale_colour_manual(values=c("#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7", "#000000")) + 
+                scale_y_continuous(limits = c(50,310) ) + 
+                labs(title = "30 replicas") +
+                theme(axis.text = element_text(size=14), axis.title = element_text(size=14), legend.position = "none")
+  
+S_refID_s.rep <- ggplot(data = df_dados_geral, aes(x = refID, y = riqueza)) + 
+                  geom_point(aes(colour = range), size = 2.5) + 
+                  scale_colour_manual(values=c("#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7", "#000000")) + 
+                  scale_y_continuous(limits = c(50,310) ) + 
+                  labs(title = "sem replicas") +
+                  theme(axis.text = element_text(size=14), axis.title = element_text(size=14),
+                        axis.text.y=element_blank(),axis.ticks=element_blank(), axis.title.y=element_blank(),
+                        legend.text=element_text(size=14))
+      
+grid.arrange(S_refID_c.rep,S_refID_s.rep, ncol = 2)
+```
+
+<div align="center"> 
+  <font size="1.3">
+    <p style="text-align:justify;">Figura X. Riqueza observada e simulada para cada um dos valores de dispersão média (valores retirados de Clark et al. 1999) e para cada levantamento fitossociologico selecionado.</p>
+  </font>
+</div>

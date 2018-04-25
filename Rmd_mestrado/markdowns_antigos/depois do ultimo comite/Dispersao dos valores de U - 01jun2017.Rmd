@@ -1,0 +1,48 @@
+---
+title: "Dispersao dos valores de U - 01jun2017"
+author: "Pereira Mori et al."
+date: "31 de maio de 2017"
+output: pdf_document
+---
+```{r global_options, echo=FALSE}
+knitr::opts_chunk$set(echo=F, warning=FALSE, message=FALSE, cache = TRUE, tidy = TRUE)
+```
+
+
+```{r global packages and data, echo=F, message=FALSE, warning=FALSE}
+library(ggplot2) 
+library(magrittr)
+library(plyr)
+library(dplyr)
+load("/home/danilo/Documents/dissertacao/dados/Rdata_antigos/df_repU.Rdata")
+df_rep.U %<>% select(rep, SiteCode, Sindrome, cluster_medio, S, U)
+names(df_rep.U)[4] <- "kernel"
+df_rep.U %<>% mutate(K.f = factor(kernel))
+```
+## Prólogo ##
+
+  Após mudar o programa coalescente (detalhes na conversa "Simulação Coalescente - Danilo Pereira Mori") observamos um considerável aumento no tempo de execução das simulações, em especial as simulações para se estimar U são muito longas.  
+  
+## Avaliação Gráfica ##
+
+```{r fig.height=25, fig.width=7, include=FALSE}
+ggplot(df_rep.U,aes(x=K.f,y=U)) +
+  geom_jitter(aes(colour=SiteCode)) +
+  facet_wrap(~cut(df_rep.U$S,10),ncol=1) +
+  theme(legend.position = "none")
+```
+
+__Figura 1__ U ~ kernel colorido por SiteCode e separado por classe de riqueza observa (10 classes de riqueza)
+
+- em geral parece existir uma nuvem coesa de pontos para um mesmo fragmento
+- parece existir uma leve tendência ao aumento da variância com o aumento de U médio
+
+```{r fig.height=6}
+df_rep.U %>% ddply(.,c("SiteCode","K.f"),summarise, U.medio = mean(U), U.var = var(U)) %>% ggplot(aes(x=U.medio,y=U.var)) +
+  geom_point(aes(colour=SiteCode)) +
+  geom_smooth() +
+  theme(legend.position = "none")
+```
+
+- com o aumento da média há aumento da variância, contudo a variância é muito baixa.
+- como com a nova simulação parece que existe uma tendência a diminuição dos valores de U com o aumento de kernel me parece que não há problemas em diminuir o número de réplicas de U para menos de 10

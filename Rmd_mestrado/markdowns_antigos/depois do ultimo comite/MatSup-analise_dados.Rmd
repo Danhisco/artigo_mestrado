@@ -1,0 +1,609 @@
+---
+title: "analise_dados_mestrado.Rmd"
+author: ""
+date: "15 de maio de 2017"
+output: pdf_document
+---
+
+
+
+
+
+```{r global_options, echo=FALSE}
+knitr::opts_chunk$set(echo=F, warning=FALSE, message=FALSE, cache = TRUE, tidy = TRUE)
+```
+
+
+```{r global packages and data, echo=F, message=FALSE, warning=FALSE}
+library(RVAideMemoire)
+library(gridExtra) 
+library(ggplot2) 
+library(tidyr)
+library(broom)
+library(purrr)
+library(lme4)
+library(sads)
+library(merTools) ## para intervalos de previsao
+library(magrittr)
+library(plyr)
+library(dplyr)
+load("/home/danilo/Desktop/l_dados.Rdata")
+df_ad %<>% mutate(p.z = (p-mean(p))/sd(p),
+                  K.z = (kernel-mean(kernel))/sd(kernel),
+                  S.z = (S-mean(S))/sd(S))
+rm(df_rep.U,df_resultados,l_dados,l_SAD.sim)
+```
+
+<!--
+- introdução geral e explanação da estrutura aleatória
+  i) Origem dos dados: falar o trabalho original e um pequeno resumo do que se trata (linkando com o próximo item)
+  ii) falar sobre as variáveis: GOF, U, p e K
+  iii) Justificativa estruturas aleatórias: (1 | Site) e (K | Site)
+- GOF
+  i) seleção da função de ligação
+  ii) seleçao da estrutura aleatória
+    a) gráfico dos dados ao nível da estrutura aleatória selecionada
+  iii) selação da estrutura fixa
+  iv) avaliação do modelo mais plausível: 
+    a) gráficos diagnóstico padrão
+    b) fatiando os dados pela estrutura aleatória e comparando com o modelo mais plausível
+    c) resíduos pelas variáveis da estrutura fixa
+  v) plotando o modelo mais plausível contra os dados usando a abordagem do PI
+  vi) tabela com os modelos mais plausíveis
+- U
+  i) seleção da função de ligação
+  ii) seleçao da estrutura aleatória
+    a) gráfico dos dados ao nível da estrutura aleatória selecionada
+  iii) selação da estrutura fixa
+  iv) avaliação do modelo mais plausível: 
+    a) gráficos diagnóstico padrão
+    b) fatiando os dados pela estrutura aleatória e comparando com o modelo mais plausível
+    c) resíduos pelas variáveis da estrutura fixa
+  v) plotando o modelo mais plausível contra os dados
+  vi) tabela com os modelos mais plausíveis
+-->  
+
+- introdução geral e explanação da estrutura aleatória
+  i) Origem dos dados: falar o trabalho original e um pequeno resumo do que se trata (linkando com o próximo item)
+  ii) Justificativa estruturas aleatórias: (1 | Site) e (K | Site)
+
+## GOF ##
+<!--
+i) selecao da função de ligacao
+ii) selecao da estrutura aleatoria
+iii) selação da estrutura fixa
+iv) resíduos X fitado e estrutura fixa
+v) glmer X glm: resíduo
+vi) glm: distribuição de parâmetros
+vii) plotando estimativa contra dados
+viii) conclusão e tabela com os modelos mais plausíveis
+-->
+
+__Tabela 1__ Seleção da função de ligação
+
+```{r}
+l_md <- vector("list", length = 3)
+names(l_md) <- c("logit","probit","cloglog")
+l_md[[1]] <- glm(cbind(GOF,100-GOF) ~ p.z * K.z, family = "binomial",df_ad)
+l_md[[2]] <- glm(cbind(GOF,100-GOF) ~ p.z * K.z, family = "binomial"(link=probit),df_ad)
+l_md[[3]] <- glm(cbind(GOF,100-GOF) ~ p.z * K.z, family = "binomial"(link=cloglog),df_ad)
+AICctab(l_md, weights = TRUE)
+```
+
+__Tabela  2__ Seleção das possíveis estruturas aleatórias
+
+```{r}
+l_md <- vector("list", length = 3)
+names(l_md) <- c("(1|Site)", "(kernel|Site)", "1")
+l_md[[1]] <- glmer(cbind(GOF,100-GOF) ~ p.z * K.z + (1 | Site), 
+                    family = "binomial"(link=cloglog), data = df_ad)
+l_md[[2]] <- glmer(cbind(GOF,100-GOF) ~ p.z * K.z + (K.z | Site), 
+                    family = "binomial"(link=cloglog), data = df_ad)
+l_md[[3]] <- glm(cbind(GOF,100-GOF) ~ p.z * K.z, 
+                    family = "binomial"(link=cloglog), data = df_ad)
+AICctab(l_md, weights = TRUE)
+```
+
+
+Visualizando GOF no nível da estrutura aleatória:
+
+```{r fig.height=7}
+df_temp <- df_ad
+df_temp[df_temp$GOF == 0,"GOF"] <- 1
+df_temp[df_temp$GOF == 100,"GOF"] <- 99
+df_temp %>% ggplot(aes(x=kernel,y=log(GOF/ (100-GOF) ),group=Site)) + 
+  geom_line(aes(col=Site)) +
+  geom_point() +
+  facet_wrap(~cut(df_ad$p.z,10),ncol=5) +
+  theme(legend.position="none")
+```
+
+__Figura 1__
+
+
+
+__Tabela 3__ Seleção da estrutura fixa
+
+```{r}
+l_md1 <- vector("list", length = 5)
+names(l_md1) <- c("p * K", "p + K", "K", "p" ,"1")
+l_md1[[1]] <- glmer(cbind(GOF,100-GOF) ~ p.z * K.z + (K.z | Site), 
+                    family = binomial, data = df_ad)
+l_md1[[2]] <- glmer(cbind(GOF,100-GOF) ~ p.z + K.z + (K.z | Site),
+                    family = binomial, data = df_ad)
+l_md1[[3]] <- glmer(cbind(GOF,100-GOF) ~ K.z + (K.z | Site),
+                    family = binomial, data = df_ad)
+l_md1[[4]] <- glmer(cbind(GOF,100-GOF) ~ p.z + (K.z | Site),
+                    family = binomial, data = df_ad)
+l_md1[[5]] <- glmer(cbind(GOF,100-GOF) ~ 1 + (K.z | Site),
+                    family = binomial, data = df_ad)
+AICctab(l_md1, weights = TRUE)
+```
+
+
+<!-- a atualização do pacote mudou a opção padrão; gráficos antigos: quantile residuals X fitted e quantile X quantile -->
+```{r}
+RVAideMemoire::plotresid(l_md1[[1]],shapiro = T)
+```
+
+**Figura 1** Gráficos diagnóstico do modelo selecionado `GOF ~ p * K + (K | Site)`
+
+
+
+  Bolker et al. (2008) propõem uma avaliação de modelos mistos: subdividir os dados segundo a estrutura aleatória e ajustar modelos que consideram a mesma distribuição de erros e funçao de ligação. A estrutura aleatória é `(K | Site)`, então agrupamos as valores de `GOF` segundo o fragmento florestal (`Site`) e ajustamos um modelo linear generalizado considerando a relação `GOF ~ K`. Dessa maneira temos o melhor ajuste possível para aquele conjunto subjconjunto de dados, considerando a mesma distribuição de erros e função de ligação do modelo misto selecionado. Ajustado os modelos para cada subgrupo de dados, comparamos os resíduos com aqueles do modelo misto mais plausível usando uma regressão linear; se o modelo misto estiver fazendo boas previsões esperamos que a regressão linear apresente intercepto, inclinação e R^2 próximos de 0, 1 e 1, respectivamente. Na figura 2 há o gráfico da regressão linear entre os resíduos do modelo linear generalizado para cada conjunto de observações e os resíduos do modelo misto selecionado, os pontos foram coloridos por `Site`. 
+
+
+```{r echo=F}
+## preparação dos dados ##
+
+# modelo binomial para aplicar em cada Site
+fun_map <- function(df){
+  glm(cbind(GOF,100-GOF) ~ K.z, family = binomial, data = df)
+}
+
+# aplicando a função do modelo binomial para cada site e armazendo em um novo data frame
+df_temp <- df_ad %>% 
+  group_by(Site) %>% nest() %>%
+  mutate(md = map(data, fun_map), # GLM binomial aplicado para cada sítio;
+         tidy = map(md,tidy), # parametros do modelo e métricas relacionadas
+         glance = map(md,glance), # métricas de qualidade dos modelos
+         augment = map(md,augment)) #info ao nível da observação 
+df_temp2 <- df_temp %>% select(-c(md,tidy,glance)) %>% unnest() %>% as.data.frame() # retornando ao formato data frame 
+# ajeitando as coisas na unha
+df_temp2 <- df_temp2[,c(1:4,10:15)]
+names(df_temp2)[8:10] <- c("glm.fit","glm.se.fit","glm.resid")
+df_temp2 %<>% inner_join(x = ., y = augment(l_md1[[1]])[,2:6], by = c("Site","K.z"))
+names(df_temp2)[12:13] <- c("glmer.fit","glmer.resid")
+
+# lm(glm.resid ~ glmer.resid, df_temp2) %>% summary
+# x11()
+
+# plotando os valores 
+ggplot(df_temp2,aes(y=glmer.resid, x=glm.resid)) + 
+  # geom_abline(intercept = 0, slope = 1, colour="red") +
+  geom_abline(intercept = -0.07178664, slope = 0.99646013) +
+  geom_point(aes(colour=Site)) +
+  theme(legend.position = "none") +
+  # facet_wrap(~ kernel.z,ncol=4)
+  labs(title = paste("y = ",round(-0.07178664,3), " + ", round(0.99646013,3), " * x", "; R^2 = ", 0.992, sep = "" ),
+       y = "resíduos glmer( GOF ~ p * K + (K | Site) )", x = "residuos glm( GOF ~ K, subset = Site)")
+```
+
+__Figura 2__ Resíduos do modelo (GOF ~ kernel) ajustado a cada sítio (eixo y) e resíduos do modelo de trabalho (eixo x). Cada cor representa um `Site`diferente
+
+
+  Existe grande congruência entre as abordagens, o que mostra que o padrão de resíduos (figura 1) não indica algum tipo de artefato estatístico - o ajuste do modelo misto é próximo do melhor ajuste possível, dado a distribuição de erros binomial e a função de ligação logito. Uma maneira de avaliar se a distribuição de erros e função de ligação são adequadas podemos fazer uma avaliaçao visual da distribuição de parâmetros do glm ajustado para cada subconjunto de dados; esperamos que tanto o intercepto quanto a inclinação sigam aproximadamente uma distribuição normal (Bolker et al. 2008). Na figura 3 há o histogramas da distribuição dos parâmetros.
+  
+```{r}
+# preparando os dados #
+df_temp2 <- df_temp %>% select(Site, tidy) %>% unnest() %>% as.data.frame() %>% 
+  select(Site, term, estimate) %>% reshape2::dcast(Site ~ term)
+# histograma dos parâmetros # 
+grid.arrange(qplot(df_temp2[,2], geom = "histogram", bins=40) + labs(x="interceptos", y=""),
+             qplot(df_temp2[,3], geom = "histogram", bins=40) + labs(x="inclinações", y=""),
+             ncol = 2, nrow = 1)
+```
+
+__Figura 3__ distribuição dos parâmetros dos GLMs ajustados para cada nível da estrutura aleatória (como proposto por Bolker et al. 2008)
+
+  
+  Na distribuição de ambos parâmetros parecem haver valores aberrantes, desconsiderando esses valores, ambos parâmetros parecem se aproximar de uma distribuição normal (figura 3).
+  
+
+- plotando resíduos contra a estrutura fixa: se o modelo esta fazendo um bom ajuste esperamos que os resíduos se distruam de maneira uniforme ao longo das variáveis presentes na estrutura fixa
+
+```{r}
+df_temp2 <- augment(l_md1[[1]]) %>% as.data.frame()
+
+l_p <- vector("list",length = 2)
+l_p[[1]] <-  ggplot(df_temp2,aes(x=p.z,y=.resid)) + 
+  # geom_line(aes(group=Site),colour="green") +
+  geom_smooth(se=T,col="red",method="lm") + 
+  geom_point() +
+  theme(legend.position = "none") + 
+  labs(x="p",y="residuos")
+l_p[[2]] <-  ggplot(df_temp2,aes(x=K.z,y=.resid)) + 
+  geom_smooth(se=T,col="red",method="lm") +
+  geom_jitter() +
+  labs(y="",x="K") +
+  theme(legend.position = "none")
+do.call("grid.arrange",c(l_p,ncol=2,nrow=1))
+```
+
+__Figura 4__ Resíduos do modelo misto selecionado e as variáveis preditoras.
+
+
+
+- plotando estimativa contra dados
+Objetivos:
+- acabar U
+- adaptar a estimativa de U para GOF
+ Metas:
+ i) acabar U - só falta escrever
+ ii) estimativa  para GOF:
+  a) An Introduction to merTools.pdf
+  b) Prediction Intervals from merMod Objects.pdf
+  c) Visualizing fits, inference, implications of (G)LMMs .pdf
+
+```{r intervalos de confiança do modelo}
+## passo 1: cria um novo conjunto de dados, com todas as combinações das preditoras para as quais se pretende estimar os previstos
+## É preciso incluir as variaveis aletaórias tb. mas como os dados serão sorteados supondo a variação aleatória total entre sítios,
+## basta incluir um sítio arbitrário nestes dados. A repetição dos sorteio muitas vezes vai reproduzir a variação que existe entre os sítios, pois vai sortear um novo valor de efeito aleatório a cada repetição.
+newdat <- expand.grid(kernel.f=unique(df_ad$kernel.f), p.z = seq(min(df_ad$p.z)*1.1,max(df_ad$p.z)*1.1, length=50),
+                      Site=df_ad$Site[1])
+## Passo 2: crie as função que devem ser calculadas dos modelos a cada simulação
+## Previstos por efeitos fixos e aleatórios
+f1 <- function(.) predict(., newdata=newdat)
+## Previstos por efeitos fixos (argumento re.form=~0)
+f2 <- function(.) predict(., newdata=newdat, re.form=~0)
+## Os dois bootstraps. Ajuste o argumento ncpus para o numero de cores de seu computador
+b1 <- bootMer(l_md2b[[1]], FUN = f1, nsim=1000, parallel="multicore", ncpus=4)
+b2 <- bootMer(l_md2b[[1]], FUN = f2, nsim=1000, parallel="multicore", ncpus=4)
+## calcula as médias e intervalos de confiança quantílicos para cada combinação de preditoras
+## no novo conjunto de dados
+newdat$p <- newdat$p.z*sd(df_ad$p) + mean(df_ad$p)
+newdat$mean <- apply(b1$t,2,mean)
+newdat$IC.low <- apply(b1$t,2,quantile, 0.025)
+newdat$IC.upp <- apply(b1$t,2,quantile, 0.975)
+newdat$mean.fixed <- apply(b2$t,2,mean)
+newdat$IC.low.fixed <- apply(b2$t,2,quantile, 0.025)
+newdat$IC.upp.fixed <- apply(b2$t,2,quantile, 0.975)
+## Plots de logito(U) x cobertura standardizada com intervalos de predição
+df_ad %>%
+    ggplot(aes(x=p,y=lU)) + 
+    geom_point() +
+    geom_ribbon(aes(y = mean, ymin=IC.low, ymax=IC.upp), data=newdat, col="gray", alpha=0.5) +
+    geom_ribbon(aes(y=mean, ymin=IC.low.fixed, ymax=IC.upp.fixed), data=newdat, col="gray", alpha=0.5) +
+    geom_line(aes(x=p, y=mean.fixed), data=newdat) +
+    facet_wrap(~kernel.f)
+```
+
+
+### Tabela com os Modelos mais plausíveis ###
+
+__Tabela 4__ Tabela sumário dos modelos mais plausíveis
+- usar o sjpAlguma coisa... pesquisar maneira de incluir o modelo nulo junto
+
+
+## U - Taxa de Imigração ##
+
+
+
+### Seleção da distribuição de erros e função de ligação ###
+
+  U é a propabilidade de um indivíduo de uma nova espécie na comunidade se estabelecer por evento de morte, taxa de imigração. U é uma variável contínua com _range:_ `r round(range(df_ad$U))`.  A distribuição da variável variável parece ser leventemente assimétrica para a esquerda (figura 1), vou usar 5 combinações de distribuições com funções de ligação como candidatas para a construção do modelo: normal, lognormal (normal com função de ligação log), e Gamma com três funções de ligação - identity, log e inverse (tabela 5). 
+  
+  Para o modelo cheio consideramos apenas as variáveis de interesse cobertura vegetal, p, e média do kernel de dispersão usado na simulação, K. K foi interpretada como 
+  
+__Tabela 5__ Seleção da distribuição de erros e função de ligação.
+
+```{r}
+l_md <- vector("list", length = 5)
+names(l_md) <- c("norm","lognorm","gamma_id","gamma_log","gamma_inv")
+l_md[[1]] <- glm(U ~ p.z * K.z, data = df_ad)
+l_md[[2]] <- glm(U ~ p.z * K.z, family = gaussian(link = "log"), data = df_ad)
+l_md[[3]] <- glm(U ~ p.z * K.z, family = Gamma(link = "identity"), data = df_ad)
+l_md[[4]] <- glm(U ~ p.z * K.z, family = Gamma(link = "log"), data = df_ad)
+l_md[[5]] <- glm(U ~ p.z * K.z, family = Gamma(link = "inverse"), data = df_ad)
+AICctab(l_md, weights = TRUE)
+```
+
+  A distribuição Gamma com função de ligação identidade foi a distribuição de probabilidade mais plausível. Contudo, por conta de problemas de convergência na função glmer do pacote lme4 usando a distribuição Gamma, optamos pela distribuição normal com função de ligação identidade para modelar U (tabela 5).  
+
+
+### Seleção da estrutura aleatória ###
+
+ 
+ As duas estruturas aleatórias candidatas são: (1 | Site) - ou seja, para cada sítio há um intercepto livre; e (K | Site) - cada sítio possui um intercepto e inclinação próprios em kernel.
+
+
+__Tabela 6__ Seleção da estrutura aleatória
+  
+```{r}
+l_md <- vector("list",length=2)
+names(l_md) <- c("(K | Site)", "(1 | Site)")
+l_md[[1]] <- lmer(U ~ p.z * K.z + (K.z | Site), data = df_ad)
+l_md[[2]] <- lmer(U ~ p.z * K.z + (1 | Site), data = df_ad)
+AICctab(l_md, weights = TRUE)
+```
+
+  O modelo cheio que considera a estrutura aleatória em que há inclinação livre em kernel para cada fragmento florestal foi selecionada. A seguir os valores agrupados segundo a estrutura aleatória selecionada (figura 5, as linhas ligam pontos de um mesmo fragmento florestal. Para facilitar a visualização subdivimos as observações em 10 classes de cobertura vegetal.
+  
+```{r}
+df_ad %>% ggplot(aes(x=kernel,y=U,group=Site)) + 
+  geom_line(aes(col=Site)) +
+  geom_point() +
+  facet_wrap(~cut(df_ad$p.z,10),ncol=5) +
+  theme(legend.position="none")
+```
+
+__Figura 5__ U ~ kernel + (kernel | Site) (~cut(p.z,10))
+
+
+  Existem diversos padrões de resposta entre os sítios (figra 5, linhas ligam pontos de observações de um mesmo fragmento florestal). Parece existir interação entre cobertura e kernel de dispersão(figura 5). Em cobertura florestais baixas, observa-se relação positiva e sempre crescente entre U e kernel (figura 5[1,1:4]). Apesar da tendência geral, há sítios que apresentam relação positiva que satura, esse padrão se torna predominante em coberturas intermediárias (figura 5[1,4:7]).  Com o aumento da cobertura vegetal, a relação de U com kernel, que antes apresentava saturação vai apresentando uma leve diminuição de U com o aumento de kernel (figura 5[1,7:10]). Talvez a função de ligação não consiga linearizar a relação. 
+
+
+__Tabela 5__ Seleção da estrutura fixa
+
+```{r}
+l_md <- vector("list",length=5)
+names(l_md) <- c("p * k", "p + k", "p", "k", "1")
+l_md[[1]] <- lmer(U ~ p.z * K.z + (K.z | Site), data = df_ad)
+l_md[[2]] <- lmer(U ~ p.z + K.z + (K.z | Site), data = df_ad)
+l_md[[3]] <- lmer(U ~ p.z + (K.z | Site), data = df_ad)
+l_md[[4]] <- lmer(U ~ K.z + (K.z | Site), data = df_ad)
+l_md[[5]] <- lmer(U ~ 1 + (K.z | Site), data = df_ad)
+AICctab(l_md, weights = TRUE)
+```
+
+  Diferente de GOF o único modelo dentro do intervalo de plausíbilidade é aquele que considera a interação entre cobertura vegetal e kernel. Antes de interpretar o modelo selecionado, vamos avaliar o modelo. Na figura 6 há os gráficos diagnóstico dos modelos.
+
+## Diagnostico do modelo U ~ p.z * kernel.z + (kernel.z | Site) ##
+
+- gráficos diagnosticos padrão # FEITO
+- distribuição dos coef da estrutura aleatória # FEITO
+- comparação resíduos contra modelo por nível da estrutura aleatória # FEITO
+- gráficos resíduos pelas variáveis preditoras da estrutura fixa # FEITO
+- gráficos resíduos pela co-variável riqueza # FEITO
+
+```{r}
+md_U1<- l_md[[1]]
+RVAideMemoire::plotresid(md_U1)
+```
+
+__Figura 6__ Gráficos diagnósticos do modelo selecionado
+
+
+  Os resíduos não se distribuem de maneira homogênea ao longo dos valores fitados (figura 6). No painel da direita (figura 6), parece haver uma tendência ao aumento da variância com o aumento dos valores fitados. Na figura 7 há os resíduos pelas variáveis preditoras da estrutura aleatória.
+
+
+```{r echo=F,fig.width=10,fig.height=5}
+df_temp2 <- augment(md_U1)
+
+l_p <- vector("list",length = 2)
+l_p[[1]] <-  ggplot(df_temp2,aes(x=p.z,y=.resid)) + 
+  geom_smooth(colour="red") + 
+  geom_point() +
+  labs(x="p",y="Resíduos") +
+  theme(legend.position = "none")
+l_p[[2]] <-  ggplot(df_temp2,aes(x=K.z,y=.resid)) + 
+  geom_smooth(colour="red") + 
+  geom_jitter() +
+  labs(y="",x="K") +
+  theme(legend.position = "none")
+do.call("grid.arrange",c(l_p,ncol=2,nrow=1))
+```
+
+__Figura 7__ Resíduos do modelo `U ~ p * K + (K | Site)` pelas variáveis da estrutura fixa, cobertura vegetal (`p`) e kernel de dispersão (`K`), em vermelho um curva do tipo _smooth_
+
+
+  Há variação que o modelo selecionado não está dando conta (figura 7). Na variável `p` parece que existe uma tendência ao aumento da variação dos resíduos com o aumento de p, contudo, de maneira geral, os resíduos se distribuem de maneira homogênea ao longo de p (figura 7, primeiro painel). Em kernel (figura 7, segundo painel), os resíduos apresentam um padrão que reflete o padrão de observações ao nível da estrutura aleatória da figura 5: o menor nível de K apresenta em média os menores valores de resíduos, seguindo de um aumenta com posterior queda suave. A variância dos resíduos também parece estar associada kernel. Assim o modelo misto parece não estar estimando bem a variação associada com kernel. 
+  
+  Para avaliar se o modelo misto está fazendo o ajuste esperado na estrutura aleatória, vamos comparar os resíduos obtidos com aqueles calculados quando ajustado GLMs à estrutura aleatória. Dessa maneira, podemos avaliar se o padrão de resíduos se deve a algum tipo de artefato estatístico ou o padrão de resíduos está correto, dado a distribuição de erros e função de ligação.
+
+```{r}
+  # Modelo linear na estrutura aleatória #
+fun_map <- function(df){
+  lm(U ~ K.z, data = df)
+}
+
+# agrupando os dados em um novo df #
+df_temp <- df_ad %>% group_by(Site) %>% nest %>% 
+  mutate(md = map(data, fun_map),
+         tidy = map(md,tidy),
+         glance = map(md,glance),
+         augment_lm = map(md,augment))
+
+df_temp1 <- df_temp %>% select(-c(md,tidy,glance)) %>% unnest() %>% as.data.frame()
+df_temp1 <- inner_join(x=df_temp1[,c(1:10,13:15)],y=augment(md_U1), by=c("Site","p.z","K.z","U"))
+
+# lm(.resid.x ~ .resid.y, df_temp1) %>% summary
+
+# plotando os valores 
+ggplot(df_temp1,aes(y=.resid.x, x=.resid.y)) + 
+  geom_abline(intercept = coef(lm(.resid.x ~ .resid.y, df_temp1))[1], slope = coef(lm(.resid.x ~ .resid.y, df_temp1))[2]) +
+  geom_point(aes(colour=Site)) +
+  theme(legend.position = "none") +
+  labs(title = paste("y = ",0, " + ", 0.8952, " * x", "; R^2 = ", 0.895, sep = "" ),
+       y = "resíduos glmer( GOF ~ p * K + (K | Site) )", x = "residuos glm( GOF ~ K, subset = Site)")
+```
+
+__Figura 8__ Resíduos do modelo (U ~ K) ajustado a cada sítio (eixo y) e resíduos do modelo de trabalho (eixo x). Cada cor representa um `Site`diferente
+
+
+  O R quadrado é menor que 90%, a inclinação da reta é menor do que 0.9 indicando que existe uma leve tendência aos resíduos do modelo misto serem maiores do que o melhor ajuste possível para cada estrutura aleatória (figura 8). A variância dos pontos é maior nessa regressão (comparar com figura 2), parece que existe variação associada com fragmento florestal (figura 8, pontos coloridos). Para avaliar se a distribuição de erros e função de ligação são adequadas vamos ver a distribuição dos parâmetros dos GLMs ajustados para cada nível da estrutura aleatória (figura 9).
+  
+```{r}
+df_temp %>% select(Site, tidy) %>% unnest() %>% as.data.frame() %>% select(Site, term, estimate) %>% ggplot(aes(x=estimate)) + 
+  geom_histogram(bins=40) + 
+  labs(x="parâmetros estimados em glm(U ~ K, subset = Site)",y="") +
+  facet_wrap(~term,scales="free")
+```
+
+__Figura 9__ Distribuição dos parâmetros de glm(u ~ K, subset = Site), no painel da esquerda a distribuição dos interceptos, na direita, das inclinações. 
+
+
+  Nenhum dos parâmetros parece se distribuir normalmente, as inclinações em especial parecem ser assimétrica para a esquerda (figura 9). Isso pode indicar que a distribuição de erros e função de ligação não são adequadas (Bolker et al. 2008?). Parece que a abordagem usada para modelar U não é adequada: i) há variação explicada por kernel que não está sendo estimada pelo modelo (figura 7, painel da direita); ii) as estimativas do modelo misto apresentam leve divergência considerando as estimativas feitas ao nível da estrutura aleatória (Figura 8); a distribuição de erros e função de ligação parecem não estar linearizando a relação (figura 9).
+  
+
+### Transformando as Variáveis ###
+
+  Afim de melhorar o ajuste vamos transformar a variável U. Taxa de imigração (U) é a probabilidade de um singleton (espécie com apenas 1 indivíduo) se estabelecer em um sítio vago por evento de morte, para linearizar e normalizar a variável vamos usar a função de ligação logito. Esperamos que assim a relação observado na figura 5 e corroborada pelos resíduos na figura 7 (painel da direita) se linearize. Além disso, vamos considerar kernel como variável categorica na construção dos modelos cheios. Isso permito que no modelo cheio cobertura possa ter uma inclinação independente por kernel. Avaliamos as combinações na tabela 6:
+
+__Tabela 6__ Seleção do modelo cheio
+  
+```{r}
+df_ad %<>% mutate(lU = log(U/(1-U)), K.f = factor(K))
+
+l_md <- vector("list",length=3)
+names(l_md) <- c("K + (K | Site)", "K + (1 | Site)","K.f + (1|Site)")
+l_md[[1]] <- lmer(lU ~ p.z * K.z + (K.z | Site), data = df_ad)
+l_md[[2]] <- lmer(lU ~ p.z * K.z + (1 | Site), data = df_ad)
+l_md[[3]] <- lmer(lU ~ p.z * K.f + (1 | Site), data = df_ad)
+AICctab(l_md, weights = TRUE)
+
+# l_md[[3]] <- lmer(lU ~ p.z * kernel.f + (kernel.f | Site), data = df_ad) # Erro: number of observations (=688) <= number of random effects (=688) for term (kernel.f | Site); the random-effects parameters and the residual variance (or scale parameter) are probably unidentifiable
+```
+
+ Na figura 10 há os dados segundo a estrutura aleatória
+  
+```{r include=FALSE, fig.height=5}
+df_ad %>% ggplot(aes(x=Site,y=lU,group=Site,order=p)) +
+  geom_boxplot() +
+  geom_jitter() +
+  theme(legend.position = "none") +
+  facet_wrap(~ cut(df_ad$p,10),ncol=2, scale="free")
+```
+
+__Figura 10__ logito de U (lU) agrupado pela fragmento florestal
+
+
+  Vamos selecionar a estrutura fixa mais plausível 
+  
+  
+__Tabela 7__ Seleção da estrutura fixa
+
+```{r}
+l_md <- vector("list",length=5)
+names(l_md) <- c("p * K.f", "p + K.f", "p", "K.f", "1")
+l_md[[1]] <- lmer(lU ~ p.z * kernel.f + (1 | Site), data = df_ad)
+l_md[[2]] <- lmer(lU ~ p.z + kernel.f + (1 | Site), data = df_ad)
+l_md[[3]] <- lmer(lU ~ p.z + (1 | Site), data = df_ad)
+l_md[[4]] <- lmer(lU ~ kernel.f + (1 | Site), data = df_ad)
+l_md[[5]] <- lmer(lU ~ 1 + (1 | Site), data = df_ad)
+AICctab(l_md, weights = TRUE)
+```
+
+  O modelo mais plausível é aquele que considera que existe interação entre cobertura vegetal e kernel ()
+
+
+
+##### Acréscimos PI após comitê #####
+Os problemas do ajuste visto nos resíduos são resolvidos se:
+
+* Transformamos a resposta $U$ em seu logito $U/log(1-U)$. O logito é uma transformação que lineariza e normaliza dados de proporção e probabilidade, como é o caso do $U$.
+* Transformamos a variável de kernel em um fator. No modelo com interação isso permite que a relação de logito(U) com
+cobertura tenha uma inclinação independente por kernel, o que resolve o formato unimodal da relação
+entre U e kernel como contínua. A desvantagem é que não resta graus de liberdade para incluir kernel no efeito aleatório. Acho que não está causando muito dano. Mas outra possibilidade é ajustar o modelo às 20 réplicas de U obtidas para cada combinação de sítio e kernel (o que não faria agora).
+
+```{r modelos de U com logito e kernel como fator}
+df_ad <-  mutate(df_ad, lU = log(U/(1-U)), kernel.f = factor(kernel))
+
+l_md2b <- vector("list",length=5)
+names(l_md2b) <- c("p * k", "p + k", "p", "k", "1")
+l_md2b[[1]] <- lmer(lU ~ p.z * kernel.f + (1| Site) , data = df_ad)
+l_md2b[[2]] <- lmer(lU ~ p.z + kernel.f + (1 | Site), data = df_ad)
+l_md2b[[3]] <- lmer(lU ~ p.z + (1 | Site), data = df_ad)
+l_md2b[[4]] <- lmer(lU ~ kernel.f + (1 | Site), data = df_ad)
+l_md2b[[5]] <- lmer(lU ~ 1 + (1 | Site), data = df_ad)
+AICctab(l_md2b, weights = TRUE)
+```
+Veja como os diagnósticos agora estão ok:
+
+```{r}
+df_temp2 <- df_ad %>% inner_join(x=.,y=augment(l_md2b[[1]]), by=c("lU","p.z","kernel.f","Site") )
+l_p2 <- vector("list",length=4)
+l_p2[[1]] <- ggplot(df_temp2,aes(x=.fitted,y=.resid))+
+  geom_point() +
+  geom_smooth(se=F,col="red") +
+  labs(x="predito",y="resíduo")
+l_p2[[2]] <- ggplot(df_temp2,aes(x=p.z,y=.resid))+
+  geom_point() +
+  geom_smooth(se=F,col="red") +
+  labs(x="p - cobertura vegetal",y="")
+l_p2[[3]] <- ggplot(df_temp2,aes(x=S.z,y=.resid))+
+  geom_point() +
+  geom_smooth(se=F,col="red") +
+  labs(x="S - riqueza observada",y="residuo")
+l_p2[[4]] <- ggplot(df_temp2,aes(x=kernel.f,y=.resid))+
+  geom_point() +
+  geom_smooth(se=F,col="red") +
+  labs(x="K - média do kernel de dispersão",y="")
+do.call("grid.arrange",c(l_p2,ncol=2,nrow=2))
+```
+
+Aqui o código para calcular os intervalos de confiança dos valores previstos, apenas para os efeitos fixos
+e para efeitos fixos e aleatórios. Para isso usamos a função bootMer para simular novos dados, ajustar o modelo
+de novo e calcular os previstos mais uma vez. Repetindo isso muitas vezes teremos um intervalo de
+confiança boostrap. O padrão de interação kernel x habitat continua o mesmo.
+
+```{r intervalos de confiança do modelo}
+## passo 1: cria um novo conjunto de dados, com todas as combinações das preditoras para as quais se pretende estimar os previstos
+## É preciso incluir as variaveis aletaórias tb. mas como os dados serão sorteados supondo a variação aleatória total entre sítios,
+## basta incluir um sítio arbitrário nestes dados. A repetição dos sorteio muitas vezes vai reproduzir a variação que existe entre os sítios, pois vai sortear um novo valor de efeito aleatório a cada repetição.
+newdat <- expand.grid(kernel.f=unique(df_ad$kernel.f), p.z = seq(min(df_ad$p.z)*1.1,max(df_ad$p.z)*1.1, length=50),
+                      Site=df_ad$Site[1])
+## Passo 2: crie as função que devem ser calculadas dos modelos a cada simulação
+## Previstos por efeitos fixos e aleatórios
+f1 <- function(.) predict(., newdata=newdat)
+## Previstos por efeitos fixos (argumento re.form=~0)
+f2 <- function(.) predict(., newdata=newdat, re.form=~0)
+## Os dois bootstraps. Ajuste o argumento ncpus para o numero de cores de seu computador
+b1 <- bootMer(l_md2b[[1]], FUN = f1, nsim=1000, parallel="multicore", ncpus=4)
+b2 <- bootMer(l_md2b[[1]], FUN = f2, nsim=1000, parallel="multicore", ncpus=4)
+## calcula as médias e intervalos de confiança quantílicos para cada combinação de preditoras
+## no novo conjunto de dados
+newdat$p <- newdat$p.z*sd(df_ad$p) + mean(df_ad$p)
+newdat$mean <- apply(b1$t,2,mean)
+newdat$IC.low <- apply(b1$t,2,quantile, 0.025)
+newdat$IC.upp <- apply(b1$t,2,quantile, 0.975)
+newdat$mean.fixed <- apply(b2$t,2,mean)
+newdat$IC.low.fixed <- apply(b2$t,2,quantile, 0.025)
+newdat$IC.upp.fixed <- apply(b2$t,2,quantile, 0.975)
+## Plots de logito(U) x cobertura standardizada com intervalos de predição
+df_ad %>%
+    ggplot(aes(x=p,y=lU)) + 
+    geom_point() +
+    geom_ribbon(aes(y = mean, ymin=IC.low, ymax=IC.upp), data=newdat, col="gray", alpha=0.5) +
+    geom_ribbon(aes(y=mean, ymin=IC.low.fixed, ymax=IC.upp.fixed), data=newdat, col="gray", alpha=0.5) +
+    geom_line(aes(x=p, y=mean.fixed), data=newdat) +
+    facet_wrap(~kernel.f)
+```
+
+E aqui o plot de logito(U) x kernel para cada classe de cobertura
+(falta pensar em como colocar o previsto para o modelo)
+
+```{r}
+df_ad %>% ggplot(aes(x=kernel,y=lU,group=Site)) + 
+  geom_line(col="red") +
+  geom_point() +
+  facet_wrap(~cut(df_ad$p,10),ncol=5)
+```
+
+## Discussão ##
+
+```{r fig.height=7}
+
+# mutate(df_ad, lU = log(U/(1-U)), kernel.f = factor(kernel))
+df_temp <- df_ad
+df_temp[df_temp$U == 0,"GOF"] <- 1
+df_temp[df_temp$UF == 100,"GOF"] <- 99
+df_ad %>% ggplot(aes(x=kernel,y=lU ),group=Site) + 
+  geom_line(aes(col=Site)) +
+  geom_point() +
+  facet_wrap(~cut(df_ad$p.z,10),ncol=5) +
+  theme(legend.position="none")
+```
+
+
+

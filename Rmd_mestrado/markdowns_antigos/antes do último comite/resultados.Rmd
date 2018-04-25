@@ -1,0 +1,140 @@
+---
+title: "resultados.Rmd"
+author: "Danilo Pereira Mori"
+date: ""
+output: html_document
+---
+```{r global packages}
+library(magrittr)
+library(dplyr)
+library(plyr)
+library(reshape2)
+library(ggplot2)
+library(sads)
+setwd("~/Documents/dissertacao/dados/imagens/paisagens_selecionadas/")
+load("resultados.Rdata")
+```
+Os dados estão em dois data frames no formato 'wide' um para as estatísticas de KS e outro de U.est para cada sitecode e valor de dispersão. Vou fazer alguns gráficos exploratórios de cobertura vegetal e dois gráficos de dispersão um para o KS e outro para U.est.
+
+```{r gráficos exploratórios}
+names(df_KS)[10] <- "cobertura"
+df_dados$cobertura %>% unique %>% hist 
+
+##arrumando os dados##
+df_KS.melt <- melt(df_KS, id.vars = c("SiteCode", "cobertura"))
+names(df_KS.melt)[3:4] <- c("sindrome","KS.value")
+df_U.est.melt <- melt(df_U.est, id.vars = c("SiteCode", "cobertura"))
+names(df_U.est.melt)[3:4] <- c("sindrome","U.est")
+df_dados <- inner_join(df_KS.melt, df_U.est.melt, by = c("SiteCode","cobertura","sindrome"))
+df_dados <- df_dados[,c(1,3,2,4,5)]
+df_dados %>% str
+
+##gráficos exploratórios##
+x11()
+KS_plot <- ggplot(df_dados, aes(x = cobertura, y = KS.value) ) + geom_point() + facet_grid(~sindrome)  #colocar uma linha de tendência
+x11()
+U.est_plot <- ggplot(df_dados, aes(x = cobertura, y = U.est) ) + geom_point() + facet_grid(~sindrome) #colocar uma linha de tendência
+x11()
+ggplot(df_ae, aes(x = cluster_medio, y = log(U.medio), group = SiteCode)) + geom_line()
+
+inner_join(df_dados, df_dispersal, by = "sindrome") -> df_dados.c
+ggplot(df_dados.c, aes(x = cluster_medio, y = log(U.est), group = SiteCode)) + geom_line() + facet_grid(.~cobertura_factor) #U.est ~ cluster_medio + SiteCode
+df_dados.c$cobertura_factor <- cut(df_dados.c$cobertura, 5)
+
+
+x11()
+par(mfrow = c(1,2))
+plot(df_KS[,"media_sindrome"] ~ df_KS[,"cobertura"])
+plot(df_U.est[,"media_sindrome"] ~ df_U.est[,"cobertura"], log ="y")
+
+```
+
+i) riqueza observada X riqueza simulada
+```{r gráficos exploratórios}
+## Sobs X Ssim ##
+df_resultados %>% inner_join(df_simulacao[,c("SiteCode","S_obs")]) -> df_ge1 #facilita a escrita no ggplot2
+p_S_obs_sim <- ggplot(df_ge) + geom_point(aes(x = S_obs, y = S_medio, color=Sindrome)) + facet_wrap(~cluster_medio) #Sobs X Ssim
+p_S_obs_sim + geom_abline(slope = 1,intercept = 0)
+## diff(Sobs X Ssim) ~ cobertura
+df_ge1 %<>% mutate(diff.S = S_medio - S_obs)
+p_diff.S_cobertura <- ggplot(df_ge1) + geom_point(aes(x = cobertura, y = diff.S, color=Sindrome)) + facet_wrap(~cluster_medio)
+## SiteCode X S
+df_ge <- df_simulacao[,c("SiteCode", "S_obs")]
+names(df_ge)[2] <- "S_medio"
+df_ge$Sindrome <- "obs"
+df_ge %>% inner_join(x=df_resultados, y = .) %>% head
+df_ge <- df_resultados[1:94,]
+df_ge[,c(3,5:9)] <- NA
+df_ge$Sindrome <- "obs"
+df_ge[,c("SiteCode","S_medio")] <- df_simulacao[,c("SiteCode","S_obs")]
+df_ge <- rbind(df_resultados,df_ge)
+df_ge %<>% arrange(cobertura, Sindrome)
+p_SiteCode_S <- ggplot(df_ge, aes(x = SiteCode, y = S_medio, color = Sindrome)) + geom_boxplot() +geom_point(position = position_jitter(width = 0.2))
+## U.est ##
+#U.est ~ cluster_medio + cobertura_fator
+df_ge <- df_resultados
+df_ge$cobertura %>% cut(.,5) -> df_ge$cobertura_fator
+p_U.est_cobertura <- ggplot(df_ge1) + geom_point(aes(x = cobertura, y = log(U.est), color=Sindrome)) + facet_wrap(~cluster_medio)
+p_U.est_cluster <- ggplot(df_ge, aes(x = cluster_medio, y = log(U.medio), group = SiteCode)) + geom_line() + facet_grid(.~cobertura_fator) #U.est ~ cluster_medio + SiteCode
+
+ggplot(df_ge, aes(x = cobertura, y = S.var, group = SiteCode)) + geom_line()
+
+## KS ##
+p_KS_cobertura <- ggplot(df_ge1) + geom_point(aes(x = cobertura, y = KS, color=Sindrome)) + f2acet_wrap(~cluster_medio)
+p_KS_p_cobertura <- ggplot(df_ge1) + geom_point(aes(x = cobertura, y = KS_p, color=Sindrome)) + facet_wrap(~cluster_medio)
+p_KS_cluster <- ggplot(df_ge, aes(x = cluster_medio, y = KS, group = SiteCode)) + geom_line() + facet_grid(~cobertura_fator)
+p_KS_p_cluster <- ggplot(df_ge, aes(x = cluster_medio, y = KS_p, group = SiteCode)) + geom_line() + facet_grid(~cobertura_fator)
+```
+
+
+
+Coisas a fazer: i) colocar todas as SADs simuladas e observadas em um grande quadro e olha-las, uma por uma; ii) pegar o valor de P de cada KS, ii) usar
+
+DADOS: df_SAD.sim0 com um vetor de abundância de espécies por SiteCode e Sindromes de dispersão. Contando com a SADobs há mais 8 tipos de SADs para cada Sitecode
+PRINT: vou usar um for para criar uma SAD de cada SiteCode com oito plots (para cada valor de dispersão) e com a sua respectiva SAD.obs
+```{r print SADs}
+library(sads)
+df_SAD.sim0$sindrome %<>% as.factor
+df_SAD.sim0$SiteCode %<>% as.factor
+df_SAD.sim0$cobertura %<>% as.factor
+df_SAD.sim0 %<>% arrange(cobertura, desc(N))
+df_SAD.obs.f$SiteCode %<>% as.character()
+
+par(mar=c(1,1,1,1))
+par(mfrow=c(1,1))
+for(i in 1:length(levels(df_SAD.sim0$cobertura))) {
+  sitecode <- df_SAD.sim0 %>% filter(.,cobertura == levels(df_SAD.sim0$cobertura)[i]) %>% .$SiteCode %>% as.character %>% unique #pegando o sitecode necessário
+  
+  if(sitecode %in% df_ge2$SiteCode[df_ge2$KS_p<1e-3]){
+  pdf(file = paste("ppeq",sitecode, ".pdf", sep=""), height = 7, width = 56)
+  par(mfrow=c(1,8))  
+    for(j in 1:length(levels(df_SAD.sim0$sindrome))) {
+      rad.obs <- df_SAD.obs.f %>% filter(SiteCode == sitecode) %>% .$N %>% rad #rank abundance obs
+      rad.sim <- df_SAD.sim0 %>% filter(SiteCode == sitecode, sindrome == levels(df_SAD.sim0$sindrome)[j]) %>% .$N %>% rad #rank abundance sim
+      plot(rad.obs, type="l", col=81, main = paste(sitecode,levels(df_SAD.sim0$sindrome)[j], sep=" "), xlim=c(0,max(dim(rad.sim)[1],dim(rad.obs)[1]))) 
+      lines(rad.sim, type="l", col=35) #SADsim vermelha, SADobs verde
+    }
+  dev.off()
+}
+}
+
+
+#tentando colocar em apenas 1 PDF NOTA: parei aqui!
+pdf(file = "SADs_obs-sim.R", height = 658, width = 56)
+par(mfrow=c(94,8))  
+for(i in 1:length(levels(df_SAD.sim0$cobertura))) {
+  sitecode <- df_SAD.sim0 %>% filter(.,cobertura == levels(df_SAD.sim0$cobertura)[i]) %>% .$SiteCode %>% as.character %>% unique #pegando o sitecode necessário
+    for(j in 1:length(levels(df_SAD.sim0$sindrome))) {
+      rad.obs <- df_SAD.obs.f %>% filter(SiteCode == sitecode) %>% .$N %>% rad #rank abundance obs
+      rad.sim <- df_SAD.sim0 %>% filter(SiteCode == sitecode, sindrome == levels(df_SAD.sim0$sindrome)[j]) %>% .$N %>% rad #rank abundance sim
+      plot(rad.obs, type="l", col=81, main = paste(sitecode,levels(df_SAD.sim0$sindrome)[j], sep=" "), xlim=c(0,max(dim(rad.sim)[1],dim(rad.obs)[1]))) 
+      lines(rad.sim, type="l", col=35) #SADsim vermelha, SADobs verde
+    }
+}
+dev.off()
+
+
+
+```
+
+Então o efeito da limitação de dispersão e da fragmentação no U.est possui um padrão (gráfico U.est ~ cluster_medio + as.factor(cobertura))

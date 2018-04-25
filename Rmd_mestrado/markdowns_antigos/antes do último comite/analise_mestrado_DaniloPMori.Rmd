@@ -1,0 +1,581 @@
+---
+title:
+author: 
+date: "16 de fevereiro de 2017"
+output: 
+  pdf_document: 
+    toc: true
+---
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(echo=T, warning=FALSE, message=FALSE, cache = TRUE, tidy = TRUE, fig.width = 10, fig.height = 5)
+```
+
+
+```{r global packages and data, echo=F}
+library(ggfortify)
+library(gridExtra) 
+library(ggplot2) 
+library(RVAideMemoire)
+library(MASS)
+library(bbmle)
+library(car)
+library(sads)
+library(nlme)
+library(lme4)
+library(sjPlot)
+library(magrittr)
+library(plyr)
+library(dplyr)
+load("/home/danilo/Desktop/dados_DaniloPMori.Rdata")
+```
+
+## Introdução ##
+
+  Utilizamos o modelo neutro como uma fonte de predições para avaliar o impacto da fragmentação e perda de habitat nas comunidades arbóreas da Mata Atlântica, Brasil. Para isso vamos avaliar como a distribuição de abundância de espécies simulada segundo uma dinâmica neutra (SAD sim) e a distribuição de abundância observada (SAD obs) diferem em um gradiente de paisagens fragmentadas na Mata Atlântica, Brasil. As SADs simuladas foram geradas utilizando o algoritmo coalescente, um modelo neutro espacialmente explícito. Ao explicitarmos o espaço em nossas dinâmicas é necessário informar como as árvores se dispersam, i.e., seu kernel de dispersão. Para tomar uma referência biológica utilizei a distância média de agregamento segundo diferentes sindromes de dispersão. A comparação entre as SADs foi feita a partir da estatística 'D' do teste de Kolmogorov-Smirnov, a maior distância entre as curvas acumuladas das SADs simuladas e observadas e de métricas relacionadas.
+
+
+
+## lista de siglas ##
+
+p: porcentagem de habitat remanescente, porcentagem de cobertura vegetal
+
+S: riqueza observada
+
+J: tamanho da comunidade, número de indivíduos na amostra
+
+kernel (m): parâmetro de escala de uma distribuição que descreve a probabilidade de um propagulo se estabelecer em função da distância da planta progenitora
+
+KS: estatística de KS, maior distância entre as curvas acumuladas de dois vetores númericos.
+
+KS.diff: media da maior distância entre as acumuladas. "KS com diferença relativa". 
+
+KS.diff_1 = 1 - KS.diff
+
+KS.ab: abundância onde se observou KS
+
+KS.obs: posição na curva acumulada da SAD observada onde KS foi observado.
+
+KS.sim: idem para SAD simulada.
+
+U: taxa de imigração
+
+VR = variável resposta: KS, KS.diff, KS.ab, KS.obs, KS.sim e U
+
+VC = variáveis controle: S e J
+
+
+
+## Modelo estatístico de trabalho ##
+
+
+  Os dados estão agrupados segundo o kernel de dispersão: i) `ballistic` ( 31.10m ), ii) `gravity` ( 47.40m ), `gyration` ( 54.50m ), `98u9wind` ( 64.50m ),`media_sin` ( 82.17m ), `animal_fruit<2cm` ( 99.30m ), `animal_fruit2-5cm`( 120.60m ), `animal_fruit>5cm`( 157.80m ). Para modelar esse tipo de estrutura vamos utilizar modelos lineares generalizados mistos. Traduzimos esse agrupamento como `(1 | kernel)`, isso implica que cada nível de `kernel` pode ter seu próprio intercepto.
+  
+  
+  O algoritmo coalescente simula uma dinâmica neutra espacialmente explicíta que ocorre em uma matriz de posições concêntrica a uma matriz da paisagem. A simulação retorna a identidade, i.e., a espécie, de cada indivíduo na matriz de posições em um momento no equilíbrio. Apesar da simulação não acompanhar a identidade dos indivíduos fora da matriz de posições, esses indivíduos podem participar da dinâmica, isso depende da relação entre a cobertura vegetal ao redor da área de interesse e `kernel`. Para exemplificar, consideremos que a paisagem está quase vazia, existe apenas a comunidade local. Nessa situação limite, o incremento no tamanho do kernel influencia os padrões de agregamento. A partir de um valor de `p` o incremento de `kernel` implica no aumento dos indivíduos que podem participar da dinâmica local. Esse efeito tende a diminuir com o aumento de `p`, pois toda a paisagem passa a ser acessível mesmo para valores intermediários de `kernel`. Para incorporar esse interação vamos utilizar `(p | kernel)` na estrutura randômica. 
+
+
+  Além da variável de interesse, `p`, vamos incluir em nossos modelos o termo `S * log(J)`. Há dois motivos para incluir esse termo: i) `S` e `J` são parâmetros da simulação e por conta disso, espera-se que os resultados das simulações sejam sensíveis à variação de `S` e `J`; ii) existe um viés na amostra, provavelmente por conta de questões biogeográficas e históricas, que gera uma correlação entre `S`, `log(J)` e `p`. Para exemplificar o efeito de `S` e `J` vou usar a variável `KS` (figura 1), em código, o gráfico para as demais variáveis.
+
+
+```{r echo=F,include=F}
+l_p3<-vector("list",length = 4)
+l_p3[[1]] <- ggplot(df_ad, aes(x = S, y = KS.diff)) + geom_point()
+l_p3[[2]] <- ggplot(df_ad, aes(x = p, y = S)) + geom_point()
+l_p3[[3]] <- ggplot(df_ad, aes(x = log(J), y = KS.diff)) + geom_point()
+l_p3[[4]] <- ggplot(df_ad, aes(x = p, y = log(J))) + geom_point()
+do.call("grid.arrange",c(l_p3,ncol=2,nrow=2))
+```
+
+```{r echo=F,include=F}
+l_p3<-vector("list",length = 4)
+l_p3[[1]] <- ggplot(df_ad, aes(x = S, y = log(KS.ab))) + geom_point()
+l_p3[[2]] <- ggplot(df_ad, aes(x = p, y = S)) + geom_point()
+l_p3[[3]] <- ggplot(df_ad, aes(x = log(J), y = log(KS.ab))) + geom_point()
+l_p3[[4]] <- ggplot(df_ad, aes(x = p, y = log(J))) + geom_point()
+do.call("grid.arrange",c(l_p3,ncol=2,nrow=2))
+```
+
+```{r echo=F,include=F}
+l_p3<-vector("list",length = 4)
+l_p3[[1]] <- ggplot(df_ad, aes(x = S, y = KS.obs)) + geom_point()
+l_p3[[2]] <- ggplot(df_ad, aes(x = p, y = S)) + geom_point()
+l_p3[[3]] <- ggplot(df_ad, aes(x = log(J), y = KS.obs)) + geom_point()
+l_p3[[4]] <- ggplot(df_ad, aes(x = p, y = log(J))) + geom_point()
+do.call("grid.arrange",c(l_p3,ncol=2,nrow=2))
+```
+
+```{r echo=F,include=F}
+l_p3<-vector("list",length = 4)
+l_p3[[1]] <- ggplot(df_ad, aes(x = S, y = KS.sim)) + geom_point()
+l_p3[[2]] <- ggplot(df_ad, aes(x = p, y = S)) + geom_point()
+l_p3[[3]] <- ggplot(df_ad, aes(x = log(J), y = KS.sim)) + geom_point()
+l_p3[[4]] <- ggplot(df_ad, aes(x = p, y = log(J))) + geom_point()
+do.call("grid.arrange",c(l_p3,ncol=2,nrow=2))
+```
+
+```{r echo=F,include=F}
+l_p3<-vector("list",length = 4)
+l_p3[[1]] <- ggplot(df_ad, aes(x = S, y = U)) + geom_point()
+l_p3[[2]] <- ggplot(df_ad, aes(x = p, y = S)) + geom_point()
+l_p3[[3]] <- ggplot(df_ad, aes(x = log(J), y = U)) + geom_point()
+l_p3[[4]] <- ggplot(df_ad, aes(x = p, y = log(J))) + geom_point()
+do.call("grid.arrange",c(l_p3,ncol=2,nrow=2))
+```
+
+```{r, echo=F}
+l_p3<-vector("list",length = 4)
+l_p3[[1]] <- ggplot(df_ad, aes(x = S, y = KS)) + geom_point()
+l_p3[[2]] <- ggplot(df_ad, aes(x = p, y = S)) + geom_point()
+l_p3[[3]] <- ggplot(df_ad, aes(x = log(J), y = KS)) + geom_point()
+l_p3[[4]] <- ggplot(df_ad, aes(x = p, y = log(J))) + geom_point()
+do.call("grid.arrange",c(l_p3,ncol=2,nrow=2))
+```
+
+__Figura 1__ `KS ~ variável de controle` e `variável de controle ~ p`. 
+
+  Existe uma relação negativa entre `KS` e `S` (figura , 1o gráfico). Isso mostra que o modelo neutro espacialmente explicíto gera SADs que são boas aproximações das SADs observadas em comunidades com muitas espécies e ruins em comunidades com poucas. A relação `S ~ p` parece ser positiva (figura X, 2o gráfico). Notem que as paisagens com baixa cobertura, também são aquelas em que a riqueza é menor, logo são as paisagens onde o modelo neutro não é um bom descritor do observado. Assim, podemos ver um efeito de `p` que decorre da relação de `p` com `S`. `J` parece ter pouca influência na relação `KS ~ p` (figura 4, 3o e 4o gráficos). A relação de `J` com `KS` e com `p` parecem ser fracas. Contudo, mantivemos `J` e a interação com `S` para compensar o viés do teste de Kolmogorov - Smirnov (ANEXO). Como tivemos problemas de ajuste ao usar `S`, utilizamos a variável `S.sc` = `scale(S)` .Assim, a fomula usada no modelo de estudo é:
+
+  `VR ~ p + S * log(J) + (p | kernel) + (1 | fitofisio)`, 
+  
+  
+  onde `VR` = `U`, `KS`, `KS.diff`, `KS.ab`, `KS.obs`, `KS.sim`.
+
+  
+  Seguimos o seguinte protocolo de análise (adaptado de Bolker et al. 2008): 
+  i) selecionamos uma distribuição de erros e uma função de ligação ajustando o glm da estrutura fixa (` ~ p + VC`) aos dados. 
+  ii) ajustamos o modelo de trabalho
+  iii) usando AIC, avaliamos se `p` possui efeito relevante nos dados observados comparando com modelos estatísticos que desconsideram seu efeito
+  iv) avaliamos os efeitos da estrutura fixa e randômica do modelo ajustado no item ii. 
+
+
+## Síntese do diagnóstico dos modelos ##
+
+  A única variável que o efeito de `p` não é plausível é `KS.ab`, para todas as outras o modelo que considerava `p` foi o mais plausível. Segue tabela com o resumo dos gráficos diagnósticos e sumários do modelo de trabalho para cada variável resposta.
+
+
+
+
+**Tabela 1** Tabela resumo diagnóstico e sumário dos modelos de trabalho. var: variáveis de trabalho; p.kernel_cor_rand: correlação entre o intercepto de `kernel` e o coeficiente de `p` na estrutura randômica;  p.var_rand: variância da estrtura randômica associada à `p`; p.cor_fix = correlação do coeficiente de `p` com algum outro coeficiente, N = sem correlaçaõ, intr = correlação com o intercepto.
+
+
+
+
+```{r echo=FALSE}
+df <- data.frame(var = c("KS", "KS.diff_1","KS.ab","KS.obs","KS.sim","U"),
+                 residuo = c("ruim","ok","ok?","ok","ok","ruim"),
+                 qqplot = c("ruim","bom","bom","ruim","bom","ruim"),
+                 p.kernel_cor_rand = c(-1,-1,-1,-1,-1,-0.73),
+                 p.var_rand = c(0.5472,0.001,0.001,0.000,0.002,0.034),
+                 p.cor_fix = c("N","intr","N","N","N","intr")
+                 )
+knitr::kable(df)
+```
+  
+
+  Na próxima sessão apresento as janelas de códigos e gráficos que interpretei para criar a tabela 1.
+
+
+
+
+## _KS_ ## 
+  
+
+
+
+__Janela de Código 1__ Seleção de distribuição de erros e função de ligação
+
+
+```{r chunk1, echo = TRUE}
+l_md1 <- vector("list", length = 5)
+names(l_md1) <- c("norm","lognorm","gamma_id","gamma_log","gamma_inv")
+l_md1[[1]] <- glm(KS ~ p + S.sc * log(J), data = df_ad)
+l_md1[[2]] <- glm(KS ~ p + S.sc * log(J), family = gaussian(link = "log"), data = df_ad)
+l_md1[[3]] <- glm(KS ~ p + S.sc * log(J), family = Gamma(link = "identity"), data = df_ad)
+l_md1[[4]] <- glm(KS ~ p + S.sc * log(J), family = Gamma(link = "log"), data = df_ad)
+l_md1[[5]] <- glm(KS ~ p + S.sc * log(J), family = Gamma(link = "inverse"), data = df_ad)
+AICtab(l_md1, weights = TRUE)
+```
+
+    
+
+__Janela de Código 2__ Ajuste do modelo de trabalho e comparação com modelos que omitem o efeito de `p`
+
+
+```{r chunk2, echo = TRUE}
+l_md2 <- vector("list", length = 3)
+names(l_md2) <- c("KS ~ p + VC","KS ~ 1 + VC","KS ~ 1")
+l_md2[[1]] <- glmer(KS ~ p + S.sc * log(J) + (p | kernel) + (1 | fitofisio), 
+                    family = Gamma(link = "inverse"), data = df_ad,
+                    start=list(fixef = coef(l_md1[[5]])), 
+                    control=glmerControl(optimizer="bobyqa", optCtrl=list(maxfun=2e5)) )
+l_md2[[2]] <- glmer(KS ~ 1 + S.sc * log(J) + (1 | kernel) + (1 | fitofisio), 
+                    family = Gamma(link = "inverse"), data = df_ad,
+                    control=glmerControl(optimizer="bobyqa", optCtrl=list(maxfun=2e5)) ) 
+l_md2[[3]] <- glmer(KS ~ 1 + (1 | kernel) + (1 | fitofisio), 
+                    family = Gamma(link = "inverse"), data = df_ad,
+                    control=glmerControl(optimizer="bobyqa", optCtrl=list(maxfun=2e5)) )
+AICtab(l_md2, weights = TRUE)
+```
+
+    
+
+```{r echo=F, message=F}
+plotresid(l_md2[[1]])
+```
+  
+__Figura 2__ Resíduos do modelo `VR ~ p + S * log(J) + (p | kernel) + (1 | fitofisio)`.
+
+  
+  Os resíduos do modelo não parecem estar igualmente distribuidos ao longo dos valores preditos, há aglomerados de pontos até cerca de 0.20 (eixo x - valores preditos, figura 2, primeiro gráfico). Os aglomerados resultam do maior número de pontos para valores baixos de `KS` e maior diferença entre as baterias de simulações, que diferem pelo valor de kernel. Para `KS` > 0.20 há menos pontos e as simulações passam a predizer o mesmo valor (figura 2, gráfico 1). Há uma tendência para resíduos com valores negativos, com uma discreta subida com o aumento de `KS`, acompanhada da diminuição da variância (figura 2, gráfico 1). 
+  A distribuição Gamma não é uma boa descritora dos pontos com valores baixos de `KS`, a qualidade da descrição melhora com o incremento dos valores, mantendo um ajuste razoável até o final (figura 2, segundo gráfico). A partir desses dois gráficos, me parece que o modelo não é um bom descritor dos dados. 
+
+   
+__Janela de Código 3__ Sumário do modelo `VR ~ p + S * log(J) + (p | kernel) + (1 | fitofisio)`.
+```{r chunk 3, echo=F}
+summary(l_md2[[1]])
+```
+  
+
+  Há correlação perfeita e negativa entre o intercepto (de `kernel`) e coeficiente (de `p`) na estrutura randômica e `p` apresenta variância = 0.546 (janela de código 3). Na estrutura fixa o coeficiente de `p` não apresenta correlação com as demais variáveis, apesar delas apresentarem alta correlação entre si (janela de código 3). 
+
+
+
+## _KS.diff 1_ ##
+
+__Janela de Código 4__ Seleção da distribuição de erros e da função de ligação 
+
+```{r chunk 4, echo = TRUE}
+l_md3 <- vector("list", length = 5)
+names(l_md3) <- c("norm","lognorm","gamma_id","gamma_log","gamma_inv")
+l_md3[[1]] <- glm(KS.diff_1 ~ p + S.sc * logJ.sc, data = df_ad)  
+l_md3[[2]] <- glm(KS.diff_1 ~ p + S.sc * logJ.sc, family = gaussian(link = "log"), data = df_ad)  
+l_md3[[3]] <- glm(KS.diff_1 ~ p + S.sc * logJ.sc, family = Gamma(link = "identity"), data = df_ad)  
+l_md3[[4]] <- glm(KS.diff_1 ~ p + S.sc * logJ.sc, family = Gamma(link = "log"), data = df_ad)  
+l_md3[[5]] <- glm(KS.diff_1 ~ p + S.sc * logJ.sc, family = Gamma(link = "inverse"), data = df_ad)  
+AICtab(l_md3, weights = TRUE)
+```
+
+
+  Os modelos com a distribuição gamma são igualmente plausíveis, vou escolher o modelo gamma_id por ter a função de ligação mais simples. 
+
+
+```{r echo=F,include=F}
+# ggplot(df_ad,aes(x=p,y=KS.diff_1)) + geom_point() + facet_wrap(~ fitofisio + factor(kernel), ncol = 8, nrow = 5) + geom_smooth(method="lm",se=F)
+# df_ad$KS.diff_1 %>% hist(.,n=40)
+# plot(KS.diff_1 ~ p, df_ad)
+```
+
+
+
+
+__Janela de Código 5__ Ajuste do modelo de trabalho e comparação com modelos que omitem o efeito de `p`
+
+```{r chunk 5 , echo = TRUE}
+l_md4 <- vector("list", length = 3)
+names(l_md4) <- c("KS.diff_1 ~ p + VC","KS.diff_1 ~ 1 + VC","KS.diff_1 ~ 1")
+l_md4[[1]] <- glmer(KS.diff_1 ~ p + S.sc * logJ.sc + (p | kernel) + (1 | fitofisio), 
+                    family = Gamma(link = "identity"), data = df_ad,
+                    start=list(fixef = coef(l_md3[[3]]) ), 
+                    control=glmerControl(optimizer="bobyqa", optCtrl=list(maxfun=2e5)) )
+l_md4[[2]] <- glmer(KS.diff_1 ~ 1 + S.sc * logJ.sc + (1 | kernel) + (1 | fitofisio), 
+                    family = Gamma(link = "identity"), data = df_ad,
+                    control=glmerControl(optimizer="bobyqa", optCtrl=list(maxfun=2e5)) ) 
+l_md4[[3]] <- glmer(KS.diff_1 ~ 1 + (1 | kernel) + (1 | fitofisio), 
+                    family = Gamma(link = "identity"), data = df_ad,
+                    control=glmerControl(optimizer="bobyqa", optCtrl=list(maxfun=2e5)) )
+AICtab(l_md4, weights = TRUE)
+```
+
+
+
+```{r echo=F, message=F}
+plotresid(l_md4[[1]])
+```
+
+__Figura 3__ Resíduos do modelo `VR ~ p + S * log(J) + (p | kernel) + (1 | fitofisio)`.
+
+
+  Os resíduos do modelo de`KS.diff_1` variam entre os mesmo valores que `KS`, contudo estão menos agregados, os agregamentos estão em valores positivos (figura 3, primeiro gráfico). A distribuição Gamma com função de ligação parece ser uma boa descritora dos pontos, com um leve desvio para valores extremos e positivos no eixo y (figura 3, segundo gráfico).
+
+
+
+__Janela de Código 6__ Sumário do modelo `VR ~ p + S * log(J) + (p | kernel) + (1 | fitofisio)`.
+
+```{r chunk 6, echo=F}
+summary(l_md4[[1]])
+```
+
+
+  Na estrutura randômica, há correlação perfeita (e negativa) entre o intercepto (de `kernel`) e coeficiente (de `p`), `p` apresenta variância = 0.001 (janela de código 6). Na estrutura fixa o coeficiente de `p` apresenta alta correlação com o intercepto (janela de código 6).
+
+
+
+
+## _KS.ab_ ##
+
+
+
+__Janela de Código 7__ 
+
+```{r echo = TRUE}
+l_md5 <- vector("list", length = 5)
+names(l_md5) <- c("norm","lognorm","gamma_id","gamma_log","gamma_inv")
+l_md5[[1]] <- glm(KS.ab ~ p + S.sc * log(J), data = df_ad)  
+l_md5[[2]] <- glm(KS.ab ~ p + S.sc * log(J), family = gaussian(link = "log"), data = df_ad)  
+l_md5[[3]] <- glm(KS.ab ~ p + S.sc * log(J), family = Gamma(link = "identity"), data = df_ad)  
+l_md5[[4]] <- glm(KS.ab ~ p + S.sc * log(J), family = Gamma(link = "log"), data = df_ad)  
+l_md5[[5]] <- glm(KS.ab ~ p + S.sc * log(J), family = Gamma(link = "inverse"), data = df_ad)  
+AICtab(l_md5, weights = TRUE)
+```
+
+
+
+__Janela de Código 8__
+
+```{r chunk 8, echo = TRUE}
+l_md6 <- vector("list", length = 3)
+names(l_md6) <- c("KS.ab ~ p + VC","KS.ab ~ 1 + VC","KS.ab ~ 1")
+l_md6[[1]] <- glmer(KS.ab ~ p + S.sc * log(J) + (p | kernel) + (1 | fitofisio), 
+                    family = Gamma(link = "log"), data = df_ad,
+                    start=list(fixef = coef(l_md5[[4]])), control=glmerControl(optimizer="bobyqa", optCtrl=list(maxfun=2e5)) )
+l_md6[[2]] <- glmer(KS.ab ~ 1 + S.sc * log(J) + (1 | kernel) + (1 | fitofisio), 
+                    family = Gamma(link = "log"), data = df_ad,
+                    control=glmerControl(optimizer="bobyqa", optCtrl=list(maxfun=2e5)) ) 
+l_md6[[3]] <- glmer(KS.ab ~ 1 + (1 | kernel) + (1 | fitofisio), 
+                    family = Gamma(link = "log"), data = df_ad,
+                    control=glmerControl(optimizer="bobyqa", optCtrl=list(maxfun=2e5)) )
+AICtab(l_md6, weights = TRUE)
+```
+
+
+
+```{r echo=F, message=F}
+plotresid(l_md6[[1]])
+```
+
+__Figura 4__ Resíduos do modelo `VR ~ p + S * log(J) + (p | kernel) + (1 | fitofisio)`.
+
+  Os resíduos do modelo apresentam grande aglomeração em valores baixos de `KS.ab` (figura 4, primeiro gráfico) [me parece que há um problemas na função que plota os resíduos, pois a escala de y deveria estar em escala log, não?]. A distribuição gammma é uma boa descrição de todos os pontos (figura 4, segundo gráfico).
+ 
+
+__Janela de Código 9__ Sumário do modelo `VR ~ p + S * log(J) + (p | kernel) + (1 | fitofisio)`.
+
+```{r chunk 9, echo=F}
+summary(l_md6[[1]])
+```
+
+
+  Há correlação perfeita e negativa entre `p` e o intercepto de `kernel` na estrutura randômica e não há correlação entre `p` e as demais variáveis na estrutura fixa (janela de código 9).
+
+
+## _KS.obs_ ##
+
+ 
+
+__Janela de Código 10__ 
+  
+```{r chunk 10, echo = TRUE}
+l_md7 <- vector("list", length = 5)
+names(l_md7) <- c("norm","lognorm","gamma_id","gamma_log","gamma_inv")
+l_md7[[1]] <- glm(KS.obs ~ p + S.sc * log(J), data = df_ad)  
+l_md7[[2]] <- glm(KS.obs ~ p + S.sc * log(J), family = gaussian(link = "log"), data = df_ad)  
+l_md7[[3]] <- glm(KS.obs ~ p + S.sc * log(J), family = Gamma(link = "identity"), data = df_ad)  
+l_md7[[4]] <- glm(KS.obs ~ p + S.sc * log(J), family = Gamma(link = "log"), data = df_ad)  
+l_md7[[5]] <- glm(KS.obs ~ p + S.sc * log(J), family = Gamma(link = "inverse"), data = df_ad)  
+AICtab(l_md7, weights = TRUE)
+```
+
+
+
+__Janela de Código 11__
+
+```{r chunk 11, echo = TRUE}
+l_md8 <- vector("list", length = 3)
+names(l_md8) <- c("KS.obs ~ p + VC","KS.obs ~ 1 + VC","KS.obs ~ 1")
+l_md8[[1]] <- lmer(KS.obs ~ p + S.sc * log(J) + (p | kernel) + (1 | fitofisio), 
+                   data = df_ad)
+l_md8[[2]] <- lmer(KS.obs ~ 1 + S.sc * log(J) + (1 | kernel) + (1 | fitofisio), 
+                   data = df_ad)
+l_md8[[3]] <- lmer(KS.obs ~ 1 + (1 | kernel) + (1 | fitofisio), 
+                   data = df_ad)
+AICtab(l_md8, weights = TRUE)
+```
+
+
+
+```{r echo=F, message=F}
+plotresid(l_md8[[1]])
+```
+
+__Figura 5__ Resíduos do modelo `VR ~ p + S * log(J) + (p | kernel) + (1 | fitofisio)`.
+
+
+  Há uma leve tendência de aglomeração dos resíduos em torno do zero, sendo que não me parece haver problemas de heterocedasticidade (figura 5, primeiro gráfico). Como a distribuição normal e lognormal são igualmente plausíveis eu optei pela distribuição normal, por ser mais prática e com menor AIC. A distribuição normal não é uma boa descrição dos pontos com valores baixos de KS.obs, apenas próximo à média que os pontos começam a "aderir" a distribuição normal (figura 5, segundo gráfico).
+
+
+
+__Janela de Código 12__ Sumário do modelo `VR ~ p + S * log(J) + (p | kernel) + (1 | fitofisio)`.
+
+```{r chunk 12, echo=F}
+summary(l_md8[[1]])
+```
+
+
+  Há correlação perfeita e negativa entre o intercepto de kernel e o coeficiente de p, já na estrutura fixa, `p` não apresenta correlação com outros coeificientes (janela de código 12). 
+
+
+
+## _KS.sim_ ##
+
+ 
+  
+__Janela de Código 13__ 
+
+```{r chunk 13, echo = TRUE}
+l_md9 <- vector("list", length = 5)
+names(l_md9) <- c("norm","lognorm","gamma_id","gamma_log","gamma_inv")
+l_md9[[1]] <- glm(KS.sim ~ p + S.sc * log(J), data = df_ad)  
+l_md9[[2]] <- glm(KS.sim ~ p + S.sc * log(J), family = gaussian(link = "log"), data = df_ad)  
+l_md9[[3]] <- glm(KS.sim ~ p + S.sc * log(J), family = Gamma(link = "identity"), data = df_ad)  
+l_md9[[4]] <- glm(KS.sim ~ p + S.sc * log(J), family = Gamma(link = "log"), data = df_ad)  
+l_md9[[5]] <- glm(KS.sim ~ p + S.sc * log(J), family = Gamma(link = "inverse"), data = df_ad)  
+AICtab(l_md9, weights = TRUE)
+```
+
+
+
+__Janela de Código 14__
+
+```{r chunk 14, echo = TRUE}
+l_md10 <- vector("list", length = 3)
+names(l_md10) <- c("KS.sim ~ p + VC","KS.sim ~ 1 + VC","KS.sim ~ 1")
+l_md10[[1]] <- lmer(KS.sim ~ p + S.sc * log(J) + (p | kernel) + (1 | fitofisio), 
+                    data = df_ad, start=list(fixef = coef(l_md9[[1]]) ) )
+l_md10[[2]] <- lmer(KS.sim ~ 1 + S.sc * log(J) + (1 | kernel) + (1 | fitofisio), 
+                    data = df_ad)
+l_md10[[3]] <- lmer(KS.sim ~ 1 + (1 | kernel) + (1 | fitofisio), 
+                    data = df_ad)
+AICtab(l_md10, weights = TRUE)
+```
+
+
+
+```{r echo=F, message=F}
+plotresid(l_md10[[1]])
+```
+
+__Figura 6__ Resíduos do modelo `VR ~ p + S * log(J) + (p | kernel) + (1 | fitofisio)`.
+
+
+  Os resíduos parecem apresentar padrão heterocedástico, os pontos não estão igualmente distribuidos ao londo do zero, Há uma tendência da variância diminuir com o aumento dos valores do eixo x (figura 6, primeiro grafico). A distribuição normal parece ser uma boa desritora dos pontos (figura 6, segundo grafico).
+
+
+ 
+__Janela de Código 15__ Sumário do modelo `VR ~ p + S * log(J) + (p | kernel) + (1 | fitofisio)`.
+
+```{r chunk 15, echo=F}
+summary(l_md10[[1]])
+```
+
+
+  Há correlação perfeita e negativa entre o intercepto de kernel e o coeficiente de p, já na estrutura fixa, `p` não apresenta correlação com outros coeificientes (janela de código 15).
+
+
+
+## _U_ ##
+
+ 
+  
+__Janela de Código 16__ 
+
+```{r chunk 16, echo = TRUE}
+l_md11 <- vector("list", length = 5)
+names(l_md11) <- c("norm","lognorm","gamma_id","gamma_log","gamma_inv")
+l_md11[[1]] <- glm(U ~ p + S.sc * log(J), data = df_ad)  
+l_md11[[2]] <- glm(U ~ p + S.sc * log(J), family = gaussian(link = "log"), data = df_ad)  
+l_md11[[3]] <- glm(U ~ p + S.sc * log(J), family = Gamma(link = "identity"), data = df_ad)  
+l_md11[[4]] <- glm(U ~ p + S.sc * log(J), family = Gamma(link = "log"), data = df_ad)  
+l_md11[[5]] <- glm(U ~ p + S.sc * log(J), family = Gamma(link = "inverse"), data = df_ad)  
+AICtab(l_md11, weights = TRUE)
+```
+
+
+
+__Janela de Código 17__
+
+```{r chunk 17, echo = TRUE}
+l_md12 <- vector("list", length = 3)
+names(l_md12) <- c("U ~ p + VC","U ~ 1 + VC","U ~ 1")
+l_md12[[1]] <- glmer(U ~ p + S.sc * logJ.sc + (p | kernel) + (1 | fitofisio), 
+                     family = Gamma(link = "log"), data = df_ad,
+                     start=list(fixef = coef(l_md11[[4]])), control=glmerControl(optimizer="bobyqa", optCtrl=list(maxfun=2e5)) )
+l_md12[[2]] <- glmer(U ~ 1 + S.sc * logJ.sc + (1 | kernel) + (1 | fitofisio), 
+                     family = Gamma(link = "log"), data = df_ad, 
+                     control=glmerControl(optimizer="bobyqa", optCtrl=list(maxfun=2e5)) ) 
+l_md12[[3]] <- glmer(U ~ 1 + (1 | kernel) + (1 | fitofisio), family = Gamma(link = "log"), 
+                     data = df_ad,
+                     control=glmerControl(optimizer="bobyqa", optCtrl=list(maxfun=2e5)) )
+AICtab(l_md12, weights = TRUE)
+```
+
+
+
+```{r echo=F, message=F}
+plotresid(l_md12[[1]])
+```
+
+__Figura 7__ Resíduos do modelo `VR ~ p + S * log(J) + (p | kernel) + (1 | fitofisio)`.
+
+
+  Os resíduos estão bem aglomerados em valores baixos de x (figura 7, primeiro gráfico), eu acredito que isso é um problema da visualização por os valores fitados não estão na escala log, não tenho certeza se é esse mesmo o problema. A distribuição Gamma falha em descrever valores baixos de `U`, o incremento de `U` é acompanhado pela melhora na descrição (figura 7, segundo gráfico). 
+
+
+ 
+__Janela de Código 18__ Sumário do modelo `VR ~ p + S * log(J) + (p | kernel) + (1 | fitofisio)`.
+
+```{r chunk 18, echo=F}
+summary(l_md12[[1]])
+```
+
+
+  Há correlação negativa e alta entre o intercepto associado ao `kernel` e o coeficiente de `p` na estrutura randômica. Esse padrão se repete na estrutura fixa, em que há alta correlação negativa entre o intercepto e o `p`.  
+
+
+
+
+
+## Questões ##
+  
+  a) eu acredito que existe uma interação entre `fitofisio` e `kernel`: o valor ótimo de kernel, onde a simulação produz as melhores estimativas depende do kernel médio da comunidade, esse por sua vez depende da composição da comunidade e essa depende da fitofisionomia em que está (ambiente e dispersão). Além disso, pela análise gráfica parece existir interação entre as variáveis.
+  
+  b) Eu e o Renato Lima pensamos em colocar `succession`, que classifica segundo o tempo desde a última perturbação, exemplo: corte raso, 80 anos. Isso pode ter alguma influência, pois a simulação cria uma comunidade no equilíbrio no tempo infinito.
+
+  c) No arquivo que eu mandei para o comitê, cada modelo de trabalho foi comparado com modelos alternativos que omitem a variável de interesse `p`. Como o objetivo é avaliar o impacto da fragmentação nas variáveis, achei que era válido manter essa parte. Mas como vocês veem essa questão?  
+  
+  d) Em alguns modelos existe correlação perfeita entre `p` e `kernel`, quais as implicações? Algo a se preocupar?
+
+  e) Como extrapolar as conclusões de KS.diff_1 para KS.diff? Quais as implicações de se transformar uma variável segundo a transformação `variável - 1`?
+  
+  f) para ajustar alguns modelos foi necessário reescalonar a variável log(J), eu transformei a variável apenas quando foi necessário. É necessário usar a variável escalonada mesmo quando o modelo converge?
+
+  h) quais as melhores maneiras de reportar os dados? Quais dados vocês querem ver?
+  
+  
+  
+  
+  
+################# Reunião com o PI 23fev2017 #################
+
+- estruturação
+- modelos
+  -construção
+  -resíduos
+  -qqplot
+  -ajuste?
+- resultados? 
+
+Próxima reunião?
+
+
+#### Sensibilidade do teste de KS ao número de Riqueza ####
