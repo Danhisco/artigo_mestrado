@@ -13,10 +13,11 @@ knitr::opts_chunk$set(echo = TRUE,tidy = TRUE, cache = TRUE)
 
 ```{r global packages, echo=FALSE, message = FALSE, warning=FALSE}
 library(lamW)
+library(reshape2)
 library(magrittr)
 library(plyr)
 library(dplyr)
-# df_resultados <- read.table(file="/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/df_resultados.txt",sep = "\t",row.names = FALSE)
+df_temp <- read.table(file="/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/df_resultados.txt", header=T, sep="\t")
 ```
 
 ## Objetivo ##
@@ -49,7 +50,7 @@ Essa equação é válida para o processo de dispersão em ambientes homogêneos
 
 $$eq.0': m' = \frac{mp}{1 - (1-p)m} $$
 
-Onde _p_ é a porcentagem de cobertura vegetal na paisagem. É necessário corrigir o valor de m quando partimos de parâmetros da simulação coalescente em paisagens fragmentadas 
+Onde _p_ é a porcentagem de cobertura vegetal na paisagem. É necessário corrigir o valor de m quando partimos de parâmetros da simulação coalescente em paisagens fragmentadas, contudo não é correto corrigir 'm' obtidos pelo ajuste do modelo neutro de campo médio. 
 
 ### Método C&L09 ###
 
@@ -89,6 +90,70 @@ ii) auditoria
 <!-- Comparação dos métodos
 i) seleção de modelos
 -->
+
+Para comparar os métodos vou utilizar SADs amostradas na Mata Atlântica. Todos os vetores de abundância foram observados em amostras com pelo menos 1 ha. As SADs observadas foram ajustado ao modelo de campo médio e obtemos m; no modelo de espaço explícito informamos *a priori* qual o desvio padrão da função de dispersão. Então vamos utilizar as equações 1a e 2a para calcular m a partir dos desvio-padrões informados *a prior*, considerando o m' corrigido. As equações 1b e 2b iram converter m em desvio padrões. Para isso vou criar uma função que contêm as equações:
+
+>Proposta da função:
+Converter um valor de parâmetro em seu correspondente no modelo neutro "oposto". Então: 
+a) par.estimadoVERO_{EI} -> par.{EI} [ (\theta , _m_) -> (_U_ , _K_) ] 
+b) par.estimadoSEMI-ANALITIC/apriori_{EE} -> par.{EI} [(_U_ , _K_) -> (\theta , _m_)]
+>Input da função
+-númerico, en 4 categorias: theta, m, U K
+>parâmetros da função:
+-valor: númerico
+-par: categorico{theta, m, U K}
+-par.aux: = list(J,DA,p)
+>Output
+-númerico, o valor do parâmetro correspondente do modelo neutro "oposto". Assim, se par = "theta", o output será U.
+
+
+
+
+
+
+
+```{r convesao par, echo=T}
+f_conv.par <- function(modelo, par., par.aux){
+  #parametros que seram convertidos
+  theta<- par.[[1]]
+  m <- par.[[2]]
+  sd_k <- par.[[3]]
+  U <- par.[[4]]
+  #parametros auxiliares a conversao
+  p <- par.aux[[1]]
+  J <- par.aux[[2]]
+  DA <- par.aux[[3]]
+  L <- 100*sqrt(J/DA)
+ #conversoes 
+  if(modelo == "campo_medio"){ # EI -> EE
+    U_ <- theta/(2*500*p*DA) # Hubbell 2001
+    sd_k.CL <- m * 100*pi*sqrt(2*J/DA)/4 # eq 1b
+    sd_K.CaCL <- sqrt(2) * L / (m * lambertW0(-exp(-1/m)/m) + 1) # eq 2b
+    df_ <- data.frame(par.value = c(U_, sd_k.CL, sd_K.CaCL),
+                      par.class = c("U","sd_k","sd_k"),
+                      par.method = c("NA","CL","CaCL"))
+    return(df_)
+  }else{ # EE -> EI
+    theta_ <- 2*500*p*DA*U # Hubbell 2001
+    m_CL <- 4 * sd_k / ( 100*pi*sqrt(2*J/DA) ) # eq 1a
+    m_CaCL <- sd_k * ( 1-exp(-sqrt(2)*L/sd_k) )/ (sqrt(2)*L/sd_k) # eq 2a
+    df_ <- data.frame(par.value = c(theta_, m_CL, m_CaCL),
+                      par.class = c("theta","m","m"),
+                      par.method = c("NA","CL","CaCL"))
+    return(df_)
+  }  
+}
+df_temp <- ddply(df_resultados,c("SiteCode","kernel_percentil"),function(X) f_conv.par(modelo = X[,"kernel_percentil"],
+                                                                                       par. = as.list(X[,c("theta","m","sd_k","U")]),
+                                                                                       par.aux = as.list(X[,c("p","J","DA")])
+                                                                                      )
+                 )
+
+```
+
+
+
+
 
 
 
