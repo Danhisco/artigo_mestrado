@@ -12,12 +12,15 @@ knitr::opts_chunk$set(echo = TRUE,tidy = TRUE, cache = TRUE)
 ```
 
 ```{r global packages, echo=FALSE, message = FALSE, warning=FALSE}
+library(rmutil)
 library(lamW)
 library(reshape2)
 library(magrittr)
 library(plyr)
 library(dplyr)
-df_temp <- read.table(file="/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/df_resultados.txt", header=T, sep="\t")
+library(ggplot2)
+library(gridExtra)
+df_resultados <- read.table(file="/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/df_resultados.txt", header=T, sep="\t")
 ```
 
 ## Objetivo ##
@@ -54,16 +57,16 @@ Onde _p_ é a porcentagem de cobertura vegetal na paisagem. É necessário corri
 
 ### Método C&L09 ###
 
-A aproximação deduzida por Cl09 é $m = \frac{Pd}{\pi A}$, onde P e A são o perímetro e área do plot, respectivamente. Considerando o plot quadrado e a distribuição de Laplace podemos reescrever essa aproximação como:
+A aproximação deduzida por C&L09 é $m = \frac{Pd}{\pi A}$, onde P e A são o perímetro e área do plot, respectivamente. Considerando o plot quadrado e a distribuição de Laplace podemos reescrever essa aproximação como:
 
-$$eq.1a: m = sd  \frac{4}{100 \pi \sqrt{2J/DA} }  $$
-$$eq.1b: sd = m \frac{100 \pi \sqrt{2J/DA}}{4} $$
+$$eq.1a: m = sd  \frac{4}{\pi L }  $$
+$$eq.1b: sd = m \frac{\pi L}{4} $$
 
 Onde $P = 4 L$, $A = L^2$ e $L= 100 \sqrt{J/DA}$ metros 
 
 ### Método Coutinho apud C&L09 ###
 
-Coutinho parte da eq.0 e aproveitando as características da simulação coalescente que utilizamos: a) utiliza apenas plot quadrados; b) a dispersão não é radial, ao invs, é descrita como o resultado do sorteio independente em eixos ortogonais. Assim, podemos escrever a eq.0 como:
+Coutinho parte da eq.0 e aproveitando as características da simulação coalescente que utilizamos: a) utiliza apenas plot quadrados; b) a dispersão não é radial, ao invés, é descrita como o resultado do sorteio independente em eixos ortogonais. Assim, podemos escrever a eq.0 como:
 
 $$eq.0-C.a:  m = \left(\frac{1}{L} \int\limits_{-L/2}^{L/2} m_{x}(x)\mathrm{d}x \right)^2 $$
 $$eq.0-C.b: m_{x} = 1 - \int\limits_{-L/2}^{L/2} K(x-y) \mathrm{d}y  $$
@@ -77,42 +80,9 @@ Para escrever a equação em função do desvio-padrão (eq 2b) utilizamos o ram
 
 ### Comparação dos métodos ###
 
-<!-- Método C&L09 
-i) implementação
-ii) auditoria
--->
+Para comparar os métodos vou utilizar os parâmetros ajustados (modelo de campor médio, por verossimilhança) à SADs amostradas na Mata Atlântica e aqueles estimados por um modelo neutro espacialmente explícito. Todos os vetores de abundância foram observados em amostras com pelo menos 1 ha. As SADs observadas foram ajustado ao modelo de campo médio e obtemos m; no modelo de espaço explícito informamos *a priori* qual o desvio padrão da função de dispersão. Então vamos utilizar as equações 1a e 2a para calcular m a partir dos desvio-padrões informados *a prior*, considerando o m' corrigido. As equações 1b e 2b irão converter m em desvio padrão. Para isso vou criar uma função que contêm as equações e a definição de $\theta$ de Hubbell (2001):
 
-<!-- Método Coutinho 
-i) implementação
-ii) auditoria
--->
-
-<!-- Comparação dos métodos
-i) seleção de modelos
--->
-
-Para comparar os métodos vou utilizar SADs amostradas na Mata Atlântica. Todos os vetores de abundância foram observados em amostras com pelo menos 1 ha. As SADs observadas foram ajustado ao modelo de campo médio e obtemos m; no modelo de espaço explícito informamos *a priori* qual o desvio padrão da função de dispersão. Então vamos utilizar as equações 1a e 2a para calcular m a partir dos desvio-padrões informados *a prior*, considerando o m' corrigido. As equações 1b e 2b iram converter m em desvio padrões. Para isso vou criar uma função que contêm as equações:
-
->Proposta da função:
-Converter um valor de parâmetro em seu correspondente no modelo neutro "oposto". Então: 
-a) par.estimadoVERO_{EI} -> par.{EI} [ (\theta , _m_) -> (_U_ , _K_) ] 
-b) par.estimadoSEMI-ANALITIC/apriori_{EE} -> par.{EI} [(_U_ , _K_) -> (\theta , _m_)]
->Input da função
--númerico, en 4 categorias: theta, m, U K
->parâmetros da função:
--valor: númerico
--par: categorico{theta, m, U K}
--par.aux: = list(J,DA,p)
->Output
--númerico, o valor do parâmetro correspondente do modelo neutro "oposto". Assim, se par = "theta", o output será U.
-
-
-
-
-
-
-
-```{r convesao par, echo=T}
+```{r convesao par, echo=T, tidy=T}
 f_conv.par <- function(modelo, par., par.aux){
   #parametros que seram convertidos
   theta<- par.[[1]]
@@ -126,34 +96,171 @@ f_conv.par <- function(modelo, par., par.aux){
   L <- 100*sqrt(J/DA)
  #conversoes 
   if(modelo == "campo_medio"){ # EI -> EE
-    U_ <- theta/(2*500*p*DA) # Hubbell 2001
-    sd_k.CL <- m * 100*pi*sqrt(2*J/DA)/4 # eq 1b
+    U_ <- theta / (2 * 500 * p * DA) # Hubbell 2001
+    sd_k.CL <- m * L * pi * sqrt(2) / 4 # eq 1b
     sd_K.CaCL <- sqrt(2) * L / (m * lambertW0(-exp(-1/m)/m) + 1) # eq 2b
     df_ <- data.frame(par.value = c(U_, sd_k.CL, sd_K.CaCL),
                       par.class = c("U","sd_k","sd_k"),
                       par.method = c("NA","CL","CaCL"))
     return(df_)
   }else{ # EE -> EI
-    theta_ <- 2*500*p*DA*U # Hubbell 2001
-    m_CL <- 4 * sd_k / ( 100*pi*sqrt(2*J/DA) ) # eq 1a
-    m_CaCL <- sd_k * ( 1-exp(-sqrt(2)*L/sd_k) )/ (sqrt(2)*L/sd_k) # eq 2a
+    theta_ <- 2 * 500 * p * DA * U # Hubbell 2001
+    m_CL <- 4 * sd_k / ( sqrt(2) * L * pi ) # eq 1a
+    m_CaCL <- sd_k * ( 1 -exp( -sqrt(2) * L / sd_k) ) / (sqrt(2) * L / sd_k) # eq 2a
     df_ <- data.frame(par.value = c(theta_, m_CL, m_CaCL),
                       par.class = c("theta","m","m"),
                       par.method = c("NA","CL","CaCL"))
     return(df_)
   }  
 }
-df_temp <- ddply(df_resultados,c("SiteCode","kernel_percentil"),function(X) f_conv.par(modelo = X[,"kernel_percentil"],
-                                                                                       par. = as.list(X[,c("theta","m","sd_k","U")]),
-                                                                                       par.aux = as.list(X[,c("p","J","DA")])
-                                                                                      )
+df_temp <- ddply(df_resultados,c("SiteCode","kernel_percentil"), 
+                 function(X) f_conv.par(modelo = X[,"kernel_percentil"], #cada modelo terá um conjunto diferente de parâmetros
+                                        par. = as.list(X[,c("theta","m","sd_k","U")]), #input dos dados; a ordem é importante
+                                        par.aux = as.list(X[,c("p","J","DA")]) #idem
+                                        )
                  )
-
 ```
 
+#### EI -> EE ####
+
+Vamos avaliar a diferença entre os métodos para as conversões de 'm' para o desvio padrão da função de dispersão [EI -> EE]:
+
+```{r avaliacao EI/EE, message=F, echo=F}
+df_sd_k <- df_temp %>% filter(kernel_percentil == "campo_medio" & par.class != "U") # %>% 
+  #dcast(.,formula = SiteCode + kernel_percentil ~ par.method + par.class, value.var = "par.value")
+df_sd_k %<>% inner_join(x=.,y=df_resultados[,c("SiteCode","kernel_percentil","m","J","DA")],by=c("SiteCode","kernel_percentil"))
+df_sd_k %>% ggplot(aes(x = m, y = log(par.value), colour = par.method)) + geom_point() + geom_smooth(method = "loess",se=F)
+```
+figura 1. Log(sd_k) ~ m * metodo de conversao. CaCL = método Coutinho apud C&L09; CL = equação 2 C&L09. A linha é uma aproximação 'loess' da função geom_smooth (ggplot2).
+
+Os dois métodos tem perfis bem distintos (mesmo fora da escala log), o método CaCL estima vaior variação para valores m -> 1. O terceiro quartil de m = 0.998.
+
+```{r avaliacao EE/EI 2, echo=FALSE, message=F}
+df_sd_k <- df_temp %>% filter(kernel_percentil == "campo_medio" & par.class != "U")  %>% 
+  dcast(.,formula = SiteCode + kernel_percentil ~ par.method + par.class, value.var = "par.value")
+df_sd_k %<>% inner_join(x=.,y=df_resultados[,c("SiteCode","kernel_percentil","m","J","DA")],by=c("SiteCode","kernel_percentil")) %>% mutate(L = 100*sqrt(J/DA))
+car::scatterplotMatrix(~ log(CaCL_sd_k) + log(CL_sd_k) + m + L,
+                       reg.line = F, smoother = F,
+                       data=df_sd_k)
+```
+Figura 2. log(sd_k) * metodo, m e L = lado da amostra
+
+Há clara distinção entre os métodos, os parâmetros convertidos estão plotados na escala log. Vou converter para porcentagem da chuva de propágulos que se mantêm até $l_{cel}$ metros da planta progenitora (%k)
+
+```{r chuva de propagulos EI}
+#preparando os dados
+df_sd_k <- df_temp %>% filter(kernel_percentil == "campo_medio" & par.class != "U")  %>%     
+  inner_join(x=.,y=df_resultados[,c("SiteCode","kernel_percentil","m","J","DA")],by=c("SiteCode","kernel_percentil"))
+
+# funcao para calcular o percentil 
+f_percentil.kernel <- function(i,df_ = df_sd_k){
+  percentilkernel<- function(sigma, density, npoints = 1e5){
+      #metríca da simulacao e distancia de referencia
+      d_ind_MA  <- 100/sqrt(density)
+      # relacao entre sd e o parametro escalar da distribuicao Laplace
+      b_laplace <- sigma / sqrt(2) 
+      # sorteios de duas distribuicoes identicas Laplace em eixos ortogonais
+      X_laplace <- d_ind_MA * round(rlaplace(npoints, s=b_laplace) / d_ind_MA) 
+      Y_laplace <- d_ind_MA * round(rlaplace(npoints, s=b_laplace) / d_ind_MA)
+      #calculando a distancia dos pontos ate a origem
+      dist_laplace <- sqrt(X_laplace^2+Y_laplace^2)
+      #Percemtil
+      percentil <- length(dist_laplace[dist_laplace<=d_ind_MA])/length(dist_laplace)
+      return(percentil)
+  }
+  kernel_percentil <- percentilkernel(sigma = df_[i,"par.value"],
+                                          density = df_[i,"DA"])
+  return(kernel_percentil)
+}
+#armazenando
+df_sd_k$k_perc <- sapply(1:nrow(df_sd_k),f_percentil.kernel) 
+
+#contra-prova
+f_q <- function(i,df=df_sd_k){
+ kernel.quantile<- function(percentil, sigma, density, npoints = 1e5){
+      #metríca da simulacao e distancia de referencia
+      d_ind_MA  <- 100/sqrt(density)
+      # relacao entre sd e o parametro escalar da distribuicao Laplace
+      b_laplace <- sigma / sqrt(2) 
+      # sorteios de duas distribuicoes identicas Laplace em eixos ortogonais
+      X_laplace <- d_ind_MA * round(rlaplace(npoints, s=b_laplace) / d_ind_MA) 
+      Y_laplace <- d_ind_MA * round(rlaplace(npoints, s=b_laplace) / d_ind_MA)
+      #calculando a distancia dos pontos ate a origem
+      dist_laplace <- sqrt(X_laplace^2+Y_laplace^2)
+      #Percemtil
+      k_quantil <- quantile(dist_laplace, probs = percentil)
+      return(k_quantil)
+      }
+ kernel_quantil <- kernel.quantile(percentil = df[i,"k_perc"],  
+                                   sigma = df[i,"par.value"],
+                                   density = df[i,"DA"])
+  return(kernel_quantil)
+} 
+
+df_sd_k$q_perc <- sapply(1:nrow(df_sd_k),f_q)
+# plot(par.value ~ q_perc, data=df_sd_k,main = "Contra-prova do percentil: sd_k X quantile(percentil)")
+df_sd_k %<>% mutate(erro=par.value - q_perc)
+```
+<!--
+figura 3. Contra prova do percentil calculado para os valores de sd_k calculados a partir de m. No ponto os dois métodos estão misturados
+-->
+```{r echo=FALSE}
+# summary(lm(par.value ~ q_perc, data=df_sd_k))
+```
+
+Eu gostaria de tirar a contra prova do valor de percentil estimado. Para isso eu tentei utilizar a função quantile com o percentil estimado pela função anterior, mas parece que eles são muito diferentes. Não sei se cometi algum erro. 
+
+
+Olhando para as estimativas do percentil me parece que faz sentido com os valores estimados em par.value, mesmo que exista um erro consistente na estimativa do par.value. Pensando que em um modelo de campo médio o espaço é desconsiderado da dinâmica.
+
+```{r}
+
+car::scatterplotMatrix(~log(par.value) + m + log(erro), 
+                        reg.line = F, smoother = F,
+                        df_sd_k)
+```
+
+Os valores de par.value (st_k estimado) apresentam dois perfis distintos quando comparado com m, mas um esmo perfil quando compardo com log.erro. Isso quer dizer que o erro entre a estimativa par.value e o quantil do percentil estimado a partir de par.value tem um erro que não é no método de conversão de parâmetros. Como discutido nas funções estabelecidas
 
 
 
 
+
+```{r funcoes chuva de propagulos, echo = FALSE}
+library(rmutil)
+
+qkernel<- function(sigma, kernel, p, density=20852/50, npoints = 1e5){
+    kernel <- match.arg(kernel, choices=c("normal","gaussian","laplace","uniform"))
+    d_ind_MA  <- 100/sqrt(density)
+    if(kernel=="laplace"){
+        b_laplace <- sigma / sqrt(2)
+        X_laplace <- d_ind_MA * round(rlaplace(npoints, s=b_laplace) / d_ind_MA) 
+        Y_laplace <- d_ind_MA * round(rlaplace(npoints, s=b_laplace) / d_ind_MA)
+        dist_laplace <- sqrt(X_laplace^2+Y_laplace^2)
+        result <- quantile(dist_laplace, p)
+    }
+    if(kernel=="normal"|kernel=="gaussian"){
+        b_norm <- sigma 
+        X_norm <- d_ind_MA * round(rnorm(npoints, sd=b_norm) / d_ind_MA)
+        Y_norm <- d_ind_MA * round(rnorm(npoints, sd=b_norm) / d_ind_MA)
+        dist_norm <- sqrt(X_norm^2+Y_norm^2)
+        result <- quantile(dist_norm, p)
+    }
+    if(kernel=="uniform"){
+        b_unif <- sigma/2
+        X_unif <- d_ind_MA * round(runif(npoints, min = -b_unif, max = b_unif) / d_ind_MA)
+        Y_unif <- d_ind_MA * round(runif(npoints, min = -b_unif, max = b_unif) / d_ind_MA)
+        dist_unif <- sqrt(X_unif^2+Y_unif^2)
+        result <- quantile(dist_unif, p)
+    }
+    return(unname(result))
+}
+
+sigkernel <- function(kernel, p, distance, density=20852/50,
+                      npoints =1e5, sigma.min = 1, sigma.max= 100){
+    f1 <- function(x) distance - qkernel(x, kernel, p, density, npoints)
+    uniroot( f1 , lower = sigma.min, upper = sigma.max)
+}
+```
 
 
