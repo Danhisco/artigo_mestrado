@@ -21,6 +21,9 @@ library(dplyr)
 library(ggplot2)
 library(gridExtra)
 df_resultados <- read.table(file="/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/df_resultados.txt", header=T, sep="\t")
+df_resultados$kernel_percentil <- factor(df_resultados$kernel_percentil, levels = levels(df_resultados$kernel_percentil)[c(12:1,13)])
+# df_resultados %>% str
+df_resultados %<>% droplevels() 
 ```
 
 ## Objetivo ##
@@ -113,12 +116,15 @@ f_conv.par <- function(modelo, par., par.aux){
     return(df_)
   }  
 }
-df_temp <- ddply(df_resultados,c("SiteCode","kernel_percentil"), 
-                 function(X) f_conv.par(modelo = X[,"kernel_percentil"], #cada modelo terá um conjunto diferente de parâmetros
-                                        par. = as.list(X[,c("theta","m","sd_k","U")]), #input dos dados; a ordem é importante
-                                        par.aux = as.list(X[,c("p","J","DA")]) #idem
-                                        )
-                 )
+df_par.conv <- ddply(df_resultados,c("SiteCode","kernel_percentil"), 
+                  function(X) f_conv.par(modelo = X[,"kernel_percentil"], #cada modelo terá um conjunto diferente de parâmetros
+                                         par. = as.list(X[,c("theta","m","sd_k","U")]), #input dos dados; a ordem é importante
+                                         par.aux = as.list(X[,c("p","J","DA")]) #idem
+                                         )
+                    )
+# df_par.conv$kernel_percentil <- factor(df_resultados$kernel_percentil, levels = levels(df_resultados$kernel_percentil))
+# df_par.conv$kernel_percentil %>% levels()
+# df_par.conv %>% str
 ```
 
 #### EI -> EE ####
@@ -126,12 +132,11 @@ df_temp <- ddply(df_resultados,c("SiteCode","kernel_percentil"),
 Vamos avaliar a diferença entre os métodos para as conversões de 'm' para o desvio padrão da função de dispersão [EI -> EE]:
 
 ```{r avaliacao EI/EE, message=F, echo=F, fig.height = 4.5 ,fig.width = 5.75}
-df_sd_k <- df_temp %>% filter(kernel_percentil == "campo_medio" & par.class != "U") # %>% 
+df_sd_k <- df_par.conv %>% filter(kernel_percentil == "campo_medio" & par.class != "U") # %>% 
   #dcast(.,formula = SiteCode + kernel_percentil ~ par.method + par.class, value.var = "par.value")
 df_sd_k %<>% inner_join(x=.,y=df_resultados[,c("SiteCode","kernel_percentil","m","J","DA")],by=c("SiteCode","kernel_percentil"))
 df_sd_k %>% ggplot(aes(x = m, y = log(par.value), colour = par.method)) + geom_point() + geom_smooth(method = "loess",se=F) +
   labs(y="log sd_k (desvio padrão da função de dispersão", x='m') + ggtitle(label="m -> sd_k")
-
 ```
 
 figura 1. Log(sd_k) ~ m * metodo de conversao. CaCL = método Coutinho apud C&L09; CL = equação 2 C&L09. A linha é uma aproximação 'loess' da função geom_smooth (ggplot2).
@@ -139,7 +144,7 @@ figura 1. Log(sd_k) ~ m * metodo de conversao. CaCL = método Coutinho apud C&L0
 Os dois métodos tem perfis bem distintos (mesmo fora da escala log), o método CaCL estima vaior variação para valores m -> 1. O terceiro quartil de m = 0.998.
 
 ```{r avaliacao EE/EI 2, echo=FALSE, message=F}
-df_sd_k <- df_temp %>% filter(kernel_percentil == "campo_medio" & par.class != "U")  %>% 
+df_sd_k <- df_par.conv %>% filter(kernel_percentil == "campo_medio" & par.class != "U")  %>% 
   dcast(.,formula = SiteCode + kernel_percentil ~ par.method + par.class, value.var = "par.value")
 df_sd_k %<>% inner_join(x=.,y=df_resultados[,c("SiteCode","kernel_percentil","m","J","DA")],by=c("SiteCode","kernel_percentil")) %>% mutate(L = 100*sqrt(J/DA))
 car::scatterplotMatrix(~ log(CaCL_sd_k) + log(CL_sd_k) + m + L,
@@ -153,7 +158,7 @@ Há clara distinção entre os métodos, os parâmetros convertidos estão plota
 
 ```{r chuva de propagulos EI}
 #preparando os dados
-df_sd_k <- df_temp %>% filter(kernel_percentil == "campo_medio" & par.class != "U")  %>%     
+df_sd_k <- df_par.conv %>% filter(kernel_percentil == "campo_medio" & par.class != "U")  %>%     
   inner_join(x=.,y=df_resultados[,c("SiteCode","kernel_percentil","m","J","DA")],by=c("SiteCode","kernel_percentil"))
 
 # funcao para calcular o percentil 
@@ -206,7 +211,7 @@ df_sd_k$q_perc <- sapply(1:nrow(df_sd_k),f_q)
 df_sd_k %<>% mutate(erro=par.value - q_perc)
 ```
 <!--
-figura 3. Contra prova do percentil calculado para os valores de sd_k calculados a partir de m. No ponto os dois métodos estão misturados
+figura . Contra prova do percentil calculado para os valores de sd_k calculados a partir de m. No ponto os dois métodos estão misturados
 -->
 ```{r echo=FALSE}
 # summary(lm(par.value ~ q_perc, data=df_sd_k))
@@ -219,13 +224,12 @@ Eu gostaria de tirar a contra prova do valor de percentil estimado. Para isso eu
 Olhando para as estimativas do percentil me parece que faz sentido com os valores estimados em par.value, mesmo que exista um erro consistente na estimativa do par.value (fig. Pensando que em um modelo de campo médio o espaço é desconsiderado da dinâmica é de se esperar que a chuva de própagulos.
 
 ```{r fig.height=4,fig.width=6}
-
-car::scatterplotMatrix(~k_perc + m + log(erro), 
+car::scatterplotMatrix(~k_perc + m + log(erro) + log(par.value), 
                         reg.line = F, smoother = F,
                         df_sd_k)
 ```
 
-fig. 3.k_perc = porcentagem estimada a partir do sd_k calculado, m = parêmetro modelo neutro, log.erro = log( diff (par.value[sd_k calculado] - quantile(.,k_perc,l_cel)) )
+__figura3__ .k_perc = porcentagem estimada a partir do sd_k calculado, m = parêmetro modelo neutro, log.erro = log( diff (par.value[sd_k calculado] - quantile(.,k_perc,l_cel)) ) log.par.value = log (estimativa de sd_k calculado a partir de m)
 
 
 Os valores de par.value (st_k estimado) apresentam dois perfis distintos quando comparado com m, mas um esmo perfil quando compardo com log.erro. Isso quer dizer que o erro entre a estimativa par.value e o quantil do percentil estimado a partir de par.value tem um erro que não é no método de conversão de parâmetros. Como discutido nas funções estabelecidas
@@ -234,8 +238,8 @@ Os valores de par.value (st_k estimado) apresentam dois perfis distintos quando 
 
 Agora vamos avaliar a conversão de parâmetros sd_k da simulação coalescente para o respectivo m do modelo de campo médio. Vou olhar os dados antes de corrigir o m (eq.0'). Aqui também é possível comparar os valores obtidos pelas conversões com aqueles estimados nas $SAD_{EE}$. Eu tenho esses dados, eles estão no git, eu deixei meu computador rodando isso enquanto eu trabalhava no TreeCo. 
 
-```{r echo=F}
-df_m <- df_temp %>% filter(kernel_percentil != "campo_medio" & par.class != "theta")  %>%     
+```{r df_m, echo=F}
+df_m <- df_par.conv %>% filter(kernel_percentil != "campo_medio" & par.class != "theta")  %>%     
   inner_join(x=.,y=df_resultados[,c("SiteCode","kernel_percentil","sd_k","J","DA")],by=c("SiteCode","kernel_percentil"))
 ```
 
@@ -260,10 +264,47 @@ df_m %>% dcast(.,formula = SiteCode + kernel_percentil ~ par.method + par.class,
   ggplot(aes(x=kernel_percentil,y=par.diff)) + geom_point() + geom_smooth(method = 'loess') + labs(x="porcentagem de propágulos", y = "diff_m = CaCL - CL")
 ```
 
-fig 5. difença no valor calculado pelos dois métodos e a correspondente porcentagem de propágulos.
+figura 6. difença no valor calculado pelos dois métodos e a correspondente porcentagem de propágulos.
 
 A escala muda entre os paineis: em 0.25 varia de 0.015 até 0.397; no último painel varia de 0.001 até 0.009; a variação dos pontos diminui com o aumento da limitação à dispersão.   
 
+
+### EE <-> EI ###
+
+**-> theta ~ m**
+
+```{r theta e m, echo=F}
+# add % cobertura vegetal
+df_par.conv %<>% inner_join(x=.,y=df_resultados[,1:3],by=c("SiteCode","kernel_percentil"))
+df_par.conv$par.method <- factor(df_par.conv$par.method,levels = c("verossimilhanca","CL","CaCL","Hubbell","NA"))
+df_par.conv[df_par.conv$par.method == "NA","par.method"] <- "Hubbell" # Hubbell 2001 theta := 2 * 500 * p * DA * U 
+
+# adaptando os dados
+df_temp <- melt(filter(df_resultados[,c(1:3,10:11)], # SiteCode, %k, p, theta, m
+                       kernel_percentil == "campo_medio"), 
+      id.vars = c("SiteCode","kernel_percentil","p"),
+      variable.name = "par.class", # formato de df_par.conv
+      value.name = "par.value")
+df_temp$par.method <- "verossimilhanca"
+df_temp$par.method %<>% factor
+
+# inner_join
+# for(i in c(1:2,4:5)){
+#   df_par.conv[,i] %<>% as.character()
+# }
+# for(i in c(1:2,4,6)){
+#   df_temp[,i] %<>% as.character()
+# }
+
+df_theta.m <- merge(x=filter(df_par.conv,par.class %in% c("theta","m") ), y=df_temp, all = T)
+df_theta.m %>% str
+
+df_par.conv %>% str
+df_temp %>% str
+
+filter(df_par.conv,par.class %in% c("theta","m") ) %>% str
+df_temp %>% str
+```
 
 
 
