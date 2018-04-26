@@ -125,11 +125,13 @@ df_temp <- ddply(df_resultados,c("SiteCode","kernel_percentil"),
 
 Vamos avaliar a diferença entre os métodos para as conversões de 'm' para o desvio padrão da função de dispersão [EI -> EE]:
 
-```{r avaliacao EI/EE, message=F, echo=F, fig.height = 6 ,fig.width = 9}
+```{r avaliacao EI/EE, message=F, echo=F, fig.height = 4.5 ,fig.width = 5.75}
 df_sd_k <- df_temp %>% filter(kernel_percentil == "campo_medio" & par.class != "U") # %>% 
   #dcast(.,formula = SiteCode + kernel_percentil ~ par.method + par.class, value.var = "par.value")
 df_sd_k %<>% inner_join(x=.,y=df_resultados[,c("SiteCode","kernel_percentil","m","J","DA")],by=c("SiteCode","kernel_percentil"))
-df_sd_k %>% ggplot(aes(x = m, y = log(par.value), colour = par.method)) + geom_point() + geom_smooth(method = "loess",se=F)
+df_sd_k %>% ggplot(aes(x = m, y = log(par.value), colour = par.method)) + geom_point() + geom_smooth(method = "loess",se=F) +
+  labs(y="log sd_k (desvio padrão da função de dispersão", x='m') + ggtitle(label="m -> sd_k")
+
 ```
 
 figura 1. Log(sd_k) ~ m * metodo de conversao. CaCL = método Coutinho apud C&L09; CL = equação 2 C&L09. A linha é uma aproximação 'loess' da função geom_smooth (ggplot2).
@@ -223,35 +225,99 @@ car::scatterplotMatrix(~k_perc + m + log(erro),
                         df_sd_k)
 ```
 
-fig. 3. % da Chuva de propagulos . ~ Log(par_calculado) + m + log(diferença entre o quantil calculado pelas equações (sd_k) e o resultado da função quantile para o quantile)
+fig. 3.k_perc = porcentagem estimada a partir do sd_k calculado, m = parêmetro modelo neutro, log.erro = log( diff (par.value[sd_k calculado] - quantile(.,k_perc,l_cel)) )
 
 
 Os valores de par.value (st_k estimado) apresentam dois perfis distintos quando comparado com m, mas um esmo perfil quando compardo com log.erro. Isso quer dizer que o erro entre a estimativa par.value e o quantil do percentil estimado a partir de par.value tem um erro que não é no método de conversão de parâmetros. Como discutido nas funções estabelecidas
 
 #### EE -> EI ####
 
-Agora vamos avaliar a conversão de parâmetros sd_k da simulação coalescente para o respectivo m do modelo de campo médio. Vou olhar os dados antes de corrigir o m (eq.0')
+Agora vamos avaliar a conversão de parâmetros sd_k da simulação coalescente para o respectivo m do modelo de campo médio. Vou olhar os dados antes de corrigir o m (eq.0'). Aqui também é possível comparar os valores obtidos pelas conversões com aqueles estimados nas $SAD_{EE}$. Eu tenho esses dados, eles estão no git, eu deixei meu computador rodando isso enquanto eu trabalhava no TreeCo. 
 
 ```{r echo=F}
 df_m <- df_temp %>% filter(kernel_percentil != "campo_medio" & par.class != "theta")  %>%     
   inner_join(x=.,y=df_resultados[,c("SiteCode","kernel_percentil","sd_k","J","DA")],by=c("SiteCode","kernel_percentil"))
 ```
 
+```{r fig 4 par.value(m) X kernel percentil, echo=FALSE, fig.height=6,fig.width=8}
+df_m %>% ggplot(aes(x=par.method,y=par.value, colour=par.method)) + geom_jitter() + geom_boxplot() + facet_wrap(~kernel_percentil, ncol=6, scales = "free") +
+  labs(x = "método de calculo", y = "m") + ggtitle(label="sd_k -> m",subtitle = "%k - porcentagem de propágulos (título dos paineis)")
+```
+
+figura 4. Relação o m calulado pelas equações 1a e 2a e a porcentagem de propágulos correspondete ao desvio padrão da função de dispersão. 
+
+```{r figura 5, echo=F}
+df_m %>% ggplot(aes(x=sd_k,y=par.value, colour=par.method)) + geom_point() + geom_smooth(method = "loess") + facet_wrap(~kernel_percentil, ncol=6, scales = "free") +
+  labs(x = "desvio-padrão da função de dispersão", y = "m") + ggtitle(label="sd_k -> m", subtitle = "~ %k")
+```
+
+figura 5. m ~ sd_k + %k + método de calculo
+
+
+```{r fig6, fig.height=3,fig.width=3, echo=F}
+# ddply(df_m,"kernel_percentil",.fun = function(X) sqrt(var(X$par.value))/mean(X$par.value) ) # coef. de variância
+df_m %>% dcast(.,formula = SiteCode + kernel_percentil ~ par.method + par.class, value.var = "par.value") %>% mutate(par.diff = CaCL_m - CL_m) %>% 
+  ggplot(aes(x=kernel_percentil,y=par.diff)) + geom_point() + geom_smooth(method = 'loess') + labs(x="porcentagem de propágulos", y = "diff_m = CaCL - CL")
+```
+
+fig 5. difença no valor calculado pelos dois métodos e a correspondente porcentagem de propágulos.
+
+A escala muda entre os paineis: em 0.25 varia de 0.015 até 0.397; no último painel varia de 0.001 até 0.009; a variação dos pontos diminui com o aumento da limitação à dispersão.   
 
 
 
-```{r funcoes chuva de propagulos, echo = FALSE}
+
+
+ANEXO: formulas que estimam o sd_k necessário para que uma determinada porcentagem dos propágulos permaneça até $l_{cel}$
+
+
+```{r }
 library(rmutil)
 
+#' Kernel quantile
+#'
+#' Returns the quantile value that acumulates a given percentile of
+#' the density of three types of dispersion kernels in a simulation of
+#' a spatially explicit neutral dynamics (Rosindell et al. 2008).
+#'
+#' @param sigma real positive, the dispersion parameter of the kernel. For
+#'     uniform it is the total width of the kernel (max - min), and for
+#'     gaussian and laplacian kernels sigma is the standard deviation.
+#' @param kernel character, either "normal", "uniform" or "laplacian";
+#'     the kernel type. See Rosindell et al. (2008) for details.
+#' @param p real 0 < p > 1; the accumulated probability from the kernel
+#'     center.
+#' @param density real positive, the density of individual in the
+#'     simulation grid, in individuals/hectare
+#' @return kernel quantile, which is the distance in meters from the kernel
+#'     center that encompasses a proportion p of total kernel
+#'     density. For example, p = 0.5 returns the median dispersal
+#'     distance.
+#' @param npoints non-negative integer, number of distance points to
+#'     simulate.
+#' @details This function simulates the sampling of dispersion
+#'     distances from the kernel as outlined by Rosindell et al
+#'     (2008), which is not the same as a bivariate version of each
+#'     distribution (e.g. a bivariate normal, laplacian,
+#'     uniform). Rather, X and Y coordinates are sampled independently
+#'     and the used to find the dispersal distance. Though an
+#'     analytical solution might be feasible, this function uses the
+#'     random sample functions of the univariate distributions and
+#'     empirical quantile functions and so provides approximate values.
+#' @references Rosindell J, Wong Y, Etienne RS, 2008, A coalescence
+#' approach to spatial neutral ecology, Ecological Informatics, Vol: 3,
+#' Pages: 259-271 
 qkernel<- function(sigma, kernel, p, density=20852/50, npoints = 1e5){
     kernel <- match.arg(kernel, choices=c("normal","gaussian","laplace","uniform"))
-    d_ind_MA  <- 100/sqrt(density)
+    ##metro na escala da simulacao
+    d_ind_MA  <- 100/sqrt(density) #100/sqrt(DA)
     if(kernel=="laplace"){
-        b_laplace <- sigma / sqrt(2)
+        b_laplace <- sigma / sqrt(2) ## relação entre sigma e b, a variância da laplaciana
+        ## gerando valores de uma distribuição laplaciana e convertendo para a distância em metros
         X_laplace <- d_ind_MA * round(rlaplace(npoints, s=b_laplace) / d_ind_MA) 
-        Y_laplace <- d_ind_MA * round(rlaplace(npoints, s=b_laplace) / d_ind_MA)
-        dist_laplace <- sqrt(X_laplace^2+Y_laplace^2)
-        result <- quantile(dist_laplace, p)
+        Y_laplace <- d_ind_MA * round(rlaplace(npoints, s=b_laplace) / d_ind_MA) # idem para Y
+        dist_laplace <- sqrt(X_laplace^2+Y_laplace^2) #distâncias dos pontos até a origem
+        result <- quantile(dist_laplace, p) #guardando
     }
     if(kernel=="normal"|kernel=="gaussian"){
         b_norm <- sigma 
@@ -270,11 +336,36 @@ qkernel<- function(sigma, kernel, p, density=20852/50, npoints = 1e5){
     return(unname(result))
 }
 
+#' Finds kernel dispersal parameter
+#'
+#' Returns dispersal parameter of three types of kernel that
+#' accumulates a proportion of the kernel density up to a given distance.
+#'
+#' @param kernel character, either "normal", "uniform" or "laplacian";
+#'     the kernel type. See Rosindell et al. (2008) for details.
+#' @param p real 0 < p > 1; the accumulated probability from the kernel
+#'     center.
+#' @param distance real positive, the quantile that should accumulate
+#'     p (for instance, if p=0.5 distance is the median distance)
+#' @param density real positive, the density of individual in the
+#'     simulation grid, in individuals/hectare
+#' @param npoints non-negative integer, number of distance points to
+#'     simulate.
+#' @param sigma.min real positive, the minimum value of the dispersal
+#'     value to try in the one-dimensional optmisation.
+#' @param sigma.max real positive, the maximum value of the dispersal
+#'     value to try in the one-dimensional optmisation.
+#' @return the output of function uniroot, which is a list. The
+#'     element 'root' of the list is the dispersal parameter necessary for the kernel having
+#'     dist as the quantile for p. For example, p = 0.5  and dist =10
+#'     returns the dispersal parameter such that the median dispersal
+#'     distance is 10 meters. The solution is not exact because of
+#'     rounding values to cell sizes of the simulation grid.
 sigkernel <- function(kernel, p, distance, density=20852/50,
                       npoints =1e5, sigma.min = 1, sigma.max= 100){
     f1 <- function(x) distance - qkernel(x, kernel, p, density, npoints)
     uniroot( f1 , lower = sigma.min, upper = sigma.max)
 }
+  
 ```
-
 
