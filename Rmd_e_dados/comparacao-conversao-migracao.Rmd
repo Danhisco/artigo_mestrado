@@ -8,7 +8,7 @@ output:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE,tidy = TRUE, cache = TRUE)
+knitr::opts_chunk$set(echo = TRUE,tidy = TRUE, cache = TRUE, fig.height = 6 ,fig.width = 9)
 ```
 
 ```{r global packages, echo=FALSE, message = FALSE, warning=FALSE}
@@ -125,12 +125,13 @@ df_temp <- ddply(df_resultados,c("SiteCode","kernel_percentil"),
 
 Vamos avaliar a diferença entre os métodos para as conversões de 'm' para o desvio padrão da função de dispersão [EI -> EE]:
 
-```{r avaliacao EI/EE, message=F, echo=F}
+```{r avaliacao EI/EE, message=F, echo=F, fig.height = 6 ,fig.width = 9}
 df_sd_k <- df_temp %>% filter(kernel_percentil == "campo_medio" & par.class != "U") # %>% 
   #dcast(.,formula = SiteCode + kernel_percentil ~ par.method + par.class, value.var = "par.value")
 df_sd_k %<>% inner_join(x=.,y=df_resultados[,c("SiteCode","kernel_percentil","m","J","DA")],by=c("SiteCode","kernel_percentil"))
 df_sd_k %>% ggplot(aes(x = m, y = log(par.value), colour = par.method)) + geom_point() + geom_smooth(method = "loess",se=F)
 ```
+
 figura 1. Log(sd_k) ~ m * metodo de conversao. CaCL = método Coutinho apud C&L09; CL = equação 2 C&L09. A linha é uma aproximação 'loess' da função geom_smooth (ggplot2).
 
 Os dois métodos tem perfis bem distintos (mesmo fora da escala log), o método CaCL estima vaior variação para valores m -> 1. O terceiro quartil de m = 0.998.
@@ -143,6 +144,7 @@ car::scatterplotMatrix(~ log(CaCL_sd_k) + log(CL_sd_k) + m + L,
                        reg.line = F, smoother = F,
                        data=df_sd_k)
 ```
+
 Figura 2. log(sd_k) * metodo, m e L = lado da amostra
 
 Há clara distinção entre os métodos, os parâmetros convertidos estão plotados na escala log. Vou converter para porcentagem da chuva de propágulos que se mantêm até $l_{cel}$ metros da planta progenitora (%k)
@@ -206,22 +208,34 @@ figura 3. Contra prova do percentil calculado para os valores de sd_k calculados
 -->
 ```{r echo=FALSE}
 # summary(lm(par.value ~ q_perc, data=df_sd_k))
+# summary(lm(log(par.value) ~ log(q_perc), data=df_sd_k))
 ```
 
-Eu gostaria de tirar a contra prova do valor de percentil estimado. Para isso eu tentei utilizar a função quantile com o percentil estimado pela função anterior, mas parece que eles são muito diferentes. Não sei se cometi algum erro. 
+Eu gostaria de tirar a contra prova do valor de percentil estimado. Para isso eu tentei utilizar a função quantile com o percentil estimado pela função anterior, mas parece que eles são muito diferentes. Não sei se cometi algum erro. Estava pensando se não era possível deduzir uma formula, agora que o Coutinho fez as eq.0-C, eu acho que talvez ficasse mais fácil, eu tava pensando em mexer nisso.  
 
 
-Olhando para as estimativas do percentil me parece que faz sentido com os valores estimados em par.value, mesmo que exista um erro consistente na estimativa do par.value. Pensando que em um modelo de campo médio o espaço é desconsiderado da dinâmica.
+Olhando para as estimativas do percentil me parece que faz sentido com os valores estimados em par.value, mesmo que exista um erro consistente na estimativa do par.value (fig. Pensando que em um modelo de campo médio o espaço é desconsiderado da dinâmica é de se esperar que a chuva de própagulos.
 
-```{r}
+```{r fig.height=4,fig.width=6}
 
-car::scatterplotMatrix(~log(par.value) + m + log(erro), 
+car::scatterplotMatrix(~k_perc + m + log(erro), 
                         reg.line = F, smoother = F,
                         df_sd_k)
 ```
 
+fig. 3. % da Chuva de propagulos . ~ Log(par_calculado) + m + log(diferença entre o quantil calculado pelas equações (sd_k) e o resultado da função quantile para o quantile)
+
+
 Os valores de par.value (st_k estimado) apresentam dois perfis distintos quando comparado com m, mas um esmo perfil quando compardo com log.erro. Isso quer dizer que o erro entre a estimativa par.value e o quantil do percentil estimado a partir de par.value tem um erro que não é no método de conversão de parâmetros. Como discutido nas funções estabelecidas
 
+#### EE -> EI ####
+
+Agora vamos avaliar a conversão de parâmetros sd_k da simulação coalescente para o respectivo m do modelo de campo médio. Vou olhar os dados antes de corrigir o m (eq.0')
+
+```{r echo=F}
+df_m <- df_temp %>% filter(kernel_percentil != "campo_medio" & par.class != "theta")  %>%     
+  inner_join(x=.,y=df_resultados[,c("SiteCode","kernel_percentil","sd_k","J","DA")],by=c("SiteCode","kernel_percentil"))
+```
 
 
 
