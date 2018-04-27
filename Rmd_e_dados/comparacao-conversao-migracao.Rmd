@@ -23,7 +23,7 @@ library(gridExtra)
 df_resultados <- read.table(file="/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/df_resultados.txt", header=T, sep="\t")
 df_resultados$kernel_percentil <- factor(df_resultados$kernel_percentil, levels = levels(df_resultados$kernel_percentil)[c(12:1,13)])
 # df_resultados %>% str
-df_resultados %<>% droplevels() 
+# df_resultados %<>% droplevels() 
 ```
 
 ## Objetivo ##
@@ -135,8 +135,15 @@ Vamos avaliar a diferença entre os métodos para as conversões de 'm' para o d
 df_sd_k <- df_par.conv %>% filter(kernel_percentil == "campo_medio" & par.class != "U") # %>% 
   #dcast(.,formula = SiteCode + kernel_percentil ~ par.method + par.class, value.var = "par.value")
 df_sd_k %<>% inner_join(x=.,y=df_resultados[,c("SiteCode","kernel_percentil","m","J","DA")],by=c("SiteCode","kernel_percentil"))
-df_sd_k %>% ggplot(aes(x = m, y = log(par.value), colour = par.method)) + geom_point() + geom_smooth(method = "loess",se=F) +
-  labs(y="log sd_k (desvio padrão da função de dispersão", x='m') + ggtitle(label="m -> sd_k")
+
+l_p <- vector("list",length = 2)
+l_p[[1]] <- ggplot(df_sd_k,aes(x = m, y = par.value, colour = par.method)) + 
+  geom_point() + geom_smooth(method = "loess",se=F) + 
+  labs(y="sd_k (desvio padrão da função de dispersão)", x='m') + ggtitle(label="m -> sd_k") + theme(legend.position="none")
+l_p[[2]] <- ggplot(df_sd_k,aes(x = m, y = log(par.value), colour = par.method)) + 
+  geom_point() + geom_smooth(method = "loess",se=F) +
+  labs(y="log sd_k (desvio padrão da função de dispersão)", x='m') + ggtitle(label="m -> log.sd_k")
+do.call("grid.arrange",c(l_p,ncol=2,nrow=1))
 ```
 
 figura 1. Log(sd_k) ~ m * metodo de conversao. CaCL = método Coutinho apud C&L09; CL = equação 2 C&L09. A linha é uma aproximação 'loess' da função geom_smooth (ggplot2).
@@ -297,8 +304,16 @@ df_temp$par.method %<>% factor
 # }
 
 df_theta.m <- merge(x=filter(df_par.conv,par.class %in% c("theta","m") ), y=df_temp, all = T)
-df_theta.m %>% str
+df_theta.m$m.value <- df_theta.m$par.value
+df_theta.m$theta.value <- df_theta.m$par.value
+filter(df_theta.m,)
 
+
+ddply(.variables = )
+# %>% 
+#   dcast(.,formula = SiteCode + kernel_percentil ~ par.class, value.var = "par.value")
+df_theta.m %>% head()
+  
 df_par.conv %>% str
 df_temp %>% str
 
