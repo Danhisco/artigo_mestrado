@@ -62,8 +62,12 @@ Onde _p_ é a porcentagem de cobertura vegetal na paisagem. É necessário corri
 
 A aproximação deduzida por C&L09 é $m = \frac{Pd}{\pi A}$, onde P e A são o perímetro e área do plot, respectivamente. Considerando o plot quadrado e a distribuição de Laplace podemos reescrever essa aproximação como:
 
-$$eq.1a: m = sd  \frac{4}{\pi L }  $$
-$$eq.1b: sd = m \frac{\pi L}{4} $$
+<!--
+m_CL <- 4 * sd_k / ( sqrt(2) * L * pi ) # eq 1a
+sd_k.CL <- m * L * pi * sqrt(2) / 4 # eq 1b
+-->
+
+$$eq.1: m = sd  \frac{4}{L \pi \sqrt{2}  }  $$
 
 Onde $P = 4 L$, $A = L^2$ e $L= 100 \sqrt{J/DA}$ metros 
 
@@ -72,11 +76,18 @@ Onde $P = 4 L$, $A = L^2$ e $L= 100 \sqrt{J/DA}$ metros
 Coutinho parte da eq.0 e aproveitando as características da simulação coalescente que utilizamos: a) utiliza apenas plot quadrados; b) a dispersão não é radial, ao invés, é descrita como o resultado do sorteio independente em eixos ortogonais. Assim, podemos escrever a eq.0 como:
 
 $$eq.0-C.a:  m = \left(\frac{1}{L} \int\limits_{-L/2}^{L/2} m_{x}(x)\mathrm{d}x \right)^2 $$
+
 $$eq.0-C.b: m_{x} = 1 - \int\limits_{-L/2}^{L/2} K(x-y) \mathrm{d}y  $$
 
 K é a função de dispersão. Podemos reescrevemos considerando a distribuição de probabilidade de Laplace como:
 
+<!--
+m_CaCL <- sd_k * ( 1 -exp( -sqrt(2) * L / sd_k) ) / (sqrt(2) * L / sd_k) # eq 2a
+-->
 $$eq. 2a: m = sd \frac{1 - e^{-\frac{\sqrt{2} L}{sd}} }{\sqrt{2} L}$$
+<!--
+sd_K.CaCL <- sqrt(2) * L / (m * lambertW0(-exp(-1/m)/m) + 1) # eq 2b
+-->
 $$ eq. 2b: sd = \frac{\sqrt{2} L}{m W_{0}(- \frac{e^{-1/m}}{m} ) + 1} $$
 
 Para escrever a equação em função do desvio-padrão (eq 2b) utilizamos o ramo principal da função W de Lambert ($W_0$).
@@ -104,7 +115,7 @@ f_conv.par <- function(modelo, par., par.aux){
     sd_K.CaCL <- sqrt(2) * L / (m * lambertW0(-exp(-1/m)/m) + 1) # eq 2b
     df_ <- data.frame(par.value = c(U_, sd_k.CL, sd_K.CaCL),
                       par.class = c("U","sd_k","sd_k"),
-                      par.method = c("NA","CL","CaCL"))
+                      par.method = c("H01","CL","CaCL"))
     return(df_)
   }else{ # EE -> EI
     theta_ <- 2 * 500 * p * DA * U # Hubbell 2001
@@ -112,7 +123,7 @@ f_conv.par <- function(modelo, par., par.aux){
     m_CaCL <- sd_k * ( 1 -exp( -sqrt(2) * L / sd_k) ) / (sqrt(2) * L / sd_k) # eq 2a
     df_ <- data.frame(par.value = c(theta_, m_CL, m_CaCL),
                       par.class = c("theta","m","m"),
-                      par.method = c("NA","CL","CaCL"))
+                      par.method = c("H01","CL","CaCL"))
     return(df_)
   }  
 }
@@ -122,31 +133,47 @@ df_par.conv <- ddply(df_resultados,c("SiteCode","kernel_percentil"),
                                          par.aux = as.list(X[,c("p","J","DA")]) #idem
                                          )
                     )
+df_par.conv
 # df_par.conv$kernel_percentil <- factor(df_resultados$kernel_percentil, levels = levels(df_resultados$kernel_percentil))
 # df_par.conv$kernel_percentil %>% levels()
 # df_par.conv %>% str
 ```
 
+Esperamos que os métodos de conversão tenham valores próximos quando a relação entre L/d -> 100; d é a distância média de dispersão, que para a distribuição Laplace é igual sd/sqrt(2). 
+
 #### EI -> EE ####
 
 Vamos avaliar a diferença entre os métodos para as conversões de 'm' para o desvio padrão da função de dispersão [EI -> EE]:
 
-```{r avaliacao EI/EE, message=F, echo=F, fig.height = 4.5 ,fig.width = 5.75}
+```{r avaliacao EI/EE, message=F, echo=F}
+# preparando dados # fig.height = 4.5 ,fig.width = 5.75
 df_sd_k <- df_par.conv %>% filter(kernel_percentil == "campo_medio" & par.class != "U") # %>% 
   #dcast(.,formula = SiteCode + kernel_percentil ~ par.method + par.class, value.var = "par.value")
 df_sd_k %<>% inner_join(x=.,y=df_resultados[,c("SiteCode","kernel_percentil","m","J","DA")],by=c("SiteCode","kernel_percentil"))
 
-l_p <- vector("list",length = 2)
+# graficos #
+l_p <- vector("list",length = 3)
+# sd_k ~ m * metodo
 l_p[[1]] <- ggplot(df_sd_k,aes(x = m, y = par.value, colour = par.method)) + 
   geom_point() + geom_smooth(method = "loess",se=F) + 
-  labs(y="sd_k (desvio padrão da função de dispersão)", x='m') + ggtitle(label="m -> sd_k") + theme(legend.position="none")
+  scale_y_continuous(labels = function(x) format(x, scientific = TRUE)) +
+  labs(y="sd_k", x='m') + ggtitle(label="m -> sd_k") + theme(legend.position="none")
+# log(sd_k) ~ m * metodo
 l_p[[2]] <- ggplot(df_sd_k,aes(x = m, y = log(par.value), colour = par.method)) + 
   geom_point() + geom_smooth(method = "loess",se=F) +
-  labs(y="log sd_k (desvio padrão da função de dispersão)", x='m') + ggtitle(label="m -> log.sd_k")
-do.call("grid.arrange",c(l_p,ncol=2,nrow=1))
+  labs(y="", x='m') + ggtitle(label="m -> log.sd_k")
+# diferenca metodos ~ w/d # sd_k.CaCL - sd_k.CL ~ L / ( mean(sd_k) / sqrt(2) ) 
+l_p[[3]] <- ddply(df_sd_k,c("SiteCode","J","DA"),summarise, diff.metodos = diff(par.value), mean.sd_k = mean(par.value)) %>% 
+  mutate(w_d = 100 * sqrt(J/DA)/(mean.sd_k/sqrt(2))) %>% ggplot(aes(x=w_d,y=log(diff.metodos))) + geom_point() +
+  labs(x="L / ( mean(sd_k) / sqrt(2) ) ",y="log(CaCL - CL)")
+# arranjo 
+grid.arrange(l_p[[1]], l_p[[2]], l_p[[3]],
+             layout_matrix = rbind(c(rep(1,3),rep(2,4)),
+                                   c(NA,NA,rep(3,3),NA,NA)) 
+             )
 ```
 
-figura 1. Log(sd_k) ~ m * metodo de conversao. CaCL = método Coutinho apud C&L09; CL = equação 2 C&L09. A linha é uma aproximação 'loess' da função geom_smooth (ggplot2).
+figura 1. Desvio-padrão (sd_k) estimado pelas equações 1 (método CL) e 2.b (método CaCL). 1o painel = sd_k ~ m; 2o painel: log(sd_k) ~ m; 3o painel: log da diferença entre os métodos e a razão entre o lado da amostra (L) e a distância média de dispersão (mean(sd_k)/sqrt(2)). mean(sd_k) é a média dos sd_k obtidos pelos dois métodos, a divição por sqrt(2) é para transformar no parâmetro escalar da distribuição de Laplace.
 
 Os dois métodos tem perfis bem distintos (mesmo fora da escala log), o método CaCL estima vaior variação para valores m -> 1. O terceiro quartil de m = 0.998.
 
@@ -162,6 +189,8 @@ car::scatterplotMatrix(~ log(CaCL_sd_k) + log(CL_sd_k) + m + L,
 Figura 2. log(sd_k) * metodo, m e L = lado da amostra
 
 Há clara distinção entre os métodos, os parâmetros convertidos estão plotados na escala log. Vou converter para porcentagem da chuva de propágulos que se mantêm até $l_{cel}$ metros da planta progenitora (%k)
+
+** Chuva de propágulos modelo EI **
 
 ```{r chuva de propagulos EI}
 #preparando os dados
@@ -185,7 +214,7 @@ f_percentil.kernel <- function(i,df_ = df_sd_k){
       return(percentil)
   }
   kernel_percentil <- percentilkernel(sigma = df_[i,"par.value"],
-                                          density = df_[i,"DA"])
+                                      density = df_[i,"DA"])
   return(kernel_percentil)
 }
 #armazenando
@@ -215,7 +244,7 @@ f_q <- function(i,df=df_sd_k){
 
 df_sd_k$q_perc <- sapply(1:nrow(df_sd_k),f_q)
 # plot(par.value ~ q_perc, data=df_sd_k,main = "Contra-prova do percentil: sd_k X quantile(percentil)")
-df_sd_k %<>% mutate(erro=par.value - q_perc)
+  df_sd_k %<>% mutate(erro=par.value - q_perc)
 ```
 <!--
 figura . Contra prova do percentil calculado para os valores de sd_k calculados a partir de m. No ponto os dois métodos estão misturados
