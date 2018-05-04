@@ -215,7 +215,7 @@ figura 3. difença no valor calculado pelos dois métodos e a razão L / (sd_k /
 
 Utilizamos apenas um método para converter $\theta$ e U, a definição apresentada em Hubbell (2001): $\theta = 2 J_{M}U$. Consideramos que $J_{M} = A_{paisagem} DA p$. 
 
-```{r df_theta, echo = F}
+```{r df_theta e fig 4, echo = F}
 # dados
 df_theta <- df_par.conv %>% filter(par.class == "theta") %>% select(-par.method) %>% # apenas os valores de theta
   dcast(.,formula = SiteCode + kernel_percentil + p + S + DA + J ~ par.class, value.var="par.value") %>%  # transformando theta em coluna
@@ -230,15 +230,36 @@ df_theta %>% ggplot(aes(x=p,y=theta)) + geom_point() + geom_smooth(method = 'loe
 figura 4. $\theta$ ~ p + (~kernel_percentil). Cada painel corresponde ao percentil de propágulos que permanece até $l_{cel}$ metros da planta progenitora. O último painel 'campo_medio' corresponde ao $\theta$ obtido pelo ajuste da formula de Etienne (2005) às SADs observadas.
 
 
-```{r}
+```{r figura 5}
 df_theta %>% mutate(p_class = cut(p,12)) %>% ggplot(aes(x=kernel_percentil,y=theta,group=SiteCode,colour=SiteCode)) + 
   geom_point() + geom_line() + scale_y_continuous(labels = function(x) format(x,scientific = T)) + 
   theme(legend.position = "none") +
   facet_wrap(~p_class, ncol=3,scales="free")
 ```
-
+figura 5. $\theta$ ~ kernel_percentil + (~p_class). p_class = cut(p,12). Os pontos e linhas estão coloridos pelo Site. 
 
 ### U ###
+
+```{r df_U e fig 6, echo=F}
+# dados
+df_U <- df_par.conv %>% filter(par.class == "U") %>% select(-par.method) %>% # apenas os valores de U
+  dcast(.,formula = SiteCode + kernel_percentil + p + S + DA + J ~ par.class, value.var="par.value") %>%  # transformando theta em coluna
+  rbind.fill(x=.,y=df_resultados[df_resultados$kernel_percentil != "campo_medio",c(1:6,8)]) # combinando com theta estimado do campo medio
+
+# grafico
+df_U %>% ggplot(aes(x=p,y=U)) + geom_point() + geom_smooth(method = 'loess',se=F,colour="red") +
+  # scale_y_continuous(labels = function(x) format(x,scientific = TRUE)) +
+  facet_wrap(~kernel_percentil,nrow = 3,scales="free")
+```
+figura 6. U ~ p + (~kernel_percentil)
+
+```{r fig 7, echo =FALSE}
+df_U %>% mutate(p_class = cut(p,12)) %>% ggplot(aes(x=kernel_percentil,y=U,group=SiteCode,colour=SiteCode)) + 
+  geom_point() + geom_line() + scale_y_continuous(labels = function(x) format(x,scientific = T)) + 
+  theme(legend.position = "none") +
+  facet_wrap(~p_class, ncol=3,scales="free")
+```
+
 
 **-> theta ~ m**
 
