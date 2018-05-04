@@ -136,11 +136,12 @@ df_par.conv <- ddply(df_resultados,c("SiteCode","kernel_percentil"),
                                          )
                     )
 
+df_par.conv %<>% inner_join(x.,y=df_resultados[,c(1:6)], by=c("SiteCode","kernel_percentil"))
 ```
 
 Esperamos que os métodos de conversão tenham valores próximos quando a relação entre L/d -> 100; d é a distância média de dispersão, que para a distribuição Laplace é igual sd/sqrt(2). 
 
-#### EI -> EE ####
+#### m -> sd ####
 
 Vamos avaliar a diferença entre os métodos para as conversões de 'm' para o desvio padrão da função de dispersão [EI -> EE]:
 
@@ -148,7 +149,7 @@ Vamos avaliar a diferença entre os métodos para as conversões de 'm' para o d
 # preparando dados # fig.height = 4.5 ,fig.width = 5.75
 df_sd_k <- df_par.conv %>% filter(kernel_percentil == "campo_medio" & par.class != "U") # %>% 
   #dcast(.,formula = SiteCode + kernel_percentil ~ par.method + par.class, value.var = "par.value")
-df_sd_k %<>% inner_join(x=.,y=df_resultados[,c("SiteCode","kernel_percentil","m","J","DA")],by=c("SiteCode","kernel_percentil"))
+df_sd_k %<>% inner_join(x=.,y=df_resultados[,c("SiteCode","kernel_percentil","m")],by=c("SiteCode","kernel_percentil"))
 
 # graficos #
 l_p <- vector("list",length = 4)
@@ -182,17 +183,16 @@ figura 1. Desvio-padrão (sd_k) estimado pelas equações 1 (método CL) e 2.b (
 -O maior valor de sd_k pelo método CL ~ 300 metros, enquanto do método CaCL ~ 2e6 (valor sem realismo biológico)
 
 
-#### EE -> EI ####
+#### sd -> m ####
 
 Agora vamos avaliar a conversão de parâmetros sd_k da simulação coalescente para o respectivo m do modelo de campo médio.
 
 ```{r df_m, echo=F}
+# dados
 df_m <- df_par.conv %>% filter(kernel_percentil != "campo_medio" & par.class != "theta")  %>%     
-  inner_join(x=.,y=df_resultados[,c("SiteCode","kernel_percentil","sd_k","J","DA")],by=c("SiteCode","kernel_percentil"))
-```
+  inner_join(x=.,y=df_resultados[,c("SiteCode","kernel_percentil","sd_k")],by=c("SiteCode","kernel_percentil"))
 
-
-```{r figura 2, echo=F}
+#gráfico
 df_m %>% ggplot(aes(x=sd_k,y=par.value, colour=par.method)) + geom_point() + geom_smooth(method = "loess",se = F) + facet_wrap(~kernel_percentil, ncol=6, scales = "free") +
   labs(x = "desvio-padrão da função de dispersão", y = "m") + ggtitle(label="sd_k -> m", subtitle = "~ %k")
 ```
@@ -204,15 +204,41 @@ figura 2. m ~ sd_k + %k + método de calculo. em x = desvio padrão da função 
 df_m %>% 
   mutate(w_d = 100 * sqrt(J/DA)/(sd_k/sqrt(2))) %>% 
   ddply(.,c("SiteCode","kernel_percentil","w_d"),summarise, diff.metodos = diff(par.value)) %>% 
-  ggplot(aes(x=w_d,y=diff.metodos))  + geom_point() + # + geom_vline(aes(xintercept = 100, colour = "red"))
+  ggplot(aes(x=w_d,y=diff.metodos))  + geom_point() + # + geom_vline(aes(xintercept = 100, colour = "red")) +
   scale_x_continuous(labels = function(x) format(x, scientific = TRUE)) + 
   labs(x="L / (sd_k / sqrt(2) ) ",y="CaCL - CL") + theme(legend.position="none")
 ```
 
 figura 3. difença no valor calculado pelos dois métodos e a razão L / (sd_k / sqrt(2) )
 
+### Theta ###
 
-### EE <-> EI ###
+Utilizamos apenas um método para converter $\theta$ e U, a definição apresentada em Hubbell (2001): $\theta = 2 J_{M}U$. Consideramos que $J_{M} = A_{paisagem} DA p$. 
+
+```{r df_theta, echo = F}
+# dados
+df_theta <- df_par.conv %>% filter(par.class == "theta") %>% select(-par.method) %>% # apenas os valores de theta
+  dcast(.,formula = SiteCode + kernel_percentil + p + S + DA + J ~ par.class, value.var="par.value") %>%  # transformando theta em coluna
+  rbind.fill(x=.,y=df_resultados[df_resultados$kernel_percentil == "campo_medio",c(1:6,10)]) # combinando com theta estimado do campo medio
+
+# grafico
+df_theta %>% ggplot(aes(x=p,y=theta)) + geom_point() + geom_smooth(method = 'loess',se=F,colour="red") +
+  scale_y_continuous(labels = function(x) format(x,scientific = TRUE)) +
+  facet_wrap(~kernel_percentil,nrow = 3,scales="free")
+```
+
+figura 4. $\theta$ ~ p + (~kernel_percentil). Cada painel corresponde ao percentil de propágulos que permanece até $l_{cel}$ metros da planta progenitora. O último painel 'campo_medio' corresponde ao $\theta$ obtido pelo ajuste da formula de Etienne (2005) às SADs observadas.
+
+
+```{r}
+df_theta %>% mutate(p_class = cut(p,12)) %>% ggplot(aes(x=kernel_percentil,y=theta,group=SiteCode,colour=SiteCode)) + 
+  geom_point() + geom_line() + scale_y_continuous(labels = function(x) format(x,scientific = T)) + 
+  theme(legend.position = "none") +
+  facet_wrap(~p_class, ncol=3,scales="free")
+```
+
+
+### U ###
 
 **-> theta ~ m**
 
