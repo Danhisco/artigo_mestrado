@@ -127,16 +127,15 @@ f_conv.par <- function(modelo, par., par.aux){
     return(df_)
   }  
 }
+
+# aplicando a formula 
 df_par.conv <- ddply(df_resultados,c("SiteCode","kernel_percentil"), 
                   function(X) f_conv.par(modelo = X[,"kernel_percentil"], #cada modelo terá um conjunto diferente de parâmetros
                                          par. = as.list(X[,c("theta","m","sd_k","U")]), #input dos dados; a ordem é importante
                                          par.aux = as.list(X[,c("p","J","DA")]) #idem
                                          )
                     )
-df_par.conv
-# df_par.conv$kernel_percentil <- factor(df_resultados$kernel_percentil, levels = levels(df_resultados$kernel_percentil))
-# df_par.conv$kernel_percentil %>% levels()
-# df_par.conv %>% str
+
 ```
 
 Esperamos que os métodos de conversão tenham valores próximos quando a relação entre L/d -> 100; d é a distância média de dispersão, que para a distribuição Laplace é igual sd/sqrt(2). 
@@ -152,43 +151,116 @@ df_sd_k <- df_par.conv %>% filter(kernel_percentil == "campo_medio" & par.class 
 df_sd_k %<>% inner_join(x=.,y=df_resultados[,c("SiteCode","kernel_percentil","m","J","DA")],by=c("SiteCode","kernel_percentil"))
 
 # graficos #
-l_p <- vector("list",length = 3)
+l_p <- vector("list",length = 4)
 # sd_k ~ m * metodo
 l_p[[1]] <- ggplot(df_sd_k,aes(x = m, y = par.value, colour = par.method)) + 
   geom_point() + geom_smooth(method = "loess",se=F) + 
   scale_y_continuous(labels = function(x) format(x, scientific = TRUE)) +
-  labs(y="sd_k", x='m') + ggtitle(label="m -> sd_k") + theme(legend.position="none")
+  labs(y="sd_k", x='m') + theme(legend.position="none") # + ggtitle(label="m -> sd_k") 
 # log(sd_k) ~ m * metodo
 l_p[[2]] <- ggplot(df_sd_k,aes(x = m, y = log(par.value), colour = par.method)) + 
   geom_point() + geom_smooth(method = "loess",se=F) +
-  labs(y="", x='m') + ggtitle(label="m -> log.sd_k")
+  labs(y="log(sd_k)", x='m') #+ ggtitle(label="m -> log.sd_k")
 # diferenca metodos ~ w/d # sd_k.CaCL - sd_k.CL ~ L / ( mean(sd_k) / sqrt(2) ) 
 l_p[[3]] <- ddply(df_sd_k,c("SiteCode","J","DA"),summarise, diff.metodos = diff(par.value), mean.sd_k = mean(par.value)) %>% 
   mutate(w_d = 100 * sqrt(J/DA)/(mean.sd_k/sqrt(2))) %>% ggplot(aes(x=w_d,y=log(diff.metodos))) + geom_point() +
-  labs(x="L / ( mean(sd_k) / sqrt(2) ) ",y="log(CaCL - CL)")
+  scale_x_continuous(labels = function(x) format(x, scientific = TRUE)) +
+  labs(x="L / ( mean(sd_k) / sqrt(2) ) ",y="log(CaCL - CL)") 
+# boxplot dos valores por estimativa
+l_p[[4]] <- ggplot(df_sd_k,aes(x="",y=par.value)) + geom_jitter() + geom_boxplot() + facet_wrap(~par.method,scales = "free") + labs(x="metodos",y="sd_k")
 # arranjo 
-grid.arrange(l_p[[1]], l_p[[2]], l_p[[3]],
+grid.arrange(l_p[[1]], l_p[[2]], l_p[[3]], l_p[[4]],
              layout_matrix = rbind(c(rep(1,3),rep(2,4)),
-                                   c(NA,NA,rep(3,3),NA,NA)) 
+                                   c(rep(4,3),rep(3,3),NA)) 
              )
 ```
 
-figura 1. Desvio-padrão (sd_k) estimado pelas equações 1 (método CL) e 2.b (método CaCL). 1o painel = sd_k ~ m; 2o painel: log(sd_k) ~ m; 3o painel: log da diferença entre os métodos e a razão entre o lado da amostra (L) e a distância média de dispersão (mean(sd_k)/sqrt(2)). mean(sd_k) é a média dos sd_k obtidos pelos dois métodos, a divição por sqrt(2) é para transformar no parâmetro escalar da distribuição de Laplace.
+figura 1. Desvio-padrão (sd_k) estimado pelas equações 1 (método CL) e 2.b (método CaCL). 1o painel = sd_k ~ m; 2o painel: log(sd_k) ~ m; 3o - boxplot de sd_k pelos métodos (título do gráfico); 4o painel: log da diferença entre os métodos e a razão entre o lado da amostra (L) e a distância média de dispersão (mean(sd_k)/sqrt(2)). mean(sd_k) é a média dos sd_k obtidos pelos dois métodos, a divição por sqrt(2) é para transformar no parâmetro escalar da distribuição de Laplace.
 
-Os dois métodos tem perfis bem distintos (mesmo fora da escala log), o método CaCL estima vaior variação para valores m -> 1. O terceiro quartil de m = 0.998.
+-Segundo a figura 1 de Chisholm & Lichstein 2009 a equação 1 deve fazer boas aproximações quando a relação entre L/d >= 100.
+-O 4o painel mostra que a condição para que a equação 1 faça boas aproximações não é observada, uma vez que L/d varia em [0;2]
+-O maior valor de sd_k pelo método CL ~ 300 metros, enquanto do método CaCL ~ 2e6 (valor sem realismo biológico)
 
-```{r avaliacao EE/EI 2, echo=FALSE, message=F}
-df_sd_k <- df_par.conv %>% filter(kernel_percentil == "campo_medio" & par.class != "U")  %>% 
-  dcast(.,formula = SiteCode + kernel_percentil ~ par.method + par.class, value.var = "par.value")
-df_sd_k %<>% inner_join(x=.,y=df_resultados[,c("SiteCode","kernel_percentil","m","J","DA")],by=c("SiteCode","kernel_percentil")) %>% mutate(L = 100*sqrt(J/DA))
-car::scatterplotMatrix(~ log(CaCL_sd_k) + log(CL_sd_k) + m + L,
-                       reg.line = F, smoother = F,
-                       data=df_sd_k)
+
+#### EE -> EI ####
+
+Agora vamos avaliar a conversão de parâmetros sd_k da simulação coalescente para o respectivo m do modelo de campo médio.
+
+```{r df_m, echo=F}
+df_m <- df_par.conv %>% filter(kernel_percentil != "campo_medio" & par.class != "theta")  %>%     
+  inner_join(x=.,y=df_resultados[,c("SiteCode","kernel_percentil","sd_k","J","DA")],by=c("SiteCode","kernel_percentil"))
 ```
 
-Figura 2. log(sd_k) * metodo, m e L = lado da amostra
 
-Há clara distinção entre os métodos, os parâmetros convertidos estão plotados na escala log. Vou converter para porcentagem da chuva de propágulos que se mantêm até $l_{cel}$ metros da planta progenitora (%k)
+```{r figura 2, echo=F}
+df_m %>% ggplot(aes(x=sd_k,y=par.value, colour=par.method)) + geom_point() + geom_smooth(method = "loess",se = F) + facet_wrap(~kernel_percentil, ncol=6, scales = "free") +
+  labs(x = "desvio-padrão da função de dispersão", y = "m") + ggtitle(label="sd_k -> m", subtitle = "~ %k")
+```
+
+figura 2. m ~ sd_k + %k + método de calculo. em x = desvio padrão da função de dispersão (sd_k), y = m; os paineis estão divididos pelas respectivas porcentagens de propágulos que permanecem até $l_{cel}$ metros da árvore progenitora.
+
+
+```{r fig 3, fig.height=4,fig.width=4, echo=F}
+df_m %>% 
+  mutate(w_d = 100 * sqrt(J/DA)/(sd_k/sqrt(2))) %>% 
+  ddply(.,c("SiteCode","kernel_percentil","w_d"),summarise, diff.metodos = diff(par.value)) %>% 
+  ggplot(aes(x=w_d,y=diff.metodos))  + geom_point() + # + geom_vline(aes(xintercept = 100, colour = "red"))
+  scale_x_continuous(labels = function(x) format(x, scientific = TRUE)) + 
+  labs(x="L / (sd_k / sqrt(2) ) ",y="CaCL - CL") + theme(legend.position="none")
+```
+
+figura 3. difença no valor calculado pelos dois métodos e a razão L / (sd_k / sqrt(2) )
+
+
+### EE <-> EI ###
+
+**-> theta ~ m**
+
+```{r theta e m, echo=F}
+# add % cobertura vegetal
+df_par.conv %<>% inner_join(x=.,y=df_resultados[,1:3],by=c("SiteCode","kernel_percentil"))
+df_par.conv$par.method <- factor(df_par.conv$par.method,levels = c("verossimilhanca","CL","CaCL","Hubbell","NA"))
+df_par.conv[df_par.conv$par.method == "NA","par.method"] <- "Hubbell" # Hubbell 2001 theta := 2 * 500 * p * DA * U 
+
+# adaptando os dados
+df_temp <- melt(filter(df_resultados[,c(1:3,10:11)], # SiteCode, %k, p, theta, m
+                       kernel_percentil == "campo_medio"), 
+      id.vars = c("SiteCode","kernel_percentil","p"),
+      variable.name = "par.class", # formato de df_par.conv
+      value.name = "par.value")
+df_temp$par.method <- "verossimilhanca"
+df_temp$par.method %<>% factor
+
+# inner_join
+# for(i in c(1:2,4:5)){
+#   df_par.conv[,i] %<>% as.character()
+# }
+# for(i in c(1:2,4,6)){
+#   df_temp[,i] %<>% as.character()
+# }
+
+df_theta.m <- merge(x=filter(df_par.conv,par.class %in% c("theta","m") ), y=df_temp, all = T)
+df_theta.m$m.value <- df_theta.m$par.value
+df_theta.m$theta.value <- df_theta.m$par.value
+# filter(df_theta.m,)
+
+
+ddply(.variables = )
+# %>% 
+#   dcast(.,formula = SiteCode + kernel_percentil ~ par.class, value.var = "par.value")
+df_theta.m %>% head()
+  
+df_par.conv %>% str
+df_temp %>% str
+
+filter(df_par.conv,par.class %in% c("theta","m") ) %>% str
+df_temp %>% str
+```
+
+
+
+
+ANEXO: formulas que estimam o sd_k necessário para que uma determinada porcentagem dos propágulos permaneça até $l_{cel}$
 
 ** Chuva de propágulos modelo EI **
 
@@ -270,90 +342,6 @@ __figura3__ .k_perc = porcentagem estimada a partir do sd_k calculado, m = parê
 
 Os valores de par.value (st_k estimado) apresentam dois perfis distintos quando comparado com m, mas um esmo perfil quando compardo com log.erro. Isso quer dizer que o erro entre a estimativa par.value e o quantil do percentil estimado a partir de par.value tem um erro que não é no método de conversão de parâmetros. Como discutido nas funções estabelecidas
 
-#### EE -> EI ####
-
-Agora vamos avaliar a conversão de parâmetros sd_k da simulação coalescente para o respectivo m do modelo de campo médio. Vou olhar os dados antes de corrigir o m (eq.0'). Aqui também é possível comparar os valores obtidos pelas conversões com aqueles estimados nas $SAD_{EE}$. Eu tenho esses dados, eles estão no git, eu deixei meu computador rodando isso enquanto eu trabalhava no TreeCo. 
-
-```{r df_m, echo=F}
-df_m <- df_par.conv %>% filter(kernel_percentil != "campo_medio" & par.class != "theta")  %>%     
-  inner_join(x=.,y=df_resultados[,c("SiteCode","kernel_percentil","sd_k","J","DA")],by=c("SiteCode","kernel_percentil"))
-```
-
-```{r fig 4 par.value(m) X kernel percentil, echo=FALSE, fig.height=6,fig.width=8}
-df_m %>% ggplot(aes(x=par.method,y=par.value, colour=par.method)) + geom_jitter() + geom_boxplot() + facet_wrap(~kernel_percentil, ncol=6, scales = "free") +
-  labs(x = "método de calculo", y = "m") + ggtitle(label="sd_k -> m",subtitle = "%k - porcentagem de propágulos (título dos paineis)")
-```
-
-figura 4. Relação o m calulado pelas equações 1a e 2a e a porcentagem de propágulos correspondete ao desvio padrão da função de dispersão. 
-
-```{r figura 5, echo=F}
-df_m %>% ggplot(aes(x=sd_k,y=par.value, colour=par.method)) + geom_point() + geom_smooth(method = "loess") + facet_wrap(~kernel_percentil, ncol=6, scales = "free") +
-  labs(x = "desvio-padrão da função de dispersão", y = "m") + ggtitle(label="sd_k -> m", subtitle = "~ %k")
-```
-
-figura 5. m ~ sd_k + %k + método de calculo
-
-
-```{r fig6, fig.height=3,fig.width=3, echo=F}
-# ddply(df_m,"kernel_percentil",.fun = function(X) sqrt(var(X$par.value))/mean(X$par.value) ) # coef. de variância
-df_m %>% dcast(.,formula = SiteCode + kernel_percentil ~ par.method + par.class, value.var = "par.value") %>% mutate(par.diff = CaCL_m - CL_m) %>% 
-  ggplot(aes(x=kernel_percentil,y=par.diff)) + geom_point() + geom_smooth(method = 'loess') + labs(x="porcentagem de propágulos", y = "diff_m = CaCL - CL")
-```
-
-figura 6. difença no valor calculado pelos dois métodos e a correspondente porcentagem de propágulos.
-
-A escala muda entre os paineis: em 0.25 varia de 0.015 até 0.397; no último painel varia de 0.001 até 0.009; a variação dos pontos diminui com o aumento da limitação à dispersão.   
-
-
-### EE <-> EI ###
-
-**-> theta ~ m**
-
-```{r theta e m, echo=F}
-# add % cobertura vegetal
-df_par.conv %<>% inner_join(x=.,y=df_resultados[,1:3],by=c("SiteCode","kernel_percentil"))
-df_par.conv$par.method <- factor(df_par.conv$par.method,levels = c("verossimilhanca","CL","CaCL","Hubbell","NA"))
-df_par.conv[df_par.conv$par.method == "NA","par.method"] <- "Hubbell" # Hubbell 2001 theta := 2 * 500 * p * DA * U 
-
-# adaptando os dados
-df_temp <- melt(filter(df_resultados[,c(1:3,10:11)], # SiteCode, %k, p, theta, m
-                       kernel_percentil == "campo_medio"), 
-      id.vars = c("SiteCode","kernel_percentil","p"),
-      variable.name = "par.class", # formato de df_par.conv
-      value.name = "par.value")
-df_temp$par.method <- "verossimilhanca"
-df_temp$par.method %<>% factor
-
-# inner_join
-# for(i in c(1:2,4:5)){
-#   df_par.conv[,i] %<>% as.character()
-# }
-# for(i in c(1:2,4,6)){
-#   df_temp[,i] %<>% as.character()
-# }
-
-df_theta.m <- merge(x=filter(df_par.conv,par.class %in% c("theta","m") ), y=df_temp, all = T)
-df_theta.m$m.value <- df_theta.m$par.value
-df_theta.m$theta.value <- df_theta.m$par.value
-filter(df_theta.m,)
-
-
-ddply(.variables = )
-# %>% 
-#   dcast(.,formula = SiteCode + kernel_percentil ~ par.class, value.var = "par.value")
-df_theta.m %>% head()
-  
-df_par.conv %>% str
-df_temp %>% str
-
-filter(df_par.conv,par.class %in% c("theta","m") ) %>% str
-df_temp %>% str
-```
-
-
-
-
-ANEXO: formulas que estimam o sd_k necessário para que uma determinada porcentagem dos propágulos permaneça até $l_{cel}$
 
 
 ```{r }
