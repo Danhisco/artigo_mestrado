@@ -8,7 +8,7 @@ output:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE,tidy = TRUE, cache = TRUE, fig.height = 6 ,fig.width = 9)
+knitr::opts_chunk$set(echo = F,tidy = TRUE, cache = TRUE, fig.height = 6 ,fig.width = 9)
 ```
 
 ```{r global packages, echo=FALSE, message = FALSE, warning=FALSE}
@@ -145,7 +145,7 @@ Esperamos que os métodos de conversão tenham valores próximos quando a relaç
 
 Vamos avaliar a diferença entre os métodos para as conversões de 'm' para o desvio padrão da função de dispersão [EI -> EE]:
 
-```{r avaliacao EI/EE, message=F, echo=F}
+```{r avaliacao EI/EE, message=F}
 # preparando dados # fig.height = 4.5 ,fig.width = 5.75
 df_sd_k <- df_par.conv %>% filter(kernel_percentil == "campo_medio" & par.class != "U") # %>% 
   #dcast(.,formula = SiteCode + kernel_percentil ~ par.method + par.class, value.var = "par.value")
@@ -183,11 +183,28 @@ figura 1. Desvio-padrão (sd_k) estimado pelas equações 1 (método CL) e 2.b (
 -O maior valor de sd_k pelo método CL ~ 300 metros, enquanto do método CaCL ~ 2e6 (valor sem realismo biológico)
 
 
+```{r fig2}
+df_resultados[,1:7] %>% 
+  filter(kernel_percentil != "campo_medio") %>% 
+  melt(.,id.vars = c("SiteCode","kernel_percentil","p","S","DA","J"), variable.name = "par.class",value.name = "par.value") %>% 
+  mutate(par.method = "a_priori") %>% 
+  rbind.fill(df_sd_k[,-10],.) %>% 
+  arrange(.,SiteCode,kernel_percentil) %>% 
+  mutate(p_class = cut(p,12)) %>% 
+  ggplot(aes(x=kernel_percentil,y=log(par.value),shape = par.method,color = SiteCode)) + geom_point(size=2.5) + 
+  theme(legend.title = element_blank()) +
+  guides(color=FALSE) +
+  labs(x="%k + campo medio", y = "log(sd_k)") +
+  facet_wrap(~p_class,ncol=4,scales="free")
+```
+
+figura 2. log(sd_k) ~ (%k + campo medio) + (~p_class); p_class = cut(p,12). Os pontos estão coloridos segundo o Site e a forma dos pontos segundo o método de obtenção do valor de sd_k
+
 #### sd -> m ####
 
 Agora vamos avaliar a conversão de parâmetros sd_k da simulação coalescente para o respectivo m do modelo de campo médio.
 
-```{r df_m, echo=F}
+```{r df_m}
 # dados
 df_m <- df_par.conv %>% filter(kernel_percentil != "campo_medio" & par.class != "theta")  %>%     
   inner_join(x=.,y=df_resultados[,c("SiteCode","kernel_percentil","sd_k")],by=c("SiteCode","kernel_percentil"))
@@ -200,7 +217,7 @@ df_m %>% ggplot(aes(x=sd_k,y=par.value, colour=par.method)) + geom_point() + geo
 figura 2. m ~ sd_k + %k + método de calculo. em x = desvio padrão da função de dispersão (sd_k), y = m; os paineis estão divididos pelas respectivas porcentagens de propágulos que permanecem até $l_{cel}$ metros da árvore progenitora.
 
 
-```{r fig 3, fig.height=4,fig.width=4, echo=F}
+```{r fig 3, fig.height=4,fig.width=4}
 df_m %>% 
   mutate(w_d = 100 * sqrt(J/DA)/(sd_k/sqrt(2))) %>% 
   ddply(.,c("SiteCode","kernel_percentil","w_d"),summarise, diff.metodos = diff(par.value)) %>% 
@@ -215,7 +232,7 @@ figura 3. difença no valor calculado pelos dois métodos e a razão L / (sd_k /
 
 Utilizamos apenas um método para converter $\theta$ e U, a definição apresentada em Hubbell (2001): $\theta = 2 J_{M}U$. Consideramos que $J_{M} = A_{paisagem} DA p$. 
 
-```{r df_theta e fig 4, echo = F}
+```{r df_theta e fig 4}
 # dados
 df_theta <- df_par.conv %>% filter(par.class == "theta") %>% select(-par.method) %>% # apenas os valores de theta
   dcast(.,formula = SiteCode + kernel_percentil + p + S + DA + J ~ par.class, value.var="par.value") %>%  # transformando theta em coluna
@@ -240,7 +257,7 @@ figura 5. $\theta$ ~ kernel_percentil + (~p_class). p_class = cut(p,12). Os pont
 
 ### U ###
 
-```{r df_U e fig 6, echo=F}
+```{r df_U e fig 6}
 # dados
 df_U <- df_par.conv %>% filter(par.class == "U") %>% select(-par.method) %>% # apenas os valores de U
   dcast(.,formula = SiteCode + kernel_percentil + p + S + DA + J ~ par.class, value.var="par.value") %>%  # transformando theta em coluna
@@ -251,14 +268,20 @@ df_U %>% ggplot(aes(x=p,y=U)) + geom_point() + geom_smooth(method = 'loess',se=F
   # scale_y_continuous(labels = function(x) format(x,scientific = TRUE)) +
   facet_wrap(~kernel_percentil,nrow = 3,scales="free")
 ```
+
 figura 6. U ~ p + (~kernel_percentil)
 
-```{r fig 7, echo =FALSE}
+```{r fig 7}
 df_U %>% mutate(p_class = cut(p,12)) %>% ggplot(aes(x=kernel_percentil,y=U,group=SiteCode,colour=SiteCode)) + 
-  geom_point() + geom_line() + scale_y_continuous(labels = function(x) format(x,scientific = T)) + 
+  geom_point() + geom_line() + #scale_y_continuous(labels = function(x) format(x,scientific = T)) + 
   theme(legend.position = "none") +
   facet_wrap(~p_class, ncol=3,scales="free")
 ```
+
+Figura 7. U ~ kernel_percentil + (~p_class); p_class = cut(p,12). Os pontos e linhas estão coloridos pelo Site.
+
+
+### sd ##
 
 
 **-> theta ~ m**
