@@ -184,13 +184,14 @@ figura 1. Desvio-padrão (sd_k) estimado pelas equações 1 (método CL) e 2.b (
 
 
 ```{r fig2}
-df_resultados[,1:7] %>% 
-  filter(kernel_percentil != "campo_medio") %>% 
-  melt(.,id.vars = c("SiteCode","kernel_percentil","p","S","DA","J"), variable.name = "par.class",value.name = "par.value") %>% 
-  mutate(par.method = "a_priori") %>% 
-  rbind.fill(df_sd_k[,-10],.) %>% 
-  arrange(.,SiteCode,kernel_percentil) %>% 
-  mutate(p_class = cut(p,12)) %>% 
+df_resultados[,1:7] %>% # sd_k EE
+  filter(kernel_percentil != "campo_medio") %>% # tirando os campos_medio
+  melt(.,id.vars = c("SiteCode","kernel_percentil","p","S","DA","J"), variable.name = "par.class",value.name = "par.value") %>% # melt o df
+  mutate(par.method = "a_priori") %>% # acrescentando o fator
+  rbind.fill(df_sd_k[,-10],.) %>% # concatenando
+  arrange(.,SiteCode,kernel_percentil) %>% # colocando os dados em ordem
+  mutate(p_class = cut(p,12)) %>% # criando p_class
+  #grafico
   ggplot(aes(x=kernel_percentil,y=log(par.value),shape = par.method,color = SiteCode)) + geom_point(size=2.5) + 
   theme(legend.title = element_blank()) +
   guides(color=FALSE) +
@@ -204,7 +205,7 @@ figura 2. log(sd_k) ~ (%k + campo medio) + (~p_class); p_class = cut(p,12). Os p
 
 Agora vamos avaliar a conversão de parâmetros sd_k da simulação coalescente para o respectivo m do modelo de campo médio.
 
-```{r df_m}
+```{r df_m e fig3}
 # dados
 df_m <- df_par.conv %>% filter(kernel_percentil != "campo_medio" & par.class != "theta")  %>%     
   inner_join(x=.,y=df_resultados[,c("SiteCode","kernel_percentil","sd_k")],by=c("SiteCode","kernel_percentil"))
@@ -214,7 +215,7 @@ df_m %>% ggplot(aes(x=sd_k,y=par.value, colour=par.method)) + geom_point() + geo
   labs(x = "desvio-padrão da função de dispersão", y = "m") + ggtitle(label="sd_k -> m", subtitle = "~ %k")
 ```
 
-figura 2. m ~ sd_k + %k + método de calculo. em x = desvio padrão da função de dispersão (sd_k), y = m; os paineis estão divididos pelas respectivas porcentagens de propágulos que permanecem até $l_{cel}$ metros da árvore progenitora.
+figura 3. m ~ sd_k + %k + método de calculo. em x = desvio padrão da função de dispersão (sd_k), y = m; os paineis estão divididos pelas respectivas porcentagens de propágulos que permanecem até $l_{cel}$ metros da árvore progenitora.
 
 
 ```{r fig 3, fig.height=4,fig.width=4}
@@ -226,7 +227,54 @@ df_m %>%
   labs(x="L / (sd_k / sqrt(2) ) ",y="CaCL - CL") + theme(legend.position="none")
 ```
 
-figura 3. difença no valor calculado pelos dois métodos e a razão L / (sd_k / sqrt(2) )
+figura 4. difença no valor calculado pelos dois métodos e a razão L / (sd_k / sqrt(2) )
+
+
+```{r fig5}
+df_m <- df_resultados[,c(1:6,11)] %>% #par.aux + m
+  filter(kernel_percentil == "campo_medio") %>% #filtrando para campo medio
+  melt(.,id.vars = c("SiteCode","kernel_percentil","p","S","DA","J"),variable.name = "par.class",value.name = "par.value") %>% #melt o df
+  mutate(par.method = "like") %>% # acrescentando o fator
+  rbind.fill(df_m[,-10],.) %>% #concatenar
+  arrange(.,SiteCode,kernel_percentil) %>% # dados em ordem
+  mutate(p_class = cut(p,12)) # p_class
+
+  #grafico
+df_m %>% ggplot(aes(x=kernel_percentil,y=par.value,shape = par.method,color = SiteCode)) + geom_point(size=2) + 
+  theme(legend.title = element_blank()) +
+  guides(color=FALSE) +
+  labs(x="%k + campo medio", y = "m") +
+  facet_wrap(~p_class,ncol=4,scales="free")
+```
+
+figura 5. m ~ %k + (~p_class).
+
+
+```{r fig6}
+df_m %>% ggplot(aes(x = p, y=par.value, group=par.method)) + 
+  geom_point(aes(shape=par.method,color=par.method)) + 
+  geom_smooth(aes(color=par.method),method = 'loess',se=F) +
+  theme(legend.title = element_blank()) +
+  labs(x="p",y="m") + 
+  ggtitle("m sem correção") + 
+  facet_wrap(~kernel_percentil,nrow = 3,scales = "free")
+```
+
+Figura 6A. m ~ p + (~kernel_percentil)
+
+```{r fig 7}
+df_m %>% 
+  mutate(m_ = ifelse(par.method != "like", par.value*p/(1-(1-p)*par.value),par.value)) %>% # eq 0'
+  ggplot(aes(x = p, y=m_, group=par.method)) + # mesma estrutura do grafico anterior
+  geom_point(aes(shape=par.method,color=par.method)) + 
+  geom_smooth(aes(color=par.method),method = 'loess',se=F) +
+  theme(legend.title = element_blank()) +
+  labs(x="p",y="m'") + 
+  ggtitle("m corrigdo (eq 0')") +
+  facet_wrap(~kernel_percentil,nrow = 3,scales = "free")
+```
+
+Figura 6B. m' ~ p + (~kernel_percentil)
 
 ### Theta ###
 
@@ -244,7 +292,7 @@ df_theta %>% ggplot(aes(x=p,y=theta)) + geom_point() + geom_smooth(method = 'loe
   facet_wrap(~kernel_percentil,nrow = 3,scales="free")
 ```
 
-figura 4. $\theta$ ~ p + (~kernel_percentil). Cada painel corresponde ao percentil de propágulos que permanece até $l_{cel}$ metros da planta progenitora. O último painel 'campo_medio' corresponde ao $\theta$ obtido pelo ajuste da formula de Etienne (2005) às SADs observadas.
+figura 7. $\theta$ ~ p + (~kernel_percentil). Cada painel corresponde ao percentil de propágulos que permanece até $l_{cel}$ metros da planta progenitora. O último painel 'campo_medio' corresponde ao $\theta$ obtido pelo ajuste da formula de Etienne (2005) às SADs observadas.
 
 
 ```{r figura 5}
@@ -253,7 +301,7 @@ df_theta %>% mutate(p_class = cut(p,12)) %>% ggplot(aes(x=kernel_percentil,y=the
   theme(legend.position = "none") +
   facet_wrap(~p_class, ncol=3,scales="free")
 ```
-figura 5. $\theta$ ~ kernel_percentil + (~p_class). p_class = cut(p,12). Os pontos e linhas estão coloridos pelo Site. 
+figura 8. $\theta$ ~ kernel_percentil + (~p_class). p_class = cut(p,12). Os pontos e linhas estão coloridos pelo Site. 
 
 ### U ###
 
@@ -269,7 +317,7 @@ df_U %>% ggplot(aes(x=p,y=U)) + geom_point() + geom_smooth(method = 'loess',se=F
   facet_wrap(~kernel_percentil,nrow = 3,scales="free")
 ```
 
-figura 6. U ~ p + (~kernel_percentil)
+figura 9. U ~ p + (~kernel_percentil)
 
 ```{r fig 7}
 df_U %>% mutate(p_class = cut(p,12)) %>% ggplot(aes(x=kernel_percentil,y=U,group=SiteCode,colour=SiteCode)) + 
@@ -278,9 +326,9 @@ df_U %>% mutate(p_class = cut(p,12)) %>% ggplot(aes(x=kernel_percentil,y=U,group
   facet_wrap(~p_class, ncol=3,scales="free")
 ```
 
-Figura 7. U ~ kernel_percentil + (~p_class); p_class = cut(p,12). Os pontos e linhas estão coloridos pelo Site.
+Figura 10. U ~ kernel_percentil + (~p_class); p_class = cut(p,12). Os pontos e linhas estão coloridos pelo Site.
 
-
+<!--
 ### sd ##
 
 
@@ -327,7 +375,7 @@ filter(df_par.conv,par.class %in% c("theta","m") ) %>% str
 df_temp %>% str
 ```
 
-
+-->
 
 
 ANEXO: formulas que estimam o sd_k necessário para que uma determinada porcentagem dos propágulos permaneça até $l_{cel}$
