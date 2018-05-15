@@ -107,23 +107,27 @@ f_conv.par <- function(modelo, par., par.aux){
   p <- par.aux[[1]]
   J <- par.aux[[2]]
   DA <- par.aux[[3]]
+  S <- par.aux[[4]]
   L <- 100*sqrt(J/DA)
+  J_M <- 500 * p * DA
  #conversoes 
   if(modelo == "campo_medio"){ # EI -> EE
-    U_ <- theta / (2 * 500 * p * DA) # Hubbell 2001
+    U_1 <- theta / (2 * J_M) # Hubbell 2001
+    U_2 <- theta / (J_M + theta - 1) # Etienne 2005 (qual foi a primeira referencia?)
     sd_k.CL <- m * L * pi * sqrt(2) / 4 # eq 1b
     sd_K.CaCL <- sqrt(2) * L / (m * lambertW0(-exp(-1/m)/m) + 1) # eq 2b
-    df_ <- data.frame(par.value = c(U_, sd_k.CL, sd_K.CaCL),
-                      par.class = c("U","sd_k","sd_k"),
-                      par.method = c("H01","CL","CaCL"))
+    df_ <- data.frame(par.value = c(U_1, U_2, sd_k.CL, sd_K.CaCL),
+                      par.class = c("U","U","sd_k","sd_k"),
+                      par.method = c("H01","E05","CL","CaCL"))
     return(df_)
   }else{ # EE -> EI
-    theta_ <- 2 * 500 * p * DA * U # Hubbell 2001
+    theta_1 <- 2 * 500 * p * DA * U # Hubbell 2001
+    theta_2 <- U * (J_M - 1) / (1 - U) # Etienne 2005
     m_CL <- 4 * sd_k / ( sqrt(2) * L * pi ) # eq 1a
     m_CaCL <- sd_k * ( 1 -exp( -sqrt(2) * L / sd_k) ) / (sqrt(2) * L / sd_k) # eq 2a
-    df_ <- data.frame(par.value = c(theta_, m_CL, m_CaCL),
-                      par.class = c("theta","m","m"),
-                      par.method = c("H01","CL","CaCL"))
+    df_ <- data.frame(par.value = c(theta_1,theta_2, m_CL, m_CaCL),
+                      par.class = c("theta","theta","m","m"),
+                      par.method = c("H01","E05","CL","CaCL"))
     return(df_)
   }  
 }
@@ -132,10 +136,9 @@ f_conv.par <- function(modelo, par., par.aux){
 df_par.conv <- ddply(df_resultados,c("SiteCode","kernel_percentil"), 
                   function(X) f_conv.par(modelo = X[,"kernel_percentil"],
                                          par. = as.list(X[,c("theta","m","sd_k","U")]),
-                                         par.aux = as.list(X[,c("p","J","DA")])
+                                         par.aux = as.list(X[,c("p","J","DA","S")])
                                          )
                     )
-
 ```
 
 ```{r inner_join df_par.conv}
