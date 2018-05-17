@@ -249,7 +249,9 @@ Figura 4A. m ~ p + (~kernel_percentil)
 
 ```{r fig 4B, fig.height=7,fig.width=10}
 df_m %>% 
-  mutate(m_ = ifelse(par.method != "like", par.value*p/(1-(1-p)*par.value),par.value)) %>% # eq 0'
+  # mutate(m_ = ifelse(par.method != "like", par.value*p/(1-(1-p)*par.value),par.value)) %>% # eq 0'
+  mutate(m_ = par.value*p/(1-(1-p)*par.value)) %>% # eq 0'
+  # filter(kernel_percentil == "campo_medio") %>% mutate(m.diff = par.value - m_) %>%  ggplot(aes(x=p,y=m.diff)) + geom_point()
   ggplot(aes(x = p, y=m_, group=par.method)) + # mesma estrutura do grafico anterior
   geom_point(aes(shape=par.method,color=par.method)) + 
   geom_smooth(aes(color=par.method),method = 'loess',se=F) +
@@ -384,11 +386,32 @@ md_1 <- df_k_perc %>% filter(kernel_percentil != "campo_medio") %>% mutate(k_per
 summary(md_1)
 ```
 
-Figura 10. Percentil de propágulos informados a priori (eixo x) e calculados pela função f_k_perc (chunk de código anterior). A linha corresponde ao modelo linear ajustado aos dados: $R^2 = 0.985$, $\alpha = -0.175$ e $\beta = 1.127$. 
+Idealmente a regressão deveria ter $\alpha$ -> 0, $\beta$ -> 1 e $R^2$ -> 1, mas, considerando que tanto a estimativa de sd_k a partir do percentil informado (sigkernel), quanto a do percentil a partir do sd_k convertido (f_k_perc) são aproximações numéricas (anexo 1: códigos), serão considerados razoáveis e vou prosseguir com esses dados para o sd_k calculado a partir de m_{EI}:
 
-```{r fig 11, fig.height=6}
-df_k_perc %>% filter(kernel_percentil == "campo_medio") %>% ggplot(aes(x=log(par.value), y=k_perc)) + 
-  geom_point() + facet_wrap(~par.method,scales="free")
+```{r fig 11, fig.height=4}
+l_p <- vector("list",length = 2) 
+l_p[[1]] <- df_k_perc %>% filter(kernel_percentil == "campo_medio") %>% ggplot(aes(x=log(par.value), y=k_perc)) + 
+  geom_point() +
+  labs(x = "log(sd_k)", y = "prop. de propag. que permanece até l_cel metros") + 
+  ggtitle("chuva de propágulos ~ [sd_k <- m_{EI}]") +
+  facet_wrap(~par.method,scales="free")
+l_p[[1]]
+# df_k_perc[,-(3:5)]
+# df_par.conv %>% filter(par.class=="m") %>% #apenas sd_k_{EE} -> m_{EE}
+#   dcast(., ... ~ par.class,value.var = "par.value") %>% # Sitecode, %k, par.method, p, S, DA, J, m
+#   rbind.fill(.,  # adicao dos valores para m estimado por verossimilhança (m_{EI})
+#              mutate(df_resultados[df_resultados$kernel_percentil == "campo_medio",c(1:2,11)],par.method="like")) #%>% 
+#   inner_join(x=.,y=df_k_perc[,-c(6:9)],by=c("SiteCode","kernel_percentil","par.method"))
+# 
+# df_m %>% 
+#   # mutate(m_ = ifelse(par.method != "like", par.value*p/(1-(1-p)*par.value),par.value)) %>% # eq 0'
+#   mutate(m_ = par.value*p/(1-(1-p)*par.value))  
+#   
+#   
+# l_p[[2]] <- ggplot(aes(x=))
 ```
 
+figura 11.
+
+### Condit et al. 2012: calculo dos parâmetro ###
 
