@@ -267,52 +267,59 @@ Utilizamos apenas um método para converter $\theta$ e U, a definição apresent
 
 ```{r df_theta e fig 5}
 # dados
-df_theta <- df_par.conv %>% filter(par.class == "theta") %>% select(-par.method) %>%   # apenas os valores de theta
-  dcast(.,formula = SiteCode + kernel_percentil + p + S + DA + J ~ par.class, value.var="par.value") %>%  # transformando theta em coluna
-  rbind.fill(x=.,y=df_resultados[df_resultados$kernel_percentil == "campo_medio",c(1:6,10)]) # combinando com theta estimado do campo medio
-
+df_theta <- df_par.conv %>% filter(par.class == "theta") %>% # apenas os valores de theta
+  dcast(.,formula = ... ~ par.class, value.var="par.value") # %>%  # transformando theta em coluna
+df_theta <- df_resultados %>% filter(kernel_percentil == "campo_medio") %>% .[,c(1:6,10)] %>% mutate(par.method="like") %>% 
+  rbind.fill(x=df_theta, y=.) %>% arrange(SiteCode,kernel_percentil)
+  
 # grafico
-df_theta %>% ggplot(aes(x=p,y=theta)) + geom_point() + geom_smooth(method = 'loess',se=F,colour="red") +
+df_theta %>% ggplot(aes(x=p,y=theta,group=par.method,color=par.method)) + geom_point() + geom_smooth(method = 'loess',se=F) +
   scale_y_continuous(labels = function(x) format(x,scientific = TRUE)) +
+  theme(legend.title = element_blank()) +
   facet_wrap(~kernel_percentil,nrow = 3,scales="free")
 ```
 
 figura 5. $\theta$ ~ p + (~kernel_percentil). Cada painel corresponde ao percentil de propágulos que permanece até $l_{cel}$ metros da planta progenitora. O último painel 'campo_medio' corresponde ao $\theta$ obtido pelo ajuste da formula de Etienne (2005) às SADs observadas.
 
-
+<!--
 ```{r figura 6}
-df_theta %>% mutate(p_class = cut(p,12)) %>% ggplot(aes(x=kernel_percentil,y=theta,group=SiteCode,colour=SiteCode)) + 
-  geom_point() + geom_line() + scale_y_continuous(labels = function(x) format(x,scientific = T)) + 
-  theme(legend.position = "none") +
-  facet_wrap(~p_class, ncol=3,scales="free")
+# df_theta %>% mutate(p_class = cut(p,12)) %>% ggplot(aes(x=kernel_percentil,y=theta,group=SiteCode,shape=par.method) ) + 
+#   geom_point() + geom_line() + scale_y_continuous(labels = function(x) format(x,scientific = T)) + 
+#   theme(legend.position = "none") +
+#   facet_grid(p_class~., scales="free")
 ```
 figura 6. $\theta$ ~ kernel_percentil + (~p_class). p_class = cut(p,12). Os pontos e linhas estão coloridos pelo Site. 
+-->
 
 ### U ###
 
 ```{r df_U e fig 7}
 # dados
-df_U <- df_par.conv %>% filter(par.class == "U") %>% select(-par.method) %>% # apenas os valores de U
-  dcast(.,formula = SiteCode + kernel_percentil + p + S + DA + J ~ par.class, value.var="par.value") %>%  # transformando theta em coluna
-  rbind.fill(x=.,y=df_resultados[df_resultados$kernel_percentil != "campo_medio",c(1:6,8)]) # combinando com theta estimado do campo medio
+df_U <- df_par.conv %>% filter(par.class == "U") %>%  # apenas os valores de U
+  dcast(.,formula = ... ~ par.class, value.var="par.value")  # transformando theta em coluna
+
+df_U <- df_resultados %>% filter(kernel_percentil != "campo_medio") %>% .[,c(1:6,8)] %>% mutate(par.method="R08") %>% #Rosindell et al. 2008 
+  rbind.fill(x=df_U, y=.) %>% arrange(SiteCode,kernel_percentil)
 
 # grafico
-df_U %>% ggplot(aes(x=p,y=U)) + geom_point() + geom_smooth(method = 'loess',se=F,colour="red") +
+df_U %>% ggplot(aes(x=p,y=U,group=par.method)) + geom_point(aes(color=par.method)) + geom_smooth(method = 'loess',se=F,colour="red") +
   # scale_y_continuous(labels = function(x) format(x,scientific = TRUE)) +
+  theme(legend.title = element_blank()) + 
   facet_wrap(~kernel_percentil,nrow = 3,scales="free")
 ```
 
 figura 7. U ~ p + (~kernel_percentil)
 
+<!--
 ```{r fig 8}
-df_U %>% mutate(p_class = cut(p,12)) %>% ggplot(aes(x=kernel_percentil,y=U,group=SiteCode,colour=SiteCode)) + 
-  geom_point() + geom_line() + #scale_y_continuous(labels = function(x) format(x,scientific = T)) + 
-  theme(legend.position = "none") +
-  facet_wrap(~p_class, ncol=3,scales="free")
+# df_U %>% mutate(p_class = cut(p,12)) %>% ggplot(aes(x=kernel_percentil,y=U,group=SiteCode,colour=SiteCode)) + 
+#   geom_point() + geom_line() + #scale_y_continuous(labels = function(x) format(x,scientific = T)) + 
+#   theme(legend.position = "none") +
+#   facet_wrap(~p_class, ncol=3,scales="free")
 ```
 
 Figura 8. U ~ kernel_percentil + (~p_class); p_class = cut(p,12). Os pontos e linhas estão coloridos pelo Site.
-
+-->
 
 ### Chuva de Propágulos ###
 
