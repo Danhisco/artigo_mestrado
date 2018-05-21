@@ -1,0 +1,83 @@
+---
+title: "Resultados - artigo"
+author: "Mori, Danilo Pereira"
+date: "21 de maio de 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE} 
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Introdução da sessão de resultados:
+
+Organizamos os resultados em 3 blocos de dados, aqueles para MNEE, MNEI e MNEE + MNEI. As variáveis resposta são: GOF, $\theta$, m, U, spp_I, $S_M$. As variáveis indepedentes são cobertura vegetal (p) e função de dispersão, que está sendo expressa de forma categorica(k), assim, podemos avaliar tanto os dados de MNEE, quanto para MNEE + MNEI; e de forma contínua d (distância média de dispersão da função de dispersão). Convertemos os parâmetros de MNEE U e d em $\theta'$, m'; e $\theta$ e m de MNEI em  U' e (d' e k'). considerando que $J_M$ = número de indivíduos na paisagem. Quando houve mais de uma observação para um mesmo Sítio de amostragem, então consideramos a variável Sítio como variável categórica dos efeitos aleatórios do modelo linear; quando a função de dispersão foi categória consideramos (1|Site) e  (k|Site) se ela foi contínua. Assim, temos duas maneiras de particionalizar a variação prevista pelo modelo. Assim, podemos avaliar quanto da variação está associada ao local e portanto aos processos de fragmentação relacionadas ao histórico da área (REFERÊNCIA). Em nossos modelos mistos ajustamos a variação a partir de um média para cada local (1|Site) e como um intercepto e inclinação na regressão com a distância média de dispersão (d) para cada local (d|Site). O $R_m^2$ é a variação explicada pelos efeitos fixos do modelo, ou seja, p ou a variável relacionada à limitação à dispersão (k ou d) ('R quadrado marginal'); já a variação condicional, $R_c^2$, é a variação associado tanto às variáveis de efeito fixo quanto ao sítio de amostragem (1|Site ou d|Site). Acredito que uma métrica de comparação entre $R^2$ para GLM e GLMM seria considerar a razão $R_{GLMM}^2 = R_m^2 / R_c^2$?
+
+Sessões de resultados:
+
+_Resultados para MNEI_
+
+i)GOF ~ p 
+     
+ii)$\theta$ ~ p
+     
+iii) m ~ p
+
+iv) U' ~ p
+
+v) d' ~ p
+
+vi.a) d' ~ m
+vi.b) k' ~ d'
+
+vii)spp_I ~ p
+
+viii)$S_M'$ ~ p
+
+xi)GOF ~ spp_I
+
+_Resultados para MNEE_
+k <- factor( as.character( c(0.99,seq(0.95,0.50,by=-0.05),0.25) ) )
+
+i)GOF ~ p * k + (1|Site)
+      ~ p * d + (d|Site)
+     
+     
+ii)U ~ p * k + (1|Site)
+     ~ p * d + (d|Site)     
+     
+     
+iii)m' ~ p * k + (1|Site)
+       ~ p * d + (d|Site)
+
+
+iv)$\theta'$ ~ p * k + (1|Site)
+           ~ p * d + (d|Site)
+
+v)spp_I' ~ p * k + (1|Site)
+         ~ p * d + (d|Site)
+        
+vi)$S_M$ ~ p * k + (1|Site)
+         ~ p * d + (d|Site)
+         
+vii)GOF ~ spp_I' * k + (1|Site)
+        ~ spp_I' * d + (d|Site) [?]
+        
+        
+_Resultados para MNEE + MNEI_
+k <- factor( c(as.character( c(0.99,seq(0.95,0.50,by=-0.05),0.25) ),"EI") )
+
+i)GOF ~ p * k + (1|Site)
+     
+ii)$\theta'$ ~ p * k + (1|Site)
+     
+iii)m' ~ p * k + (1|Site)
+
+iv)U' ~ p * k + (1|Site)
+
+v)spp_I' ~ p * k + (1|Site)
+        
+vi)$S_M'$ ~ p * k + (1|Site)
+
+vii)GOF ~ spp_' * k + (1|Site)
+
