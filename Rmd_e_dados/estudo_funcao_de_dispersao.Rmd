@@ -10,11 +10,10 @@ output:
 knitr::opts_chunk$set(echo = TRUE,tidy = TRUE, cache = TRUE)
 ```
 
-```{r}
+```{r global packages and data}
 library(magrittr)
 library(plyr)
 library(dplyr)
-
 ```
 
 Introdução

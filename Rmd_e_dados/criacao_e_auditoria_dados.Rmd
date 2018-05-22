@@ -332,18 +332,30 @@ Os resultados da conversão de d em m 'estouraram' os possíveis valores de m, u
 
 ### Síntese dos dados ###
 
-SdT: i) unir os data frames
+SdT: i) unir os data frames; ii) agora com dois métodos de conversão vou limpar as estimativas de m para o EE e as de sd_k para EI. 
 
 ```{r unindo os data frames}
 # df_EE %>% str
 # df_EI %>% str
 df_resultados <- merge(x=df_EE,y=df_EI, all = TRUE) 
+df_resultados[df_resultados$modelo == "EI","kernel_percentil"] <- "campo_medio"
+df_resultados %<>% select(-modelo)
+
+# arrumando os levels de kernel_percentil #
+# vou colocar o nível 'campo_medio' como o de limitação à dispersão menos severo #
+df_resultados$kernel_percentil <- factor(df_resultados$kernel_percentil, levels=levels(df_resultados$kernel_percentil)[c(12:1,13)])
 
 ## Para arrumar o nome depois da reunião do dia 29 de março, onde compreendi que a coluna kernel é apenas o desvio padrão da dist subjacente e desta forma fica mais exp
 ## como já arrumei o código acima o codigo a seguir só é válido para o que foi feito antes de 29 de março.
 ## Mudei aqui para não precisar rodar todas as analises acima
 # df_resultados  <- df_resultados[,1:12]
 # names(df_resultados)[7] <- "sd_k"
+
+
+# ii) limpar os valores das conversões ##
+df_resultados[df_resultados$kernel_percentil == "campo_medio",c("sd_k","U")] <- NA
+df_resultados[df_resultados$kernel_percentil != "campo_medio",c("theta","m")] <- NA
+df_resultados %>% head(.,n=14)
 
 write.table(df_resultados,file="/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/df_resultados.txt",sep = "\t",row.names = FALSE)
 ```

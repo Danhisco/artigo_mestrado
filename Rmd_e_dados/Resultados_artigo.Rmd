@@ -13,71 +13,162 @@ Introdução da sessão de resultados:
 
 Organizamos os resultados em 3 blocos de dados, aqueles para MNEE, MNEI e MNEE + MNEI. As variáveis resposta são: GOF, $\theta$, m, U, spp_I, $S_M$. As variáveis indepedentes são cobertura vegetal (p) e função de dispersão, que está sendo expressa de forma categorica(k), assim, podemos avaliar tanto os dados de MNEE, quanto para MNEE + MNEI; e de forma contínua d (distância média de dispersão da função de dispersão). Convertemos os parâmetros de MNEE U e d em $\theta'$, m'; e $\theta$ e m de MNEI em  U' e (d' e k'). considerando que $J_M$ = número de indivíduos na paisagem. Quando houve mais de uma observação para um mesmo Sítio de amostragem, então consideramos a variável Sítio como variável categórica dos efeitos aleatórios do modelo linear; quando a função de dispersão foi categória consideramos (1|Site) e  (k|Site) se ela foi contínua. Assim, temos duas maneiras de particionalizar a variação prevista pelo modelo. Assim, podemos avaliar quanto da variação está associada ao local e portanto aos processos de fragmentação relacionadas ao histórico da área (REFERÊNCIA). Em nossos modelos mistos ajustamos a variação a partir de um média para cada local (1|Site) e como um intercepto e inclinação na regressão com a distância média de dispersão (d) para cada local (d|Site). O $R_m^2$ é a variação explicada pelos efeitos fixos do modelo, ou seja, p ou a variável relacionada à limitação à dispersão (k ou d) ('R quadrado marginal'); já a variação condicional, $R_c^2$, é a variação associado tanto às variáveis de efeito fixo quanto ao sítio de amostragem (1|Site ou d|Site). Acredito que uma métrica de comparação entre $R^2$ para GLM e GLMM seria considerar a razão $R_{GLMM}^2 = R_m^2 / R_c^2$?
 
-Sessões de resultados:
+Relação das variáveis e base de dados utilizado:
 
 _Resultados para MNEI_
 
-i)GOF ~ p 
-     
-ii)$\theta$ ~ p
-     
-iii) m ~ p
+A) Variável de congruência com o observado e parâmetros livres
+-GOF, $\theta$, m ~ p 
 
-iv) U' ~ p
+B) Parâmetros convertidos
+-U', d' ~ p
 
-v) d' ~ p
-
+<!-- Anexo, uma frase no texto principal
 vi.a) d' ~ m
 vi.b) k' ~ d'
+-->
 
-vii)spp_I ~ p
+C) Parâmetros estimados a posteriori
+-spp_I, $S_M'$ ~ p
 
-viii)$S_M'$ ~ p
+D) Congruência com o observado e spp input como métrica composto de theta e m
+-GOF ~ spp_I
 
-xi)GOF ~ spp_I
+_Resultados para MNEE_ 
+k <- factor( as.character( c(0.99,seq(0.95,0.50,by=-0.05),0.25) ) ) - a proporção de propágulos até a área imediata da planta progenitora ($l_{cel}$ metros da copa da árvore progenitora)
 
-_Resultados para MNEE_
-k <- factor( as.character( c(0.99,seq(0.95,0.50,by=-0.05),0.25) ) )
-
-i)GOF ~ p * k + (1|Site)
-      ~ p * d + (d|Site)
+A) Variável de congruência com o observado e parâmetro livre 
+-GOF, U ~ p * k + (1|Site)
+        ~ p * d + (d|Site)
      
-     
-ii)U ~ p * k + (1|Site)
-     ~ p * d + (d|Site)     
-     
-     
-iii)m' ~ p * k + (1|Site)
-       ~ p * d + (d|Site)
+B) Parâmetros convertidos     
+-m' ~ p * k + (1|Site)
+    ~ p * d + (d|Site)
 
-
+<!-- acredito que deve ser repetitivo com U, vou mandar para o anexo
 iv)$\theta'$ ~ p * k + (1|Site)
-           ~ p * d + (d|Site)
+     ~ p * d + (d|Site)
+-->
 
-v)spp_I' ~ p * k + (1|Site)
-         ~ p * d + (d|Site)
-        
+C) Parâmetros estimados a posteriori
+-spp_I' ~ p * k + (1|Site)
+        ~ p * d + (d|Site)
+
+<!--  idem, esses valores já serão apresentados na próxima sessão, vou deixar essa seleção em anexo      
 vi)$S_M$ ~ p * k + (1|Site)
          ~ p * d + (d|Site)
-         
-vii)GOF ~ spp_I' * k + (1|Site)
-        ~ spp_I' * d + (d|Site) [?]
+
+-->
+-GOF ~ spp_I' * k + (1|Site)
+     ~ spp_I' * d + (d|Site)
         
         
-_Resultados para MNEE + MNEI_
-k <- factor( c(as.character( c(0.99,seq(0.95,0.50,by=-0.05),0.25) ),"EI") )
+### Resultados para MNEE + MNEI ###
+k <- factor( c(c(0.99,seq(0.95,0.50,by=-0.05),0.25),"EI") ) - agora os valores de MNEI são uma categoria de k, está logo após 0.25, pois em geral d foi muito alto para os m estimados por verossimilhança.
 
-i)GOF ~ p * k + (1|Site)
-     
-ii)$\theta'$ ~ p * k + (1|Site)
-     
-iii)m' ~ p * k + (1|Site)
+A) Variável de congruência com o observado e os parâmetros de MNEI
+-$\theta'$, m', GOF ~ p * k + (1|Site)
 
-iv)U' ~ p * k + (1|Site)
+#### $\theta'$ ####
+```{r selecao de funcao de ligacao e distribuicao teorica, echo=FALSE}
+#i) seleção da combinação de funcao de ligacao e distribuicao teorica utilizando apenas o modelo cheio
+```
 
-v)spp_I' ~ p * k + (1|Site)
-        
-vi)$S_M'$ ~ p * k + (1|Site)
+```{r md_theta' - EE + EI}
+# i) construção de modelos
+# ii) seleção de modelos.
+```
 
-vii)GOF ~ spp_' * k + (1|Site)
+```{r avaliacao modelo selecionado, echo=FALSE}
+# i) summary
+# ii) gráficos diagnóstico
+```
 
+
+#### m' ####
+```{r selecao de funcao de ligacao e distribuicao teorica, echo=FALSE}
+#i) seleção da combinação de funcao de ligacao e distribuicao teorica utilizando apenas o modelo cheio
+```
+
+```{r md_theta' - EE + EI}
+# i) construção de modelos
+# ii) seleção de modelos.
+```
+
+```{r avaliacao modelo selecionado, echo=FALSE}
+# i) summary
+# ii) gráficos diagnóstico
+```
+
+
+#### GOF ####
+```{r selecao de funcao de ligacao e distribuicao teorica, echo=FALSE}
+#i) seleção da combinação de funcao de ligacao e distribuicao teorica utilizando apenas o modelo cheio
+```
+
+```{r md_theta' - EE + EI}
+# i) construção de modelos
+# ii) seleção de modelos.
+```
+
+```{r avaliacao modelo selecionado, echo=FALSE}
+# i) summary
+# ii) gráficos diagnóstico
+```
+
+B) Parâmetro com maior significado biológico, uma vez que no equilíbrio U = taxa de extinção de espécies por evento de morte; uma aproximação da probabilidade de extinção de espécies raras.
+-U' ~ p * k + (1|Site)
+
+#### U' ####
+```{r selecao de funcao de ligacao e distribuicao teorica, echo=FALSE}
+#i) seleção da combinação de funcao de ligacao e distribuicao teorica utilizando apenas o modelo cheio
+```
+
+```{r md_theta' - EE + EI}
+# i) construção de modelos
+# ii) seleção de modelos.
+```
+
+```{r avaliacao modelo selecionado, echo=FALSE}
+# i) summary
+# ii) gráficos diagnóstico
+```
+
+
+C) Parâmetros a posteriori
+-spp_I' ~ p * k + (1|Site)
+
+#### spp_I' ####
+```{r selecao de funcao de ligacao e distribuicao teorica, echo=FALSE}
+#i) seleção da combinação de funcao de ligacao e distribuicao teorica utilizando apenas o modelo cheio
+```
+
+```{r md_theta' - EE + EI}
+# i) construção de modelos
+# ii) seleção de modelos.
+```
+
+```{r avaliacao modelo selecionado, echo=FALSE}
+# i) summary
+# ii) gráficos diagnóstico
+```
+
+-GOF ~ spp_I' * k + (1|Site)
+
+#### GOF ~ spp_I' ####
+```{r selecao de funcao de ligacao e distribuicao teorica, echo=FALSE}
+#i) seleção da combinação de funcao de ligacao e distribuicao teorica utilizando apenas o modelo cheio
+```
+
+```{r md_theta' - EE + EI}
+# i) construção de modelos
+# ii) seleção de modelos.
+```
+
+```{r avaliacao modelo selecionado, echo=FALSE}
+# i) summary
+# ii) gráficos diagnóstico
+```
+
+ANEXO:
+<!-- apenas os itens -->

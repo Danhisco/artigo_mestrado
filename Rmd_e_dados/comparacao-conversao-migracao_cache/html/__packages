@@ -1,0 +1,10 @@
+base
+rmutil
+lamW
+reshape2
+magrittr
+plyr
+dplyr
+ggplot2
+gridExtra
+bindrcpp
