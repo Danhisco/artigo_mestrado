@@ -6,15 +6,305 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE} 
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = FALSE, tidy = TRUE, include = TRUE, warning = FALSE,cache = TRUE)
 ```
+
+```{r dados e pacotes,warning=FALSE,message=FALSE,echo=FALSE}
+library(reshape2) # para mudar formato dos dados
+library(RVAideMemoire) #gráficos diagnóstico dos GLMM
+library(sjPlot) #gráficos de GLMM
+library(MuMIn) # para R^2
+library(gridExtra)  #pacote para gráficos
+library(ggplot2)  # idem
+library(lme4) # pacote de criação dos modelos estatísticos
+library(sads) # pacote para comparar os modelos, seleção per se
+library(merTools) # para intervalos de previsao
+library(broom) # para manipular os modelos
+library(magrittr) # p escrita
+library(plyr) 
+library(dplyr) 
+df_resultados <- read.table(file="/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/df_resultados_conv.txt", header=T, sep="\t",as.is = T)
+df_resultados$k <- factor(df_resultados$k,
+                          levels=df_resultados$k[c(12:1,13)])
+# df_resultados$k %>% unique
+```
+
+<!-- última paragráfo de material e métodos
+
+Organizamos os resultados em 3 blocos de dados, aqueles para MNEE, MNEI e MNEE + MNEI. As variáveis resposta são: GOF, $\theta$, m, U, spp_I e d. As variáveis indepedentes são cobertura vegetal (p) e função de dispersão, que está sendo expressa de forma categorica(k), assim, podemos avaliar tanto os dados de MNEE, quanto para MNEE + MNEI; e de forma contínua d (distância média de dispersão da função de dispersão), para os dados de MNEE. Convertemos os parâmetros de MNEE U e d em $\theta'$, m'; e $\theta$ e m de MNEI em  U' e (d' e k'), considerando que $J_M$ = número de indivíduos na paisagem. Quando houve mais de uma observação para um mesmo Sítio de amostragem, então utilizamos a variável Sítio como variável categórica dos efeitos aleatórios do modelo linear; quando a função de dispersão foi categória utilizamos (1|Site) e  (d|Site) se ela foi contínua. Assim, temos duas maneiras de partir a variação prevista pelo modelo. O $R_m^2$ é a variação explicada pelos efeitos fixos do modelo, ou seja, p e/ou a variável relacionada à limitação à dispersão (k ou d) ('R quadrado marginal'); já o R quadrado condicional, $R_c^2$, é a variação associado tanto às variáveis de efeito fixo quanto ao efeito aleatório (sítio de amostragem). 
+Acredito que uma métrica de comparação entre $R^2$ para GLM e GLMM seria considerar a razão $R_{GLMM}^2 = R_m^2 / R_c^2$? -->
 
 Introdução da sessão de resultados:
 
-Organizamos os resultados em 3 blocos de dados, aqueles para MNEE, MNEI e MNEE + MNEI. As variáveis resposta são: GOF, $\theta$, m, U, spp_I, $S_M$. As variáveis indepedentes são cobertura vegetal (p) e função de dispersão, que está sendo expressa de forma categorica(k), assim, podemos avaliar tanto os dados de MNEE, quanto para MNEE + MNEI; e de forma contínua d (distância média de dispersão da função de dispersão). Convertemos os parâmetros de MNEE U e d em $\theta'$, m'; e $\theta$ e m de MNEI em  U' e (d' e k'). considerando que $J_M$ = número de indivíduos na paisagem. Quando houve mais de uma observação para um mesmo Sítio de amostragem, então consideramos a variável Sítio como variável categórica dos efeitos aleatórios do modelo linear; quando a função de dispersão foi categória consideramos (1|Site) e  (k|Site) se ela foi contínua. Assim, temos duas maneiras de particionalizar a variação prevista pelo modelo. Assim, podemos avaliar quanto da variação está associada ao local e portanto aos processos de fragmentação relacionadas ao histórico da área (REFERÊNCIA). Em nossos modelos mistos ajustamos a variação a partir de um média para cada local (1|Site) e como um intercepto e inclinação na regressão com a distância média de dispersão (d) para cada local (d|Site). O $R_m^2$ é a variação explicada pelos efeitos fixos do modelo, ou seja, p ou a variável relacionada à limitação à dispersão (k ou d) ('R quadrado marginal'); já a variação condicional, $R_c^2$, é a variação associado tanto às variáveis de efeito fixo quanto ao sítio de amostragem (1|Site ou d|Site). Acredito que uma métrica de comparação entre $R^2$ para GLM e GLMM seria considerar a razão $R_{GLMM}^2 = R_m^2 / R_c^2$?
+Vou explorar o terceiro bloco de dados c(MNEE, MNEI), em anexo a análise dos dados para o conjunto de dados MNEE e MNEI. MNEE e MNEI diferem na forma que implementam a teoria neutra e na forma com que estimam os parâmetros a priori simulação. Assim, unir os resultados em uma mesma análise de dados tem que ser feita considerando a origem dos dados, para adequar com os resultados de MNEE organizei os dados pela proporção da chuva de propágulos que permanece até a área imediata a da copa da árvore progenitora (l_cel metros). Incluindo os dados de MNEI, são 13 níveis na variável "k", o primeiro nível é aquele com cenário de limitação à dispersão mais rigoroso (=0.99), o penúltimo nível é o cenário de limitação à dispersão menos realista (=0.25) e o último nível são os dados de MNEI. Em análise exploratória observamos que mesmo com valores razoáveis de m, MNEI apresentou d's superiores ao de MNEE em escala log (anexo) e como d está relacionado com a proporção de propágulos até a área imediata da planta progenitora (k) ordenei os níveis de "k" agrupando os valores de MNEI juntos no último nível. Existe grande variação no parâmetro 'm' estimado por verossimilhança, contudo, essa variação não apresenta efeito de p (anexo), então, não considerar a variação interna de m em MNEI não deve interferir na análise dos dados. Em anexo, há as análises auxiliares que inclui dos outros conjuntos de dados.
+i) Os dois modelos conseguem apresentar boa congruência com o observado? 
+ii) Se sim quais as característica da paisagem e da relação com a área amostrada que propiciam esse resultado? 
+iii) Em cenários de limitação à dispersão biologicamente realistas o modelo neutro apresente boa congruência com os dados?
+iv) Qual o efeito da fragmentação na diversidade da paisagem segundo o predito neutro?
 
-Relação das variáveis e base de dados utilizado:
+<!--
+Para faciltar o ajuste dos modelos mistos aplicamos a transformação z nas variáveis contínuas: 
+-->
 
+```{r preparacao dos dados, echo=FALSE}
+f_z <- function(x){
+  m <- base::mean(x,na.rm=TRUE)
+  sd <- sd(x,na.rm=TRUE)
+  output <- (x-m)/sd
+  return(output)
+} 
+
+df_resultados %<>% mutate(GOF.z = f_z(GOF), #-1
+                          p.z = f_z(p),
+                          S.z = f_z(S),
+                          U.z = f_z(U),
+                          U_.z = f_z(U_),
+                          theta.z = f_z(theta),
+                          theta_.z = f_z(theta_),
+                          m.z = f_z(m),
+                          m_.z = f_z(m_),
+                          S_M.z = f_z(S_M),
+                          S_M_.z = f_z(S_M_),
+                          spp_I.z = f_z(spp_I),
+                          spp_I_.z = f_z(spp_I_))
+
+names(df_resultados)[1] <- "Site"
+```
+
+__A) Variável de congruência com o observado e os parâmetros de MNEI__
+
+#### GOF ####
+__EE + EI__
+
+```{r 1selecao de funcao de ligacao, echo=FALSE}
+#0) criação dos dados e gráfico
+df_md <- df_resultados %>% dplyr::select(Site, k, GOF, p.z,p)
+# df_md %>% ggplot(aes(x=p,y=GOF)) + geom_point() + facet_wrap(~k,ncol = 4)
+
+#i) seleção da combinação de funcao de ligacao e distribuicao teorica utilizando apenas o modelo cheio
+l_md <- vector("list", length = 4)
+names(l_md) <- c("logit-bin","probit-bin","cloglog - bin","normal")
+l_md[[1]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k + (1 | Site), 
+                    family = "binomial",df_md)
+l_md[[2]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k + (1 | Site), 
+                    family = "binomial"(link=probit),df_md)
+l_md[[3]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k + (1 | Site), 
+                    family = "binomial"(link=cloglog), data = df_md)
+l_md[[4]] <- lmer(GOF ~ p.z * k + (1 | Site), data = df_md)
+
+# AICctab(l_md, weights = TRUE)
+# df_md %>% ggplot(aes(x=p.z,y=GOF)) + geom_point() + facet_wrap(~k,ncol=4)
+# df_md %>% ggplot(aes(x=p,y=GOF)) + geom_point() + facet_wrap(~k,ncol=4)
+```
+<!--
+Como o R2 do modelo cheio estava muito baixo eu resolvi utilizar uma outra distribuição de probabilidade e função de ligação.
+-->
+
+
+```{r GOF selecao}
+# i) construção de modelos
+l_md <- vector("list",length = 5)
+names(l_md) <- c("GOF ~ p * k", "GOF ~ p + k", "GOF ~ p", "GOF ~ k","GOF ~ 1")
+l_md[[1]] <- lmer(GOF ~ p.z * k + (1 | Site),df_md)
+l_md[[2]] <- lmer(GOF ~ p.z + k + (1 | Site),df_md)
+l_md[[3]] <- lmer(GOF ~ p.z + (1 | Site),df_md)
+l_md[[4]] <- lmer(GOF ~ k + (1 | Site),df_md)
+l_md[[5]] <- lmer(GOF ~ 1 + (1 | Site),df_md)
+# l_md %<>% llply(.,function(X) update(X,control=glmerControl(optimizer="bobyqa", optCtrl = list(maxfun=2e5)))) 
+
+# ii) seleção de modelos.
+AICctab(l_md, weights = TRUE)
+
+# hipótese selecionada #
+md_GOF <- l_md[[1]]
+# summary(md_GOF)
+# 
+(r2_GOF <- sapply(l_md, r.squaredGLMM))
+# r2_GOF[1,]/r2_GOF[2,] * 100 %>% round(3)
+# md_GOF %>% fixef() # parâmetros do efeito fixo
+# md_GOF %>% ranef() # parâmetros do efeito aleatório
+
+## inner_join com os resultados do modelo ##
+df_md %<>% inner_join(.,augment(md_GOF),by=c("Site","k","GOF","p.z"))
+```
+
+__Figura 1__ Seleção de modelos e R quadrado marginal e condicional
+
+
+```{r 1avaliacao modelo selecionado, echo=FALSE,message=FALSE,include=TRUE}
+# gráficos diagnóstico
+l_p <- vector("list",length = 3)
+l_p[[1]] <- ggplot(df_md,aes(x=.fitted,y=.resid))+
+  geom_smooth(se=T,col="red") +
+  geom_point() +
+  ggtitle("gráfico diagnostico") + 
+  labs(x="predito",y="residuo") +
+  facet_wrap(~k,ncol=4)
+l_p[[2]] <- ggplot(df_md,aes(x=p.z,y=.resid)) + 
+  geom_smooth(se=T,col="red") +
+  geom_point() +
+  labs(x="p(z)",y="residuo") +
+  facet_wrap(~k,ncol=4)
+l_p[[3]] <- ggplot(mutate(df_md,p_class = cut(p.z,12)),aes(x=k,y=.resid)) + 
+  geom_boxplot() + 
+  labs(x="k",y="residuo")
+  # geom_smooth(se=F,col="red") +
+  # geom_point() +
+  # facet_wrap(~p_class,ncol=4)
+# grid.arrange(l_p[[1]], l_p[[2]], l_p[[3]],
+#              layout_matrix = rbind(rep(1,4),rep(1,4),
+#                                    rep(2,4),rep(2,4),
+#                                    rep(3,4)) 
+#              )
+l_p[[1]]
+```
+
+__Figura 2__- modelo selecionado GOF: resíduos ~ ajustado. A variância não é constante ao longo dos valores fitados e parece que existe uma tendência na nuvem de dados, o que pode indicar que o modelo não conseguiu linearizar os dados.
+
+A regressão dos resíduos contra o predito e as duas variáveis respostas (p e k) mostram que os modelos ajustados não apresentam boa congruência com os dados: a variância não é constante ao longo dos valores fitados para nenhum nível de k; e parece que há uma pequena tendência nos dados, principalmente para o nível 0.25 de k. Outra forma de avaliar a congruência com os dados é plotar o modelo ajustado com o observado:
+
+```{r 1exploracao grafica dos resultados - estimativa e intervalo de confianca bootsrap, echo=FALSE,fig.height=7}
+## novo conjunto de dados ##
+# objetivo: criar todas as combinações entre as preditoras
+df_newdat <- expand.grid(Site = df_md$Site[1],
+                         k = unique(df_md$k),
+                         p.z = seq(min(df_md$p.z)*1.1,max(df_md$p.z)*1.1, length=50)) #no código original é length=50, qual a implicação dessa mudança?
+## Funçoes a serem calculadas a cada simulação ##
+# Previstos por efeitos fixos e aleatórios
+f1 <- function(.) predict(.,newdata=df_newdat)
+# Previstos por efeitos fixos (argumento re.form=~0)
+f2 <- function(.) predict(.,newdata=df_newdat, re.form=~0)
+## Os dois bootstraps. Ajuste o argumento ncpus para o numero de cores de seu computador
+b1 <- bootMer(md_GOF, FUN = f1, nsim=1000, parallel="multicore", ncpus=3) #fixos e aleatorios
+b2 <- bootMer(md_GOF, FUN = f2, nsim=1000, parallel="multicore", ncpus=3) #fixos
+## calcula as médias e intervalos de confiança quantílicos para cada combinação de preditoras
+## no novo conjunto de dados
+df_newdat$p <- df_newdat$p.z*sd(df_md$p) + mean(df_md$p) #?
+df_newdat$mean <- apply(b1$t,2,mean)
+df_newdat$IC.low <- apply(b1$t,2,quantile, 0.025)
+df_newdat$IC.upp <- apply(b1$t,2,quantile, 0.975)
+df_newdat$mean.fixed <- apply(b2$t,2,mean)
+df_newdat$IC.low.fixed <- apply(b2$t,2,quantile, 0.025)
+df_newdat$IC.upp.fixed <- apply(b2$t,2,quantile, 0.975)
+## Plots de GOF/100 x cobertura standardizada com intervalos de predição
+df_md %>%
+    ggplot(aes(x=p,y=GOF) ) + 
+    geom_ribbon(aes(y=mean, ymin=IC.low, ymax=IC.upp), data=df_newdat, col="gray", alpha=0.5) +
+    geom_ribbon(aes(y=mean, ymin=IC.low.fixed, ymax=IC.upp.fixed), data=df_newdat, col="gray", alpha=0.5) +
+    geom_line(aes(x=p, y=mean.fixed), data=df_newdat) +
+    geom_point() +
+    ggtitle("GOF ~ p * k + (1|Sitio)") + 
+    facet_wrap(~k,ncol=4)
+```
+
+__Figura 3__ GOF: observado e o estimado segundo o modelo mais plausível + intervarlo de confiança 95% bootstrap. Entre linhas brancas o intervalo de confiança considerando apenas os efeitos fixos do modelo, fora dela, na região cinza claro, o intervalo de confiança considerando efeitos fixos e efeitos aleatórios. A inclinação da tendência geral varia em função de k para p: para a proporção de propágulos que permanecem até $l_{cel}$ metros da planta progenitora = 0.99, observamos um efeito negativo de p; com o aumento da proporção de propágulos observamos a atenuação dessa tendência chegando a ser quase nula para proporção ~ 0.50 e invertendo o efeito em 0.25, onde p apresenta efeito positivo. O efeito de p para os resultados de MNEI podem ser negligenciados, além disso é a categoria que apresenta o melhor ajuste do modelo, sendo que para k = 0.25 é onde observa-se maior variância entre os resíduos. 
+
+
+
+#### m ####
+```{r 2selecao de funcao de ligacao e distribuicao teorica, echo=FALSE}
+## Dados ##
+# df_resultados %>% select(Site, k, p, m, m_) %>% 
+  # melt(.,id.vars = c("Site","k","p"))
+
+
+#i) seleção da combinação de funcao de ligacao e distribuicao teorica utilizando apenas o modelo cheio
+```
+
+```{r m}
+# i) construção de modelos
+# ii) seleção de modelos.
+```
+
+```{r 2avaliacao modelo selecionado, echo=FALSE}
+# gráficos diagnóstico
+```
+
+```{r 2exploracao grafica dos resultados, echo=FALSE}
+# plotar os dados completos: x = p, y = VR; 13 paineis o primeiro é 0.99 e o último EI
+```
+
+#### $\theta$ ####
+```{r 3selecao de funcao de ligacao e distribuicao teorica, echo=FALSE}
+#i) seleção da combinação de funcao de ligacao e distribuicao teorica utilizando apenas o modelo cheio
+```
+
+```{r theta}
+# i) construção de modelos
+# ii) seleção de modelos.
+```
+
+```{r 3avaliacao modelo selecionado, echo=FALSE}
+# gráficos diagnóstico
+```
+
+```{r 3exploracao grafica dos resultados, echo=FALSE}
+# plotar os dados completos: x = p, y = VR; 13 paineis o primeiro é 0.99 e o último EI
+```
+
+
+__B) Parâmetro com maior significado biológico, uma vez que no equilíbrio U = taxa de extinção de espécies por evento de morte; uma aproximação da probabilidade de extinção de espécies raras na paisagem dado a riqueza observada na área amostrada.__
+
+#### U ####
+```{r 4selecao de funcao de ligacao e distribuicao teorica, echo=FALSE}
+#i) seleção da combinação de funcao de ligacao e distribuicao teorica utilizando apenas o modelo cheio
+```
+
+```{r U}
+# i) construção de modelos
+# ii) seleção de modelos.
+```
+
+```{r 4avaliacao modelo selecionado, echo=FALSE}
+# gráficos diagnóstico
+```
+
+```{r 4exploracao grafica dos resultados, echo=FALSE}
+# plotar os dados completos: x = p, y = VR; 13 paineis o primeiro é 0.99 e o último EI
+```
+
+
+
+__C) Parâmetros a posteriori__
+
+
+#### spp_I ####
+```{r 5selecao de funcao de ligacao e distribuicao teorica, echo=FALSE}
+#i) seleção da combinação de funcao de ligacao e distribuicao teorica utilizando apenas o modelo cheio
+```
+
+```{r spp_I}
+# i) construção de modelos
+# ii) seleção de modelos.
+```
+
+```{r 5avaliacao modelo selecionado, echo=FALSE}
+# gráficos diagnóstico
+```
+
+```{r 5exploracao grafica dos resultados, echo=FALSE}
+# plotar os dados completos: x = p, y = VR; 13 paineis o primeiro é 0.99 e o último EI
+```
+
+
+#### GOF ~ spp_I ####
+```{r 6selecao de funcao de ligacao e distribuicao teorica, echo=FALSE}
+#i) seleção da combinação de funcao de ligacao e distribuicao teorica utilizando apenas o modelo cheio
+```
+
+```{r GOF_spp.I}
+# i) construção de modelos
+# ii) seleção de modelos.
+```
+
+```{r 6avaliacao modelo selecionado, echo=FALSE}
+# i) summary
+# ii) gráficos diagnóstico
+```
+
+<!--
+ANEXO:
+ apenas os itens 
 _Resultados para MNEI_
 
 A) Variável de congruência com o observado e parâmetros livres
@@ -23,10 +313,8 @@ A) Variável de congruência com o observado e parâmetros livres
 B) Parâmetros convertidos
 -U', d' ~ p
 
-<!-- Anexo, uma frase no texto principal
 vi.a) d' ~ m
 vi.b) k' ~ d'
--->
 
 C) Parâmetros estimados a posteriori
 -spp_I, $S_M'$ ~ p
@@ -45,130 +333,16 @@ B) Parâmetros convertidos
 -m' ~ p * k + (1|Site)
     ~ p * d + (d|Site)
 
-<!-- acredito que deve ser repetitivo com U, vou mandar para o anexo
 iv)$\theta'$ ~ p * k + (1|Site)
      ~ p * d + (d|Site)
--->
 
 C) Parâmetros estimados a posteriori
 -spp_I' ~ p * k + (1|Site)
         ~ p * d + (d|Site)
 
-<!--  idem, esses valores já serão apresentados na próxima sessão, vou deixar essa seleção em anexo      
 vi)$S_M$ ~ p * k + (1|Site)
          ~ p * d + (d|Site)
 
--->
 -GOF ~ spp_I' * k + (1|Site)
      ~ spp_I' * d + (d|Site)
-        
-        
-### Resultados para MNEE + MNEI ###
-k <- factor( c(c(0.99,seq(0.95,0.50,by=-0.05),0.25),"EI") ) - agora os valores de MNEI são uma categoria de k, está logo após 0.25, pois em geral d foi muito alto para os m estimados por verossimilhança.
-
-A) Variável de congruência com o observado e os parâmetros de MNEI
--$\theta'$, m', GOF ~ p * k + (1|Site)
-
-#### $\theta'$ ####
-```{r selecao de funcao de ligacao e distribuicao teorica, echo=FALSE}
-#i) seleção da combinação de funcao de ligacao e distribuicao teorica utilizando apenas o modelo cheio
-```
-
-```{r md_theta' - EE + EI}
-# i) construção de modelos
-# ii) seleção de modelos.
-```
-
-```{r avaliacao modelo selecionado, echo=FALSE}
-# i) summary
-# ii) gráficos diagnóstico
-```
-
-
-#### m' ####
-```{r selecao de funcao de ligacao e distribuicao teorica, echo=FALSE}
-#i) seleção da combinação de funcao de ligacao e distribuicao teorica utilizando apenas o modelo cheio
-```
-
-```{r md_theta' - EE + EI}
-# i) construção de modelos
-# ii) seleção de modelos.
-```
-
-```{r avaliacao modelo selecionado, echo=FALSE}
-# i) summary
-# ii) gráficos diagnóstico
-```
-
-
-#### GOF ####
-```{r selecao de funcao de ligacao e distribuicao teorica, echo=FALSE}
-#i) seleção da combinação de funcao de ligacao e distribuicao teorica utilizando apenas o modelo cheio
-```
-
-```{r md_theta' - EE + EI}
-# i) construção de modelos
-# ii) seleção de modelos.
-```
-
-```{r avaliacao modelo selecionado, echo=FALSE}
-# i) summary
-# ii) gráficos diagnóstico
-```
-
-B) Parâmetro com maior significado biológico, uma vez que no equilíbrio U = taxa de extinção de espécies por evento de morte; uma aproximação da probabilidade de extinção de espécies raras.
--U' ~ p * k + (1|Site)
-
-#### U' ####
-```{r selecao de funcao de ligacao e distribuicao teorica, echo=FALSE}
-#i) seleção da combinação de funcao de ligacao e distribuicao teorica utilizando apenas o modelo cheio
-```
-
-```{r md_theta' - EE + EI}
-# i) construção de modelos
-# ii) seleção de modelos.
-```
-
-```{r avaliacao modelo selecionado, echo=FALSE}
-# i) summary
-# ii) gráficos diagnóstico
-```
-
-
-C) Parâmetros a posteriori
--spp_I' ~ p * k + (1|Site)
-
-#### spp_I' ####
-```{r selecao de funcao de ligacao e distribuicao teorica, echo=FALSE}
-#i) seleção da combinação de funcao de ligacao e distribuicao teorica utilizando apenas o modelo cheio
-```
-
-```{r md_theta' - EE + EI}
-# i) construção de modelos
-# ii) seleção de modelos.
-```
-
-```{r avaliacao modelo selecionado, echo=FALSE}
-# i) summary
-# ii) gráficos diagnóstico
-```
-
--GOF ~ spp_I' * k + (1|Site)
-
-#### GOF ~ spp_I' ####
-```{r selecao de funcao de ligacao e distribuicao teorica, echo=FALSE}
-#i) seleção da combinação de funcao de ligacao e distribuicao teorica utilizando apenas o modelo cheio
-```
-
-```{r md_theta' - EE + EI}
-# i) construção de modelos
-# ii) seleção de modelos.
-```
-
-```{r avaliacao modelo selecionado, echo=FALSE}
-# i) summary
-# ii) gráficos diagnóstico
-```
-
-ANEXO:
-<!-- apenas os itens -->
+-->
