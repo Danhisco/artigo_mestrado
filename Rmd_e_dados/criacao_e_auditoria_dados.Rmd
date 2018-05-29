@@ -186,179 +186,424 @@ Diria que está autocoerente: GOF é proporcional à KS.p_mean e KS.p_mean é in
 
 ### Conversão dos parâmetros ###
 
-  Os dois modelos neutros EE e EI são implementações da teoria geral desenvolvida por Hubbell 2001, contudo, a relação entre seus parâmetros não é direta. Aqui convertemos os parâmetros obtidos por verossimilhança utilizando o modelo EI nos parâmetros do modelo EE, U (taxa de especiação na paisagem) e d (média da dispersão). E convertemos o parâmetro U do modelo EE, estimado utilizando uma formula semi-analítica baseada na natureza genealogica do modelo coalescente dado a riqueza observada e a função de dispersão (parâmetro informado a priori), em theta e m. Para fazer a conversão entre U e theta utilizamos a definição presente em Hubbell 2001 onde: 
+__Objetivo:__ Comparar os dois métodos de conversão de parâmetro de migração entre um modelo neutro de campo médio (Etienne 2005) e um modelo neutro de espaço explícito (Rosindell et al. 2008) a partir de deduções da eq 1 apresentada por Chisholm & Lichstein (2009). O primeiro método é desenvolvido pelos autores anteriores e trata-se de uma aproximação (eq2 Chisholm & Lichstein 2009); o segundo método foi deduzido a partir da eq 1 e aproveitou das particularidades de nossas simulações para deduzir uma equação. Ambos métodos relacionam a probabilidade de um indivíduo de fora da comunidade colonizar uma unidade de habitat na comunidade local por evento de morte ('m') com a distância média de dispersão dos indivíduos na paisagem ('d'). 
 
-$theta := 2*JM*U$; 
-
-Onde JM = número de indivíduos na paisagem = área total do recorte de paisagem (500 ha) X densidade observada (DA) X cobertura vegetal observada (p). Utilizamos essa relação para conversão reciproca de theta e U:
-
-$theta = 2*500*DA*p*U$  
-$U = theta/(2*500*DA*p)$
-
-Para a conversão de m e d utilizamos a aproximação de caso geral apresentado por Chisholm & Linchestein 2009. Essa aproximação considera que existe apenas duas escalas: a amostra de tamanho J e uma paisagem infinita e homogenea. Em sua aproximação geral a forma da função de dispersão (ou seja, a distribuição de probabilidade que descreve a probabilidade de colonização de um propágulo em função da distância da planta progenitora) não têm influência no resultado da aproximação. Contudo, a área da amostra, relativo à média de dispersão, e a forma da amostra têm consideraveis influências na aproximação. Amostras circulares apresentam maior acuracia do que amostra retangulares e quanto maior o diâmetro da amostra em relacão à media de dispersão maior a acuracia da aproximação. Em nosso caso, selecionamos apenas trabalhos fitossociológicos que realizaram amostras em bloco único e em nossas simulações aproximamos essas amostras como um bloco único quadrado. Assim, a aproximação geral apresentada por Chisholm & Linchestein 2009:
-
-m ~ P d /pi A; 
-
-onde P = perímetro da amostra, d = mean dispersal distance, A = área da amostra
-
-pode ser reescrita como:
-
-m ~ 4l d/pi l^2; 
-
-Onde l = lado da amostra = sqrt(A) e A = J/DA (número de indivíduos da amostra dividido pela densidade observada na amostra)
-
-Simplificando:
-
-m ~ 4 d / pi sqrt(J/DA)
-
-A variável *d* está descrita na unidade de espaço utilizada para definir $DA_{obs}$. A unidade de espaço utilizada em $DA_{obs} = individuos/ha$ é o héctare (*ha*) = $100^2$ metros, assim, para escrever *d* em metros dividimos por 100, uma vez que $\sqrt{ha} = 100$ metros.
-
-$$m = 4d /100 \pi \sqrt{J/DA}$$
+O modelo neutro espacialmente explícito tem as seguintes características: i) utilizamos apenas áreas amostradas contíguas que aproximamos como quadrados; ii) a distribuição de probabilidade subjacente a função de dispersão é Laplace e parametrizamos a partir do desvio-padrão; iii) a área foi escrita em função de J e DA, número de indivíduos e densidade(ind/ha) observada na amostra, respectivamente.
 
 
-A função de dispersão que desenvolvemos foi parâmetrizada para que informemos o desvio padrão da distribuição, assim, é possível utilizar a mesma variável com diferentes funções de probabilidade subjacente como a distribuição uniforme e a normal. 
+### Contexto ###
 
-A função de dispersão que utilizamos no modelo EE tem como distribuição de probabilidade subjacente a distribuição de Laplace, nela a variância é descrita por:
+Chisholm & Lichstein (2009) (doravante C&L09) estabeleceram uma relação entre *m* e *A* (a área da comunidade local):
 
-$var = 2 b ^2$
+>When an individual at location (x, y) in the local
+>community dies, the replacement individual may, by virtue
+>of the random dispersal and recruitment processes, be from
+>within the local community (i.e., within the quadrat) or from
+>outside the local community (i.e., from outside the quadrat).
+>Define m x,y as the probability that the replacement individual
+>at location (x, y) is drawn from outside the local community.
+>This parameter will be highest for individuals on the edges
+>of the quadrat and smallest for individuals at the centre of
+>the quadrat, where m x,y » 0 for large A. We define m as the
+>average value of m x,y across the whole of the local
+>community as follows:  
+  
+$$eq.0:  m = \frac{1}{A} \int \int_A m_{x,y} dxdy $$
 
-e assim,
+Essa equação é válida para o processo de dispersão em ambientes homogêneos, ou seja, sem fragmentação. A maneira que simulamos a dispersão em paisagens fragmentadas é diferente em uma simulação coalescente: uma vez que sorteamos um progenitor e este estaria presente em uma unidade de não habitat, o sorteio é refeito até que o progenitor esteja em uma unidade de habitat. Uma vez que o sorteio é refeito este pode cair novamente dentro da área da comunidade local, uma equação que descreve exatamente a probabilidade de um indivíduo da comunidade ser substituido por um indivíduo de fora da comunidade em uma paisagem fragmentada dependeria de explicitamente considerar a configuração espacial. Uma aproximação do efeito da fragmentação na simulação é considerar que a chance da dispersão ser oriunda de uma área de cobertura vegetal, assim, podemos corrigir m pela porcentagem de cobertura vegetal na paisagem:
 
-$b=sd/sqrt(2)$
+$$eq.0': m' = \frac{mp}{1 - (1-p)m} $$
 
-Onde b é o parâmetro escalar, que descreve a "distância média" da Laplaciana (não é a distância média per se, pois podemos entender a Laplaciana como uma exponencial espelhada, seria o equivalente ao escalar médio), portanto b = d. Assim, substituindo b na aproximação
+Onde _p_ é a porcentagem de cobertura vegetal na paisagem. É necessário corrigir o valor de m quando partimos de parâmetros da simulação coalescente em paisagens fragmentadas, contudo não é correto corrigir 'm' obtidos pelo ajuste do modelo neutro de campo médio. 
 
-$$m = 4 sd/(100 \pi \sqrt{2J/DA}$$
+### Método C&L09 ###
+
+A aproximação deduzida por C&L09 é $m = \frac{Pd}{\pi A}$, onde P e A são o perímetro e área do plot, respectivamente. Considerando o plot quadrado e a distribuição de Laplace podemos reescrever essa aproximação como:
+
+<!--
+m_CL <- 4 * sd_k / ( sqrt(2) * L * pi ) # eq 1a
+sd_k.CL <- m * L * pi * sqrt(2) / 4 # eq 1b
+-->
+
+$$eq.1: m = sd  \frac{4}{L \pi \sqrt{2}  }  $$
+
+Onde $P = 4 L$, $A = L^2$ e $L= 100 \sqrt{J/DA}$ metros 
+
+### Método Coutinho apud C&L09 ###
+
+Coutinho parte da eq.0 e aproveitando as características da simulação coalescente que utilizamos: a) utiliza apenas plot quadrados; b) a dispersão não é radial, ao invés, é descrita como o resultado do sorteio independente em eixos ortogonais. Assim, podemos escrever a eq.0 como:
+
+$$eq.0-C.a:  m = \left(\frac{1}{L} \int\limits_{-L/2}^{L/2} m_{x}(x)\mathrm{d}x \right)^2 $$
+
+$$eq.0-C.b: m_{x} = 1 - \int\limits_{-L/2}^{L/2} K(x-y) \mathrm{d}y  $$
+
+K é a função de dispersão. Podemos reescrevemos considerando a distribuição de probabilidade de Laplace como:
+
+<!--
+m_CaCL <- sd_k * ( 1 -exp( -sqrt(2) * L / sd_k) ) / (sqrt(2) * L / sd_k) # eq 2a
+-->
+$$eq. 2a: m = sd \frac{1 - e^{-\frac{\sqrt{2} L}{sd}} }{\sqrt{2} L}$$
+<!--
+sd_K.CaCL <- sqrt(2) * L / (m * lambertW0(-exp(-1/m)/m) + 1) # eq 2b
+-->
+$$ eq. 2b: sd = \frac{\sqrt{2} L}{m W_{0}(- \frac{e^{-1/m}}{m} ) + 1} $$
+
+Para escrever a equação em função do desvio-padrão (eq 2b) utilizamos o ramo principal da função W de Lambert ($W_0$).
+
+### Comparação dos métodos ###
+
+Para comparar os métodos vou utilizar os parâmetros ajustados (modelo de campor médio, por verossimilhança) à SADs amostradas na Mata Atlântica e aqueles estimados por um modelo neutro espacialmente explícito. Todos os vetores de abundância foram observados em amostras com pelo menos 1 ha. As SADs observadas foram ajustado ao modelo de campo médio e obtemos m; no modelo de espaço explícito informamos *a priori* qual o desvio padrão da função de dispersão. Então vamos utilizar as equações 1a e 2a para calcular m a partir dos desvio-padrões informados *a prior*, considerando o m' corrigido. As equações 1b e 2b irão converter m em desvio padrão. Para isso vou criar uma função que contêm as equações e a definição de $\theta$ de Hubbell (2001):
+
+```{r convesao par, echo=T, tidy=T}
+f_conv.par <- function(modelo, par., par.aux){
+  #parametros que seram convertidos
+  theta<- par.[[1]]
+  m <- par.[[2]]
+  sd_k <- par.[[3]]
+  U <- par.[[4]]
+  #parametros auxiliares a conversao
+  p <- par.aux[[1]]
+  J <- par.aux[[2]]
+  DA <- par.aux[[3]]
+  S <- par.aux[[4]]
+  L <- 100*sqrt(J/DA)
+  J_M <- 500 * p * DA
+ #conversoes 
+  if(modelo == "campo_medio"){ # EI -> EE
+    U_1 <- theta / (2 * J_M) # Hubbell 2001
+    U_2 <- theta / (J_M + theta - 1) # Etienne 2005 (qual foi a primeira referencia?)
+    sd_k.CL <- m * L * pi * sqrt(2) / 4 # eq 1b
+    sd_K.CaCL <- sqrt(2) * L / (m * lambertW0(-exp(-1/m)/m) + 1) # eq 2b
+    df_ <- data.frame(par.value = c(U_1, U_2, sd_k.CL, sd_K.CaCL),
+                      par.class = c("U","U","sd_k","sd_k"),
+                      par.method = c("H01","E05","CL","CaCL"))
+    return(df_)
+  }else{ # EE -> EI
+    theta_1 <- 2 * 500 * p * DA * U # Hubbell 2001
+    theta_2 <- U * (J_M - 1) / (1 - U) # Etienne 2005
+    m_CL <- 4 * sd_k / ( sqrt(2) * L * pi ) # eq 1a
+    m_CaCL <- sd_k * ( 1 -exp( -sqrt(2) * L / sd_k) ) / (sqrt(2) * L / sd_k) # eq 2a
+    df_ <- data.frame(par.value = c(theta_1,theta_2, m_CL, m_CaCL),
+                      par.class = c("theta","theta","m","m"),
+                      par.method = c("H01","E05","CL","CaCL"))
+    return(df_)
+  }  
+}
+
+# aplicando a formula 
+df_par.conv <- ddply(df_resultados,c("SiteCode","kernel_percentil"), 
+                  function(X) f_conv.par(modelo = X[,"kernel_percentil"],
+                                         par. = as.list(X[,c("theta","m","sd_k","U")]),
+                                         par.aux = as.list(X[,c("p","J","DA","S")])
+                                         )
+                    )
+```
+
+```{r inner_join df_par.conv}
+# escrevendo a versão completa de df_par.conv
+df_par.conv %<>% inner_join(x.,y=df_resultados[,c(1:6)], by=c("SiteCode","kernel_percentil"))
+df_par.conv %<>% mutate(d = sd_k / sqrt(2),
+                        d_ = sd_k_ / sqrt(2))
+write.table(df_par.conv,file="/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/df_conv-par.txt", sep="\t")
+
+# modificando para unidr com df_resultados
+df_par.conv %<>% filter(par.method != "H01" & par.method != "CL") %>% select(-par.method) %>% 
+  dcast(., ...~par.class,value.var = "par.value") %>% 
+  mutate(m_ = m * p / ( 1 - (1-p)*m )) %>% select(-m)
+names(df_par.conv)[c(7:9)] <- c("theta_","sd_k_","U_")
+
+#df com os resultados de congruência, parametros estimados, parametros convertidos e parametros a posteriori
+df_resultados_conv <- inner_join(x=df_resultados,
+                                 y=df_par.conv,
+                                 by = c("SiteCode","kernel_percentil","p","S","DA","J")) %>% 
+  mutate(d = sd_k / sqrt(2),
+         d_ = sd_k_ / sqrt(2),
+         spp_I = - theta * (1-m) / (J * log(m)),
+         spp_I_ = - theta_ * (1-m_) / (J * log(m_)),
+         J_M = 500 * DA * p,
+         S_M = - J_M * U * log(U) / (1-U),
+         S_M_ = - J_M * U_ * log(U_) / (1-U_)
+         ) %>% 
+  select(SiteCode, kernel_percentil, GOF, p, J, S, DA, J_M, sd_k, sd_k_, U, U_, theta, theta_,m,m_,S_M,S_M_,spp_I,spp_I_)
+names(df_resultados_conv)[2] <- "k"
+levels(df_resultados_conv$k)[13] <- "EI"
+
+#armazenando o novo df de dados.
+
+write.table(df_resultados_conv,file="/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/df_resultados_conv.txt", sep="\t")
+```
+
+Esperamos que os métodos de conversão tenham valores próximos quando a relação entre L/d -> 100; d é a distância média de dispersão, que para a distribuição Laplace é igual sd/sqrt(2). 
+
+#### m -> sd ####
+
+Vamos avaliar a diferença entre os métodos para as conversões de 'm' para o desvio padrão da função de dispersão [EI -> EE]:
+
+```{r avaliacao EI/EE, message=F}
+# preparando dados 
+df_sd_k <- df_par.conv %>% filter(kernel_percentil == "campo_medio" & par.class != "U") # %>% 
+  #dcast(.,formula = SiteCode + kernel_percentil ~ par.method + par.class, value.var = "par.value")
+df_sd_k %<>% inner_join(x=.,y=df_resultados[,c("SiteCode","kernel_percentil","m")],by=c("SiteCode","kernel_percentil"))
+
+# graficos #
+l_p <- vector("list",length = 4)
+# sd_k ~ m * metodo
+l_p[[1]] <- ggplot(df_sd_k,aes(x = m, y = par.value, colour = par.method)) + 
+  geom_point() + geom_smooth(method = "loess",se=F) + 
+  scale_y_continuous(labels = function(x) format(x, scientific = TRUE)) +
+  labs(y="sd_k", x='m') + theme(legend.position="none") # + ggtitle(label="m -> sd_k") 
+# log(sd_k) ~ m * metodo
+l_p[[2]] <- ggplot(df_sd_k,aes(x = m, y = log(par.value), colour = par.method)) + 
+  geom_point() + geom_smooth(method = "loess",se=F) +
+  labs(y="log(sd_k)", x='m') #+ ggtitle(label="m -> log.sd_k")
+# diferenca metodos ~ w/d # sd_k.CaCL - sd_k.CL ~ L / ( mean(sd_k) / sqrt(2) ) 
+l_p[[3]] <- ddply(df_sd_k,c("SiteCode","J","DA"),summarise, diff.metodos = diff(par.value), mean.sd_k = mean(par.value)) %>% 
+  mutate(w_d = 100 * sqrt(J/DA)/(mean.sd_k/sqrt(2))) %>% ggplot(aes(x=w_d,y=log(diff.metodos))) + geom_point() +
+  scale_x_continuous(labels = function(x) format(x, scientific = TRUE)) +
+  labs(x="L / ( mean(sd_k) / sqrt(2) ) ",y="log(CaCL - CL)") 
+# boxplot dos valores por estimativa
+l_p[[4]] <- ggplot(df_sd_k,aes(x="",y=par.value)) + geom_jitter() + geom_boxplot() + facet_wrap(~par.method,scales = "free") + labs(x="metodos",y="sd_k")
+# arranjo 
+grid.arrange(l_p[[1]], l_p[[2]], l_p[[3]], l_p[[4]],
+             layout_matrix = rbind(c(rep(1,3),rep(2,4)),
+                                   c(rep(4,3),rep(3,3),NA)) 
+             )
+```
+
+figura 1. Desvio-padrão (sd_k) estimado pelas equações 1 (método CL) e 2.b (método CaCL). 1o painel = sd_k ~ m; 2o painel: log(sd_k) ~ m; 3o - boxplot de sd_k pelos métodos (título do gráfico); 4o painel: log da diferença entre os métodos e a razão entre o lado da amostra (L) e a distância média de dispersão (mean(sd_k)/sqrt(2)). mean(sd_k) é a média dos sd_k obtidos pelos dois métodos, a divição por sqrt(2) é para transformar no parâmetro escalar da distribuição de Laplace.
+
+-Segundo a figura 1 de Chisholm & Lichstein 2009 a equação 1 deve fazer boas aproximações quando a relação entre L/d >= 100.
+-O 4o painel mostra que a condição para que a equação 1 faça boas aproximações não é observada, uma vez que L/d varia em [0;2]
+-O maior valor de sd_k pelo método CL ~ 300 metros, enquanto do método CaCL ~ 2e6 (valor sem realismo biológico)
 
 
-Uma vez calculado sd a partir do modelo EI, estimamos a equivalente chuva de propágulos que definimos em termos de porcentagem de propágulos que se mantêm até uma determinada distãncia da planta progenitora. Aqui vale relembrar uma nota sobre a função que criamos para realizar tal tarefa:
+#### sd -> m ####
 
-"Há um erro que é proporcionalmente maior quando as distâncias são pequenas. Acho que é arredondamento que está na função de quantil, que faz ela andar aos saltos. Mas a boa notícia é que o erro é o mesmo para todos os kerneis. Então, apesar da função não achar exatamente o sigma necessário para que p indivíduos caiam até distance de distância, o sigma encontrado resulta na mesma distância (quantil), o que torna os sigmas calculados com os mesmos parametros p e distance equivalentes."
+Agora vamos avaliar a conversão de parâmetros sd_k da simulação coalescente para o respectivo m do modelo de campo médio.
 
-A distância de referência é dist_0 = 100/sqrt(DA) (lado da célula da simulação).
+```{r df_m e fig2}
+# dados
+df_m <- df_par.conv %>% filter(kernel_percentil != "campo_medio" & par.class != "theta")  %>%     
+  inner_join(x=.,y=df_resultados[,c("SiteCode","kernel_percentil","sd_k")],by=c("SiteCode","kernel_percentil"))
 
-#### Conversão dos parâmetros modelo EI ####
+#gráfico
+df_m %>% ggplot(aes(x=sd_k,y=par.value, colour=par.method)) + geom_point() + geom_smooth(method = "loess",se = F) + facet_wrap(~kernel_percentil, ncol=6, scales = "free") +
+  labs(x = "desvio-padrão da função de dispersão", y = "m") + ggtitle(label="sd_k -> m", subtitle = "~ %k")
+```
+
+figura 2. m ~ sd_k + %k + método de calculo. em x = desvio padrão da função de dispersão (sd_k), y = m; os paineis estão divididos pelas respectivas porcentagens de propágulos que permanecem até $l_{cel}$ metros da árvore progenitora.
 
 
+```{r fig 3, fig.height=2.5,fig.width=2.5}
+df_m %>% 
+  mutate(w_d = 100 * sqrt(J/DA)/(sd_k/sqrt(2))) %>% 
+  ddply(.,c("SiteCode","kernel_percentil","w_d"),summarise, diff.metodos = diff(par.value)) %>% 
+  ggplot(aes(x=w_d,y=diff.metodos))  + geom_point() + # + geom_vline(aes(xintercept = 100, colour = "red")) +
+  scale_x_continuous(labels = function(x) format(x, scientific = TRUE)) + 
+  labs(x="L / (sd_k / sqrt(2) ) ",y="CaCL - CL") + theme(legend.position="none")
+```
 
-```{r conversao de par modelo EI}
-# SdT: 
-#i) adicionar as informações observadas necessárias para a conversão (p e DA); 
-#ii) converter theta -> U e m -> d; 
-#iii) calcular a correspondente chuva de propágulos
+figura 3. difença no valor calculado pelos dois métodos e a razão L / (sd_k / sqrt(2) )
 
-# i) Adicionar as informações necesssárias #
-# seleção dos campos de interesse 
-df_EI <- df_par.Etienne[,c(1:5,7)]
-# adicionando classe de modelo
-df_EI$modelo<- rep("EI",nrow(df_EI))
-# adicionando info para conversão dos parâmetros
-df_EI %<>% inner_join(x=.,y=unique(df_ad[,c(1,5,7)]),by=c("SiteCode")) # DA e p
 
-# ii) conversão dos parâmetros #
-# conversão dos parâmetros
-df_EI %<>% mutate(U = theta/(2*500*DA*p),
-                  sd_k = m*100*pi*sqrt((2*J)/DA)/4)
+```{r df_m}
+df_m <- df_resultados[,c(1:6,11)] %>% #par.aux + m
+  filter(kernel_percentil == "campo_medio") %>% #filtrando para campo medio
+  melt(.,id.vars = c("SiteCode","kernel_percentil","p","S","DA","J"),variable.name = "par.class",value.name = "par.value") %>% #melt o df
+  mutate(par.method = "like") %>% # acrescentando o fator
+  rbind.fill(df_m[,-10],.) %>% #concatenar
+  arrange(.,SiteCode,kernel_percentil) %>% # dados em ordem
+  mutate(p_class = cut(p,12)) # p_class
 
-# iii) Calculando a correspondente chuva de propágulos #
-# A função a seguir é uma modificação de qkernel de utility_functions, que o PI desenvolveu.
-# Essa função tem como inputs: sigma e a distância de referência e como output o percentil determinado pelo número de pontos que se acumulam até
-# a determinada distância dado o sigma.
+  #grafico
+# df_m %>% ggplot(aes(x=kernel_percentil,y=par.value,shape = par.method,color = SiteCode)) + geom_point(size=2) + 
+#   theme(legend.title = element_blank()) +
+#   guides(color=FALSE) +
+#   labs(x="%k + campo medio", y = "m") +
+#   facet_wrap(~p_class,ncol=4,scales="free")
+```
 
-# funcao para calcular a porcentagem da chuva de propagulos a partir de kernel e 
-f_percentil.kernel <- function(i,df_=df_EI){
-  percentilkernel<- function(sigma, density, npoints = 1e5){
-      #metro na escala da simulacao 
-      d_ind_MA  <- 100/sqrt(density) #tanto a metrica da paisagem quanto a distancia de referencia
-      b_laplace <- sigma / sqrt(2) ## relação entre sigma e b, a variância da laplaciana
-      ## gerando valores de uma distribuição laplaciana e convertendo para a distância em metros
+```{r fig 4A, fig.height=7,fig.width=10}
+df_m %>% ggplot(aes(x = p, y=par.value, group=par.method)) + 
+  geom_point(aes(shape=par.method,color=par.method)) + 
+  geom_smooth(aes(color=par.method),method = 'loess',se=F) +
+  theme(legend.title = element_blank()) +
+  labs(x="p",y="m") + 
+  ggtitle("m sem correção") + 
+  facet_wrap(~kernel_percentil,nrow = 3,scales = "free")
+```
+
+Figura 4A. m ~ p + (~kernel_percentil)
+
+```{r fig 4B, fig.height=7,fig.width=10}
+df_m %>% 
+  # mutate(m_ = ifelse(par.method != "like", par.value*p/(1-(1-p)*par.value),par.value)) %>% # eq 0'
+  mutate(m_ = par.value*p/(1-(1-p)*par.value)) %>% # eq 0'
+  # filter(kernel_percentil == "campo_medio") %>% mutate(m.diff = par.value - m_) %>%  ggplot(aes(x=p,y=m.diff)) + geom_point()
+  ggplot(aes(x = p, y=m_, group=par.method)) + # mesma estrutura do grafico anterior
+  geom_point(aes(shape=par.method,color=par.method)) + 
+  geom_smooth(aes(color=par.method),method = 'loess',se=F) +
+  theme(legend.title = element_blank()) +
+  labs(x="p",y="m'") + 
+  ggtitle("m corrigdo (eq 0')") +
+  facet_wrap(~kernel_percentil,nrow = 3,scales = "free")
+```
+
+Figura 4B. m' ~ p + (~kernel_percentil)
+
+### Theta ###
+
+Utilizamos apenas um método para converter $\theta$ e U, a definição apresentada em Hubbell (2001): $\theta = 2 J_{M}U$. Consideramos que $J_{M} = A_{paisagem} DA p$. 
+
+```{r df_theta e fig 5}
+# dados
+df_theta <- df_par.conv %>% filter(par.class == "theta") %>% # apenas os valores de theta
+  dcast(.,formula = ... ~ par.class, value.var="par.value") # %>%  # transformando theta em coluna
+df_theta <- df_resultados %>% filter(kernel_percentil == "campo_medio") %>% .[,c(1:6,10)] %>% mutate(par.method="like") %>% 
+  rbind.fill(x=df_theta, y=.) %>% arrange(SiteCode,kernel_percentil)
+  
+# grafico
+df_theta %>% ggplot(aes(x=p,y=theta,group=par.method,color=par.method)) + geom_point() + geom_smooth(method = 'loess',se=F) +
+  scale_y_continuous(labels = function(x) format(x,scientific = TRUE)) +
+  theme(legend.title = element_blank()) +
+  facet_wrap(~kernel_percentil,nrow = 3,scales="free")
+```
+
+figura 5. $\theta$ ~ p + (~kernel_percentil). Cada painel corresponde ao percentil de propágulos que permanece até $l_{cel}$ metros da planta progenitora. O último painel 'campo_medio' corresponde ao $\theta$ obtido pelo ajuste da formula de Etienne (2005) às SADs observadas.
+
+<!--
+```{r figura 6}
+# df_theta %>% mutate(p_class = cut(p,12)) %>% ggplot(aes(x=kernel_percentil,y=theta,group=SiteCode,shape=par.method) ) + 
+#   geom_point() + geom_line() + scale_y_continuous(labels = function(x) format(x,scientific = T)) + 
+#   theme(legend.position = "none") +
+#   facet_grid(p_class~., scales="free")
+```
+figura 6. $\theta$ ~ kernel_percentil + (~p_class). p_class = cut(p,12). Os pontos e linhas estão coloridos pelo Site. 
+-->
+
+### U ###
+
+```{r df_U e fig 7}
+# dados
+df_U <- df_par.conv %>% filter(par.class == "U") %>%  # apenas os valores de U
+  dcast(.,formula = ... ~ par.class, value.var="par.value")  # transformando theta em coluna
+
+df_U <- df_resultados %>% filter(kernel_percentil != "campo_medio") %>% .[,c(1:6,8)] %>% mutate(par.method="R08") %>% #Rosindell et al. 2008 
+  rbind.fill(x=df_U, y=.) %>% arrange(SiteCode,kernel_percentil)
+
+# grafico
+df_U %>% ggplot(aes(x=p,y=U,group=par.method)) + geom_point(aes(color=par.method)) + geom_smooth(method = 'loess',se=F,colour="red") +
+  # scale_y_continuous(labels = function(x) format(x,scientific = TRUE)) +
+  theme(legend.title = element_blank()) + 
+  facet_wrap(~kernel_percentil,nrow = 3,scales="free")
+```
+
+figura 7. U ~ p + (~kernel_percentil)
+
+<!--
+```{r fig 8}
+# df_U %>% mutate(p_class = cut(p,12)) %>% ggplot(aes(x=kernel_percentil,y=U,group=SiteCode,colour=SiteCode)) + 
+#   geom_point() + geom_line() + #scale_y_continuous(labels = function(x) format(x,scientific = T)) + 
+#   theme(legend.position = "none") +
+#   facet_wrap(~p_class, ncol=3,scales="free")
+```
+
+Figura 8. U ~ kernel_percentil + (~p_class); p_class = cut(p,12). Os pontos e linhas estão coloridos pelo Site.
+-->
+
+### Chuva de Propágulos ###
+
+A chuva de propágulos pode ser entendida como o produto da fecundidade e função de dispersão (Clark et al. 1999). Por conta do pressuposto da equivalência funcional todos os indivíduos produzem o mesmo número de propágulos por unidade de tempo (Hubbell 2001) e, portanto, podemos simular cenários de limitação à dispersão em função da porcentagem de propágulos que permace até determinada distância da planta progenitora. Dessa maneira, não precisamos definir a dispersão em termos de distância per se mas em termos de porcentagem de indivíduos que permanecem na área imediata da planta progenitora. Para isso é necessário estabelecer uma distância padrão da planta progenitora e estimar ou definir a porcentagem de indivíduos que se mantêm até esta distância padrão. Como distância padronizamos $l_{cel}$, assim, cada paisagem possui uma distância padrão que depende da densidade observada de indivíduos naquela paisagem. Podemos estimar qual a porcentagem de propágulos até a distância padrão que um determinado sd gera, partindo de um m (eqn 2); ou podemos informar a priori quais as porcentagens de interesse e estimar o sd necessário para gerar tais porcentagens. Na simulação coalescente, utilizamos 12 valores de porcentagem para simular os cenários de limitação à dispersão: `r paste(c(99,seq(95,50,by=-5),25),"%")`.
+
+
+Na primeira sessão estimamos o desvio-padrão da função de dispersão(sd_k) a partir do parâmetro m, estimado por verossimilhança, do modelo de campo médio. Com os valores de sd_k estimados podemos calcular a respectiva chuva de propágulos. Antes de executar essa tarefa vamos observar os valores de sd_k estimados para o modelo de espaço explícito e aqueles calculados a partir de m do campo médio pelos dois métodos de conversão:
+
+```{r df_k_perc e fig 9, fig.height=4,fig.width=7}
+#dados 
+df_k_perc <- df_resultados[,1:7] %>% # sd_k EE
+  filter(kernel_percentil != "campo_medio") %>% # tirando os campos_medio
+  melt(.,id.vars = c("SiteCode","kernel_percentil","p","S","DA","J"), variable.name = "par.class",value.name = "par.value") %>% # melt o df
+  mutate(par.method = "a_priori") %>% # acrescentando o fator
+  rbind.fill(df_sd_k[,-10],.) %>% # concatenando
+  arrange(.,SiteCode,kernel_percentil)
+
+# gráfico
+df_k_perc %>% ggplot(aes(x=kernel_percentil,y=log(par.value), color=par.method)) + geom_jitter() + geom_boxplot() +
+  theme(legend.title = element_blank()) + 
+  labs(x = "%k + campo medio", y = "log(sd_k)") +
+  ggtitle(label = "Comparacao sd_k EE e EI")
+```
+
+figura 9. Boxplot log(sd_k) ~ (%k + campo medio)
+
+- Exceto alguns valores de sd_k pelo método CL, a grande maioria de sd_k calculados para o campo médio estão em outra escala em comparação aos sd_k do modelo EE. Como pode ser visto pelo gráfico acima mas também pelos valores de m calculados a partir de sd_k do modelo EE (figura )
+- Como a estimativa do percentil da chuva de propagulos (%k) é feito por função que utiliza uma abordagem numérica e não analítica, quanto maior a dispersão maior o número de pontos para se obter uma boa estimativa (?)
+- Para comparar, vou calcular %k a partir dos valores de sd_k{EE} e comparar com os respectivos percentis utilizando uma regressão:
+
+```{r k_perc, echo=T}
+# funcoes
+f_k_perc <- function(sigma, density, npoints=1e5){
+      #metríca da simulacao e distancia de referencia
+      d_ind_MA  <- 100/sqrt(density)
+      # relacao entre sd e o parametro escalar da distribuicao Laplace
+      b_laplace <- sigma / sqrt(2) 
+      # sorteios de duas distribuicoes identicas Laplace em eixos ortogonais
       X_laplace <- d_ind_MA * round(rlaplace(npoints, s=b_laplace) / d_ind_MA) 
-      Y_laplace <- d_ind_MA * round(rlaplace(npoints, s=b_laplace) / d_ind_MA) # idem para Y
-      dist_laplace <- sqrt(X_laplace^2+Y_laplace^2) #distâncias dos pontos até a origem
-      percentil <- length(dist_laplace[dist_laplace<=d_ind_MA])/length(dist_laplace) # percentil
+      Y_laplace <- d_ind_MA * round(rlaplace(npoints, s=b_laplace) / d_ind_MA)
+      #calculando a distancia dos pontos ate a origem
+      dist_laplace <- sqrt(X_laplace^2+Y_laplace^2)
+      #Percemtil
+      percentil <- length(dist_laplace[dist_laplace<=d_ind_MA])/length(dist_laplace)
       return(percentil)
-  }
-  kernel_percentil <- percentilkernel(sigma = df_[i,"sd_k"],
-                                      density = df_[i,"DA"])
+}
+f_percentil.kernel <- function(i,df_=df_k_perc){
+  kernel_percentil <- f_k_perc(sigma = df_[i,"par.value"],
+                               density = df_[i,"DA"]
+                               )
   return(kernel_percentil)
 }
-df_EI$kernel_percentil <- sapply(1:nrow(df_EI),f_percentil.kernel) #armazenando
+#armazenando
+df_k_perc$k_perc <- sapply(1:nrow(df_k_perc),f_percentil.kernel)
 ```
 
--> Pontos a confirmar:
-i) a maneira que utilizei 'd', da aproximação de Chisholm & Linchestein 2009, está correta dentro do uso de sigma?
+Segue summary da regressão linear entre o percentil da chuva de propágulos original (k_perc0) e o estimado pela função acima (k_perc):
 
-Danilo: eu havia pensando que 'd' era a variância (ou escalar, correto?) da distribuilção de LaPlace, mas não sei se entendi corretamente a correspondência entre os parâmetros estimados pela aproximação(Chisholm & Linchestein, 2009) e pela distribuição de LaPlace.
-Danilo_04abril: eu corrigi as formulas de conversão a argumentação está melhor desenvolvida no aqruivo "estudo_funcao_de_dispersao"
-
-ii) A função para calcular o percentil está correta? Em especial gostaria de confirmar que fiz a indexação corretamente para calcular o percentil correspondente 
-Danilo_04abril: uma maneira de descobrir é utilizando a função quantil, se está tudo funcionando como o planejado então dado percentil deve retornar a distância 
-
-```{r auditoria visual da conversao EI}
-car::scatterplotMatrix(~ theta + U + m + sd_k + kernel_percentil,
-                       reg.line = "", smoother = "",
-                       data=df_EI, main = "Parâmetros modelo EI")
+```{r lm k_perc}
+#comparacao regressao linear
+md_1 <- df_k_perc %>% filter(kernel_percentil != "campo_medio") %>% mutate(k_perc0 = as.numeric(as.character(kernel_percentil))) %>% lm(k_perc0 ~ k_perc, data=.)
+summary(md_1)
 ```
 
-figura 2. Relação entre os parametros originais (theta e m) e as estimativas a partir deles (U, kernel e kernel_percentil). 
+Idealmente a regressão deveria ter $\alpha$ -> 0, $\beta$ -> 1 e $R^2$ -> 1, mas, considerando que tanto a estimativa de sd_k a partir do percentil informado (sigkernel), quanto a do percentil a partir do sd_k convertido (f_k_perc) são aproximações numéricas (anexo 1: códigos), serão considerados razoáveis e vou prosseguir com esses dados para o sd_k calculado a partir de m_{EI}:
 
-
-#### Conversão dos parâmetros modelo EE ####
-
-```{r conversao de par modelo EE}
-# SdT: i) info de interesse; ii) conversão de parâmetros
-# i) info de interesse
-df_EE <- df_ad[,c(1:2,5:8,13:14,20)]
-names(df_EE)[c(4,6)] <- c("S","J") #uniformizando os nomes
-df_EE$modelo<- rep("EE",nrow(df_EE))
-
-# ii) conversão de parâmetros
-df_EE %<>% mutate(theta = 2*500*DA*p*U,
-                  m = sd_k * 4 / ( 100 * pi * sqrt( (2*J) /DA) )) 
+```{r fig 11, fig.height=4}
+l_p <- vector("list",length = 2) 
+l_p[[1]] <- df_k_perc %>% filter(kernel_percentil == "campo_medio") %>% ggplot(aes(x=log(par.value), y=k_perc)) + 
+  geom_point() +
+  labs(x = "log(sd_k)", y = "prop. de propag. que permanece até l_cel metros") + 
+  ggtitle("chuva de propágulos ~ [sd_k <- m_{EI}]") +
+  facet_wrap(~par.method,scales="free")
+l_p[[1]]
+# df_k_perc[,-(3:5)]
+# df_par.conv %>% filter(par.class=="m") %>% #apenas sd_k_{EE} -> m_{EE}
+#   dcast(., ... ~ par.class,value.var = "par.value") %>% # Sitecode, %k, par.method, p, S, DA, J, m
+#   rbind.fill(.,  # adicao dos valores para m estimado por verossimilhança (m_{EI})
+#              mutate(df_resultados[df_resultados$kernel_percentil == "campo_medio",c(1:2,11)],par.method="like")) #%>% 
+#   inner_join(x=.,y=df_k_perc[,-c(6:9)],by=c("SiteCode","kernel_percentil","par.method"))
+# 
+# df_m %>% 
+#   # mutate(m_ = ifelse(par.method != "like", par.value*p/(1-(1-p)*par.value),par.value)) %>% # eq 0'
+#   mutate(m_ = par.value*p/(1-(1-p)*par.value))  
+#   
+#   
+# l_p[[2]] <- ggplot(aes(x=))
 ```
 
--> Pontos a confirmar:
-i) a questão da relação de 'd' da aproximação e do parâmetro da LaPlace é válido aqui
+figura 11.
 
-```{r auditoria visual da conversao EE}
-car::scatterplotMatrix(~ theta + U + m + sd_k + kernel_percentil,
-                       reg.line = "", smoother = "",
-                       data=df_EE, main = "Parâmetros modelo EE")
-```
+### Condit et al. 2012: calculo dos parâmetro ###
 
-figura 3. Relação entre os parametros originais (theta e m) e as estimativas a partir deles (U, kernel e kernel_percentil). 
-
-Os resultados da conversão de d em m 'estouraram' os possíveis valores de m, uma vez que, m está por definição restrito à [0;1]. 
-
-### Síntese dos dados ###
-
-SdT: i) unir os data frames; ii) agora com dois métodos de conversão vou limpar as estimativas de m para o EE e as de sd_k para EI. 
-
-```{r unindo os data frames}
-# df_EE %>% str
-# df_EI %>% str
-df_resultados <- merge(x=df_EE,y=df_EI, all = TRUE) 
-df_resultados[df_resultados$modelo == "EI","kernel_percentil"] <- "campo_medio"
-df_resultados %<>% select(-modelo)
-
-# arrumando os levels de kernel_percentil #
-# vou colocar o nível 'campo_medio' como o de limitação à dispersão menos severo #
-df_resultados$kernel_percentil <- factor(df_resultados$kernel_percentil, levels=levels(df_resultados$kernel_percentil)[c(12:1,13)])
-
-## Para arrumar o nome depois da reunião do dia 29 de março, onde compreendi que a coluna kernel é apenas o desvio padrão da dist subjacente e desta forma fica mais exp
-## como já arrumei o código acima o codigo a seguir só é válido para o que foi feito antes de 29 de março.
-## Mudei aqui para não precisar rodar todas as analises acima
-# df_resultados  <- df_resultados[,1:12]
-# names(df_resultados)[7] <- "sd_k"
-
-
-# ii) limpar os valores das conversões ##
-df_resultados[df_resultados$kernel_percentil == "campo_medio",c("sd_k","U")] <- NA
-df_resultados[df_resultados$kernel_percentil != "campo_medio",c("theta","m")] <- NA
-df_resultados %>% head(.,n=14)
-
-write.table(df_resultados,file="/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/df_resultados.txt",sep = "\t",row.names = FALSE)
-```
+  
 
 
 ### Parâmetros do modelo EI a partir das SADs{EE} ###
