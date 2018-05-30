@@ -21,7 +21,7 @@ library(dplyr)
 library(ggplot2)
 library(gridExtra)
 df_resultados <- read.table(file="/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/df_resultados.txt", header=T, sep="\t")
-df_resultados$kernel_percentil <- factor(df_resultados$kernel_percentil, levels = levels(df_resultados$kernel_percentil)[c(12:1,13)])
+df_resultados$kernel_percentil <- factor(df_resultados$kernel_percentil, levels = levels(df_resultados$kernel_percentil)[c(12:1,13)],ordered = T)
 # df_resultados %>% str
 # df_resultados %<>% droplevels() 
 ```
@@ -142,15 +142,19 @@ df_par.conv <- ddply(df_resultados,c("SiteCode","kernel_percentil"),
 ```
 
 ```{r inner_join df_par.conv}
+# escrevendo a versão completa de df_par.conv
 df_par.conv %<>% inner_join(x.,y=df_resultados[,c(1:6)], by=c("SiteCode","kernel_percentil"))
+df_par.conv %<>% mutate(d = sd_k / sqrt(2),
+                        d_ = sd_k_ / sqrt(2))
 write.table(df_par.conv,file="/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/df_conv-par.txt", sep="\t")
-df_resultados
+
+# modificando para unidr com df_resultados
 df_par.conv %<>% filter(par.method != "H01" & par.method != "CL") %>% select(-par.method) %>% 
   dcast(., ...~par.class,value.var = "par.value") %>% 
   mutate(m_ = m * p / ( 1 - (1-p)*m )) %>% select(-m)
 names(df_par.conv)[c(7:9)] <- c("theta_","sd_k_","U_")
 
-#df com os resultados de congruência, parametros estimados e parametros convertidos
+#df com os resultados de congruência, parametros estimados, parametros convertidos e parametros a posteriori
 df_resultados_conv <- inner_join(x=df_resultados,
                                  y=df_par.conv,
                                  by = c("SiteCode","kernel_percentil","p","S","DA","J")) %>% 
@@ -163,16 +167,13 @@ df_resultados_conv <- inner_join(x=df_resultados,
          S_M_ = - J_M * U_ * log(U_) / (1-U_)
          ) %>% 
   select(SiteCode, kernel_percentil, GOF, p, J, S, DA, J_M, sd_k, sd_k_, U, U_, theta, theta_,m,m_,S_M,S_M_,spp_I,spp_I_)
+names(df_resultados_conv)[2] <- "k"
+levels(df_resultados_conv$k)[13] <- "EI"
+
+#armazenando o novo df de dados.
 
 write.table(df_resultados_conv,file="/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/df_resultados_conv.txt", sep="\t")
-
 ```
-
-```{r f_par.condit, echo = FALSE}
-f_par.condit <- 
-
-```
-
 
 Esperamos que os métodos de conversão tenham valores próximos quando a relação entre L/d -> 100; d é a distância média de dispersão, que para a distribuição Laplace é igual sd/sqrt(2). 
 

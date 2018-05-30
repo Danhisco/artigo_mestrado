@@ -76,7 +76,7 @@ __A) Variável de congruência com o observado e os parâmetros de MNEI__
 #### GOF ####
 __EE + EI__
 
-```{r 1selecao de funcao de ligacao, echo=FALSE}
+```{r GOF EE+EI 1selecao de funcao de ligacao, echo=FALSE}
 #0) criação dos dados e gráfico
 df_md <- df_resultados %>% dplyr::select(Site, k, GOF, p.z,p)
 # df_md %>% ggplot(aes(x=p,y=GOF)) + geom_point() + facet_wrap(~k,ncol = 4)
@@ -101,7 +101,7 @@ Como o R2 do modelo cheio estava muito baixo eu resolvi utilizar uma outra distr
 -->
 
 
-```{r GOF selecao}
+```{r GOF EE EI selecao}
 # i) construção de modelos
 l_md <- vector("list",length = 5)
 names(l_md) <- c("GOF ~ p * k", "GOF ~ p + k", "GOF ~ p", "GOF ~ k","GOF ~ 1")
@@ -128,10 +128,10 @@ md_GOF <- l_md[[1]]
 df_md %<>% inner_join(.,augment(md_GOF),by=c("Site","k","GOF","p.z"))
 ```
 
-__Figura 1__ Seleção de modelos e R quadrado marginal e condicional
+__Figura 1__ [EE + EI] Seleção de modelos e R quadrado marginal e condicional da seleção de modelos
 
 
-```{r 1avaliacao modelo selecionado, echo=FALSE,message=FALSE,include=TRUE}
+```{r GOF EE EI 1avaliacao modelo selecionado, echo=FALSE,message=FALSE,include=TRUE}
 # gráficos diagnóstico
 l_p <- vector("list",length = 3)
 l_p[[1]] <- ggplot(df_md,aes(x=.fitted,y=.resid))+
@@ -163,7 +163,7 @@ __Figura 2__- modelo selecionado GOF: resíduos ~ ajustado. A variância não é
 
 A regressão dos resíduos contra o predito e as duas variáveis respostas (p e k) mostram que os modelos ajustados não apresentam boa congruência com os dados: a variância não é constante ao longo dos valores fitados para nenhum nível de k; e parece que há uma pequena tendência nos dados, principalmente para o nível 0.25 de k. Outra forma de avaliar a congruência com os dados é plotar o modelo ajustado com o observado:
 
-```{r 1exploracao grafica dos resultados - estimativa e intervalo de confianca bootsrap, echo=FALSE,fig.height=7}
+```{r GOF EE EI 1exploracao grafica dos resultados - estimativa e intervalo de confianca bootsrap, echo=F,fig.height=7}
 ## novo conjunto de dados ##
 # objetivo: criar todas as combinações entre as preditoras
 df_newdat <- expand.grid(Site = df_md$Site[1],
@@ -193,13 +193,191 @@ df_md %>%
     geom_ribbon(aes(y=mean, ymin=IC.low.fixed, ymax=IC.upp.fixed), data=df_newdat, col="gray", alpha=0.5) +
     geom_line(aes(x=p, y=mean.fixed), data=df_newdat) +
     geom_point() +
-    ggtitle("GOF ~ p * k + (1|Sitio)") + 
+    ggtitle("[EE + EI] GOF ~ p * k + (1|Sitio)") + 
     facet_wrap(~k,ncol=4)
 ```
 
 __Figura 3__ GOF: observado e o estimado segundo o modelo mais plausível + intervarlo de confiança 95% bootstrap. Entre linhas brancas o intervalo de confiança considerando apenas os efeitos fixos do modelo, fora dela, na região cinza claro, o intervalo de confiança considerando efeitos fixos e efeitos aleatórios. A inclinação da tendência geral varia em função de k para p: para a proporção de propágulos que permanecem até $l_{cel}$ metros da planta progenitora = 0.99, observamos um efeito negativo de p; com o aumento da proporção de propágulos observamos a atenuação dessa tendência chegando a ser quase nula para proporção ~ 0.50 e invertendo o efeito em 0.25, onde p apresenta efeito positivo. O efeito de p para os resultados de MNEI podem ser negligenciados, além disso é a categoria que apresenta o melhor ajuste do modelo, sendo que para k = 0.25 é onde observa-se maior variância entre os resíduos. 
 
 
+
+__EE__
+
+```{r GOF EE 1selecao de funcao de ligacao, echo=FALSE}
+#0) criação dos dados e gráfico
+df_md <- df_resultados %>% dplyr::select(Site, k, GOF, p.z,p,sd_k, DA) %>% filter(k != "EI") %>% mutate(d = sd_k/sqrt(2))
+# df_md %>% ggplot(aes(x=p,y=GOF)) + geom_point() + facet_wrap(~k,ncol = 4)
+# df_md %>% mutate(DA_class = cut(DA,12)) %>% ggplot(aes(x=k,y=d,group=Site)) + 
+#   geom_smooth(method = "loess") + 
+#   geom_point() +
+#   facet_wrap(~ DA_class,ncol=4)
+
+#i) seleção da combinação de funcao de ligacao e distribuicao teorica utilizando apenas o modelo cheio
+l_md <- vector("list", length = 8)
+names(l_md) <- c("lb 1|S","lb d|S","pb 1|S","pb d|S","cb 1|S","cb d|S","n 1|S","n d|S")
+l_md[[1]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k + (1 | Site),  # erro de convergencia
+                   family = "binomial",
+                   control = glmerControl(optimizer = "bobyqa",optCtrl = list(maxfun=2e5)),
+                   df_md)
+l_md[[2]] <- glmer(cbind(GOF,100-GOF) ~ p.z * d + (d | Site), 
+                   family = "binomial",
+                   control = glmerControl(optimizer = "bobyqa",optCtrl = list(maxfun=2e5)),
+                   df_md)
+l_md[[3]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k + (1 | Site), # erro de convergencia 
+                   family = "binomial"(link=probit),
+                   control = glmerControl(optimizer = "bobyqa",optCtrl = list(maxfun=2e5)),
+                   df_md)
+l_md[[4]] <- glmer(cbind(GOF,100-GOF) ~ p.z * d + (d | Site), 
+                   family = "binomial"(link=probit),
+                   control = glmerControl(optimizer = "bobyqa",optCtrl = list(maxfun=2e5)),
+                   df_md)
+l_md[[5]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k + (1 | Site), # erro de convergencia 
+                   family = "binomial"(link=cloglog),
+                   control = glmerControl(optimizer = "bobyqa",optCtrl = list(maxfun=2e5)),
+                   data = df_md)
+l_md[[6]] <- glmer(cbind(GOF,100-GOF) ~ p.z * d + (d | Site), 
+                   family = "binomial"(link=cloglog), 
+                   control = glmerControl(optimizer = "bobyqa",optCtrl = list(maxfun=2e5)),
+                   data = df_md)
+l_md[[7]] <- lmer(GOF ~ p.z * k + (1 | Site), data = df_md)
+l_md[[8]] <- lmer(GOF ~ p.z * d + (d | Site), data = df_md)
+
+# funcao de dispersao = categorica
+# l_md <- vector("list", length = 4)
+# names(l_md) <- c("lb 1|S","pb 1|S","cb 1|S","n 1|S")
+# l_md[[1]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k + (1 | Site), 
+#                     family = "binomial",df_md)
+# l_md[[2]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k + (1 | Site), 
+#                     family = "binomial"(link=probit),df_md)
+# l_md[[3]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k + (1 | Site), 
+#                     family = "binomial"(link=cloglog), data = df_md)
+# l_md[[4]] <- lmer(GOF ~ p.z * k + (1 | Site), data = df_md)
+
+# AICctab(l_md, weights = TRUE)
+# sapply(l_md, r.squaredGLMM)
+# df_md %>% mutate(p_class = cut(p,20)) %>% 
+  # ggplot(aes(x=d,y=GOF,group=Site)) + geom_point() + geom_line() + facet_wrap(~p_class,ncol=4)
+```
+<!--
+Como o R2 do modelo cheio estava muito baixo eu resolvi utilizar uma outra distribuição de probabilidade e função de ligação.
+-->
+
+__figura 4__ d ~ k, distância média de 
+
+```{r GOF EE selecao, warning=FALSE}
+# # i) construção de modelos
+l_md <- vector("list",length = 5)
+names(l_md) <- c("GOF ~ p * d", "GOF ~ p + d", "GOF ~ p", "GOF ~ d","GOF ~ 1")
+l_md[[1]] <- glmer(cbind(GOF,100-GOF) ~ p.z * d + (d | Site), 
+                   family = "binomial"(link=probit),
+                   control = glmerControl(optimizer = "bobyqa",optCtrl = list(maxfun=2e5)),
+                   df_md)
+l_md[[2]] <- glmer(cbind(GOF,100-GOF) ~ p.z + d + (d | Site), 
+                   family = "binomial"(link=probit),
+                   control = glmerControl(optimizer = "bobyqa",optCtrl = list(maxfun=2e5)),
+                   df_md)
+l_md[[3]] <- glmer(cbind(GOF,100-GOF) ~ p.z + (1 | Site), 
+                   family = "binomial"(link=probit),
+                   control = glmerControl(optimizer = "bobyqa",optCtrl = list(maxfun=2e5)),
+                   df_md)
+l_md[[4]] <- glmer(cbind(GOF,100-GOF) ~ d + (d | Site), 
+                   family = "binomial"(link=probit),
+                   control = glmerControl(optimizer = "bobyqa",optCtrl = list(maxfun=2e5)),
+                   df_md)
+l_md[[5]] <- glmer(cbind(GOF,100-GOF) ~ 1 + (1 | Site), 
+                   family = "binomial"(link=probit),
+                   control = glmerControl(optimizer = "bobyqa",optCtrl = list(maxfun=2e5)),
+                   df_md)
+# # l_md %<>% llply(.,function(X) update(X,control=glmerControl(optimizer="bobyqa", optCtrl = list(maxfun=2e5)))) 
+# 
+# # ii) seleção de modelos.
+AICctab(l_md, weights = TRUE)
+# 
+# # hipótese selecionada #
+# md_GOF <- l_md[[1]]
+# # summary(md_GOF)
+# # 
+# (r2_GOF <- sapply(l_md, r.squaredGLMM))
+# # r2_GOF[1,]/r2_GOF[2,] * 100 %>% round(3)
+# # md_GOF %>% fixef() # parâmetros do efeito fixo
+# # md_GOF %>% ranef() # parâmetros do efeito aleatório
+# 
+# ## inner_join com os resultados do modelo ##
+# df_md %<>% inner_join(.,augment(md_GOF),by=c("Site","k","GOF","p.z"))
+```
+
+__Figura 4__ [EE] Seleção de modelos e R quadrado marginal e condicional da seleção de modelos
+
+
+```{r GOF EE 1avaliacao modelo selecionado, echo=FALSE,message=FALSE,include=TRUE}
+# gráficos diagnóstico
+# l_p <- vector("list",length = 3)
+# l_p[[1]] <- ggplot(df_md,aes(x=.fitted,y=.resid))+
+#   geom_smooth(se=T,col="red") +
+#   geom_point() +
+#   ggtitle("gráfico diagnostico") + 
+#   labs(x="predito",y="residuo") +
+#   facet_wrap(~k,ncol=4)
+# l_p[[2]] <- ggplot(df_md,aes(x=p.z,y=.resid)) + 
+#   geom_smooth(se=T,col="red") +
+#   geom_point() +
+#   labs(x="p(z)",y="residuo") +
+#   facet_wrap(~k,ncol=4)
+# l_p[[3]] <- ggplot(mutate(df_md,p_class = cut(p.z,12)),aes(x=k,y=.resid)) + 
+#   geom_boxplot() + 
+#   labs(x="k",y="residuo")
+#   # geom_smooth(se=F,col="red") +
+#   # geom_point() +
+#   # facet_wrap(~p_class,ncol=4)
+# # grid.arrange(l_p[[1]], l_p[[2]], l_p[[3]],
+# #              layout_matrix = rbind(rep(1,4),rep(1,4),
+# #                                    rep(2,4),rep(2,4),
+# #                                    rep(3,4)) 
+# #              )
+# l_p[[1]]
+```
+
+__Figura 2__- modelo selecionado GOF: resíduos ~ ajustado. A variância não é constante ao longo dos valores fitados e parece que existe uma tendência na nuvem de dados, o que pode indicar que o modelo não conseguiu linearizar os dados.
+
+A regressão dos resíduos contra o predito e as duas variáveis respostas (p e k) mostram que os modelos ajustados não apresentam boa congruência com os dados: a variância não é constante ao longo dos valores fitados para nenhum nível de k; e parece que há uma pequena tendência nos dados, principalmente para o nível 0.25 de k. Outra forma de avaliar a congruência com os dados é plotar o modelo ajustado com o observado:
+
+```{r GOF EE 1exploracao grafica dos resultados - estimativa e intervalo de confianca bootsrap, echo=FALSE,fig.height=7}
+## novo conjunto de dados ##
+# objetivo: criar todas as combinações entre as preditoras
+# df_newdat <- expand.grid(Site = df_md$Site[1],
+#                          k = unique(df_md$k),
+#                          p.z = seq(min(df_md$p.z)*1.1,max(df_md$p.z)*1.1, length=50)) #no código original é length=50, qual a implicação dessa mudança?
+# ## Funçoes a serem calculadas a cada simulação ##
+# # Previstos por efeitos fixos e aleatórios
+# f1 <- function(.) predict(.,newdata=df_newdat)
+# # Previstos por efeitos fixos (argumento re.form=~0)
+# f2 <- function(.) predict(.,newdata=df_newdat, re.form=~0)
+# ## Os dois bootstraps. Ajuste o argumento ncpus para o numero de cores de seu computador
+# b1 <- bootMer(md_GOF, FUN = f1, nsim=1000, parallel="multicore", ncpus=3) #fixos e aleatorios
+# b2 <- bootMer(md_GOF, FUN = f2, nsim=1000, parallel="multicore", ncpus=3) #fixos
+# ## calcula as médias e intervalos de confiança quantílicos para cada combinação de preditoras
+# ## no novo conjunto de dados
+# df_newdat$p <- df_newdat$p.z*sd(df_md$p) + mean(df_md$p) #?
+# df_newdat$mean <- apply(b1$t,2,mean)
+# df_newdat$IC.low <- apply(b1$t,2,quantile, 0.025)
+# df_newdat$IC.upp <- apply(b1$t,2,quantile, 0.975)
+# df_newdat$mean.fixed <- apply(b2$t,2,mean)
+# df_newdat$IC.low.fixed <- apply(b2$t,2,quantile, 0.025)
+# df_newdat$IC.upp.fixed <- apply(b2$t,2,quantile, 0.975)
+# ## Plots de GOF/100 x cobertura standardizada com intervalos de predição
+# df_md %>%
+#     ggplot(aes(x=p,y=GOF) ) + 
+#     geom_ribbon(aes(y=mean, ymin=IC.low, ymax=IC.upp), data=df_newdat, col="gray", alpha=0.5) +
+#     geom_ribbon(aes(y=mean, ymin=IC.low.fixed, ymax=IC.upp.fixed), data=df_newdat, col="gray", alpha=0.5) +
+#     geom_line(aes(x=p, y=mean.fixed), data=df_newdat) +
+#     geom_point() +
+#     ggtitle("GOF ~ p * k + (1|Sitio)") + 
+#     facet_wrap(~k,ncol=4)
+```
+
+__Figura 3__ GOF: observado e o estimado segundo o modelo mais plausível + intervarlo de confiança 95% bootstrap. Entre linhas brancas o intervalo de confiança considerando apenas os efeitos fixos do modelo, fora dela, na região cinza claro, o intervalo de confiança considerando efeitos fixos e efeitos aleatórios. A inclinação da tendência geral varia em função de k para p: para a proporção de propágulos que permanecem até $l_{cel}$ metros da planta progenitora = 0.99, observamos um efeito negativo de p; com o aumento da proporção de propágulos observamos a atenuação dessa tendência chegando a ser quase nula para proporção ~ 0.50 e invertendo o efeito em 0.25, onde p apresenta efeito positivo. O efeito de p para os resultados de MNEI podem ser negligenciados, além disso é a categoria que apresenta o melhor ajuste do modelo, sendo que para k = 0.25 é onde observa-se maior variância entre os resíduos. 
+
+__EI__
 
 #### m ####
 ```{r 2selecao de funcao de ligacao e distribuicao teorica, echo=FALSE}
