@@ -333,7 +333,7 @@ l_p <- vector("list",length=4)
 l_p[[1]] <- ggplot(df_temp,aes(x=.fitted,y=.resid))+
   geom_point() +
   geom_smooth(se=F,col="red") +
-  labs(x="predito",y="reśiduo")
+  labs(x="predito",y="residuo")
 l_p[[2]] <- ggplot(df_temp,aes(x=p.z,y=.resid))+
   geom_point() +
   geom_smooth(se=F,col="red") +

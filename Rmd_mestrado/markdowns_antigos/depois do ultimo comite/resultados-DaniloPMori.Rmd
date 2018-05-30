@@ -23,7 +23,7 @@ library(sads)
 library(magrittr)
 library(plyr)
 library(dplyr)
-load("/home/danilo/Documents/dissertacao/dados/df_ad.Rdata")
+load("/home/danilo/Documentos/Documentos/projetos/dissertacao/dados/df_ad.Rdata")
 df_ad %<>% select(SiteCode, kernel_percentil, S.obs, p, U, GOF) %>% mutate(K = 1-kernel_percentil)
 df_ad %<>% mutate(p.z = (p - mean(p))/sd(p),
                   K.z = (K - mean(K))/sd(K))
@@ -126,7 +126,7 @@ df_newdat$IC.upp <- apply(b1$t,2,quantile, 0.975)
 df_newdat$mean.fixed <- apply(b2$t,2,mean)
 df_newdat$IC.low.fixed <- apply(b2$t,2,quantile, 0.025)
 df_newdat$IC.upp.fixed <- apply(b2$t,2,quantile, 0.975)
-## Plots de logito(U) x cobertura standardizada com intervalos de predição
+## Plots de GOF/100 x cobertura standardizada com intervalos de predição
 df_ad %>%
     ggplot(aes(x=p,y=I(GOF/100)) ) + 
     geom_ribbon(aes(y=mean, ymin=IC.low, ymax=IC.upp), data=df_newdat, col="gray", alpha=0.5) +
