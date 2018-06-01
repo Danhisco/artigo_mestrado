@@ -1,0 +1,140 @@
+---
+title: 'Parametrizacao Imigracao'
+author: "Danilo Pereira Mori"
+date: "31 de maio de 2018"
+output: html_document
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = F,tidy = TRUE, cache = TRUE)
+```
+
+```{r global packages, echo=FALSE, message = FALSE, warning=FALSE}
+library(rmutil)
+library(lamW)
+library(reshape2)
+library(magrittr)
+library(plyr)
+library(dplyr)
+library(ggplot2)
+library(gridExtra)
+df_resultados <- read.table(file="/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/df_resultados_conv.txt", header=T, sep="\t",as.is = T)
+df_resultados$k <- factor(df_resultados$k,
+                          levels=df_resultados$k[c(12:1,13)])
+df_resultados %<>% mutate(d = sd_k / sqrt(2), d_ = sd_k_ / sqrt(2))
+```
+
+<!--
+i) média de d para cada nível de k
+ii) estimativa de k para 30 valores igualmente espaçados entre média de d_{0.25} e 600m [seq(d,600,length=30)]: aplicar função numérica
+-->
+
+## Estatística resumo da parametrizacao atual de d ##
+```{r estatistica resumo}
+# estatistica resumo
+df_resultados %>% filter(k != "EI") %>% 
+  ddply(.,"k",summarise, d_mean = mean(d),
+                         d_sd = sd(d), 
+                         d_min = min(d),
+                         d_max = max(d),
+                         m_mean = mean(m_),
+                         m_sd = sd(m_))
+```
+
+__Janela 1__ Estatística resumo para 'd' e 'm' 
+
+```{r grafico df_resultados, echo=FALSE}
+# grafico resumo
+l_p <- vector("list",length = 2)
+l_p[[1]] <- df_resultados %>% filter(k != "EI") %>% mutate(k_perc = as.numeric(as.character(k))) %>% 
+  ggplot(aes(x=k, y = d)) + geom_jitter() + geom_boxplot() + labs(x="prop. de propagulos até l_cel metros (k)",y="distância média de dispersão (d)")
+l_p[[2]] <- df_resultados %>% filter(k != "EI") %>% mutate(k_perc = as.numeric(as.character(k))) %>% 
+  ggplot(aes(x=k, y = m_)) + geom_jitter() + geom_boxplot() + labs(x="prop. de propagulos até l_cel metros (k)",y="prob. de colonização de imigrantes (m)")
+# l_p[[3]] <- df_resultados %>% filter(k != "EI") %>% mutate(k_perc = as.numeric(as.character(k))) %>% 
+  # ggplot(aes(x=d, y = m_, colour=k_perc)) + geom_point() + labs(x="d",y="m") + guides(colour)
+do.call("grid.arrange",c(l_p,ncol=2))
+```
+
+__Figura 1__ Boxplot de 'd' e 'm' para cada nível de k para a atual parametrização de MNEE
+
+## d médios de sindromes de dispersão ##
+
+Munoz et al. (2013) revisaram valores médios de dispersão de sementes para comparar com os parâmetros estimados a partir de modelos neutros, os autores observaram variação da distância média de dispersão em 10 - 600m. Vou estimar k_, a proporção de propágulos até a média do lado da unidade de dispersão ($l_{media}$), a partir dos valores médios de d para os níveis de k já utilizados mais valores igualmente espaçados entre 4m (~round(média para k=0.25) e 600m (~valor máximo observado em Munoz et al. 2013). A função que estima k_ utiliza uma solução numérica, podemos observar um aumento da variância com o aumento de k na figura 1 (não sei se isso é relacionado com a natureza da função ?).
+
+```{r k para l_medio}
+# dados #
+
+## d's realistas (Munoz et al. 2013) ##
+df_k <- data.frame(k = paste("media_",round(seq(4,600,length.out = 30),2),"m",sep=""),
+                   DA = mean(df_resultados$DA),
+                   L_plot = mean(100/sqrt(df_resultados$J/df_resultados$DA)),
+                   d = seq(4,600,length.out = 30))
+
+## d's de cenários de limitação à dispersão severos - ausência de agente dispersor ##
+df_k <- df_resultados %>% filter(k != "EI") %>% mutate(d = sd_k / sqrt(2)) %>%
+  ddply(.,"k",summarise, d = mean(d)) %>% 
+  mutate(DA = mean(df_resultados$DA),L_plot = mean(100/sqrt(df_resultados$J/df_resultados$DA))) %>% 
+  rbind.fill(.,df_k)
+
+# k #
+
+## função para estimar k ##
+f_k_perc <- function(sigma, density, npoints=1e6){
+      #metríca da simulacao e distancia de referencia
+      d_ind_MA  <- 100/sqrt(density)
+      # relacao entre sd e o parametro escalar da distribuicao Laplace
+      b_laplace <- sigma
+      # sorteios de duas distribuicoes identicas Laplace em eixos ortogonais
+      X_laplace <- d_ind_MA * round(rlaplace(npoints, s=b_laplace) / d_ind_MA) 
+      Y_laplace <- d_ind_MA * round(rlaplace(npoints, s=b_laplace) / d_ind_MA)
+      #calculando a distancia dos pontos ate a origem
+      dist_laplace <- sqrt(X_laplace^2+Y_laplace^2)
+      #Percemtil
+      percentil <- length(dist_laplace[dist_laplace<=d_ind_MA])/length(dist_laplace)
+      return(percentil)
+}
+f_percentil.kernel <- function(i,df_=df_k){
+  kernel_percentil <- f_k_perc(sigma = df_[i,"d"],
+                               density = df_[i,"DA"]
+                               )
+  return(kernel_percentil)
+}
+
+## armazenando ##
+df_k$k_ <- sapply(1:nrow(df_k),f_percentil.kernel)
+
+# m #
+df_k %<>% mutate( m = d * ( 1 - exp(-L_plot/d) ) / L_plot )
+
+# grafico #
+df_k %>% select(-c(DA,L_plot)) %>% melt(.,id.vars = c("k","d"),variable.name = "par.class", value.name = "par.value") %>% 
+  ggplot(aes(x=d,y=par.value,group=par.class)) + geom_point(aes(colour=par.class)) + geom_line(aes(colour=par.class))
+```
+
+__Figura 2__ distâncias médias de dispersão de sementes considerados biologicamente realistas (Munoz et al. 2013) e os parâmetros de dispersão k_ (proporção de propágulos até l_cel metros a planta progenitora = mean(l_cel)) e m (dedução exata a partir da equação 1 de Chisholm & Lichstein 2009).
+
+A distância média de dispersão tem efeito oposto nas duas variáveis: para k_ é negativo e para m positivo. A taxa de variação é muito maior para k_ do que para m, provavelmente por conta de sua natureza - k_ é parâmetro de dispersão modelado no nível do indivíduo; enquanto m é modelado no nível da amostra. 
+
+
+## Próximos Passos ##
+
+- Descobrir qual o maior valor de 'd' que podemos usar para simular U e SAD a partir de MNEE
+- Ideia:
+a) estimar os parâmetros theta e m a partir de Etienne (2005) e avaliar a congruência do modelo com o observado a partir desse conjunto de parâmetros (par_EE.vero). Situação em que esperamos ter a melhor congruência possível com o observado;
+b) partir de valores biologicamente realistas de d (figura 2), e que sejam possíveis de calcular a partir de MNEE, estimamos U_EE então convertemos U_EE para $\theta$;
+c) utilizamos m, calculado a partir de d's realistas, e $\theta$, estimados a partir de U_EE, para simular SADs segundo MNEI;
+d) Assim teremos um conjunto de dados que podemos comparar diretamente os dois modelos neutros - iriamos criar a variável categórica MN: MNEE e MNEI.
+e) Acredito que considerando esse design experimental podemos comparar diretamente os dois modelos. Pensei em uma estrutura de modelo estatístico: 
+```{r}
+print("GOF ~ p * d * MN + (d | Site / MN)")
+```
+  Se entendi corretamente, os efeitos aleatórios serão:
+```{r}
+print("GOF ~ d * MN, subset = Site")
+```
+  ou seja, teriamos para cada Site uma regressão entre GOF e d onde MNEE e MNEI teriam um intercepto e inclinação próprios. Me parece que é uma forma adequada de comparar os dois modelos teóricos, não?
+
+
+### Referências ###
+- Chisholm et al 2009. Linking dispersal, immigration and scale in neutral theory of biodiversity.
+- Etienne 2005. A new sampling formula for neutral biodiversity.
+- Munoz et al. 2013. Do spatially-implicit estimates of neutral migration comply with seed dispersal data in tropical forests?
