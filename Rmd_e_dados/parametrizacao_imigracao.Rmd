@@ -5,12 +5,13 @@ date: "31 de maio de 2018"
 output: html_document
 ---
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = F,tidy = TRUE, cache = TRUE)
+knitr::opts_chunk$set(echo = F,tidy = TRUE, cache = TRUE, warning = FALSE)
 ```
 
 ```{r global packages, echo=FALSE, message = FALSE, warning=FALSE}
 library(rmutil)
 library(lamW)
+library(doMC)
 library(reshape2)
 library(magrittr)
 library(plyr)
@@ -131,10 +132,218 @@ print("GOF ~ p * d * MN + (d | Site / MN)")
 ```{r}
 print("GOF ~ d * MN, subset = Site")
 ```
-  ou seja, teriamos para cada Site uma regressão entre GOF e d onde MNEE e MNEI teriam um intercepto e inclinação próprios. Me parece que é uma forma adequada de comparar os dois modelos teóricos, não?
+  ou seja, teriamos para cada Site uma regressão entre GOF e d onde MNEE e MNEI terão intercepto e inclinação próprios. Me parece que é uma forma adequada de comparar os dois modelos teóricos, não?
+
+## Abacus ##
+
+-Objetivo: avaliar viabilidade da simulação coalescente para estimar U em função de d.
+
+-Campo de parâmetro de d: 20 valores igualmente distribuidos em [0.5;125]m (~ a média de k=0.99; e o ~ valor médio para m estimado por verossimilhança segundo a hipótese selecionada entre aquelas que consideravam o efeito de p e de l_cel: a hipótese nula) + 200m (bônus)
+
+-Organizar resultado e selecionar o modelo estatístico para descrever U e $\theta$.
+
+-Trabalhar na apresentação dos resultados para os parâmetros utilizados k/m e U/$\theta$
+
+```{r preparacao dos dados para simulacao, echo=FALSE}
+# dados #
+
+## 20 valores de d: indo de cenários extremos de limitação à dispersão (0.5) até à distância média de algumas sindromes de dispersão (Munoz et al. 2013)  ##
+df_k <- data.frame(SiteCode = rep(unique(df_resultados$SiteCode),each=20),
+                   d = seq(0.5,125,length.out = 20)) %>% 
+  inner_join(x=.,y=unique(df_resultados[,c(1,4:8)]),by="SiteCode")
+
+# k #
+
+## função para estimar k ##
+f_k_perc <- function(sigma, density, npoints=1e6){
+      #metríca da simulacao e distancia de referencia
+      d_ind_MA  <- 100/sqrt(density)
+      # relacao entre sd e o parametro escalar da distribuicao Laplace
+      b_laplace <- sigma
+      # sorteios de duas distribuicoes identicas Laplace em eixos ortogonais
+      X_laplace <- d_ind_MA * round(rlaplace(npoints, s=b_laplace) / d_ind_MA) 
+      Y_laplace <- d_ind_MA * round(rlaplace(npoints, s=b_laplace) / d_ind_MA)
+      #calculando a distancia dos pontos ate a origem
+      dist_laplace <- sqrt(X_laplace^2+Y_laplace^2)
+      #Percemtil
+      percentil <- length(dist_laplace[dist_laplace<=d_ind_MA])/length(dist_laplace)
+      return(percentil)
+}
+f_percentil.kernel <- function(i,df_=df_k){
+  kernel_percentil <- f_k_perc(sigma = df_[i,"d"],
+                               density = df_[i,"DA"]
+                               )
+  return(kernel_percentil)
+}
+
+## armazenando ##
+registerDoMC(3)
+k_ <- llply(as.list(1:nrow(df_k)),f_percentil.kernel,.parallel = TRUE)
+df_k$k_ <- unlist(k_)
+
+# m #
+df_k %<>% mutate( L_plot = 100/sqrt(J/DA), 
+                  m = d * ( 1 - exp(-L_plot/d) ) / L_plot,
+                  sd_k = sqrt(2) * d,
+                  m_ = m * p / (1 - (1-p) * m))
+
+# grafico #
+df_k %>% select(SiteCode, d, k_, m, m_) %>% melt(.,id.vars =c("SiteCode", "d"),variable.name = "par.class", value.name = "par.value") %>% 
+  ggplot(aes(x=d,y=par.value,group=SiteCode)) + geom_point() + geom_line() + ggtitle("Parâmetros de imigração em função da distância média (d)") + facet_wrap(~par.class,ncol=3)
+```
+
+__Figura 3__ Parâmetros de imigração: k_ = proporção dos propágulos que permanecem até l_cel(100/sqrt(J/DA)) metros da planta progenitora; m = estimativa exata a partir da equação 1 de Chisholm & Lichstein 2009 de m em função de d e o lado da área amostrada em metros; m_ = probabilidade de colonização de um indivíduo de fora da comunidade local corrigido pela cobertura vegetal (considerando o processo de dispersão de MNEE - detalhes em métodos).
+
+### Scripts para rodar no abacus ###
+
+```{r dados abacus, echo =TRUE}
+# dados #
+# add txt file name
+load("/home/danilo/Documentos/Doutorado/dados/l_dados_brutos.Rdata")
+df_k %<>% inner_join(x=.,y=l_dados_brutos$df_resultados_sem_filtro %>% select(SiteCode,txt.file,kernel_type,kernel_code) %>% unique,by="SiteCode")
+# aumentando o número de linhas e adicionando outros vetores
+func1 <- function(x,replicas=10) {
+  x <- x[rep(1:nrow(x),each=replicas),]
+}
+df_k %<>% func1() %>% mutate(U = NA, rep = rep(1:10,80*20))
+
+# grafico #
+# df_k %>% select(-rep) %>% unique %>% ggplot(aes(x=d,y=k_,group=SiteCode)) + geom_point() + geom_line()
+# 
+# # Separando as simulações por kernel #
+d <- df_k$d %>% unique
+# 
+# 
+# df_k1 <- 
+# 
+# 
+# df_resultados1 <- df_resultados %>% filter(kernel_percentil == percentis[1])
+# df_resultados1$f.cluster <- cut(1:dim(df_resultados1)[1],6) #número de simulações/número de máquinas de 8 cores
+# df_resultados2 <- df_resultados %>% filter(kernel_percentil %in% percentis[2:6])
+# df_resultados2$f.cluster <- cut(1:dim(df_resultados2)[1],8) #idem / número de máquinas com 4 cores usadas
+# df_resultados3 <- df_resultados %>% filter(kernel_percentil %in% percentis[7:12])
+# df_resultados3$f.cluster <- cut(1:dim(df_resultados3)[1],7) #idem / número de máquinas com 4 cores usadas
+
+# save(df_resultados, df_resultados1, df_resultados2, df_resultados3, file="/home/danilo/Documents/dissertacao/cluster/simulacao/df_resultados.Rdata")
+
+
+## Piloto fora do Cluster ##
+df_k %>% ddply(.,"d",summarise,k_min = max(k_))
+# df_k %>% filter(SiteCode == "PEalia") %>% select(-c(rep,J,S,J_M,L_plot)) %>% unique
+df_piloto <- df_k %>% filter(SiteCode == "PEalia")
+```
+
+```{r script guia}
+setwd("/home/danilo/Documentos/Doutorado/artigo_mestrado/dados_p_artigo_do_zero/")
+### Piloto ###
+df_piloto %>% head
+
+op <- options(digits.secs=6)
+for(i in 1:nrow(df_piloto)){
+  aviao <- list()
+  aviao <- dinamica_coalescente(U = 1.25e-06, 
+                                S = df_piloto[i,"S"], 
+                                N_simul = 1, 
+                                seed = as.numeric(Sys.time()), 
+                                disp_range = df_piloto[i,"sd_k"], 
+                                disp_kernel = df_piloto[i,"kernel_code"], 
+                                landscape = df_piloto[i,"txt.file"])
+  df_piloto[i,"U"] <- aviao$U_est
+}
+
+# paralelizando e armazensando os dados #
+registerDoMC(8)
+replica.sim <- as.list(1:dim(df_resultados__)[1])
+resultados <- llply(.data = replica.sim, .fun = funcao_imigracao, .parallel = TRUE)
+df_resultados__[,"U"] <- unlist(resultados)
+  
+}
+
+
+## Script guia ##
+
+f.cluster <- levels(df_resultados_$f.cluster)
+# length(f.cluster)
+df_resultados__ <- df_resultados_[df_resultados_$f.cluster == f.cluster[],]
+# df_resultados_._
+
+# funcao para paralelizar o programa #
+op <- options(digits.secs=6)
+funcao_imigracao <- function(i,data_frame=df_resultados__){
+  df_temp <- data_frame
+  aviao <- list()
+  aviao <- dinamica_coalescente(U = 1.25e-06, 
+                                S = df_temp[i,"S.obs"], 
+                                N_simul = 1, 
+                                seed = as.numeric(Sys.time()), 
+                                disp_range = df_temp[i,"kernel"], 
+                                disp_kernel = df_temp[i,"kernel_code"], 
+                                landscape = df_temp[i,"txt.file"])
+  return(aviao$U_est)
+}
+
+# paralelizando e armazensando os dados #
+registerDoMC(8)
+replica.sim <- as.list(1:dim(df_resultados__)[1])
+resultados <- llply(.data = replica.sim, .fun = funcao_imigracao, .parallel = TRUE)
+df_resultados__[,"U"] <- unlist(resultados)
+
+save(df_resultados__, file="df_resultados__-simulado.Rdata")
+```
+
+>Códigos para rodar<
+
+# substituir df_teste por df_resultados nos nomes dos arquivos #
+shell nomes dos .R: for f in *.R; do mv "$f" "`echo $f | sed s/df_teste/df_resultados/`"; done
+# substituir df_teste por df_resultados dentro dos arquivos #
+sheel objetos dentro dos .R: sed -i -- 's/df_teste/df_resultados/g' *
+
+-linha guia
+nohup ssh abacus00__ "cd ~/dinamica_coalescente/simulacao/; R CMD BATCH df_resultados__.R &" &
+cat ~/dinamica_coalescente/simulacao/df_resultados__.R
+
+
+
+- 25%
+nohup ssh abacus0001 "cd ~/dinamica_coalescente/simulacao/; R CMD BATCH df_resultados11.R &" &
+cat ~/dinamica_coalescente/simulacao/df_resultados11.Rout
+nohup ssh abacus0002 "cd ~/dinamica_coalescente/simulacao/; R CMD BATCH df_resultados12.R &" &
+nohup ssh abacus0003 "cd ~/dinamica_coalescente/simulacao/; R CMD BATCH df_resultados13.R &" &
+nohup ssh abacus0004 "cd ~/dinamica_coalescente/simulacao/; R CMD BATCH df_resultados14.R &" &
+nohup ssh abacus0005 "cd ~/dinamica_coalescente/simulacao/; R CMD BATCH df_resultados15.R &" &
+nohup ssh abacus0007 "cd ~/dinamica_coalescente/simulacao/; R CMD BATCH df_resultados16.R &" &
+
+- 50 a 70%
+nohup ssh abacus0008 "cd ~/dinamica_coalescente/simulacao/; R CMD BATCH df_resultados21.R &" &
+nohup ssh abacus0009 "cd ~/dinamica_coalescente/simulacao/; R CMD BATCH df_resultados22.R &" &
+nohup ssh abacus0010 "cd ~/dinamica_coalescente/simulacao/; R CMD BATCH df_resultados23.R &" &
+nohup ssh abacus0011 "cd ~/dinamica_coalescente/simulacao/; R CMD BATCH df_resultados24.R &" &
+nohup ssh abacus0012 "cd ~/dinamica_coalescente/simulacao/; R CMD BATCH df_resultados25.R &" &
+nohup ssh abacus0013 "cd ~/dinamica_coalescente/simulacao/; R CMD BATCH df_resultados26.R &" &
+nohup ssh abacus0014 "cd ~/dinamica_coalescente/simulacao/; R CMD BATCH df_resultados27.R &" &
+nohup ssh abacus0015 "cd ~/dinamica_coalescente/simulacao/; R CMD BATCH df_resultados28.R &" &
+
+- 75 a 99%
+nohup ssh abacus0016 "cd ~/dinamica_coalescente/simulacao/; R CMD BATCH df_resultados31.R &" &
+nohup ssh abacus0017 "cd ~/dinamica_coalescente/simulacao/; R CMD BATCH df_resultados32.R &" &
+nohup ssh abacus0018 "cd ~/dinamica_coalescente/simulacao/; R CMD BATCH df_resultados33.R &" &
+nohup ssh abacus0020 "cd ~/dinamica_coalescente/simulacao/; R CMD BATCH df_resultados34.R &" &
+nohup ssh abacus0021 "cd ~/dinamica_coalescente/simulacao/; R CMD BATCH df_resultados35.R &" &
+nohup ssh abacus0022 "cd ~/dinamica_coalescente/simulacao/; R CMD BATCH df_resultados36.R &" &
+nohup ssh abacus0023 "cd ~/dinamica_coalescente/simulacao/; R CMD BATCH df_resultados37.R &" &
 
 
 ### Referências ###
 - Chisholm et al 2009. Linking dispersal, immigration and scale in neutral theory of biodiversity.
 - Etienne 2005. A new sampling formula for neutral biodiversity.
 - Munoz et al. 2013. Do spatially-implicit estimates of neutral migration comply with seed dispersal data in tropical forests?
+
+
+### Pesquisa Bibliográficca para parametrizaçao de m ###
+
+-Artigo sobre estimativa de m e theta a partir da SAD: Etienne et al. 2006. Comment on "Neutral Ecological Theory Reveals Isolation and Rapid Speciation in a Biodiversity Hot Spot"
+
+-Pergunta: é possível estimar theta a partir da SAD observada e m? O quê isso informa sobre a teoria?
+  Estimar theta e m simultaneamente a partir da SAD pode não ser uma escolha metodológica adequada uma vez que 
+
+-Pergunta: Qual são valores razoáveis de m para comunidades em paisagens cheias e fragmentadas?
