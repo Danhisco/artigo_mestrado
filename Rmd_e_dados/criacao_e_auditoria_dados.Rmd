@@ -154,7 +154,7 @@ df_SAD.obs <- read.table("/home/danilo/Documentos/Doutorado/dados/df_SADs-obs.tx
 
 ############ inner_join e save ############
 df_resultados %<>% inner_join(x=.,y=df_SAD.obs,by="SiteCode")
-save(df_resultados,file = "/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/df_resultados.Rdata")
+saveRDS(df_resultados,file = "/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/df_resultados.Rdata")
 ```
 
 
@@ -167,12 +167,12 @@ f_SAD.Etienne <- function(df_par){
 # registerDoMC(4) # tentatida de paralelizar 1 [TESTAR]
 df_resultados %<>% mutate(SAD_rep = map(data,f_SAD.Etienne))
 #save
-save(df_resultados,file = "/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/df_resultados.Rdata")
+saveRDS(df_resultados,file = "/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/df_resultados.Rdata")
 ```
 
 
 ```{r GOF_ S_m S_sd estatisticas resumo}
-# df_resultados <- load(file = "/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/df_resultados.Rdata")
+# df_resultados <- readRDS("/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/df_resultados.Rdata")
 # funcao para aplicar o teste de Kolmogorov-Smirnov
 # retorna: data frame 1 X 2 [,c("maior dist. entre as SADs acumuladas","p valor associado ao teste")]
 # input: SAD_obs e 
@@ -194,7 +194,7 @@ save(df_resultados,file = "/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd
 # l_SAD_rep.teste %>% length
 # todos os vetores em SAD_rep.teste irão ser comparados com o único vetor de SAD_obs.teste
 
-
+# função que era para usar no ddply :-(
 f_GOF.S_ <- function(df_data, SAD.obs, l_SAD.rep){
   # teste de Kolmogoro-Smirnov #
   f_ks.test0 <- function(par1.SAD_obs = SAD.obs, par2.SAD_sim){
@@ -217,18 +217,62 @@ f_GOF.S_ <- function(df_data, SAD.obs, l_SAD.rep){
   df_S %<>% ddply(.,"k",summarise, S_m = mean(V1), S_sd = sd(V1) )
   # juntando com df_ks.test #
   df_ks.teste %<>% inner_join(x.,y=df_S,by="k")
+  df_ks.teste %<>% select(k,p,J,S,DA,d,theta_,m_,I,GOF,GOF_,S_m,S_sd,KS.D_mean,KS.D_sd,KS.p_mean,KS.p_sd)
   return(df_ks.teste)
 }
 
 # armazenando #
-df_resultados0 <- df_resultados
+
+# Danilo 14jun: não sei o motivo de não estar funcionando; 
+
+# df_resultados0 <- df_resultados
+# registerDoMC(3)
+# df_teste <- df_resultados %>% dlply(.,"SiteCode", function(X) f_GOF.S_(df_data = X$data, SAD.obs = X$SAD_obs$N, l_SAD.rep = X$SAD_rep))
+# df_resultados %<>% mutate(df_ks.teste = map(.f = function(X) f_GOF.S_(df_data = X$data, SAD.obs = X$SAD_obs$N, l_SAD.rep = X$SAD_rep)) )  
+  
+# Danilo 15jun: vou usar um for mesmo;
+
+# df_ para armazenar
+df_ks.teste <- vector("list",nrow(df_resultados))
+# paralelizando o ldply #
 registerDoMC(3)
-df_resultados <- df_resultados %>% dlply(.,"SiteCode", function(X) f_GOF.S_(df_data = X$data, 
-                                                            SAD.obs = X$SAD_obs$N, 
-                                                            l_SAD.rep = X$SAD_rep))
-  
-  
-    
+for(i in 1:nrow(df_resultados)){
+# dados
+  df_data <- df_resultados$data[[i]]
+  SAD.obs <- df_resultados$SAD_obs[[i]]$N
+  l_SAD.rep <- df_resultados$SAD_rep[[i]]
+# teste de Kolmogoro-Smirnov #
+  f_ks.test0 <- function(par1.SAD_obs = SAD.obs, par2.SAD_sim){
+      a <- suppressWarnings(ks.test(x = par1.SAD_obs,
+                                    y = par2.SAD_sim))
+      a <- data.frame(KS.D = a$statistic, KS.p = a$p.value)
+  }  
+  # teste de KS e armazenamento #
+  df_ks.teste[[i]] <- ldply(l_SAD.rep,function(X) ldply(X,function(Y) f_ks.test0(par2.SAD_sim = Y)), .parallel = TRUE )
+  # estatística resumo do teste de KS #
+  # GOF, número de vezes em que não foi possível refutar a hipótese nula de que os dois vetores de abund. são amostras de uma mesma dist. #
+  df_ks.teste[[i]] %<>% inner_join(x=ddply(.,"k",summarise, KS.D_mean = mean(KS.D), KS.D_sd = sd(KS.D),KS.p_mean = mean(KS.p), KS.p_sd = sd(KS.p)),
+                                   y=ddply(.,"k",function(x) nrow(x[x$KS.p >= 0.05,])),
+                                   by="k")
+  names(df_ks.teste[[i]])[6] <- "GOF_"
+  # juntando com as info de cada SiteCode #
+  df_ks.teste[[i]] %<>% inner_join(x=.,y=df_data,by="k")
+  # S_m e S_sd #
+  df_S <- ldply(l_SAD.rep,function(X) ldply(X,function(Y) length(Y)) )
+  df_S %<>% ddply(.,"k",summarise, S_m = mean(V1), S_sd = sd(V1) )
+  # juntando com df_ks.test #
+  df_ks.teste[[i]] %<>% inner_join(x.,y=df_S,by="k")
+  df_ks.teste[[i]] %<>% dplyr::select(k,p,J,S,DA,d,theta_,m_,I,GOF,GOF_,S_m,S_sd,KS.D_mean,KS.D_sd,KS.p_mean,KS.p_sd)
+}
+#adicionando ao df_resultados
+df_resultados %<>% add_column(.,df_ks.teste)
+# armazenando em disco
+df_resultados0 <- df_resultados
+saveRDS(df_resultados0,file = "/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/df_resultados.Rdata")
+
+#salvando em csv para upar para o git.
+df_resultados %<>% dplyr::select(SiteCode,df_ks.teste) %>% unnest() %>% as.data.frame()
+write_csv(df_resultados,path = "/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/df_resultados.csv")
 ```
 
 ## Função ##
