@@ -10,7 +10,6 @@ knitr::opts_chunk$set(echo=T, warning=FALSE, message=FALSE, cache = TRUE, tidy =
 ```
 
 ```{r global packages and data, echo=F, message=FALSE, warning=FALSE}
-library(tidyverse)
 library(sads)
 library(gridExtra)
 library(ggplot2)
@@ -21,6 +20,7 @@ library(GUILDS)
 library(magrittr)
 library(plyr)
 library(dplyr)
+library(tidyverse)
 
 # df_ad <- read.table("/home/danilo/Documentos/Doutorado/dados/df_dados.txt", sep = "\t",header = TRUE)
 # names(df_ad)[13] <- "sd_k"
@@ -235,6 +235,7 @@ f_GOF.S_ <- function(df_data, SAD.obs, l_SAD.rep){
 # df_ para armazenar
 df_ks.teste <- vector("list",nrow(df_resultados))
 # paralelizando o ldply #
+# mudar para llply e paralelizar #
 registerDoMC(3)
 for(i in 1:nrow(df_resultados)){
 # dados
@@ -275,73 +276,6 @@ df_resultados %<>% dplyr::select(SiteCode,df_ks.teste) %>% unnest() %>% as.data.
 write_csv(df_resultados,path = "/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/df_resultados.csv")
 ```
 
-## Função ##
-
-
-
-############ GOF, S e estatisticas resumo ############
-
-
-### teste ###
-df_teste <- df_resultados$data[[1]]
-SAD_obs.teste <- df_resultados$SAD_obs[[1]] %>% .$N
-l_teste <- dlply(df_teste,"k",function(X) replicate(100,generate.ESF(theta = X$theta_, I = X$I, J = X$J)))
-# l_teste %>% names()
-
-f_ks.test0 <- function(SAD.obs = SAD_obs.teste, SAD.sim){
-    a <- suppressWarnings(ks.test(x = SAD.obs,
-                                  y = SAD.sim))
-    a <- data.frame(KS.D = a$statistic, KS.p = a$p.value)
-}
-df_teste2 <- ldply(l_teste,function(X) ldply(X,function(Y) f_ks.test0(SAD.sim = Y)))
-df_teste2 %<>% ddply(.,"k",function(x) nrow(x[x$KS.p >= 0.05,]))
-
-
-f_GOF.Etienne <- function(par,SAD.obs){
-  # dados #
-  df_par <- par
-  SAD__obs <- SAD.obs$N
-  # SADs replicas #
-  l_SAD.rep <- dlply(df_par,"k",function(X) replicate(100,generate.ESF(theta = X$theta_, I = X$I, J = X$J)))
-  # ks teste #
-  f_ks.test0 <- function(SAD.obs = SAD__obs, SAD.sim){
-      a <- suppressWarnings(ks.test(x = SAD.obs,
-                                    y = SAD.sim))
-      a <- data.frame(KS.D = a$statistic, KS.p = a$p.value)
-  }
-  # armazenando #
-  df_return <- ldply(l_SAD.rep,function(X) ldply(X,function(Y) f_ks.test0(SAD.sim = Y)))
-  df_return  <-  inner_join(x=ddply(df_return,"k",function(x) nrow(x[x$KS.p >= 0.05,])),
-                            y=ddply(df_return,"k",summarise, KS.D_mean = mean(KS.D),KS.D_var = var(KS.D), KS.p_mean = mean(KS.p), KS.p_var = var(KS.p)),
-                            by = "k")
-return(df_return)  
-}
-
-ddply(df_resultados,"SiteCode",function(A) f_GOF.Etienne(par = A$data, SAD.obs = A$SAD_obs) )
-
-for(i in 1:nrow(df_resultados)){
-  # dados #
-  df_par <- df_resultados$data[[i]]
-  SAD__obs <- df_resultados$SAD_obs[[i]]
-  # SADs replicas #
-  l_SAD.rep <- dlply(df_par,"k",function(X) replicate(100,generate.ESF(theta = X$theta_, I = X$I, J = X$J)))
-  # ks teste #
-  f_ks.test0 <- function(SAD.obs = SAD__obs, SAD.sim){
-      a <- suppressWarnings(ks.test(x = SAD.obs,
-                                    y = SAD.sim))
-      a <- data.frame(KS.D = a$statistic, KS.p = a$p.value)
-  }
-  # armazenando #
-  df_return <- ldply(l_SAD.rep,function(X) ldply(X,function(Y) f_ks.test0(SAD.sim = Y)))
-  df_return  <-  inner_join(x=ddply(df_return,"k",function(x) nrow(x[x$KS.p >= 0.05,])),
-                            y=ddply(df_return,"k",summarise, KS.D_mean = mean(KS.D),KS.D_var = var(KS.D), KS.p_mean = mean(KS.p), KS.p_var = var(KS.p)),
-                            by = "k")
-return(df_return)  
-}
-
-l_teste[[1]][[100]] %>% length()
-l_SAD.rep[[1]][[1]] %>% length()
-
 
 ### Comparação das SADs simuladas e observadas utilizando o teste KS ###
 
@@ -371,18 +305,61 @@ names(df_par.Etienne)[c(1,7)] <- c("SiteCode","GOF")
 ### Auditoria dos dados ###
 - Avaliação visual da autocoerência dos dados:
   
-```{r auditoria dados Etienne}
+```{r auditoria dados Etienne, echo=F,include=F}
 # save.image(file = "/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/dados_completo.Rdata")
 # load("/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/dados_completo.Rdata")
 # x11()
+
+
 car::scatterplotMatrix(~ GOF + KS.p_mean + KS.D_mean, 
                        reg.line = "", smoother = "" ,
                        data=df_par.Etienne, main = "Avaliação Visual de GOF e estats resumo modelo EI")
 ```
+<!--
+figura 1. GOF - bondade de ajuste (número de SADs réplicas onde não foi possível refutar a hipótese nula para cada conjunto de parâmetros); KS.p_mean - média dos 'p-values' de cada bateria de simulações; KS.D_mean - média da estatística de interesse D do teste de Kolmogorov-Smirnov, considerando uma distribuição nula de D quanto menor for D menor a probabilidade de se refutar a hipótese nula.
+-->
 
-figura 1. GOF - bondade de ajuste (número de SADs réplicas onde não foi possível refutar a hipótese nula para cada conjunto de parâmetros); KS.p_mean - média dos 'p-values' de cada bateria de simulações; KS.D_mean - média da estatística de interesse D do teste de Kolmogorov-Smirnov, considerando uma distribuição nula de D quanto menor for D menor a probabilidade de se refutar a hipótese nula. 
+```{r auditoria par_EE -> MNEI}
+df_resultados <- read_csv("/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/df_resultados.csv")
+# x11()
+car::scatterplotMatrix(~ GOF_ + KS.p_mean + KS.p_sd + KS.D_mean + KS.D_sd + S_m + S_sd, 
+                       reg.line = "", smoother = "" ,
+                       data=df_resultados, main = "Avaliação Visual de GOF e estats resumo modelo EI")
 
+```
+
+figura X. Auditoria dos valores de GOF_. Quanto maior o valor de GOF maior a média do p valor associado ao teste de KS.
+
+```{r S_m k e GOF}
+l_p <- vector("list",length = 2)
+l_p[[1]] <- df_resultados %>% ggplot(aes(x=k,y=S_m,group=k)) + geom_jitter() + geom_boxplot()
+l_p[[2]] <- df_resultados %>% ggplot(aes(x=S_m,y=GOF)) + geom_point() + geom_smooth(se=F) + facet_wrap(~k,scales="free") + coord_flip()
+do.call("grid.arrange",c(l_p,ncol=2))
+```
+
+figura X. Riqueza média das réplicas (S_m), proporção de propágulos na área da copa da planta progenitora (k), e GOF
+ 
 Diria que está autocoerente: GOF é proporcional à KS.p_mean e KS.p_mean é inversamente proporcional à KS.D_mean. 
+
+-> análise exploratória de GOF:
+-melt de GOF e GOF_
+-juntar S_var e S_mean de MNEE para comparação.
+
+ 
+```{r df_resultados final}
+df_resultados %<>% gather(MN,GOF,GOF:GOF_)
+df_resultados$MN[df_resultados$MN=="GOF"] <- "EE"
+df_resultados$MN[df_resultados$MN=="GOF_"] <- "EI"
+df_resultados$MN %<>% factor()
+df_resultados %<>% select(SiteCode,k,MN,GOF,p,d,m_,I,J,S,DA,S_m,S_sd,KS.D_mean,KS.D_sd,KS.p_mean,KS.p_sd)
+
+df_resultados %>% ggplot(aes(x=p,y=GOF,color=MN)) + geom_point() + geom_smooth(method = "glm", se=F) + facet_wrap(~k,ncol=4)
+
+write_csv(df_resultados,path = "/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/df_resultados.csv")
+
+```
+
+
 
 <!--
 ### Modelo neutro coalescente ###
