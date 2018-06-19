@@ -8,25 +8,42 @@ Esqueleto do Artigo:
 
 ## Objetivo ##
 
-O objetivo do trabalho é avaliar se a SAD observada em um gradiente de cobertura vegetal pode ser evidência suficiente para refutar as predições de dois modelos neutros que diferem na descrição da limitação à dispersão. Uma das principais contribuições da teoria neutra foi salientar a importância da limitação à dispersão entre os mecanismos que influênciam os padrões de diversidade (Alonso et al. 2006, McGill 2010, Rosindell et al. 2012, Condit et al. 2012). 
+O objetivo do trabalho é avaliar se SADs observadas em um gradiente de cobertura vegetal podem ser evidência suficiente para refutar predições de dois modelos neutros que diferem na descrição da limitação à dispersão. 
 
-- Uma vez que A SAD é um padrão muito influênciado por processos de dispersão estocásticas, que a teoria neutra faz uma boa descrição, (McGill 2010),
--
+A teoria neutra tem fornecido predições que reproduzem os padrões observados de maneira parsimoniosa(REESCREVER REFERENCIA), sendo uma opção para a construção de teoria com uma abordagem constrututivista (REFERÊNCIA livro sobre padrões): os modelos neutros baseiam-se em aproximações onde podemos acrescentar complexidade afim de continuar as investigações dos padrões macroecologicos (Rosindell et al. 2012, Matthews & Whittaker 2014) [REESCREVER].
 
+O pressuposto de neutralidade, pressuposto central da teoria (Connolly et al. 2017), não é uma aproximação válida em paisagens fragmentadas (Gilbert et al. 2006, Laurance et al. 2018). Assim, comparar SADs preditas segundo um modelo neutro com SADs empíricas de um gradiente de cobertura vegetal, proxy para fragmentação (Fahrig 2003), é uma forma de avaliar quando um padrão de abundância pode revelar algo além de que um modelo nulo pode ser suficiente para descrever o observado (Hammal et al. 2015).
+
+Abordagens nulas se fazem necessárias dado a escassez de dados, ESCREVER: % DE ÁREA COBERTA, % FRAGMENTADA, (REFERENCIA). No caso da Mata Atlântica,  (Lima et al. 2013)
+
+Uma das principais contribuições da teoria neutra foi salientar a importância da limitação à dispersão entre os mecanismos que influênciam os padrões de diversidade (Alonso et al. 2006, McGill 2010, Condit et al. 2012, Munhoz et al. 2016). 
+
+Os modelos neutros apresenta alta congruência com os padrões de abundância observados nos sistemas naturais, se o parâmetro de dispersão apresentar realismo biológico, (Rosindell & Cornell 2007, 2009); assim, espera-se alta congruência do predito neutro quando o parâmetro de dispersão for coerente com o sistema biológico estudado. Nesse contexto, há dois cenários extremos: a) quando o agente dispersor está ausente/modificado de modo que a dispersão dos indivíduos seja restrito às proximidades da árvore progenitora, que pode acontecer como resultado da fragmentação [REFERÊNCIA]; b) e naqueles casos em que o agente dispersor está presente e podemos ter como referência a dispersão média de diferentes sindromes de dispersão (Munoz et al. 2013) ou estimativas dos parâmetros de imigração em paisagens pouco perturbadas (REFERÊNCIA).
+
+Os modelos neutros diferem em seus pressupostos auxiliares, MNEI considera que existe dois níveis: comunidade local (com J indivíduos) e metacomunidade (com J_M indivíduos), o constante influxo de indivíduos da metacomunidade para a comunidade local mantem a diversidade local e balanceam a erosão de espécies resultado da variação ao acaso das abundâncias das espécies (deriva ecológica); na metacomunidade a deriva ecológica é compensanda pela especiação de novas espécies como resultado de especiação por mutação, alternativamente também pode ser interpretado como dispersão de longa distância de um pool de espécies externos (REFERÊNCIAS: Etienne e cia).
+
+Uma vez que o pressupostos da soma-zero não é necessário para predizer os padrões de abundância, tem se utilizado o pressuposto de que J_M pode ter tamanho infinito (Etienne et al. 2007. The zero-sum assumption). 
+
+esse processo de especiação pressupõem que espécies mais abundantes tem mais chance de 
 
 
 Hipóteses:
 
 H1: A SAD não retem informação suficiente para refutar a hipótese de neutralidade mesmo em sistemas onde a equivalência funcional não é uma aproximação válida (Hubbell 2005, Clark 2009).
+P1: Espera-se observar alta congruência dos modelos indepentende do efeito da cobertura vegetal e dos parâmetros de imigração e diversidade para ambos os modelos neutros.
 
-H2: Os modelos neutros não contêm informação suficiente para reproduzir as SADs observadas em paisagens fragmentadas, uma vez que o pressuposto de neutralidade, pressuposto central da teoria (Connolly et al. 2017), não é uma aproximação válida nestes contextos (Gilbert et al. 2006, Laurance et al. 2018).
+H2: Os modelos neutros não contêm informação suficiente para reproduzir as SADs observadas em paisagens fragmentadas.
+P2:
 
-H3: A teoria neutra reproduz suficientemente bem a SAD observada em qualquer contexto dado parâmetro de dispersão adequado (Rosindell et al. 2011, Matthews & Whittaker 2014). Os modelos neutros apresenta alta congruência com os padrões de abundância observados nos sistemas naturais, se o parâmetro de dispersão apresentar realismo biológico, (Rosindell & Cornell 2007, 2009); assim, espera-se alta congruência do predito neutro quando o parâmetro de dispersão for coerente com o sistema biológico estudado. Nesse contexto, há dois cenários extremos: a) quando o agente dispersor está ausente/modificado de modo que a dispersão dos indivíduos seja restrito às proximidades da árvore progenitora, que pode acontecer como resultado da retirada de habitat e fragmentação [REFERÊNCIA]; b) e naqueles casos em que o agente dispersor está presente e podemos ter como referência a dispersão média de diferentes sindromes de dispersão (Munoz et al. 2013).
+H3: A teoria neutra reproduz suficientemente bem a SAD observada em qualquer contexto dado parâmetro de dispersão adequado (Rosindell et al. 2011, Matthews & Whittaker 2014). 
 
-H4: O modelo neutro de espaço implícito (MNEI) consegue ajustar SADs em campos de parâmetros que o modelo neutro de espaço explícito (MNEE) não consegue simular (Rosindell & Etienne 2011). Contudo, o modelo MNEI apresenta boa congruência com o observado dado conjunto de parâmetros que permita a SAD neutra ter a forma adequada (Magurran 2003, REFERÊNCIAS), sem necessariamente refletir o contexto em que a SAD foi observada. Como MNEI pressupõem panmixia intra-escalas, esperamos que para parâmetros de imigração que melhor aproximem a condição de panmixia valores de GOF superiores para MNEI, em comparação ao MNEE, pois um pressuposto auxiliar ao pressupostos de equivalência funcional é correto (Connolly et al. 2017).
+H4: Os modelos neutros diferem na forma que conceitualizam a limitação à dispersão e portanto apresentam 
+
+
+O modelo neutro de espaço implícito (MNEI) consegue ajustar SADs em campos de parâmetros que o modelo neutro de espaço explícito (MNEE) não consegue simular (Rosindell & Etienne 2011). Contudo, o modelo MNEI apresenta boa congruência com o observado dado conjunto de parâmetros que permita a SAD neutra ter a forma adequada (Magurran 2003, REFERÊNCIAS), sem necessariamente refletir o contexto em que a SAD foi observada. Como MNEI pressupõem panmixia intra-escalas, esperamos que para parâmetros de imigração que melhor aproximem a condição de panmixia valores de GOF superiores para MNEI, em comparação ao MNEE, pois um pressuposto auxiliar ao pressupostos de equivalência funcional é correto (Connolly et al. 2017).
 
 ## Teoria ##
-?[box 1: figura modelos teóricos (figura 1 Etienne & Alonso 2007 modificada + Matriz de paisagem para algum Site) + esquema dos métodos]?
+?[box 1: figura modelos teóricos (figura 1 Etienne & Alonso 2007,  modificada + Matriz de paisagem para algum Site) + esquema dos métodos]?
 -Teoria neutra: modelo clássico
 -incongruência e alternativas [ questão da hipótese de pamixia; dificuldade de interpretar os parâmetros do modelo de espaço implícito de forma biológica; alternativas de parametrização com maior realismo biológico como maneira de fazer inferências mais fortes]
 -diferenças nas conceitualizações dos modelos em relação entre escalas [ barreiras de mudança de propriedades como pressuposto, hipótese de equilíbrio dinâmico como aproximação para descrever a SAD ]
