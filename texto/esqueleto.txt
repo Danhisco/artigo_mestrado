@@ -1,0 +1,74 @@
+Esqueleto do Artigo:
+
+## Introdução ##
+- SADs e teoria neutra (tipo de explicação da teoria neutra, Bell 2003, Etienne & alonso 2007, Condit et al. 2012, Munoz et al 2016, Connolly et al. 2017).
+- Forma de investigação dentro do arcabouço da teoria neutra: calibração do modelo e comparação com o observado Hubbel 2001, 2005, Alonso et al. 2006, Rosindell et al. 2011, Hammal et al. 2015.
+- Um exemplo de estudo que compara dados de census de 20 anos, e assim investiga a dinâmica de nascimentos e mortes na comunidade local ao inves do padrão estatítico de abundância (SAD), é uma investigação mais poderosa da teoria neutra pois permite fazer uma inferência mais forte quanto o pressuposto de neutralidade no sistema [REESCREVER]. Gilbert et al. 2006 avaliou ....
+- Gradiente de fragmentação e teoria neutra - olhar artigo science sobre os projetos de longa data sobre os efeitos de fragmentação nas dinâmica ecológicas subjacentes em diferentes lugares do planeta. Justificar os motivos de que a teoria neutra não é uma boa aproximação do sistema observado. [pressuposto central da teoria neutra não é uma aproximação válida, assim, se a SAD retêm alguma informação sobre a dinâmica ecológica subjacente que nos permita testar hipóteses ecológicas, a teoria neutra não deve prover boas aproximações da SAD observada em tais contextos.] 
+
+## Teoria ##
+-Teoria neutra: modelo clássico
+-incongruência e alternativas [ questão da hipótese de pamixia; dificuldade de interpretar os parâmetros do modelo de espaço implícito de forma biológica; alternativas de parametrização com maior realismo biológico como maneira de fazer inferências mais fortes]
+-diferenças nas conceitualizações dos modelos em relação entre escalas [ barreiras de mudança de propriedades como pressuposto, hipótese de equilíbrio dinâmico como aproximação para descrever a SAD ]
+-relação entre modelos e uma abordagem baseada em função de dispersão para parametrizar a imigração pressuposta[ Chisholm & Linchstein 2009; Etienne & Rosindell 2011; Munoz et al. 2013 ]
+
+## Objetivo ##
+
+Objetivo: 
+
+Avaliar se a SAD pode ser evidência suficiente para refutar a neutralidade a partir da comparação da congruência da SAD predita segundo dois modelos neutros que diferem na forma que descrevem a limitação à dispersão. Uma das principais contribuições da teoria neutra foi salientar a importância da limitação à dispersão entre os processos que influênciam os padrões de diversidade (Alonso et al. 2006, Rosindell et al. 2012, Condit et al. 2012). 
+
+Hipóteses:
+
+H1: A SAD não retem informação suficiente para refutar a hipótese de neutralidade mesmo em sistemas onde a equivalência funcional não é uma aproximação válida (Hubbell 2005, Clark 2009)
+H2: Os modelos neutros não contêm informação suficiente para reproduzir as SADs observadas em paisagens fragmentadas, uma vez que o pressuposto de neutralidade, pressuposto central da teoria (Connolly et al. 2017), não é uma aproximação válida nestes contextos (Gilbert et al. 2006, Laurance et al. 2018). 
+H3: A teoria neutra reproduz suficientemente bem a SAD observada em qualquer contexto dado parâmetro de dispersão adequado (Rosindell et al. 2011, Matthews & Whittaker 2014). Uma vez que A SAD é um padrão muito influênciado por processos de dispersão estocásticas, que a teoria neutra faz uma boa descrição, (McGill 2010), os modelos neutros apresenta alta congruência com os padrões de abundância observados nos sistemas naturais, se o parâmetro de dispersão apresentar realismo biológico, (Rosindell & Cornell 2007, 2009); assim, espera-se alta congruência do predito neutro quando o parâmetro de dispersão for coerente com o sistema biológico estudado. Nesse contexto, há dois cenários extremos: a) quando o agente dispersor está ausente/modificado de modo que a dispersão dos indivíduos seja restrito às proximidades da árvore progenitora, que pode acontecer como resultado da retirada de habitat e fragmentação [REFERÊNCIA]; b) e naqueles casos em que o agente dispersor está presente e podemos ter como referência a dispersão média de diferentes sindromes de dispersão (Munoz et al. 2013).
+H4: O modelo neutro de espaço implícito (MNEI) consegue ajustar SADs em campos de parâmetros que o modelo neutro de espaço explícito (MNEE) não consegue simular (Rosindell & Etienne 2011). Contudo, o modelo MNEI apresenta boa congruência com o observado dado conjunto de parâmetros que permita a SAD neutra ter a forma adequada (Magurran 2003, REFERÊNCIAS), sem necessariamente refletir o contexto em que a SAD foi observada. Como MNEI pressupõem panmixia intra-escalas, esperamos que para parâmetros de imigração que melhor aproximem a condição de panmixia valores de GOF superiores para MNEI, em comparação ao MNEE, pois um pressuposto auxiliar ao pressupostos de equivalência funcional é correto (Connolly et al. 2017).
+
+## Resumo Métodos ##
+
+Para testar essas hipóteses geramos predições a partir de modelos neutros que utilizam abordagem coalescente, um de espaço implícito (MNEI, Etienne 2005) e outro de espaço explícito (MNEE, Rosindell et al. 2008), que transcreve a configuração espacial de habitat e não habitat da paisagem que contêm o sítio de amostragem da SAD observada na matriz de simulação de tamanho finito (Campos et al. 2013). 
+
+Selecionamos 80 sítios onde foram amostrados todos os indivíduos vegetais com DBH>=5cm em pelo menos 1 ha de área contígua em diferentes paisagens da Mata Atlântica (Brasil, REFERÊNCIA). As amostraram foram tomadas em torno do ano de 2000, data dos rasters das paisagens (landSAT08, Hansen et al. 2013). Os sítios possuem diferentes históricos de perturbações, mas todos estão sendo preservados desde REFERENCIA. 
+
+O recorte de paisagem é na ordem de 100 vezes maior do que a área amostrada (recorte de paisagem 500 ha (5 Km^2); área amostrada ~ 1 ha (10e-2 km^2) o quê pode ser considerado como estudo da influência da escala regional na dinâmica local (Nathan 2006, McGill 2010, Beck et al. 2012). A matriz de simulação é obtida do arquivo raster de cobertura vegetal onde a resolução foi ajustada de modo que o número total de células de simulação, espaços onde podem existir apenas um indivíduo (pressuposto da soma-zero), é igual ao produto da densidade observada (DA) pela área da paisagem (A_land = 500 ha) (Rosindell et al. 2008, Campos et al. 2013). No raster original a resolução é de 30 m2 (Hansen et al. 2013), quando pelo menos 70% dessa área é cobertura vegetal consideramos que aquele pixel era uma unidade de habitat, depois de aplicar esse filtro utilizamos uma função para preencher as unidades de não habitat dentro de manchas de habitat (anexo 1 - detalhes dos Métodos). No centro da paisagem está a comunidade local, área quadrada com J indivíduos. O número total de indivíduos na paisagem, J_M, é o produto da DA, porcentagem de cobertura vegetal (p, número de unidades de habitat / número total de células de simulação) e área total da paisagem (500 ha),
+
+Uma vez que a SAD não retêm informação para parametrizar tanto o número fundamental da biodiversidade quanto o da imigração (Etienne et al. 2006), optamos por não estimar nenhum parâmetro por verossimilhança a partir da SAD, padrão a ser comparado, pois é uma crítica comum à calibração dos modelos neutros (McGill et al. 2003 REFERÊNCIAS). Informamos a priori os parâmetros de dispersão e estimamos o parâmetro de diversidade a partir de um método semi-análitico do modelo MNEE (apêndice A, Rosindell et al. 2008).
+
+Para estudar a escala regional é comum aproximar o processo de dispersão estocástico a partir de uma distribuição exponencial (Clark et al. 1999), para isso utilizamos a distribuição de Laplace como uma exponencial espelhada para parâmetrizar a função de dispersão que descreve a probabilidade de colonização em função da distância da unidade de habitat e a planta progenitora. A função de dispersão foi parametrizada de modo a simular cenários de extrema limitação à dispersão onde a maior parte da proporção de propágulos produzidos por um indivíduo fertil se mantêm até a distância de sua copa (k). Além desses cenários buscamos simular cenários de dispersão em que a distância média de dispersão é próximo para as distâncias médias de sindromes de dispersão em ambiente pouco perturbado (Munoz et al. 2013), contudo, por uma limitação da solução numérica de MNEE não é possível simular valores de dispersão muito elevados, pois se torna computacionalmente inviável (Rosindell et al. 2008). Procuramos simular a maior amplitude possível de distâncias médias de dispersão (d) em que as simulações eram computacionalmente viáveis (figura 1). 
+
+Dado parâmetro de imigração, podemos estimar a taxa de especiação necessária para manter a riqueza observada sob a hipótese de equilíbrio dinâmico (v, Rosindell et al. 2008). Geramos uma árvore genealógica da comunidade considerado v -> 0, portanto uma comunidade onde há monodominancia. Cada nó dessa árvore é um evento de coalescência que poderia ter sido um evento de especiação. Assim, podemos utilizar essa árvore para criar uma equação que relaciona o número de espécies com a probabilidade de cada nó ter sido um evento de especiação. Então para uma determinada riqueza, função de dispersão e matriz de paisagem teríamos a probabilidade média de especiação por evento de morte (v, apêndice A de Rossindell et al. 2008). Parametrizamos MNEI a partir da formula de theta presente em Etienne (2005). Como o pressuposto da soma-zero não é necessária para a teoria neutra, uma consequência disso é que não podemos partir do parâmetro theta para estimar v ou J_m, mas o caminho inverso é possível (Etienne et al. 2007).
+
+Para cada dupla de parâmetros (parâmetro de diversidade e de imigração) gerou-se 100 SADs réplicas para cada SAD observada, os quais comparamos a partir do teste de Kolmogorov-Smirnov sob a hipótese nula de que os dois vetores de abundância (a SAD réplica e a SAD observada) são amostras de uma mesma distribuição teórica. Contabilizamos o número de SADs réplicas em que não foi possível refutar a hipótese nula, para cada conjunto de parâmetros, na variável GOF (de Goodness-of-fit, Rosindell & Etienne 2011) e utilizamos como variável de congruência entre as predições dos modelos neutros e o padrão observado. 
+
+Avaliamos o efeito da cobertura vegetal (p), classe modelo neutro (MNEE ou MNEI) e o parâmetro de imigração em GOF e v utilizando modelos mistos, onde os efeitos aleatórios estão categorizados pelo sítio de amostragem (Site). Como variável para descrever o parâmetro de imigração utilizamos 3 parâmetros comumentes utilizados em modelos neutros (d - distância média de dispersão; m - prob. de colonização local por um imigrante; I - número fundamental da imigração, que corrigi m pelo tamanho da amostra (J)) e um desenvolvido para parametrizar os cenários de limitação à dispersão mais severos (k, a proporção de propágulos que permanece até a área da copa da árvore progenitora). Utilizamos 30 valores de d e buscamos varrer o campo de parâmetros de modo a ter igual representação das 4 variáveis (figura 1).
+
+
+## Resultados ##
+
+_Parâmetros de imigração_
+
+	Em MNEI há dois parâmetros para descrever a limitação à dispersão: m e I. O parâmetro 'm' é a probabilidade de que qualquer indivíduo da comunidade local seja 'replace' por um imigrante da metacomunidade, ao invés da prole de indivíduos da comunidade local (Alonso et al. 2006). Para levar em conta o tamanho da amostra e corrigir a probabilidade m pelo número de indivíduos que produzem prole potencialmente competidora para colonizar a unidade de habitat disponível utiliza-se I (Etienne 2005). 
+	Para uma versão espacial da teoria neutra, podemos fazer uma primeira aproximação para uma paisagem homogênea e infinita onde a comunidade local é uma amostra quadrada; quando um indivíduo da comunidade local morre o indivíduo que coloniza a unidade de habitat disponível pode ser da comunidade local ou amostrado da paisagem (Chisholm & Lichstein 2009). Dado m_{x,y}, a probabilidade de que replacemente individual na localização {x,y} seja tomado da paisagem, m é o produto de m_{x,y} para todas as unidades de habitat da comunidade local (Chisholm & Lichstein 2009). Deduzimos uma formula exata para calcular m a partir de J e d, a distância média de dispersão, considerando os pressupostos de MNEE (dispersão é resultante do sorteio independente em dois eixos ortogonais; e distribuição de Laplace). Essa formula não considera a matriz de paisagem pois teriamos que explicitar a configuração espacial de habitat e não habitat, uma vez que em MNEE as unidades de habitat são tratadas como barreiras (Campos et al. 2013 REESCREVER). Uma primeira aproximação foi corrigir 'm' para a cobertura vegetal (p) (anexo X) e então calcular I.
+	MNEE é parametrizado pela distância média de dispersão (d), o que permite comparação direta com estimativas de dispersão em campo (Munoz et al. 2013). Como não é possível mais de um indivíduo por unidade de habitat (soma-zero), a distância entre os indivíduos (l_{cel}) varia em função de DA (anexo X). Para levar em conta a distância entre os indivíduos em MNEE calculamos k, a proporção de propágulos até l_{cel} metros da planta progenitora, a partir de um método numérico (anexo X). Os valores de d foram escolhidos de modo a explorar o campo de parâmetros para dois cenários extremos: quando o agente dispersor está ausente ou muito modificado e a dispersão é limitada para as proximidades da planta progenitora, simulando uma situação comum em paisagens fragmentadas (REFERÊNCIA); e para d's que geram valores de 'm' em paisagens preservadas (REFERÊNCIA).
+
+figura 1. VR ~ d + DA + J + p + (d|Site). d igual para todos - referência biológica. VR = k, m, I
+
+_Taxa de especiação necessária para manter a riqueza observada no equilíbrio_
+
+	A taxa de especiação (v) é estimada a partir de MNEE e portanto reflete: i) a arvore genealógica da comunidade simulada na matriz de paisagem, que transcreve a configuração espacial de habitat e não habitat para uma resolução onde cada árvore ocupa uma unidade mínima de espaço (unidade de habitat); e ii) a probabilidade de colonização de uma unidade de habitat por um propágulo como função da distância da planta progenitora e a unidade de habitat, pressuposto uma função de dispersão do tipo exponencial. A estimativa é feita para se obter o número de espécies da SAD observada (S obs) no equilíbrio. Dado a hipótese de equilíbrio dinâmico, a taxa de especiação se iguala à taxa de extinção (Rosindell et al. 2008). Uma vez que, o modelo neutro faz uma boa aproximação da taxa de extinção de espécies raras em ambientes fragmentados (Gilbert et al. 2006). 
+	  
+
+figura 2. v ~ p * par_imig + S + (par_imig | Site)
+
+
+_Congruência com o observado (Goodness-of-fit GOF)_
+
+
+figura 3. GOF ~ p * MN * par_imigr + S + (par_imig | Site / MN)
+
+
+
+
+## Discussão ##
+
