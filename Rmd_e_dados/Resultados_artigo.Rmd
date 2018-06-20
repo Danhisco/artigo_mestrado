@@ -10,30 +10,68 @@ knitr::opts_chunk$set(echo = FALSE, tidy = TRUE, include = TRUE, warning = FALSE
 ```
 
 ```{r dados e pacotes,warning=FALSE,message=FALSE,echo=FALSE}
-library(reshape2) # para mudar formato dos dados
+# library(reshape2) # para mudar formato dos dados
 library(RVAideMemoire) #gráficos diagnóstico dos GLMM
 library(sjPlot) #gráficos de GLMM
 library(MuMIn) # para R^2
-library(gridExtra)  #pacote para gráficos
-library(ggplot2)  # idem
+# library(gridExtra)  #pacote para gráficos
+# library(ggplot2)  # idem
+library(sads)
 library(lme4) # pacote de criação dos modelos estatísticos
-library(sads) # pacote para comparar os modelos, seleção per se
+library(blme) # pacote para comparar os modelos, seleção per se
 library(merTools) # para intervalos de previsao
-library(broom) # para manipular os modelos
+library(tidyverse)
+# library(broom) # para manipular os modelos 
 library(magrittr) # p escrita
-library(plyr) 
-library(dplyr) 
-df_resultados <- read.table(file="/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/df_resultados_conv.txt", header=T, sep="\t",as.is = T)
-df_resultados$k <- factor(df_resultados$k,
-                          levels=df_resultados$k[c(12:1,13)])
+# library(plyr) 
+# library(dplyr) 
+df_resultados <- read_csv("/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/df_resultados.csv")
+# df_resultados %>% str
+df_resultados$MN <- factor(df_resultados$MN)
+df_resultados$SiteCode <- factor(df_resultados$SiteCode)
+df_resultados$k <- factor(df_resultados$k,levels=unique(df_resultados$k))
+
 # df_resultados$k %>% unique
 ```
+<!-- Esqueleto dos resultados
+
+a) MNEI por verossimilhança
+-GOF) Se MNEI tiver seus parâmetros livres ele sempre apresentara boa congruência com o observado?
+-theta) Se o ajuste dos parâmetros informa algo além da SAD em si, esperamos observar efeito positivo de p, pois para maiores coberturas vegetais há mais indivíduos na região biogeográfica.
+-m) Idem, esperamos observar efeito positivo de p, uma vez que quanto menor a cobertura vegetal de uma paisagem menor a concetividade entre as manchas de habitat (REFERÊNCIA)
+
+b) Conversão de parâmetros de imigração
+-par{MNEI} -> par{MNEE} [parâmetros com maior interpretação biológica - que permite a parametrização a partir de valores observados]
+-distância médias de dispersão -> m segundo uma simulação coalescente em paisagem fragmentada.
+
+c) Estimando U a partir de uma simulação coalescente
+- 20 valores de U a partir de cada nível de d [MM]
+- U -> theta, pela formula de conversão de theta [MM]
+- U ~ p * d + (d | Site) [ou a formula que estamos utilizando]
+
+d) Congruência do observado entre os modelos neutros consideramos mesmo conjunto de parâmetros
+[MM]: estabelecemos distâncias de dispersões segundo diferentes cenários de limitação à dispersão médio (d), que parametrizados com valores observados na natureza para diferentes sindromes de dispersão. Para cada nível de d estimamos a taxa de especiação necessária para manter a riqueza observada, sob a hipótese de equilíbrio dinâmico, (U - singleton/evento de morte) segundo MNEE. Utilizamos o par U e d para gerar SADs segundo MNEE e convertemos U e d em theta e m, respectivamente, para gerar SADs segundo MNEI. Para cada MN geramos 100 SADs réplicas que comparamos com a respectiva SAD observada pelo teste de Kolmogorov-Smirnov; contabilizamos o número de vezes que não foi possível refutar a hipótese nula de que a SAD réplica e SAD observada são amostras de uma mesma distribuição teórica na variável GOF (Goodness-of-fit). Temos 80 sítios de amostragens, 30 rodadas de simulação para cada nível de MN (EE e EI).
+
+- GOF ~ p * d * MN + (d | Site / MN)
+MN: factor 2 levels: EE, EI
+d: numeric 30 valores para todas as simulações
+
+e) Parâmetro a posteori: espécies input (Condit et al. 2012)
+- spp_I ~ p * d + (d|Site)
+- GOF ~ spp_I * d * MN + (d | Site / MN)
+
+
+-->
+
+
 
 <!-- última paragráfo de material e métodos
 
 Organizamos os resultados em 3 blocos de dados, aqueles para MNEE, MNEI e MNEE + MNEI. As variáveis resposta são: GOF, $\theta$, m, U, spp_I e d. As variáveis indepedentes são cobertura vegetal (p) e função de dispersão, que está sendo expressa de forma categorica(k), assim, podemos avaliar tanto os dados de MNEE, quanto para MNEE + MNEI; e de forma contínua d (distância média de dispersão da função de dispersão), para os dados de MNEE. Convertemos os parâmetros de MNEE U e d em $\theta'$, m'; e $\theta$ e m de MNEI em  U' e (d' e k'), considerando que $J_M$ = número de indivíduos na paisagem. Quando houve mais de uma observação para um mesmo Sítio de amostragem, então utilizamos a variável Sítio como variável categórica dos efeitos aleatórios do modelo linear; quando a função de dispersão foi categória utilizamos (1|Site) e  (d|Site) se ela foi contínua. Assim, temos duas maneiras de partir a variação prevista pelo modelo. O $R_m^2$ é a variação explicada pelos efeitos fixos do modelo, ou seja, p e/ou a variável relacionada à limitação à dispersão (k ou d) ('R quadrado marginal'); já o R quadrado condicional, $R_c^2$, é a variação associado tanto às variáveis de efeito fixo quanto ao efeito aleatório (sítio de amostragem). 
 Acredito que uma métrica de comparação entre $R^2$ para GLM e GLMM seria considerar a razão $R_{GLMM}^2 = R_m^2 / R_c^2$? -->
 
+<!--
+## Sessão antiga, 18jun ##
 Introdução da sessão de resultados:
 
 Vou explorar o terceiro bloco de dados c(MNEE, MNEI), em anexo a análise dos dados para o conjunto de dados MNEE e MNEI. MNEE e MNEI diferem na forma que implementam a teoria neutra e na forma com que estimam os parâmetros a priori simulação. Assim, unir os resultados em uma mesma análise de dados tem que ser feita considerando a origem dos dados, para adequar com os resultados de MNEE organizei os dados pela proporção da chuva de propágulos que permanece até a área imediata a da copa da árvore progenitora (l_cel metros). Incluindo os dados de MNEI, são 13 níveis na variável "k", o primeiro nível é aquele com cenário de limitação à dispersão mais rigoroso (=0.99), o penúltimo nível é o cenário de limitação à dispersão menos realista (=0.25) e o último nível são os dados de MNEI. Em análise exploratória observamos que mesmo com valores razoáveis de m, MNEI apresentou d's superiores ao de MNEE em escala log (anexo) e como d está relacionado com a proporção de propágulos até a área imediata da planta progenitora (k) ordenei os níveis de "k" agrupando os valores de MNEI juntos no último nível. Existe grande variação no parâmetro 'm' estimado por verossimilhança, contudo, essa variação não apresenta efeito de p (anexo), então, não considerar a variação interna de m em MNEI não deve interferir na análise dos dados. Em anexo, há as análises auxiliares que inclui dos outros conjuntos de dados.
@@ -42,6 +80,15 @@ ii) Se sim quais as característica da paisagem e da relação com a área amost
 iii) Em cenários de limitação à dispersão biologicamente realistas o modelo neutro apresente boa congruência com os dados?
 iv) Qual o efeito da fragmentação na diversidade da paisagem segundo o predito neutro?
 
+
+## Esqueleto dos resultados - 18jun ##
+
+a) resultados para os parâmetros de imigração para as distâncias simuladas: m, I e k. Tentar incluir os valores estimados em campo
+b) v ~ p * par_imig + S + (par_imig | Site); par_imig = d, m, I, k
+c) GOF ~ p * MN * par_imig + S + (par_imig | Site / MN) 
+
+
+-->
 <!--
 Para faciltar o ajuste dos modelos mistos aplicamos a transformação z nas variáveis contínuas: 
 -->
@@ -54,25 +101,134 @@ f_z <- function(x){
   return(output)
 } 
 
-df_resultados %<>% mutate(GOF.z = f_z(GOF), #-1
+df_resultados %<>% mutate(GOF.z = f_z(GOF),
                           p.z = f_z(p),
                           S.z = f_z(S),
                           U.z = f_z(U),
-                          U_.z = f_z(U_),
-                          theta.z = f_z(theta),
-                          theta_.z = f_z(theta_),
-                          m.z = f_z(m),
                           m_.z = f_z(m_),
-                          S_M.z = f_z(S_M),
-                          S_M_.z = f_z(S_M_),
-                          spp_I.z = f_z(spp_I),
-                          spp_I_.z = f_z(spp_I_))
+                          I.z = f_z(I),
+                          d.z = f_z(d),
+                          k.z0 = as.numeric(as.character(k)),
+                          k.z = f_z(k.z0))
 
 names(df_resultados)[1] <- "Site"
 ```
 
-__A) Variável de congruência com o observado e os parâmetros de MNEI__
+__GOF__
 
+<!--
+i) selecao da funcao de ligacao e distribuicao de erros a partir da modelo cheio
+ii) selecao do modelo mais plausível
+iii) diagnóstico do modelo: Bolker et al.
+-->
+
+```{r GOF selecao de funcao de ligacao, echo=FALSE}
+l_md <- vector("list", length = 16)
+names(l_md) <- paste(paste(rep("(par_imig|Site/MN)",4),c("d","k","m","I")),rep(c("logit","probit","cloglog","ID normal"),each=4))
+# logito
+l_md[[1]] <- glmer(cbind(GOF,100-GOF) ~ p.z * MN * d.z + S.z + (d.z | Site / MN), 
+                   family = "binomial"(link=logit),
+                   control = glmerControl(optimizer = "bobyqa",optCtrl = list(maxfun=2e5)),
+                   data = df_resultados)
+l_md[[2]] <- glmer(cbind(GOF,100-GOF) ~ p.z * MN * k.z + S.z + (k.z | Site / MN), 
+                   family = "binomial"(link=logit),
+                   control = glmerControl(optimizer = "bobyqa",optCtrl = list(maxfun=2e5)),
+                   data = df_resultados)
+l_md[[3]] <- glmer(cbind(GOF,100-GOF) ~ p.z * MN * m_.z + S.z + (m_.z | Site / MN), 
+                   family = "binomial"(link=logit),
+                   control = glmerControl(optimizer = "bobyqa",optCtrl = list(maxfun=2e5)),
+                   data = df_resultados)
+l_md[[4]] <- glmer(cbind(GOF,100-GOF) ~ p.z * MN * I.z + S.z + (I.z | Site / MN), 
+                    family = "binomial"(link=logit),
+                   control = glmerControl(optimizer = "bobyqa",optCtrl = list(maxfun=2e5)),
+                   data = df_resultados)
+# probito
+l_md[[5]] <- glmer(cbind(GOF,100-GOF) ~ p.z * MN * d.z + S.z + (d.z | Site / MN), 
+                    family = "binomial"(link=probit),
+                   control = glmerControl(optimizer = "bobyqa",optCtrl = list(maxfun=2e5)),
+                   data = df_resultados)
+l_md[[6]] <- glmer(cbind(GOF,100-GOF) ~ p.z * MN * k.z + S.z + (k.z | Site / MN), 
+                    family = "binomial"(link=probit),
+                   control = glmerControl(optimizer = "bobyqa",optCtrl = list(maxfun=2e5)),
+                   data = df_resultados)
+l_md[[7]] <- glmer(cbind(GOF,100-GOF) ~ p.z * MN * m_.z + S.z + (m_.z | Site / MN), 
+                    family = "binomial"(link=probit),
+                   control = glmerControl(optimizer = "bobyqa",optCtrl = list(maxfun=2e5)),
+                   data = df_resultados)
+l_md[[8]] <- glmer(cbind(GOF,100-GOF) ~ p.z * MN * I.z + S.z + (I.z | Site / MN), 
+                    family = "binomial"(link=probit),
+                   control = glmerControl(optimizer = "bobyqa",optCtrl = list(maxfun=2e5)),
+                   data = df_resultados)
+# cloglog
+l_md[[9]] <- glmer(cbind(GOF,100-GOF) ~ p.z * MN * d.z + S.z + (d.z | Site / MN), 
+                    family = "binomial"(link=cloglog),
+                   control = glmerControl(optimizer = "bobyqa",optCtrl = list(maxfun=2e5)),
+                   data = df_resultados)
+l_md[[10]] <- glmer(cbind(GOF,100-GOF) ~ p.z * MN * k.z + S.z + (k.z | Site / MN), 
+                    family = "binomial"(link=cloglog),
+                    control = glmerControl(optimizer = "bobyqa",optCtrl = list(maxfun=2e5)),
+                   data = df_resultados)
+l_md[[11]] <- glmer(cbind(GOF,100-GOF) ~ p.z * MN * m_.z + S.z + (m_.z | Site / MN), 
+                    family = "binomial"(link=cloglog),
+                    control = glmerControl(optimizer = "bobyqa",optCtrl = list(maxfun=2e5)),
+                   data = df_resultados)
+l_md[[12]] <- glmer(cbind(GOF,100-GOF) ~ p.z * MN * I.z + S.z + (I.z | Site / MN), 
+                    family = "binomial"(link=cloglog),
+                    control = glmerControl(optimizer = "bobyqa",optCtrl = list(maxfun=2e5)),
+                   data = df_resultados)
+# ID normal
+l_md[[13]] <- lmer(GOF ~ p.z * MN * d.z + S.z + (d.z | Site / MN), data = df_resultados)
+l_md[[14]] <- lmer(GOF ~ p.z * MN * k.z + S.z + (k.z | Site / MN), data = df_resultados)
+l_md[[15]] <- lmer(GOF ~ p.z * MN * m_.z + S.z + (m_.z | Site / MN), data = df_resultados)
+l_md[[16]] <- lmer(GOF ~ p.z * MN * I.z + S.z + (I.z | Site / MN), data = df_resultados)
+AICctab(l_md, weights = TRUE)
+```
+
+- classe de modelo estastítico selecionado: lmer( I + (I | Site / MN) )
+```{r}
+l_md <- vector("list",length = 4)
+names(l_md) <- c("(1|Site)","(I|Site)","(1|Site/MN)","(I|Site/MN)")
+l_md[[1]] <- lmer(GOF ~ p.z * MN * I.z + S.z + (1 | Site), data = df_resultados)
+l_md[[2]] <- lmer(GOF ~ p.z * MN * I.z + S.z + (I.z | Site), data = df_resultados)
+l_md[[3]] <- lmer(GOF ~ p.z * MN * I.z + S.z + (1 | Site / MN), data = df_resultados)
+l_md[[4]] <- lmer(GOF ~ p.z * MN * I.z + S.z + (I.z | Site / MN), data = df_resultados)
+AICctab(l_md, weights = TRUE)
+```
+
+
+- modelo cheio: GOF ~ p * MN * I + S + (I | Site / MN)
+- todas as hipóteses: ~1, ~p; ~MN; ~I; ~S; ~p * MN; ~p * I; ~p + S; ~MN + S; ~MN * I; ~I + S; ~p * MN + S; ~p * I + S;  ~MN * I + S; ~p * MN * I + S
+
+```{r}
+l_md <- vector("list",length = 15)
+names(l_md) <- c("1","p","MN","I","S","p * MN","p * I","MN * I","p + S","MN + S", "I + S","p * MN + S","p * I + S","MN * I + S","p * MN * I + S")
+l_md[[1]] <- lmer(GOF ~ 1 + (1 | Site), data = df_resultados)
+l_md[[2]] <- lmer(GOF ~ p.z + (1 | Site), data = df_resultados)
+l_md[[3]] <- lmer(GOF ~ MN + (1 | Site / MN), data = df_resultados)
+l_md[[4]] <- lmer(GOF ~ I.z + (I.z | Site), data = df_resultados)
+l_md[[5]] <- lmer(GOF ~ S.z + (1 | Site), data = df_resultados)
+l_md[[6]] <- lmer(GOF ~ p.z * MN + (1 | Site / MN), data = df_resultados)
+l_md[[7]] <- lmer(GOF ~ p.z * I.z + (I.z | Site), data = df_resultados)
+l_md[[8]] <- lmer(GOF ~ MN * I.z + (I.z | Site / MN), data = df_resultados)
+l_md[[9]] <- lmer(GOF ~ p.z + S.z + (1 | Site), data = df_resultados)
+l_md[[10]] <- lmer(GOF ~ MN + S.z + (1 | Site / MN), data = df_resultados)
+l_md[[11]] <- lmer(GOF ~ I.z + S.z + (I.z | Site), data = df_resultados)
+l_md[[12]] <- lmer(GOF ~ p.z * MN + S.z + (1 | Site / MN), data = df_resultados)
+l_md[[13]] <- lmer(GOF ~ p.z * I.z + S.z + (I.z | Site), data = df_resultados)
+l_md[[14]] <- lmer(GOF ~ MN * I.z + S.z + (I.z | Site / MN), data = df_resultados)
+l_md[[15]] <- lmer(GOF ~ p.z * MN * I.z + S.z + (I.z | Site / MN), data = df_resultados)
+AICctab(l_md, weights = TRUE)
+```
+
+```{r}
+(r2_GOF <- sapply(l_md, r.squaredGLMM) %>% t)
+```
+
+```{r}
+l_md[[15]] %>% summary
+```
+
+<!--
 #### GOF ####
 __EE + EI__
 
@@ -96,9 +252,7 @@ l_md[[4]] <- lmer(GOF ~ p.z * k + (1 | Site), data = df_md)
 # df_md %>% ggplot(aes(x=p.z,y=GOF)) + geom_point() + facet_wrap(~k,ncol=4)
 # df_md %>% ggplot(aes(x=p,y=GOF)) + geom_point() + facet_wrap(~k,ncol=4)
 ```
-<!--
 Como o R2 do modelo cheio estava muito baixo eu resolvi utilizar uma outra distribuição de probabilidade e função de ligação.
--->
 
 
 ```{r GOF EE EI selecao}
@@ -258,9 +412,7 @@ l_md[[8]] <- lmer(GOF ~ p.z * d + (d | Site), data = df_md)
 # df_md %>% mutate(p_class = cut(p,20)) %>% 
   # ggplot(aes(x=d,y=GOF,group=Site)) + geom_point() + geom_line() + facet_wrap(~p_class,ncol=4)
 ```
-<!--
 Como o R2 do modelo cheio estava muito baixo eu resolvi utilizar uma outra distribuição de probabilidade e função de ligação.
--->
 
 __figura 4__ d ~ k, distância média de 
 
@@ -291,14 +443,17 @@ l_md[[5]] <- glmer(cbind(GOF,100-GOF) ~ 1 + (1 | Site),
 # # l_md %<>% llply(.,function(X) update(X,control=glmerControl(optimizer="bobyqa", optCtrl = list(maxfun=2e5)))) 
 # 
 # # ii) seleção de modelos.
+print("tabela de selecao de hipoteses")
 AICctab(l_md, weights = TRUE)
 # 
 # # hipótese selecionada #
 # md_GOF <- l_md[[1]]
 # # summary(md_GOF)
 # # 
-# (r2_GOF <- sapply(l_md, r.squaredGLMM))
-# # r2_GOF[1,]/r2_GOF[2,] * 100 %>% round(3)
+print("R2m e R2c")
+(r2_GOF <- sapply(l_md, r.squaredGLMM))
+print("R2m / R2c")
+r2_GOF[1,]/r2_GOF[2,] * 100 %>% round(3)
 # # md_GOF %>% fixef() # parâmetros do efeito fixo
 # # md_GOF %>% ranef() # parâmetros do efeito aleatório
 # 
@@ -308,6 +463,8 @@ AICctab(l_md, weights = TRUE)
 
 __Figura 4__ [EE] Seleção de modelos e R quadrado marginal e condicional da seleção de modelos
 
+Três hipóteses são igualmente plausíveis para descrever os efeitos da porcentagem de cobertura vegetal na paisagem (p) e da distância média de dispersão (d), o maior peso de evidência está para a hipótese que considera apenas o efeito de d, seguindo para a hipótese de interação entre p e d e de soma entre as duas variáveis. Nota-se que as hipóteses fora do intervalo de plausibilidade são aquelas que apresentam R2m < 0.57. O poder de explicação de R2m do modelo considerando apenas o conjunto de dados EE é menor do que o observado para os modelos selecionados para o conjunto de dados  
+ 
 
 ```{r GOF EE 1avaliacao modelo selecionado, echo=FALSE,message=FALSE,include=TRUE}
 # gráficos diagnóstico
@@ -480,7 +637,44 @@ __C) Parâmetros a posteriori__
 # ii) gráficos diagnóstico
 ```
 
-<!--
+
+
+#########################################################################################################
+m de MNEI 
+#########################################################################################################
+
+```{r selecao de hipoteses para m}
+# dados #
+df_md <- df_resultados %>% filter(k == "EI") %>% select(SiteCode,k,p,sd_k_,J,DA,m) %>% mutate(l_cel = 100/sqrt(J/DA),d=sd_k_/sqrt(2))
+
+# selecao de dist. prob #
+l_md <- vector("list", length = 4)
+names(l_md) <- c("logit-bin","probit-bin","cloglog - bin","normal")
+l_md[[1]] <- glm(cbind(m,1-m) ~ p * l_cel, 
+                    family = "binomial",df_md)
+l_md[[2]] <- glm(cbind(m,1-m) ~ p * l_cel, 
+                    family = "binomial"(link=probit),df_md)
+l_md[[3]] <- glm(cbind(m,1-m) ~ p * l_cel, 
+                    family = "binomial"(link=cloglog), data = df_md)
+l_md[[4]] <- lm(m ~ p * l_cel, data = df_md)
+# AICctab(l_md, weights = TRUE)
+## modelo mais plausivel: lm
+
+# selecao de modelos #
+l_md <- vector("list",length = 5)
+names(l_md) <- c("~ p * l", "~ p + l", "~ l", "~ p", "~ 1")
+l_md[[1]] <- lm(m ~ p * l_cel,df_md)
+l_md[[2]] <- lm(m ~ p + l_cel,df_md)
+l_md[[3]] <- lm(m ~ l_cel,df_md)
+l_md[[4]] <- lm(m ~ p,df_md)
+l_md[[5]] <- lm(m ~ 1,df_md)
+AICctab(l_md, weights = TRUE)
+
+#modelo mais plausível
+coef(l_md[[5]])
+
+```
+
 ANEXO:
  apenas os itens 
 _Resultados para MNEI_
