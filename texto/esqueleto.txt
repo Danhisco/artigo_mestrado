@@ -6,6 +6,13 @@ Esqueleto do Artigo:
 - Um exemplo de estudo que compara dados de census de 20 anos, e assim investiga a dinâmica de nascimentos e mortes na comunidade local ao inves do padrão estatítico de abundância (SAD), é uma investigação mais poderosa da teoria neutra pois permite fazer uma inferência mais forte quanto o pressuposto de neutralidade no sistema [REESCREVER]. Gilbert et al. 2006 avaliou .... (Laurance et al. 2018).
 - Gradiente de fragmentação e teoria neutra - olhar artigo science sobre os projetos de longa data sobre os efeitos de fragmentação nas dinâmica ecológicas subjacentes em diferentes lugares do planeta. Justificar os motivos de que a teoria neutra não é uma boa aproximação do sistema observado. [pressuposto central da teoria neutra não é uma aproximação válida, assim, se a SAD retêm alguma informação sobre a dinâmica ecológica subjacente que nos permita testar hipóteses ecológicas, a teoria neutra não deve prover boas aproximações da SAD observada em tais contextos.] 
 
+### Por quê pensar em forma de escalas em ecologia? ###
+- o conhecimento cientifíco caminha em função do poder de resolução que temos da natureza (REFERÊNCIAS)
+- ao passo que devastamos os ecossistemas naturais temos cada vez mais informação sobre eles (REFERÊNCIAS)
+- contudo, ainda não será possível se quer descrever a diversidade biológica encontradas em biomas ameaçados (REFERÊNCIAS)
+- uma alternativa é utilizar uma teoria que explique a diversidade biológia como produto da interação entre escalas, aqui definidas como níveis onde um determinado conjunto de regras se aplica (REFERÊNCIAS).
+
+
 ## Objetivo ##
 
 O objetivo do trabalho é avaliar se SADs observadas em um gradiente de cobertura vegetal podem ser evidência suficiente para refutar predições de dois modelos neutros que diferem na descrição da limitação à dispersão. 
@@ -20,7 +27,7 @@ Uma das principais contribuições da teoria neutra foi salientar a importância
 
 [PARAGRAFO PERDIDO]
 Uma das principais contribuições da teoria neutra foi salientar a importância da limitação à dispersão entre os processos que influênciam os padrões de diversidade (Condit et al. 2002). Essa característica faz da teoria neutra uma teoria espacial (Alonso et al. 2006). A explicação proposta pela teoria neutra baseia-se na aproximação de equivalência funcional entre as espécies, ou seja, pressupõem que todas as espécies do sistema apresentam as mesmas taxas de natalidade e mortalidade per capita (Hubbell 2001). A ideia é criar um modelo mínimo, que explicitamente integra a dinâmica de nascimentos e mortes das populações no espaço sob a possibilidade de constante influxo de novas espécies (Bell 2003). Dessa maneira, a teoria neutra prevê/pressupõem(?-as duas coisas?O que a comparação entre o observado e o resultado de uma simulação 'análitica' e 'númerica' provam?) que os padrões de distribuição de espécies no espaço, e portanto suas abundâncias também (Magurran REFERÊNCIA, McGill 2010), são resultados das caminhadas aleatórias das populações no espaço (deriva ecológica, Rosindell et al. 2012). O modelo neutro clássico (Hubbell 2001) propõem-se a estudar a distribuição de abundância de espécies árboreas em uma amostra de 50ha em BCI, para isso parte do teoria de biogeográfia de ilhas de Wilson & MacArthur (1967) que pressupõem que a riqueza de espécies em ilhas próximas ao continente é resultado do equilíbrio entre a taxa de extinção local e de imigração de novas espécies vindas do continente, o pool de espécies permanente e infinito. Ao adicionar uma taxa de entrada de novas espécies no pool de espécies, foi possível derivar um modelo que descreve a abundância das espécies (Hubbell 2001 - PRECISA DO PARÁGRAFO?)
-[PARAGRAFO PERDIDO]
+[PARAGRAFO PERDIDO]-
 
 
 
