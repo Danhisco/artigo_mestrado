@@ -1,5 +1,86 @@
 Esqueleto do Artigo:
 
+## Introdução 2## 
+<!--
+intro->pergunta
+-->
+
+
+- nossa capacidade de gerar informações sobre a natureza aumentou: i) surgimento de conjuntos de dados; ii) maior poder de processamento
+- isso permitiu observar que a taxa com que destruímos os sistemas naturais é menor do que com o quê conseguimos estuda-los - ciências naturais ciência da escassez (?)
+## ecologia de comunidades: ciência histórica
+- para entender adequadamente o funcionamento das comunidades ecológicas é necessário avaliar como o sistema muda ao longo do tempo (dinâmica ecológica)
+- contudo, esse tipo de informação é rara (?), em geral possuímos descrição de momentos das comunidades ecológicas resumidas em contagens de indivíduos por espécie para uma determinada área amostrada (Distribuição de abundância de espécies - SAD) (REESCREVER)
+- e mesmo esse tipo de informação não está disponível para todos os locais
+- alguns ecossistemas estão ameaçados de serem destruídos sem ao menos terem sido descritos, assim, é válido entender o tipo de inferência que podemos fazer a partir de um padrão de primeira ordem [REFERENCIA]. 
+- PERGUNTA: quando a SAD pode informar sobre o efeito de diferentes mecanismos na dinâmica ecológica subjacente?
+
+OBJETIVO:
+- para responder essa pergunta comparamos a SAD observada em um gradiente de cobertura vegetal com a SAD predita por dois modelos neutros que diferem quanto aos pressupostos auxiliares ao pressuposto de neutralidade.
+
+H1
+- o pressuposto de neutralidade é observado quando as taxas demográficas de todas espécies potencialmente competidoras são iguais (equivalência funcional: todas as espécies possuem as mesmas taxas demográficas per capita).
+- a ideia é avaliar até quando esse pressuposto é suficiente para explicar o padrão observado.(quando não é suficiente devemos adicionar mais informação sobre o sistema e.g. hierarquia competitiva, associação de nicho (filtro ambiental)
+- o pressuposto de neutralidade não é uma boa aproximação para descrever comunidades em paisagens fragmentadas, pois a probabilidade de extinção varia em função da espécie
+- assim se a SAD pode informar algo sobre a variação das abundâncias ao longo do tempo devemos poder refutar neutralidade a partir da comparação da SAD observada em um gradiente de cobertura vegetal e da SAD predita segundo qualquer modelo neutro. 
+	PADRÃO: baixa congruência entre predito neutro e observado em paisagens fragmentadas
+
+H2
+- Por outro lado, a SAD é um padrão que parece ser muito influênciado por certas características do sistema que estão mais relacionadas com a distribuição espacial dos indivíduos (McGill 2010).
+- A SAD é um padrão que parece ser muito influênciado pela movimentação dos indivíduos no espaço; a teoria neutra ao assumir neutralidade entre as espécies, colocou a dispersão como principal processo na estruturação das comunidade ecológicas (McGill 2010).
+- Dado parâmetros de dispersão com realismo biológico para descrever o sistema sob estudo, as predições neutras aprensentam boa congruência com o observado (REFERÊNCIA Rosindell & Conelly 2007, 2009 [SAC] e Rosindell...2013[SAD] [[MNEE]], MNEI: Etienne 2007(?), Condit ..., Rosindell et al. 2011?):
+	- para sistemas sem perturbação que poderiamos considerar sem efeito de fragmentação (REFERÊNCIAS)
+	- e para sistemas onde houve remoção de habitat original, criação de matriz, e efeito de borda (REFERÊNCIAS)
+- assim se a SAD é um padrão influenciado principalmente pela dispersão, esperamos que para valores de parâmetros coerentes com o observado no sistema biológico sob estudo devemos observar boa congruência entre observado e predito.
+- portanto, em paisagens fragmentadas, onde o agente dispersor pode estar ausente ou modificado (REFERÊNCIAS), esperamos observar baixa distância média de dispersão, de modo que a maior proporção dos propágulos permanece na região imediata da planta progenitora (REFERÊNCIAS). Em paisagem pouco fragmentadas esperamos que o agente dispersor garanta maiores distâncias médias de dispersão (REFERÊNCIAS) e portanto esperamos boa congruência entre predito e observado para parâmetros de dispersão mais elevados.
+- para comparação consideramos a distância de dispersão média de diferentes sindromes de dispersão para floresta intacta (REFERÊNCIA Munoz et al. 2013?)
+	PADRÃO:boa congruência para d -> 0 se p -> 0; e boa congruência para d -> max(media_sindromes_dispersao) se p -> 1
+
+H3
+- os modelos neutros diferem em seus pressupostos auxiliares ao de neutralidade:
+	a) MNEI: deriva do modelo clássico da teoria de biogegrafia de ilhas, pressupõem a existência de um pool de espécies que sempre fornece indivíduos de novas espécies ou de espécies em declínio como mecanismo de manutenção da diversidade local (Hubbell 2001, Condit et al. 2012). Existe apenas dois níveis: comunidade local, que observamos a distribuição de abundância de espécies; e a metacomunidade, da onde os indivíduos que estão na comunidade local imigração ou descem de um imigrante (Alonso et al. 2006). Seu parâmetro que relaciona a migração não tem necessário significado biológico com a dispersão per se, apesar de ser possível derivar funções que relacionam probabilidade de um colonização por um imigrante na comunidade local (m) com distância média de dispersão (d) (Conolly Lichstein 2009?)
+	b) MNEE: considera explicitamente o espaço na dinâmica ecológica, a paisagem é composta de unidades de habitat onde apenas um indivíduo pode se estabelecer; a comunidade local está inserida na paisagem; a probabilidade de colonização depende da distância entre a unidade de habitat disponível e a planta progenitora; pode haver especiação neutra em qualquer unidade de habitat e portanto na comunidade local; contudo, como a paisagem é pelo menos 500 vezes maior do que a comunidade local a probabilidade de ocorrer especiação na comunidade local é pequena; quando a paisagem é fragmentada existem unidades de habitat que não estão disponíveis para os indivíduos colonizarem; o padrão de fragmentação é uma trascrição do observado em imagens de satélite, onde a coordenada central da imagem é a coordenada central da área amostrada, então a comunidade local é uma área quadrada com J unidade de habitat concêntrico à coordenada central; a metacomunidade é a paisagem e há J_M = 500 * p * DA (número de hectares do recorte de paisagem de 5km * 5km = 500 ha; p = proporção de unidades de habitat na paisagem; DA = densidade observada (número de indivíduos/área amostrada)); a dispersão é simulada utilizando uma distribuição de Laplace com dispersão variando conforme a proporção de propágulos que permanecem até l_cel metros (l_cel = tamanho da unidade de habitat), assim parametrizamos considerando que o espaço é discreto, constante e saturado por indivíduos (pressuposto da soma-zero).
+- existem uma diversidade de modelos neutros que permite até criar um gradiente de pressupostos entre os dois modelos neutros apresentados anteriormente; por exemplo seria possível considerar um modelo de espaço implícito que explicitamente considera a proporção de habitat original (Hanski 2001). Etienne & Rosindell (2011) já compararam esses dois modelos anteriormente utilizando paisagens infinitas homogeneas e infinitas e avaliaram a auto coerência entre os dois modelos; MNEI consegue varer o campo de parâmetros em combinações de theta e m onde MNEE não consegue simular que são justamente aquelas estimadas em florestas. Eles concluíram que MNEI era simples e geral onde MNEE precisava ser específico como na estrutura de paisagem.
+- Aqui MNEE é parametrizado a partir da matriz de paisagem, distância média de dispersão (d) e taxa de especiação (U); MNEI é a partir do número de indivíduos amostrados (J), theta e I (Etienne 2005).
+- Quando utilizamos a formula de amostragem de Etienne (2005) para estimar por verossimilhança os parâmetros theta e I e então geramos predições a partir destes parâmetros obtivemos alta congruência entre o observado e o predito para o gradiente de cobertura vegetal, contudo, o parâmetro de imigração m quando convertido para a distância média de dispersão (d) apresentou pouco realismo biológico (d muito elevado); o parâmetro theta apresentou variação ao longo do gradiente de cobertura vegetal, contudo, o principal efeito era da riqueza observada, que apresenta colinearidade com cobertura vegetal (Anexo 1: resultados complementares).
+- Um dos problemas é que a SAD não retêm informação suficiente para estimar concomitantemente a taxa de imigração (I) e theta (Etienne et al. 2006). Alternativamente exploramos o campo de parâmetros buscando correspondentes biológicos para a distância de dispersão média (d) e estimamos a partir de MNEE a taxa de especiação que considera explicitamente a configuração de paisagem e densidade observada.
+- MNEI apresenta estrutura espacial similar ao de biogeografia de ilhas: comunidade local com fluxo de indivíduos do pool de espécies (com taxa de especiação e/ou dispersão de longa distância) e não é uma boa aproximação de comunidades em paisagens fragmentadas (Gilbert et al. 2006, Laurance 2008), contudo, é uma boa descrição da dinâmoca ecológica de comunidades em paisagens preservadas (science 2006, dinamic ecossystem). Simulações de MNEE geram predições coerentes com o observado, considerando diferentes contextos de fragmentação (REFERÊNCIAS: Campos et al.,).
+- Se a estrutura espacial onde a amostra é obtida é releventa para descrever a SAD então:
+	PADRÃO: MNEE>MNEI se p->0; MNEE<MNEI se p->1 (Situação canonica do modelo neutro)
+
+Hipóteses não excludentes:
+H1: MN alta congruência se p -> 1, baixa congruência se p -> 0
+H2: se d for biologicamente realista então alta congruência: d->0 e p->0; d->pouco perturbado e p->1
+H3: alta congruência se: MNEE e p->0, MNEI e p->1
+
+
+
+- As distâncias médias de dispersão (d) variam de modo a obtermos parâmetros que correspondam à ausência de dispersão (alta proporção de indivíduos até as imediações da planta progenitora) e com o agente dispersor (aumento das classes de dispersão maiores).
+- Existe uma limitação computacional para o campo de parâmetros que MNEE pode variar, então buscamos o limite superior onde poderiamos realizar comparações para todos os níveis de distância média de dispersão para MNEE e MNEI.
+- Em CAMPO DE PARÂMETROS DE DISPERSÃO há a comparação do campo de parâmetros que estamos varendo com o observado para diferentes sindromes de dispersão.
+- Uma vez determinado d, então utilizamos o método semi-análitico de MNEE que parte da matriz de paisagem e da riqueza observada para estimar a taxa de especiação necessária para manter a riqueza observada no equilíbrio dinâmico (Anexo 2 - métodos complementares)
+- assim, parametrizamos os modelos considerando que a dispersão ocorre no espaço explícito e posso calcular a taxa de imigração equivalente para o espaço implícito (Lichstein et al. 2006); e a taxa de especiação como resultado da entrada de novas espécies na paisagem (Rosindell et al. 2008, Condit et al. 2012), isso pode ser resultado da especiação real (uma nova espécies no pool global) ou uma dispersão de longa distância (Bell 2003). E também explicitamos o tamanho da metacomunidade J_M. Em alguns modelos de espaço implíctito a paisagem pode ter tamanho infinito e ainda ter imigração do pool de espécies infinito (Etienne et al. 2007a). A ideia de utilizar paisagens de tamanho infinito possuem base na ideia de que o pressuposto da soma zero não é necessário para derivar predições neutras (Etienne et al. 2007b). Contudo, o modelo neutro coalescente varia em função da paisagem que a dinâmica ecológica ocorre (Campos et al. 2013). Os padrões de  abundância (SAD e SAC) variam em função da proporção de habitat, fragmentação per se, distância média de dispersão e forma da dispersão (Campos et al., Rosindell et al. ).
+- a fragmentação dos ambientes perturbados não ocorre de maneira aleatória, ela cria diversos padrões na paisagem.
+- para levar em conta estes padrões utilizamos rasters tomados no ano de 2000 onde podemos observar o padrão de habitat e não habitat
+- selecionamos amostras de espécies arbóreas feitas próximas deste ano e que consideramos que não haviam modificado entre a amostragem e foto (detalhes em anexo 2: Métodos)
+- 
+
+
+<!-- DESCARTE
+- quando não for, então é necessário acrescentar complexidade à descrição teórica do sistema, e.g. hierarquia competitiva, associação de
+o padrão observado requer a adição de mais complexidade à descrição teórica do sistema como por exemplo hierarquia de nicho e/ou associação de espécies com o habitat
+- a dinâmica ecológica subjacente 
+a predição de dois modelos neutro que diferem 
+-->
+
+<!--
+pergunta->objetivo:contexto teórico
+-->
+-modelos para explicar a dinâmica ecológica: nicho, neutro
+-neutro é um bom modelo heurístico - contudo talvez por apresentar combinação de parâmetros que pode gerar qualquer tipo de SAD, uma vez que estimados por verossimilhança
+
+
+
 ## Introdução ##
 - SADs e teoria neutra (tipo de explicação da teoria neutra, Bell 2003, Etienne & alonso 2007, Condit et al. 2012, Munoz et al 2016, Connolly et al. 2017).
 - Forma de investigação dentro do arcabouço da teoria neutra: calibração do modelo e comparação com o observado Hubbel 2001, 2005, Alonso et al. 2006, Rosindell et al. 2011, Hammal et al. 2015 (When species abundance data can reveal non-neutrality?).
