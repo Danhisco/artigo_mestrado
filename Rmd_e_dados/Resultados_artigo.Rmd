@@ -18,21 +18,55 @@ library(MuMIn) # para R^2
 # library(ggplot2)  # idem
 library(sads)
 library(lme4) # pacote de criação dos modelos estatísticos
-library(blme) # pacote para comparar os modelos, seleção per se
+# library(blme) # pacote para comparar os modelos, seleção per se
 library(merTools) # para intervalos de previsao
 library(tidyverse)
 # library(broom) # para manipular os modelos 
 library(magrittr) # p escrita
+library(MASS)
+library(car)
 # library(plyr) 
 # library(dplyr) 
 df_resultados <- read_csv("/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/df_resultados.csv")
 # df_resultados %>% str
-df_resultados$MN <- factor(df_resultados$MN)
+df_resultados$MN <- factor(df_resultados$MN,levels = c("EI","EE"))
 df_resultados$SiteCode <- factor(df_resultados$SiteCode)
 df_resultados$k <- factor(df_resultados$k,levels=unique(df_resultados$k))
-
-# df_resultados$k %>% unique
+# df_resultados$k %>% contrasts()
+df_resultados$MN %>% contrasts()
 ```
+
+<!--
+Ideia geral dos métodos:
+
+i) estabelecer valores do parâmetro de dispersão a priori;
+ii) estimar taxa de especiação necessária para manter a riqueza no equilíbrio a partir do método de MNEE
+iii) simular SADs neutras segundo MNEI e MNEE a partir dos mesmo parâmetros
+-->
+
+
+<!--
+Resultados completos:
+-> distância média de dispersão ~ k * p + (k|Site) ou k_factor * p + (1|Site) [modelo completo se houver mais níveis de k e estiverem igualmente espaçados - segunda etapa] 
+
+  - com isso avaliar quais as situações biológicas de limitação à dispersão que a simulação está ocorrendo
+  - para comparação podemos plotar a curva das médias como comparação visual?
+  - 1o gráfico: eixo y
+-> congruência do simulado com o observado ~ k_factor * p + (1|Site)
+  - em ambientes fragmentados o pressuposto de equivalência funcional não é uma boa aproximação
+  -
+  - com isso podemos avaliar se a SAD pode ser evidência suficiente para refutar neutralidade
+  
+  a SAD observada em um gradiente biológico onde o pressupostos da equivalência funcional não é uma boa aproximação (a fragmentação leva à modificação do habitat remanescente que se reflete nas taxas demográficas das populações observadas segundo sua espécies) [REESCREVER]
+
+-> taxa de especiação necessária para manter a riqueza observada no equilíbrio dinâmico segundo um modelo neutro espacialmente explícito (U) ~ k_factor * p + (1|Site)
+  - a teoria neutra pode ser uma boa aproximaçaõ para descrever a taxa de extinção de espécies raras em ambientes fragmentados (Gilbert et al. 2006)
+  - o modelo neutro coalescente é uma boa aproximação para descrever o comportamento dos sistemas biológicos em diferentes contextos de fragmentação (Campos et al.)
+  - no modelo coalescente o equilíbrio dinâmico é observado, nesse cenário a taxa de surgimento de singletons por evento de morte se igual à taxa de extinção de singletons
+  - assim, a estimativa de taxa de especiaçaõ necessária para manter a riqueza observada no equilíbrio pode ser uma aproximação da taxa de extinção das espécies raras na paisagem.
+-->
+
+
 <!-- Esqueleto dos resultados
 
 a) MNEI por verossimilhança
@@ -93,6 +127,8 @@ c) GOF ~ p * MN * par_imig + S + (par_imig | Site / MN)
 Para faciltar o ajuste dos modelos mistos aplicamos a transformação z nas variáveis contínuas: 
 -->
 
+### Anexo 1: código auxiliar ###
+
 ```{r preparacao dos dados, echo=FALSE}
 f_z <- function(x){
   m <- base::mean(x,na.rm=TRUE)
@@ -114,6 +150,93 @@ df_resultados %<>% mutate(GOF.z = f_z(GOF),
 names(df_resultados)[1] <- "Site"
 ```
 
+__par_imig ~ k __
+<!--
+i) seleção da estrutura aleatória, distribuição teórica e função de ligação
+ii) seleção das hipóteses estatísticas  
+-->
+
+_d_
+
+## Exploração gráfica ##
+
+```{r graf}
+# x11()
+par(mfrow=c(3,2))
+## d e d.z ##
+# ~ norm
+qqp(df_resultados$d, "norm",ylab="d (metros)") 
+qqp(df_resultados$d.z, "norm",ylab="d.z (Z(d))") 
+# ~ lnorm
+qqp(df_resultados$d, "lnorm",ylab="d (metros)")
+qqp(df_resultados$d.z, "lnorm",ylab="d.z (Z(d))")
+# ~ gamma
+fit_gamma1 <- fitdistr(df_resultados$d, "gamma")
+qqp(df_resultados$d, "gamma", shape = fit_gamma1$estimate[[1]], rate = fit_gamma1$estimate[[2]],ylab="d (metros)")
+## d.z ##
+# ~ norm
+# ~ lnorm
+# ~ gamma
+```
+
+Figura A1. Gráficos quantile-quantile para três distribuições teóricas (normal, lognormal e gamma) e a variável d (metros) e z-transformada (d.z). Para a distribuição gamma utilizei ajustamos apenas a variável d, uma vez que o domínio da distribuição não contempla valores menores do que zero.
+
+A distribuição que melhor se adequa aos dados é a distribuição gamma: i) ajusta maior porção dos dados em comparação com a normal (segunda melhor distribuição) e ii) consegue capturar a variação nas caudas da distribuição de valores obervados (em especial para valores pequenos), diferente da normal. Contudo, para comparar os resíduos eu vou construir duas classes de modelos cheio: uma normal e outra gamma.
+
+O objetivo é avaliar o efeito da variável k na distância média de dispersão (d), para isso o modelo cheio vai considerar a variável DA, uma vez que k é definido como a proporção de propágulos até l_cel metros da planta progenitora. A largura da célula de simulação (l_cel) = 100/sqrt(DA) (PERGUNTA:devo utilizar DA ou a transformação de DA = I( 100/sqrt(DA) )? ).
+
+-Formulas dos modelos estatísticos:
+d ~ k + DA + (k|Site)
+d ~ k_factor + DA + (1|Site)
+```{r d k}
+# df_resultados %>% str
+## Seleção da estrutura eleatória ##
+l_md <- vector("list",length = 4)
+names(l_md) <- c("1|Site ID","k|Site ID","1|Site log","k|Site log")
+l_md[[3]] <-  glmer(d ~ k * DA + (1|Site),family = "gaussian"(link=log),data = df_resultados)
+l_md[[4]] <-  glmer(d ~ k.z * DA + (k.z|Site),family = "gaussian"(link=log),data = df_resultados)
+AICctab(l_md)
+```
+<!--
+A estrutura aleatória selecionada foi (1|Site). Segue o R^2 explicado pelos dois modelos:
+-->
+Coisas a fazer: 
+i) estudar a nova forma de calcular o coeficiente de explicação[é esse o nome?] (R^2); intervalo de confiança (IC) e uma terceira métrica (Nakagawa et al. 2017)
+ii) avaliar a opção mais prática e implementar
+```{r d k R2}
+sapply(l_md, r.squaredGLMM)
+```
+<!--
+27jun2018[Válido para lmer, não para normal link=log: acredito que se houver mais níveis de k e melhor distribuidos no campo de parâmetros aumentaria o R^2 de k|Site
+-->
+
+```{r}
+l_md <- vector("list",length = 5)
+names(l_md) <- c("k+DA","DA","k","1","k*DA")
+l_md[[1]] <-  lmer(d ~ k + DA + (1|Site),data = df_resultados)
+l_md[[2]] <-  lmer(d ~ DA + (1|Site),data = df_resultados)
+l_md[[3]] <-  lmer(d ~ k + (1|Site),data = df_resultados)
+l_md[[4]] <-  lmer(d ~ 1 + (1|Site),data = df_resultados)
+l_md[[5]] <-  lmer(d ~ k * DA + (1|Site),data = df_resultados)
+AICctab(l_md)
+```
+
+A distância média de dispersão variou em função da proporção de propágulos que permanece na vizinhança da planta progenitora (k) e da densidade observada (DA). Segue os dados plotados e a estimativa linear
+
+```{r}
+# gráfico #
+df_resultados %>% ggplot(aes(x=DA,y=d)) + geom_smooth(method = "lm") + geom_point() + facet_wrap(~k,ncol=3,scales="free")
+# broom::tidy(l_md[[1]])
+df_diag <- broom::augment(l_md[[1]]) %>% inner_join(x=.,y=df_resultados[,-c(7,12)],by=c("Site","k"))
+```
+
+figura X. d ~ k * DA + (1|Site). Parece que o modelo faz ótimo ajuste o que mostra que a função que desenvolvemos está fazendo boas aproximações.
+
+```{r}
+df_diag %>% ggplot(aes(x=DA,y=.resid)) + geom_smooth(method = "lm") + geom_point() + facet_wrap(~k,ncol=3,scales = "free")
+```
+
+
 __GOF__
 
 <!--
@@ -124,7 +247,7 @@ iii) diagnóstico do modelo: Bolker et al.
 
 ```{r GOF selecao de funcao de ligacao, echo=FALSE}
 l_md <- vector("list", length = 16)
-names(l_md) <- paste(paste(rep("(par_imig|Site/MN)",4),c("d","k","m","I")),rep(c("logit","probit","cloglog","ID normal"),each=4))
+names(l_md) <- paste("k",rep(c("logit","probit","cloglog"),each=4))
 # logito
 l_md[[1]] <- glmer(cbind(GOF,100-GOF) ~ p.z * MN * d.z + S.z + (d.z | Site / MN), 
                    family = "binomial"(link=logit),
@@ -643,35 +766,35 @@ __C) Parâmetros a posteriori__
 m de MNEI 
 #########################################################################################################
 
-```{r selecao de hipoteses para m}
+```{r selecao de hipoteses para m, include=FALSE}
 # dados #
-df_md <- df_resultados %>% filter(k == "EI") %>% select(SiteCode,k,p,sd_k_,J,DA,m) %>% mutate(l_cel = 100/sqrt(J/DA),d=sd_k_/sqrt(2))
+#df_md <- df_resultados %>% filter(k == "EI") %>% select(SiteCode,k,p,sd_k_,J,DA,m) %>% mutate(l_cel = 100/sqrt(J/DA),d=sd_k_/sqrt(2))
 
 # selecao de dist. prob #
-l_md <- vector("list", length = 4)
-names(l_md) <- c("logit-bin","probit-bin","cloglog - bin","normal")
-l_md[[1]] <- glm(cbind(m,1-m) ~ p * l_cel, 
-                    family = "binomial",df_md)
-l_md[[2]] <- glm(cbind(m,1-m) ~ p * l_cel, 
-                    family = "binomial"(link=probit),df_md)
-l_md[[3]] <- glm(cbind(m,1-m) ~ p * l_cel, 
-                    family = "binomial"(link=cloglog), data = df_md)
-l_md[[4]] <- lm(m ~ p * l_cel, data = df_md)
+#l_md <- vector("list", length = 4)
+#names(l_md) <- c("logit-bin","probit-bin","cloglog - bin","normal")
+#l_md[[1]] <- glm(cbind(m,1-m) ~ p * l_cel, 
+#                    family = "binomial",df_md)
+#l_md[[2]] <- glm(cbind(m,1-m) ~ p * l_cel, 
+#                    family = "binomial"(link=probit),df_md)
+#l_md[[3]] <- glm(cbind(m,1-m) ~ p * l_cel, 
+#                    family = "binomial"(link=cloglog), data = df_md)
+#l_md[[4]] <- lm(m ~ p * l_cel, data = df_md)
 # AICctab(l_md, weights = TRUE)
 ## modelo mais plausivel: lm
 
 # selecao de modelos #
-l_md <- vector("list",length = 5)
-names(l_md) <- c("~ p * l", "~ p + l", "~ l", "~ p", "~ 1")
-l_md[[1]] <- lm(m ~ p * l_cel,df_md)
-l_md[[2]] <- lm(m ~ p + l_cel,df_md)
-l_md[[3]] <- lm(m ~ l_cel,df_md)
-l_md[[4]] <- lm(m ~ p,df_md)
-l_md[[5]] <- lm(m ~ 1,df_md)
-AICctab(l_md, weights = TRUE)
+#l_md <- vector("list",length = 5)
+#names(l_md) <- c("~ p * l", "~ p + l", "~ l", "~ p", "~ 1")
+#l_md[[1]] <- lm(m ~ p * l_cel,df_md)
+#l_md[[2]] <- lm(m ~ p + l_cel,df_md)
+#l_md[[3]] <- lm(m ~ l_cel,df_md)
+#l_md[[4]] <- lm(m ~ p,df_md)
+#l_md[[5]] <- lm(m ~ 1,df_md)
+#AICctab(l_md, weights = TRUE)
 
 #modelo mais plausível
-coef(l_md[[5]])
+#coef(l_md[[5]])
 
 ```
 
