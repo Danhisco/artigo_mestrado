@@ -1,12 +1,15 @@
 Esqueleto do Artigo:
 
+INTRODUAÇÃO-1: 
+Um teste de detecção de não-neutralidade em distribuição de abundância de espécies arbóreas observada em um gradiente natural de cobertura vegetal.
+
 ## Introdução 2## 
 <!--
 intro->pergunta
 -->
 
 
-- nossa capacidade de gerar informações sobre a natureza aumentou: i) surgimento de conjuntos de dados; ii) maior poder de processamento
+- nossa capacidade de gerar informações sobre a natureza aumentou: i) surgimento de conjuntos de dados que agrupam diferentes estudos; ii) maior poder de processamento;...
 - isso permitiu observar que a taxa com que destruímos os sistemas naturais é menor do que com o quê conseguimos estuda-los - ciências naturais ciência da escassez (?)
 ## ecologia de comunidades: ciência histórica
 - para entender adequadamente o funcionamento das comunidades ecológicas é necessário avaliar como o sistema muda ao longo do tempo (dinâmica ecológica)
