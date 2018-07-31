@@ -33,7 +33,7 @@ df_resultados$MN <- factor(df_resultados$MN,levels = c("EI","EE"))
 df_resultados$SiteCode <- factor(df_resultados$SiteCode)
 df_resultados$k <- factor(df_resultados$k,levels=unique(df_resultados$k))
 # df_resultados$k %>% contrasts()
-df_resultados$MN %>% contrasts()
+# df_resultados$MN %>% contrasts()
 ```
 
 <!--
@@ -46,7 +46,7 @@ iii) simular SADs neutras segundo MNEI e MNEE a partir dos mesmo parâmetros
 
 
 <!--
-Resultados completos:
+Resultados 2 completos:
 -> distância média de dispersão ~ k * p + (k|Site) ou k_factor * p + (1|Site) [modelo completo se houver mais níveis de k e estiverem igualmente espaçados - segunda etapa] 
 
   - com isso avaliar quais as situações biológicas de limitação à dispersão que a simulação está ocorrendo
@@ -67,7 +67,7 @@ Resultados completos:
 -->
 
 
-<!-- Esqueleto dos resultados
+<!-- Esqueleto dos resultados 1
 
 a) MNEI por verossimilhança
 -GOF) Se MNEI tiver seus parâmetros livres ele sempre apresentara boa congruência com o observado?
@@ -138,6 +138,7 @@ f_z <- function(x){
 } 
 
 df_resultados %<>% mutate(GOF.z = f_z(GOF),
+                          DA.z = f_z(DA),
                           p.z = f_z(p),
                           S.z = f_z(S),
                           U.z = f_z(U),
@@ -191,50 +192,150 @@ d ~ k_factor + DA + (1|Site)
 ```{r d k}
 # df_resultados %>% str
 ## Seleção da estrutura eleatória ##
-l_md <- vector("list",length = 4)
-names(l_md) <- c("1|Site ID","k|Site ID","1|Site log","k|Site log")
-l_md[[3]] <-  glmer(d ~ k * DA + (1|Site),family = "gaussian"(link=log),data = df_resultados)
-l_md[[4]] <-  glmer(d ~ k.z * DA + (k.z|Site),family = "gaussian"(link=log),data = df_resultados)
-AICctab(l_md)
+l_md <- vector("list",length = 8)
+names(l_md) <- c("Gamma 1|Site","Gamma k|Site",
+                 "log.Gamma 1|Site","log.Gamma k|Site",
+                 "normal 1|Site","normal k|Site",
+                 "log.normal 1|Site","log.normal k|Site")
+l_md[[1]] <-  glmer(d ~ k + DA.z + (1|Site),family = "Gamma",data = df_resultados)
+l_md[[2]] <-  glmer(d ~ k.z + DA.z + (k.z|Site),family = "Gamma",data = df_resultados)
+l_md[[3]] <-  glmer(d ~ k + DA.z + (1|Site),family = "Gamma"(link=log),data = df_resultados)
+l_md[[4]] <-  glmer(d ~ k.z + DA.z + (k.z|Site),family = "Gamma"(link=log),data = df_resultados)
+l_md[[5]] <-  glmer(d ~ k + DA.z * (1|Site),family = "gaussian",data = df_resultados)
+l_md[[6]] <-  glmer(d ~ k.z + DA.z + (k.z|Site),family = "gaussian",data = df_resultados)
+l_md[[7]] <-  glmer(d ~ k + DA.z + (1|Site),family = "gaussian"(link=log),data = df_resultados)
+l_md[[8]] <-  glmer(d ~ k.z + DA.z + (k.z|Site),family = "gaussian"(link=log),data = df_resultados)
+AICctab(l_md,weights=T)
 ```
 <!--
-A estrutura aleatória selecionada foi (1|Site). Segue o R^2 explicado pelos dois modelos:
+A estrutura aleatória selecionada foi (1|Site).
 -->
-Coisas a fazer: 
-i) estudar a nova forma de calcular o coeficiente de explicação[é esse o nome?] (R^2); intervalo de confiança (IC) e uma terceira métrica (Nakagawa et al. 2017)
-ii) avaliar a opção mais prática e implementar
+
+O modelo global com distribuição gamma, função de ligação log e estrutura aleatória 1|Site foi o mais plausível. Segue sumário
+
 ```{r d k R2}
-sapply(l_md, r.squaredGLMM)
+summary(l_md[[3]]) # problema de convergência, indicam para reescalonar as variáveis
 ```
 <!--
+Error: Error in r.squaredGLMM.merMod(X[[i]], ...) : do not know how to calculate variance for this family/link combination
 27jun2018[Válido para lmer, não para normal link=log: acredito que se houver mais níveis de k e melhor distribuidos no campo de parâmetros aumentaria o R^2 de k|Site
 -->
 
-```{r}
-l_md <- vector("list",length = 5)
-names(l_md) <- c("k+DA","DA","k","1","k*DA")
-l_md[[1]] <-  lmer(d ~ k + DA + (1|Site),data = df_resultados)
-l_md[[2]] <-  lmer(d ~ DA + (1|Site),data = df_resultados)
-l_md[[3]] <-  lmer(d ~ k + (1|Site),data = df_resultados)
-l_md[[4]] <-  lmer(d ~ 1 + (1|Site),data = df_resultados)
-l_md[[5]] <-  lmer(d ~ k * DA + (1|Site),data = df_resultados)
+## 31jun2018 ##
+- Problema de convergência:
+convergence code: 0
+Model is nearly unidentifiable: very large eigenvalue
+ - Rescale variables?
+ajuda: ?convergence
+
+"
+if you do see convergence warnings, and want to trouble-shoot/double-check the results, the following steps are recommended (examples are given below):
+
+double-check the model specification and the data for mistakes
+
+center and scale continuous predictor variables (e.g. with scale)
+
+check for singularity: if any of the diagonal elements of the Cholesky factor are zero or very small, the convergence testing methods may be inappropriate (see examples)
+
+double-check the Hessian calculation with the more expensive Richardson extrapolation method (see examples)
+
+restart the fit from the apparent optimum, or from a point perturbed slightly away from the optimum
+
+try all available optimizers (e.g. several different implementations of BOBYQA and Nelder-Mead, L-BFGS-B from optim, nlminb, ...) via the allFit() function, see ‘5.’ in the examples. While this will of course be slow for large fits, we consider it the gold standard; if all optimizers converge to values that are practically equivalent, then we would consider the convergence warnings to be false positives.
+"
+
+
+A única variável contínua que não foi rescalonada foi a resposta d, se aplicar transformação z em d, a variável resposta terá números negativos. Utilizando a variável DA ao inves de DA.z piora o caso. Alternativamente busquei simplificar o modelo: a) retirando a variável DA.z; e b) retirando o último nível de k (contudo como é um factor não há de fazer muita diferença) - para ambos não houve melhora.
+
+PRÓXIMOS PASSOS PARA MELHORAR AJUSTE: uma alternativa fácil é reajustar a partir das estimativas feitas pelo modelo com problema de convergência e/ou modificar o otimizador.
+PERGUNTAS NORTEADORAS: i) o aviso de problema de convergência é um falso positivo? 
+
+Ben Bolker: Since the likelihood differs by <0.1 between the model fits, and the largest relative differences in the parameters are of the order of about 10^(-4), I would say that you have successfully demonstrated that the warning is a false positive and you can proceed with your initial model.
+
+
+<!--
+[pasta GLMM (...) scale issues] Some common examples:
+
+-Some columns of our data might be different orders of magnitude to others, for instance gender might be encoded as a binary variable, while income might be stored in whole-dollar amounts.
+
+-An outcome might be extremely rare
+
+-The impact of variable X1 on Y could be orders of magnitude greater than the impact of variable X2. That is, it’s not the scale of the data that is causing issues so much as the scale of the parameters.
+
+
+-->
+
+
+Foram estimados 13 parâmetros e seus respectivos erro-padrão. Os resíduos escalonados variam de -3.956 até 6.554, pelos valores dos quantils parece que a distribuição dos resíduos não é simétrica ao redor da estimativa. Há dois avisos sobre convergência: a) Model failed to converge with max|grad|=4.11797 (tol = 0.001, component 1); b) Modelo is nearly unidentifiable: very large eigenvalue - Rescale variables?
+
+25jun2018:
+Para lidar com b modifiquei DA -> DA.z nos modelos globais
+Com isso obtive o erro: 'converge code:0; Model is nearly unidentifiable: very large eigenvalue - Rescale variables?
+- a transformação z de DA deveria ser o suficiente para lidar com problemas relacionados com escalamento de variáveis; a outra variável explanatória é categórica.
+- vou continuar o estudo com esse modelo como global
+
+
+```{r selecao d}
+l_md <- vector("list",length = 4)
+names(l_md) <- c("k+DA","DA","k","1")
+l_md[[1]] <-  glmer(d ~ k + DA.z + (1|Site),family = "Gamma"(link=log),data = df_resultados)
+l_md[[2]] <-  glmer(d ~ DA.z + (1|Site),family = "Gamma"(link=log),data = df_resultados)
+l_md[[3]] <-  glmer(d ~ k + (1|Site),family = "Gamma"(link=log),data = df_resultados)
+l_md[[4]] <-  glmer(d ~ 1 + (1|Site),family = "Gamma"(link=log),data = df_resultados)
 AICctab(l_md)
 ```
 
-A distância média de dispersão variou em função da proporção de propágulos que permanece na vizinhança da planta progenitora (k) e da densidade observada (DA). Segue os dados plotados e a estimativa linear
+O modelo global foi o mais plausível. [PROBLEMA DE CONVERGÊNCIA].
 
-```{r}
+```{r model matrix d}
+df_effect <- data.frame(par.class = c("beta",rep("alfa",length(levels(df_resultados$k)) ) ),
+                        par.VE = c("DA.z",
+                                   paste("k=",levels(df_resultados$k),sep="")),
+                        par.value = c(exp(fixef(l_md[[1]])[13]),
+                                      exp(fixef(l_md[[1]])[1]),
+                                      exp(fixef(l_md[[1]])[2:12]-fixef(l_md[[1]])[1])) 
+                        )
+df_effect %>% ggplot(aes())
+```
+
+
+
+```{r obs e predito d}
 # gráfico #
-df_resultados %>% ggplot(aes(x=DA,y=d)) + geom_smooth(method = "lm") + geom_point() + facet_wrap(~k,ncol=3,scales="free")
+# df_resultados %>% ggplot(aes(x=DA.z,y=d)) + geom_point() + facet_wrap(~k,ncol=3,scales="free")
 # broom::tidy(l_md[[1]])
-df_diag <- broom::augment(l_md[[1]]) %>% inner_join(x=.,y=df_resultados[,-c(7,12)],by=c("Site","k"))
+df_reg <- broom::augment(l_md[[1]]) %>% mutate(predito = exp(.fitted),
+                                               predito_min = exp())
+ggplot(df_reg,aes(x=DA.z,y=d)) + geom_point() + geom_line(aes(x=DA.z,y=predito)) + facet_wrap(~k,ncol=3,scales="free")
 ```
 
-figura X. d ~ k * DA + (1|Site). Parece que o modelo faz ótimo ajuste o que mostra que a função que desenvolvemos está fazendo boas aproximações.
+figura 1. d ~ k * DA.z + (1|Site): observado (pontos) e predito (linha contínua)
 
 ```{r}
-df_diag %>% ggplot(aes(x=DA,y=.resid)) + geom_smooth(method = "lm") + geom_point() + facet_wrap(~k,ncol=3,scales = "free")
+df_diag %>% ggplot(aes(x=DA.z,y=.resid)) + geom_smooth(method = "loess") + geom_point() + facet_wrap(~k,ncol=3,scales = "free")
 ```
+
+Para avaliar alguma tendência no padrão de residuos, vou repetir a associação proposta nos modelos utilizados na seleção de modelos anterior:
+
+```{r selecao modelos resid d}
+l_md <- vector("list",length = 4)
+names(l_md) <- c("k+DA","DA","k","1")
+l_md[[1]] <-  lmer(.resid ~ k + DA.z + (1|Site),data = df_reg)
+l_md[[2]] <-  lmer(.resid ~ DA.z + (1|Site),data = df_reg)
+l_md[[3]] <-  lmer(.resid ~ k + (1|Site),data = df_reg)
+l_md[[4]] <-  lmer(.resid ~ 1 + (1|Site),data = df_reg)
+AICctab(l_md)
+```
+
+E ainda podemos avaliar a variância explicada pelo modelos:
+
+```{r r2 resid d}
+summary(l_md[[4]])
+```
+
+O modelo mais plausível não aponta para alguma associação entre os resíduos e as variáveis explanatórias, o quê corrobora a boa congruência entre observado e o predito. A seguir vou avaliar como os efeitos. Vou seguir considerando que apesar do problema de convergência 
+
+
 
 
 __GOF__
@@ -841,3 +942,15 @@ vi)$S_M$ ~ p * k + (1|Site)
 -GOF ~ spp_I' * k + (1|Site)
      ~ spp_I' * d + (d|Site)
 -->
+
+
+### John Fox A R companion to applied regression ###
+
+ii) visualização gráfica
+
+"
+For two- (and higher-) way tables, however, the design principles of perception, detection, and comparison imply that we should try to show the observed frequencies in the cells in relation to what we would expect those frequencies to be under a reasonable null model — for example, the hypothesis that the row and column variables are unassociated.
+
+To this end, several schemes for representing contingency tables graphically are based on the fact that when the row and column variables are independent, the estimated expected frequencies, m ij , are products of the row and column totals (divided by the grand total): m ij = n i + n + j =n ++ . Then, each cell can be represented by a rectangle whose area shows the cell frequency, n ij , or the deviation from independence.
+"
+
