@@ -52,24 +52,31 @@ H3
 	PADRÃO: MNEE>MNEI se p->0; MNEE<MNEI se p->1 (Situação canonica do modelo neutro)
 
 __Hipóteses e Predições:__
+n_ref = número de SADs réplicas neutras refutadas
 
 Para todo MN:
 
 H1: para todo MN, baixa congruência se a paisagem for muito fragmentada [uma vez que é possível detectar não neutralidade na SAD e em paisagem fragmentada o pressuposto de neutralidade não é uma boa aproximação]
-P1: GOF ~ p | beta_p > 0
+P1: n_ref ~ p | beta_p > 0
 
 H2: Se a dispersão média for próximo da dispersão média apresentada pelas espécies arbóreas observada na amostra esperamos observar boa congruência entre predito neutro e observado [uma vez que o processo de dispersão neutra é suficiente para gerar SADs neutras que são boas aproximações de SADs observadas - dado parâmetro de dispersão com realismo biológico]
 Dado que em paisagens fragmentadas o agente dispersor pode estar ausente ou modificado, pode existir uma associação entre a distância média de dispersão e grau de fragmentação da paisagem 
-P2: GOF ~ k | k_0.99 < k_ideal > k_max 
-	~ k : p | k_0.99 * [p->0] > k_ideal * [p->1]
+P2: n_ref ~ k | k_0.99 < k_ideal > k_max 
+	  ~ k : p | k_0.99 * [p->0] > k_ideal * [p->1]
 nota: k_ideal = k tal que I -> I_observado em floresta não perturbada
 
 Diferença entre MN:
 
 H3: se a proporção e configuração de habitat original na paisagem for suficiente para descrever a SAD observada em paisagens fragmentadas, esperamos que o MNEE apresente maior congruência com o observado do que MNEI em paisagens fragmentadas.[uma vez que MNEE explicitamente considera a proporção de habitat original e a configuração espacial da paisagem e MNEI utiliza uma aproximação de campo médio espacialmente similar a um sistema continente-ilha]. Caso contrário esperamos que MNEI aproxime melhor o sistema por ser mais geral quando MNEE precisa ser específico.
-P3: GOF ~ MN / ~ MN : p | MNEI > MNEE para todo p / MNEI < MNEE, se p->0
+P3: n_ref ~ MN / ~ MN : p | MNEI > MNEE para todo p / MNEI < MNEE, se p->0
 
-H4: GOF ~ MN : k? [se d -> 0, MNEE > MNEI? pois está mais próximo da concepção de dispersão do modelo? se d -> d_ideal então MNEE < MNEI] 
+H4: n_ref ~ MN : k? [se d -> 0, MNEE > MNEI? pois está mais próximo da concepção de dispersão do modelo? se d -> d_ideal então MNEE < MNEI] 
+Motivação: a) ajustando a função de amostragem de Etienne (2005) às SADs observadas e gerando SADs réplicas a partir dos parâmetros ajustados, nesses casos não se observa SADs réplicas refutadas e os parâmetros apresentam baixa correspondência com o esperado caso o ajuste da SAD fosse informativa do contexto em a SAD foi observada, por exemplo I_{p->0} < I_{p->1}. 
+P4: se p -> 0 e d -> 0, MNEE > MNEI
+
+H5: EE apresenta boas predições em diferentes cenários de fragmentação simulada; EI costuma apresentar boa congruência para florestas ricas e não perturbadas, mas não em contextos de fragmentação 
+P4: n_ref ~ p : MN | beta_p:MNEE > beta_p:MNEI
+
 
  
 # Apresentação da ideia de teste #
