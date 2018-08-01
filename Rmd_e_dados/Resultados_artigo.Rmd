@@ -11,6 +11,8 @@ knitr::opts_chunk$set(echo = FALSE, tidy = TRUE, include = TRUE, warning = FALSE
 
 ```{r dados e pacotes,warning=FALSE,message=FALSE,echo=FALSE}
 # library(reshape2) # para mudar formato dos dados
+library(lattice)
+library(gridExtra)
 library(RVAideMemoire) #gráficos diagnóstico dos GLMM
 library(sjPlot) #gráficos de GLMM
 library(MuMIn) # para R^2
@@ -18,10 +20,10 @@ library(MuMIn) # para R^2
 # library(ggplot2)  # idem
 library(sads)
 library(lme4) # pacote de criação dos modelos estatísticos
-# library(blme) # pacote para comparar os modelos, seleção per se
+# library(bblme) # pacote para comparar os modelos, seleção per se
 library(merTools) # para intervalos de previsao
 library(tidyverse)
-# library(broom) # para manipular os modelos 
+library(broom) # para manipular os modelos
 library(magrittr) # p escrita
 library(MASS)
 library(car)
@@ -34,6 +36,29 @@ df_resultados$SiteCode <- factor(df_resultados$SiteCode)
 df_resultados$k <- factor(df_resultados$k,levels=unique(df_resultados$k))
 # df_resultados$k %>% contrasts()
 # df_resultados$MN %>% contrasts()
+
+#### z score ###
+
+f_z <- function(x){
+  m <- base::mean(x,na.rm=TRUE)
+  sd <- sd(x,na.rm=TRUE)
+  output <- (x-m)/sd
+  return(output)
+} 
+
+df_resultados %<>% mutate(GOF.z = f_z(GOF),
+                          DA.z = f_z(DA),
+                          p.z = f_z(p),
+                          S.z = f_z(S),
+                          U.z = f_z(U),
+                          m_.z = f_z(m_),
+                          I.z = f_z(I),
+                          d.z = f_z(d),
+                          k.z0 = as.numeric(as.character(k)),
+                          k.z = f_z(k.z0))
+
+names(df_resultados)[1] <- "Site"
+
 ```
 
 <!--
@@ -127,29 +152,7 @@ c) GOF ~ p * MN * par_imig + S + (par_imig | Site / MN)
 Para faciltar o ajuste dos modelos mistos aplicamos a transformação z nas variáveis contínuas: 
 -->
 
-### Anexo 1: código auxiliar ###
-
-```{r preparacao dos dados, echo=FALSE}
-f_z <- function(x){
-  m <- base::mean(x,na.rm=TRUE)
-  sd <- sd(x,na.rm=TRUE)
-  output <- (x-m)/sd
-  return(output)
-} 
-
-df_resultados %<>% mutate(GOF.z = f_z(GOF),
-                          DA.z = f_z(DA),
-                          p.z = f_z(p),
-                          S.z = f_z(S),
-                          U.z = f_z(U),
-                          m_.z = f_z(m_),
-                          I.z = f_z(I),
-                          d.z = f_z(d),
-                          k.z0 = as.numeric(as.character(k)),
-                          k.z = f_z(k.z0))
-
-names(df_resultados)[1] <- "Site"
-```
+## Anexo 1: código auxiliar ##
 
 __par_imig ~ k __
 <!--
@@ -161,7 +164,7 @@ _d_
 
 ## Exploração gráfica ##
 
-```{r graf}
+```{r graf d}
 # x11()
 par(mfrow=c(3,2))
 ## d e d.z ##
@@ -285,60 +288,121 @@ l_md[[4]] <-  glmer(d ~ 1 + (1|Site),family = "Gamma"(link=log),data = df_result
 AICctab(l_md)
 ```
 
-O modelo global foi o mais plausível. [PROBLEMA DE CONVERGÊNCIA].
+O modelo global foi o mais plausível. [PROBLEMA DE CONVERGÊNCIA]. E por conta disso não consigo avaliar o ajuste visualmente:
 
-```{r model matrix d}
-df_effect <- data.frame(par.class = c("beta",rep("alfa",length(levels(df_resultados$k)) ) ),
+```{r echo=TRUE}
+prof_glmm.d <- profile(l_md[[3]])
+# xyplot(prof_glmm.d , aspect =1.3)
+```
+
+Avaliação gráfica do ajuste do modelo:
+
+```{r residuos d}
+df_reg <- broom::augment(l_md[[1]])
+df_reg %<>% mutate(predito = exp(.fitted),
+                   std.resid = .resid/sd(.resid),
+                   sqrt.std.resid = sqrt(std.resid))
+## observado e predito ##
+df_reg %>%  ggplot(aes(x=DA.z,y=d)) + geom_point() +
+  geom_line(aes(y=predito),color="red") + facet_wrap(~k,ncol=3,scales="free")
+```
+
+__Figura 1__ Distância média de dispersão (d) e o predito segundo d ~ DA.z + k + (1 | Sítio), family=Gamma. Os pontos são as distâncias médias estimados para o determinado percentil (k) de propágulos que permanecem até l_cel metros da planta progenitora [ADICIONAR FORMULA l_cel ~ DA,J]; em vermelho o predito.
+
+Parece que há boa congruência entre o observado e o predito pelo modelo, segue regressão dos resíduos do modelo:
+
+```{r graf residuo d 1}
+ggplot(df_reg,aes(x=.fitted,y=std.resid)) + 
+  geom_point() +
+  geom_smooth(method = "loess") + 
+  facet_wrap(~k,ncol=3,scales="free")
+```
+
+__Figura 2.1__ standard resíduos ~ ajustado
+
+```{r graf residuo d 1}
+ggplot(df_reg,aes(x=.fitted,y=sqrt.std.resid)) + 
+  geom_point() +
+  geom_smooth(method = "loess") + 
+  facet_wrap(~k,ncol=3,scales="free")
+```
+
+__Figura 2.2__ sqrt standard resíduos ~ ajustado
+
+```{r effects glmm d}
+(df_effect <- data.frame(par.class = c("beta",rep("alfa",length(levels(df_resultados$k)) ) ),
                         par.VE = c("DA.z",
                                    paste("k=",levels(df_resultados$k),sep="")),
                         par.value = c(exp(fixef(l_md[[1]])[13]),
                                       exp(fixef(l_md[[1]])[1]),
-                                      exp(fixef(l_md[[1]])[2:12]-fixef(l_md[[1]])[1])) 
-                        )
-df_effect %>% ggplot(aes())
+                                      exp(fixef(l_md[[1]])[2:12]-fixef(l_md[[1]])[1]))
+                        ))
+
+## falta estimar os intervalos de confiança ##
 ```
 
 
 
-```{r obs e predito d}
-# gráfico #
-# df_resultados %>% ggplot(aes(x=DA.z,y=d)) + geom_point() + facet_wrap(~k,ncol=3,scales="free")
-# broom::tidy(l_md[[1]])
-df_reg <- broom::augment(l_md[[1]]) %>% mutate(predito = exp(.fitted),
-                                               predito_min = exp())
-ggplot(df_reg,aes(x=DA.z,y=d)) + geom_point() + geom_line(aes(x=DA.z,y=predito)) + facet_wrap(~k,ncol=3,scales="free")
+
+### hip_ref ###
+n_ref = número de SADs réplicas neutras refutadas
+
+```{r explor graf n_ref }
+df_resultados %<>% mutate(n_ref=100-GOF)
+# df_resultados$k %>% levels
+
+### lattice ###
+
+# par(mfrow=c(1,2))
+# lattice::xyplot(n_ref ~ p | k, data=df_resultados,as.table=T,
+#                 group=df_resultados$MN, auto.key=list(text=c("EI", "EE")))
+# xyplot(n_ref ~ MN | k, data=df_resultados,as.table=T,
+#                 group=df_resultados$MN, auto.key=list(text=c("EI", "EE")))
+
+### ggplot2 ###
+l_p <- vector("list",3) # número de hipóteses 
+l_p[[1]] <- ggplot(df_resultados,aes(x=p,y=n_ref)) + #P1: n_ref ~p
+  geom_point() + geom_smooth(method="loess")
+l_p[[2]] <- ggplot(df_resultados,aes(x=k,y=n_ref)) + #P2: n_ref ~ k
+  geom_jitter() +
+  geom_boxplot() +
+  labs(y="")
+l_p[[3]] <- ggplot(df_resultados,aes(x=MN,y=n_ref)) + #P3: n_ref ~ MN
+  geom_jitter() +
+  geom_boxplot() +
+  labs(y="")
+l_p[[4]] <- ggplot(df_resultados,aes(x=p,y=n_ref)) + #P4: n_ref ~ p : k
+  geom_point() + geom_smooth(method="loess") + facet_wrap(~k,ncol=3)
+l_p[[5]] <- ggplot(df_resultados,aes(x=MN,y=n_ref)) + #P5: n_ref ~ MN : k [?]
+  geom_jitter() + geom_boxplot() + facet_wrap(~k,ncol=3)
+l_p[[6]] <- ggplot(df_resultados,aes(x=p,y=n_ref)) + #P4: n_ref ~ p : MN [?]
+  geom_point() + geom_smooth(method = "loess") + facet_wrap(~MN,ncol=2)
+l_p[[7]] <- ggplot(df_resultados,aes(x=p,y=n_ref,color=MN)) + # P7: p:k:MN [?]
+  geom_point() + geom_smooth(method="loess") + facet_wrap(~k,ncol=3)
+grid.arrange(l_p[[1]],l_p[[2]],l_p[[3]],l_p[[4]],l_p[[5]])
 ```
 
-figura 1. d ~ k * DA.z + (1|Site): observado (pontos) e predito (linha contínua)
 
-```{r}
-df_diag %>% ggplot(aes(x=DA.z,y=.resid)) + geom_smooth(method = "loess") + geom_point() + facet_wrap(~k,ncol=3,scales = "free")
+```{r graf d}
+# x11()
+par(mfrow=c(3,2))
+## d e d.z ##
+# ~ norm
+qqp(df_resultados$d, "norm",ylab="d (metros)") 
+qqp(df_resultados$d.z, "norm",ylab="d.z (Z(d))") 
+# ~ lnorm
+qqp(df_resultados$d, "lnorm",ylab="d (metros)")
+qqp(df_resultados$d.z, "lnorm",ylab="d.z (Z(d))")
+# ~ gamma
+fit_gamma1 <- fitdistr(df_resultados$d, "gamma")
+qqp(df_resultados$d, "gamma", shape = fit_gamma1$estimate[[1]], rate = fit_gamma1$estimate[[2]],ylab="d (metros)")
+## d.z ##
+# ~ norm
+# ~ lnorm
+# ~ gamma
 ```
 
-Para avaliar alguma tendência no padrão de residuos, vou repetir a associação proposta nos modelos utilizados na seleção de modelos anterior:
 
-```{r selecao modelos resid d}
-l_md <- vector("list",length = 4)
-names(l_md) <- c("k+DA","DA","k","1")
-l_md[[1]] <-  lmer(.resid ~ k + DA.z + (1|Site),data = df_reg)
-l_md[[2]] <-  lmer(.resid ~ DA.z + (1|Site),data = df_reg)
-l_md[[3]] <-  lmer(.resid ~ k + (1|Site),data = df_reg)
-l_md[[4]] <-  lmer(.resid ~ 1 + (1|Site),data = df_reg)
-AICctab(l_md)
-```
-
-E ainda podemos avaliar a variância explicada pelo modelos:
-
-```{r r2 resid d}
-summary(l_md[[4]])
-```
-
-O modelo mais plausível não aponta para alguma associação entre os resíduos e as variáveis explanatórias, o quê corrobora a boa congruência entre observado e o predito. A seguir vou avaliar como os efeitos. Vou seguir considerando que apesar do problema de convergência 
-
-
-
-
-__GOF__
 
 <!--
 i) selecao da funcao de ligacao e distribuicao de erros a partir da modelo cheio
