@@ -1,0 +1,46 @@
+04 setembro
+
+1) Identifique a sua ideia:
+
+## Avaliar se a SAD pode ser evidência suficiente para refutar neutralidade ##
+
+A) Para abordar essa questão utilizamos SADs observadas em um gradiente de fragmentação.
+
+A perda de habitat e fragmentação resulta: 
+i) na diminuição de habitat disponível (diminuição da quantidade de habitat);
+ii) modificação na configuração espacial da paisagem (a chamada fragmentação per se);
+iii) modifica o habitat original pela introdução de novos gradientes ecológicos associado com a região de fronteira entre o habitat remanescente e a matrix, região onde foi retirado o habitat (o efeito de borda).
+
+O efeito de borda é um dos principais efeitos da fragmentação e perda de habitat nas comunidades ecológicas, atua como um filtro ambiental aumentando a taxa de natalidade de certas espécies associadas com o novo habitat, e diminui as taxas de natalidade e aumenta a de mortalidade daquelas espécies associadas ao habitat original.
+
+Assim, em ambientes fragmentados o pressupostos de neutralidade não é uma boa aproximação dos processos ecológicos que ocorrrem naquela área, pois as espécies da paisagem não apresentam as mesmas taxas demográficas per capita.
+
+B) Comparamos as predições de dois modelos neutros.
+
+Um possível teste empírico da teoria neutra é comparar a congruência entre o vetor de abundância observado e aquele predito por um modelo neutro.
+
+Existem diversos modelos neutros, todos compartilham o pressuposto central de neutralidade.
+
+O modelo neutro clássico apresentado por Hubbell (2001) [assemelha-se em estrutura ao modelo mais simples da Teoria de Equilíbrio de Biogeografia de Ilhas onde] temos uma a comunidade local que recebe imigrantes de um pool de espécies regional onde ocorre especiação.
+
+Esse modelo neutro clássico considera implicitamente o espaço e, como seu correspondente na teoria de Biogeografia de Ilhas, pode ser usado como uma primeira abordagem para o estudo de comunidades em paisagens fragmentadas.
+
+Um segundo modelo neutro deve poder considerar explicitamente as características da paisagem fragmentada que não estão relacionados com a refutação da neutralidade, ou seja, a diminuição da quantidade de habitat e a fragmentação per se. Pois desvios do predito que decorrem destas características podem ser incorporadas diretamente no modelo.
+
+Assim, geramos predições de um modelo geral de espaço implícito (EI) e de um modelo específico para estudo de comunidades em paisagens fragmentadas de espaço explícito (EE).
+
+C) Parametrização dos modelos I - Imigração
+
+Uma primeira abordagem no estudo do modelo neutro EI é estimar por verossimilhança os dois parâmetros do modelo, theta (número fundamental da diversidade) e I (número fundamental da imigração) a partir da SAD observada. Contudo, essa abordagem leva a um vies de confirmação entre o predito e o observado
+
+Alternativamente desenvolveu-se um corpo teórico que relaciona o parâmetro de imigração I com uma abordagem de imigração baseada na função de dispersão, que permite parametrizar um modelo neutro a partir de valores de distâncias médias de dispersão, que podem ser estimados em campo.
+
+A função de dispersão relaciona a distância entre a planta progenitora e o local de estabelecimento do propágulo com a probabilidade deste propágulo se estabelecer naquele local
+
+A distância média e a forma da função de dispersão variam entre espécies e dependem das condições ambientais como presença do agente dispersor.
+
+O pressupostos de neutralidade não postula que todas as espécies possuem a mesma função de dispersão, mas como uma primeira aproximação é comum utilizar a mesma função de dispersão para todas as espécies.
+
+Em paisagens fragmentadas o agente dispersor pode não estar presente, reduzindo a distância média de dispersão para as proximidades da planta progenitora. Por outro lado, as mudanças que decorrem da fragmentação podem aumentar a capacidade de dispersão de algumas espécies ou não ter efeito algum. 
+
+D)
