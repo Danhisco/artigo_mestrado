@@ -160,9 +160,9 @@ i) seleção da estrutura aleatória, distribuição teórica e função de liga
 ii) seleção das hipóteses estatísticas  
 -->
 
-_d_
+### d - distância média de dispersão ###
 
-## Exploração gráfica ##
+__Exploração gráfica__
 
 ```{r graf d}
 # x11()
@@ -224,7 +224,7 @@ Error: Error in r.squaredGLMM.merMod(X[[i]], ...) : do not know how to calculate
 27jun2018[Válido para lmer, não para normal link=log: acredito que se houver mais níveis de k e melhor distribuidos no campo de parâmetros aumentaria o R^2 de k|Site
 -->
 
-## 31jun2018 ##
+_31jun2018_
 - Problema de convergência:
 convergence code: 0
 Model is nearly unidentifiable: very large eigenvalue
@@ -291,7 +291,7 @@ AICctab(l_md)
 O modelo global foi o mais plausível. [PROBLEMA DE CONVERGÊNCIA]. E por conta disso não consigo avaliar o ajuste visualmente:
 
 ```{r echo=TRUE}
-prof_glmm.d <- profile(l_md[[3]])
+# prof_glmm.d <- profile(l_md[[3]])
 # xyplot(prof_glmm.d , aspect =1.3)
 ```
 
@@ -311,7 +311,7 @@ __Figura 1__ Distância média de dispersão (d) e o predito segundo d ~ DA.z + 
 
 Parece que há boa congruência entre o observado e o predito pelo modelo, segue regressão dos resíduos do modelo:
 
-```{r graf residuo d 1}
+```{r graf residuo d }
 ggplot(df_reg,aes(x=.fitted,y=std.resid)) + 
   geom_point() +
   geom_smooth(method = "loess") + 
@@ -329,7 +329,8 @@ ggplot(df_reg,aes(x=.fitted,y=sqrt.std.resid)) +
 
 __Figura 2.2__ sqrt standard resíduos ~ ajustado
 
-```{r effects glmm d}
+
+```{r effects glmm d, echo=TRUE}
 (df_effect <- data.frame(par.class = c("beta",rep("alfa",length(levels(df_resultados$k)) ) ),
                         par.VE = c("DA.z",
                                    paste("k=",levels(df_resultados$k),sep="")),
@@ -341,13 +342,63 @@ __Figura 2.2__ sqrt standard resíduos ~ ajustado
 ## falta estimar os intervalos de confiança ##
 ```
 
+### A partir daqui trabalho a ser feito ###
+
+1) I = número fundamental da imigração (Etienne 2005)
+
+a) avaliar qual a melhor distribuição de probabilidade
+b) avaliar função de ligação
+c) seleção de modelos
+d) avaliação do modelo selecionado
+e) estudo das estimativas e interpretação
+
+2) n_ref = número de SADs réplicas neutras refutadas
+
+a) avaliar qual a melhor distribuição de probabilidade
+b) avaliar função de ligação
+c) seleção de modelos
+d) avaliação do modelo selecionado
+e) estudo das estimativas e interpretação
+
+3) U = probabilidade de especiação segundo modelo EE
+
+a) avaliar qual a melhor distribuição de probabilidade
+b) avaliar função de ligação
+c) seleção de modelos
+d) avaliação do modelo selecionado
+e) estudo das estimativas e interpretação
+
+### I - número fundamental da dispersão (Etienne 2005) ###
+
+__Exploração Gráfica__
+
+```{r exp graf I}
+# x11()
+par(mfrow=c(2,2))
+hist(log(df_resultados$I),breaks=40,main = "",xlab = "log(I)",ylab="")
+## d e d.z ##
+# ~ norm
+qqp(df_resultados$I, "norm",ylab="I") 
+# ~ lnorm
+qqp(df_resultados$I, "lnorm",ylab="I")
+# ~ gamma
+fit_gamma1 <- fitdistr(df_resultados$d, "gamma")
+qqp(df_resultados$I, "gamma", shape = fit_gamma1$estimate[[1]], rate = fit_gamma1$estimate[[2]],ylab="I")
+## d.z ##
+# ~ norm
+# ~ lnorm
+# ~ gamma
+```
 
 
 
+<!--
 ### hip_ref ###
-n_ref = número de SADs réplicas neutras refutadas
+-n_ref = número de SADs réplicas neutras refutadas
+-exploração gráfica das hipóteses levantadas até o momento
+-inclui código mas não inclui as figuras pois iria ficar muito longo
 
-```{r explor graf n_ref }
+```{r explor graf n_ref,echo=TRUE,include=FALSE}
 df_resultados %<>% mutate(n_ref=100-GOF)
 # df_resultados$k %>% levels
 
@@ -383,34 +434,16 @@ grid.arrange(l_p[[1]],l_p[[2]],l_p[[3]],l_p[[4]],l_p[[5]])
 ```
 
 
-```{r graf d}
-# x11()
-par(mfrow=c(3,2))
-## d e d.z ##
-# ~ norm
-qqp(df_resultados$d, "norm",ylab="d (metros)") 
-qqp(df_resultados$d.z, "norm",ylab="d.z (Z(d))") 
-# ~ lnorm
-qqp(df_resultados$d, "lnorm",ylab="d (metros)")
-qqp(df_resultados$d.z, "lnorm",ylab="d.z (Z(d))")
-# ~ gamma
-fit_gamma1 <- fitdistr(df_resultados$d, "gamma")
-qqp(df_resultados$d, "gamma", shape = fit_gamma1$estimate[[1]], rate = fit_gamma1$estimate[[2]],ylab="d (metros)")
-## d.z ##
-# ~ norm
-# ~ lnorm
-# ~ gamma
-```
 
 
 
-<!--
+
+
 i) selecao da funcao de ligacao e distribuicao de erros a partir da modelo cheio
 ii) selecao do modelo mais plausível
 iii) diagnóstico do modelo: Bolker et al.
--->
 
-```{r GOF selecao de funcao de ligacao, echo=FALSE}
+```{r GOF selecao de funcao de ligacao, echo=FALSE, include=FALSE}
 l_md <- vector("list", length = 16)
 names(l_md) <- paste("k",rep(c("logit","probit","cloglog"),each=4))
 # logito
@@ -472,7 +505,8 @@ l_md[[16]] <- lmer(GOF ~ p.z * MN * I.z + S.z + (I.z | Site / MN), data = df_res
 AICctab(l_md, weights = TRUE)
 ```
 
-- classe de modelo estastítico selecionado: lmer( I + (I | Site / MN) )
+
+
 ```{r}
 l_md <- vector("list",length = 4)
 names(l_md) <- c("(1|Site)","(I|Site)","(1|Site/MN)","(I|Site/MN)")
@@ -515,6 +549,7 @@ AICctab(l_md, weights = TRUE)
 ```{r}
 l_md[[15]] %>% summary
 ```
+-->
 
 <!--
 #### GOF ####
@@ -1005,7 +1040,6 @@ vi)$S_M$ ~ p * k + (1|Site)
 
 -GOF ~ spp_I' * k + (1|Site)
      ~ spp_I' * d + (d|Site)
--->
 
 
 ### John Fox A R companion to applied regression ###
@@ -1017,4 +1051,5 @@ For two- (and higher-) way tables, however, the design principles of perception,
 
 To this end, several schemes for representing contingency tables graphically are based on the fact that when the row and column variables are independent, the estimated expected frequencies, m ij , are products of the row and column totals (divided by the grand total): m ij = n i + n + j =n ++ . Then, each cell can be represented by a rectangle whose area shows the cell frequency, n ij , or the deviation from independence.
 "
+-->
 
