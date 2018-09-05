@@ -69,28 +69,35 @@ ii) estimar taxa de especiação necessária para manter a riqueza no equilíbri
 iii) simular SADs neutras segundo MNEI e MNEE a partir dos mesmo parâmetros
 -->
 
+## Estrutura dos Resultados Completos: ##
 
+I) parâmetros de dispersão:
+
+  a) distância média de dispersão (d)
+
+  b) número fundamental da dispersão (I)
+- com isso podemos avaliar quais as situações biológicas de limitação à dispersão que a simulação está ocorrendo para os dois modelos neutros
 <!--
-Resultados 2 completos:
--> distância média de dispersão ~ k * p + (k|Site) ou k_factor * p + (1|Site) [modelo completo se houver mais níveis de k e estiverem igualmente espaçados - segunda etapa] 
-
-  - com isso avaliar quais as situações biológicas de limitação à dispersão que a simulação está ocorrendo
-  - para comparação podemos plotar a curva das médias como comparação visual?
-  - 1o gráfico: eixo y
--> congruência do simulado com o observado ~ k_factor * p + (1|Site)
-  - em ambientes fragmentados o pressuposto de equivalência funcional não é uma boa aproximação
-  -
-  - com isso podemos avaliar se a SAD pode ser evidência suficiente para refutar neutralidade
-  
-  a SAD observada em um gradiente biológico onde o pressupostos da equivalência funcional não é uma boa aproximação (a fragmentação leva à modificação do habitat remanescente que se reflete nas taxas demográficas das populações observadas segundo sua espécies) [REESCREVER]
-
--> taxa de especiação necessária para manter a riqueza observada no equilíbrio dinâmico segundo um modelo neutro espacialmente explícito (U) ~ k_factor * p + (1|Site)
-  - a teoria neutra pode ser uma boa aproximaçaõ para descrever a taxa de extinção de espécies raras em ambientes fragmentados (Gilbert et al. 2006)
-  - o modelo neutro coalescente é uma boa aproximação para descrever o comportamento dos sistemas biológicos em diferentes contextos de fragmentação (Campos et al.)
-  - no modelo coalescente o equilíbrio dinâmico é observado, nesse cenário a taxa de surgimento de singletons por evento de morte se igual à taxa de extinção de singletons
-  - assim, a estimativa de taxa de especiaçaõ necessária para manter a riqueza observada no equilíbrio pode ser uma aproximação da taxa de extinção das espécies raras na paisagem.
+distância média de dispersão ~ k * p + (k|Site) ou k_factor * p + (1|Site) [modelo completo se houver mais níveis de k e estiverem igualmente espaçados - segunda etapa] 
 -->
 
+II) Congruência do predito com o observado
+- a ideia central do artigo é: "Avaliar se a SAD pode ser evidência suficiente para refutar neutralidade"
+- assim optei por mudar a variável de congruência de GOF, que avalia quantas predições neutras foram refutadas por cenário neutro
+- para n_ref = número de predições neutras refutadas por cenário neutro
+
+III) taxa de especiação necessária para manter a riqueza observada no equilíbrio dinâmico segundo um modelo neutro espacialmente explícito (U)
+- a teoria neutra pode ser uma boa aproximaçaõ para descrever a taxa de extinção de espécies raras em ambientes fragmentados
+- o modelo neutro coalescente é uma boa aproximação para descrever o comportamento dos sistemas biológicos em diferentes contextos de fragmentação (Campos et al.)
+- no modelo coalescente o equilíbrio dinâmico é observado, nesse cenário a taxa de surgimento de singletons por evento de morte se igual à taxa de extinção de singletons
+- assim, a estimativa de taxa de especiação necessária para manter a riqueza observada no equilíbrio pode ser uma aproximação da taxa de extinção das espécies raras na paisagem.
+
+IV) Anexo 1: código auxiliar
+- segue a mesma ordem das variáveis
+- é o local onde eu desenvolvo a análise dos dados
+
+
+Notas: até o momento desenvolvi parte da análise dos dados para I.A
 
 <!-- Esqueleto dos resultados 1
 
@@ -152,17 +159,12 @@ c) GOF ~ p * MN * par_imig + S + (par_imig | Site / MN)
 Para faciltar o ajuste dos modelos mistos aplicamos a transformação z nas variáveis contínuas: 
 -->
 
-## Anexo 1: código auxiliar ##
+#### Anexo 1: código auxiliar ####
 
-__par_imig ~ k __
-<!--
-i) seleção da estrutura aleatória, distribuição teórica e função de ligação
-ii) seleção das hipóteses estatísticas  
--->
+##### I) parâmetros de dispersão #####
+__I.A) distância média de dispersão (d)__
 
-### d - distância média de dispersão ###
-
-__Exploração gráfica__
+Exploração gráfica
 
 ```{r graf d}
 # x11()
@@ -189,9 +191,8 @@ A distribuição que melhor se adequa aos dados é a distribuição gamma: i) aj
 
 O objetivo é avaliar o efeito da variável k na distância média de dispersão (d), para isso o modelo cheio vai considerar a variável DA, uma vez que k é definido como a proporção de propágulos até l_cel metros da planta progenitora. A largura da célula de simulação (l_cel) = 100/sqrt(DA) (PERGUNTA:devo utilizar DA ou a transformação de DA = I( 100/sqrt(DA) )? ).
 
--Formulas dos modelos estatísticos:
-d ~ k + DA + (k|Site)
-d ~ k_factor + DA + (1|Site)
+_Tabela Seleção da distribuição de probabiliade e estrutura aleatória_
+
 ```{r d k}
 # df_resultados %>% str
 ## Seleção da estrutura eleatória ##
@@ -214,9 +215,9 @@ AICctab(l_md,weights=T)
 A estrutura aleatória selecionada foi (1|Site).
 -->
 
-O modelo global com distribuição gamma, função de ligação log e estrutura aleatória 1|Site foi o mais plausível. Segue sumário
+O modelo global com distribuição gamma, função de ligação log e estrutura aleatória 1|Site foi o mais plausível. Segue sumário:
 
-```{r d k R2}
+```{r d k R2,echo=TRUE}
 summary(l_md[[3]]) # problema de convergência, indicam para reescalonar as variáveis
 ```
 <!--
@@ -277,6 +278,7 @@ Com isso obtive o erro: 'converge code:0; Model is nearly unidentifiable: very l
 - a transformação z de DA deveria ser o suficiente para lidar com problemas relacionados com escalamento de variáveis; a outra variável explanatória é categórica.
 - vou continuar o estudo com esse modelo como global
 
+_Tabela Selecao de variaveis esplanatorias para descrever 'd'_
 
 ```{r selecao d}
 l_md <- vector("list",length = 4)
@@ -292,6 +294,7 @@ O modelo global foi o mais plausível. [PROBLEMA DE CONVERGÊNCIA]. E por conta 
 
 ```{r echo=TRUE}
 # prof_glmm.d <- profile(l_md[[3]])
+
 # xyplot(prof_glmm.d , aspect =1.3)
 ```
 
@@ -307,7 +310,7 @@ df_reg %>%  ggplot(aes(x=DA.z,y=d)) + geom_point() +
   geom_line(aes(y=predito),color="red") + facet_wrap(~k,ncol=3,scales="free")
 ```
 
-__Figura 1__ Distância média de dispersão (d) e o predito segundo d ~ DA.z + k + (1 | Sítio), family=Gamma. Os pontos são as distâncias médias estimados para o determinado percentil (k) de propágulos que permanecem até l_cel metros da planta progenitora [ADICIONAR FORMULA l_cel ~ DA,J]; em vermelho o predito.
+__Figura 1__ Distância média de dispersão (d) e o predito segundo d ~ DA.z + k + (1 | Sítio), family=Gamma. Os pontos são as distâncias médias estimados para o determinado percentil (k) de propágulos que permanecem até l_cel metros da planta progenitora; em vermelho o predito.
 
 Parece que há boa congruência entre o observado e o predito pelo modelo, segue regressão dos resíduos do modelo:
 
@@ -329,8 +332,9 @@ ggplot(df_reg,aes(x=.fitted,y=sqrt.std.resid)) +
 
 __Figura 2.2__ sqrt standard resíduos ~ ajustado
 
+_Tabela efeitos estimados na escala padrão (não na escala log)_
 
-```{r effects glmm d, echo=TRUE}
+```{r effects glmm d}
 (df_effect <- data.frame(par.class = c("beta",rep("alfa",length(levels(df_resultados$k)) ) ),
                         par.VE = c("DA.z",
                                    paste("k=",levels(df_resultados$k),sep="")),
@@ -343,6 +347,13 @@ __Figura 2.2__ sqrt standard resíduos ~ ajustado
 ```
 
 ### A partir daqui trabalho a ser feito ###
+
+0) Continuar análise de d - distância média de dispersão
+
+d) avaliação do modelo selecionado
+e) estudo das estimativas e interpretação
+
+
 
 1) I = número fundamental da imigração (Etienne 2005)
 
@@ -367,26 +378,3 @@ b) avaliar função de ligação
 c) seleção de modelos
 d) avaliação do modelo selecionado
 e) estudo das estimativas e interpretação
-
-### I - número fundamental da dispersão (Etienne 2005) ###
-
-__Exploração Gráfica__
-
-```{r exp graf I}
-# x11()
-par(mfrow=c(2,2))
-hist(log(df_resultados$I),breaks=40,main = "",xlab = "log(I)",ylab="")
-## d e d.z ##
-# ~ norm
-qqp(df_resultados$I, "norm",ylab="I") 
-# ~ lnorm
-qqp(df_resultados$I, "lnorm",ylab="I")
-# ~ gamma
-fit_gamma1 <- fitdistr(df_resultados$d, "gamma")
-qqp(df_resultados$I, "gamma", shape = fit_gamma1$estimate[[1]], rate = fit_gamma1$estimate[[2]],ylab="I")
-## d.z ##
-# ~ norm
-# ~ lnorm
-# ~ gamma
-```
-
