@@ -1,8 +1,8 @@
-04 setembro
+## 04 setembro ##
 
 1) Identifique a sua ideia:
 
-## Avaliar se a SAD pode ser evidência suficiente para refutar neutralidade ##
+Avaliar se a SAD pode ser evidência suficiente para refutar neutralidade
 
 A) Para abordar essa questão utilizamos SADs observadas em um gradiente de fragmentação.
 
@@ -62,3 +62,35 @@ a) justifica do motivo de utilizar o modelo neutro clássico - que me parece que
 b) parametrização dos modelos para o parâmetro de diversidade. Como evitar viés de confirmação para um modelo ou para outro? Considerar que o modelo EE apresenta considerável limitação computacional para gerar predições.
 
 
+## 03 setembro ## 
+
+1) Identifique a sua ideia:
+- A proposta geral do trabalho é avaliar se a SAD pode ser evidência suficiente para refutar neutralidade
+- Para abordar essa questão:
+i) utilizamos SADs observadas em um gradiente de fragmentação
+->pois em paisagens fragmentadas o pressupostos de neutralidade não é uma boa aproximação // e assim, se a SAD reflete a dinâmica ecológica subjacente, esperamos não observar boa congruência em paisagens fragmentadas.
+ii) utilizamos dois modelos neutros para gerar predições. Por quê?
+a) os modelos diferem em complexidade: a.i) modelo clássico permite generalidade na forma da SAD? a.ii) modelo EE requer parametrização mais especifica?
+iii) não parametrizamos os modelos a partir da SAD observada
+a) é de se esperar que se parametrizarmos os modelos a partir do ajuste por verossimilhança iremos obter alta congruência com o observado
+b) ao inves estabelecemos valores a priori de limitação à dispersão e utilizamos a riqueza observada no modelo EE para parametrizar ambos modelos. Por quê o modelo EE?
+iv) utilizamos um teste genérico de comparação de vetores numéricos que considera a H_0 = os dois vetores são amostras de uma mesma distribuição teórica.
+
+2) Quais questões não estão claras?
+i) Porquê utilizamos os dois modelos neutros
+ii)Porquê utilizamos o teste de KS
+
+3) Qual o problema central que a ideia se propõem a abordar? [ou o quê leva ao seu objetivo/ideia]
+-SAD padrão universal pode ser menos informativo do que se propõem até agora?
+-Por quê avaliar se a SAD pode ser evidência suficiente para refutar neutralidade?
+*Estou com dificuldades de iniciar o texto, segue lista de ideias que devem estar no começo:
+i) SAD - padrão ecológico
+ii) Teoria neutra e sua abordagem de investigação
+iii) Para distinguir entre diferentes mecanismos atuana na estruturação das comunidades ecológicas é mais confiável utilizar dados de dinâmica ecológica
+iv) Contudo, a SAD é uma informação abundante comparativamente e mesmo ela é escassa
+v) Assim se faz necessário avaliar em que considções é possível utiliza-la para refutar neutralidade // avaliar se a SAD pode ser evidência suficiente para refutar neutralidade
+-> não está muito claro pra mim ainda
+
+4) Quais os pontos que devo desenvolver a seguir?
+- Por quê utilizar os dois modelos neutros?
+- Deixar começo da introdução para depois, acredito que o ponto de partida estabelecido (ideia identificada) é suficiente para prosseguir 
