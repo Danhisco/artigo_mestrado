@@ -43,4 +43,22 @@ O pressupostos de neutralidade não postula que todas as espécies possuem a mes
 
 Em paisagens fragmentadas o agente dispersor pode não estar presente, reduzindo a distância média de dispersão para as proximidades da planta progenitora. Por outro lado, as mudanças que decorrem da fragmentação podem aumentar a capacidade de dispersão de algumas espécies ou não ter efeito algum. 
 
-D)
+D) Parametrização dos modelos II - Diversidade
+
+Na teoria neutra, o quê mantem a diversidade ecológica é o constante influxo de novas espécies para o sistema.
+
+No modelo EI o parâmetro que controla a diversidade é theta, um parâmetro composto do tamanho da metacomunidade (J_M) e da taxa de especiação na metacomunidade (U).
+
+A taxa de especiação é a probabilidade de uma nova espécie surgir no sistema por evento de nascimento. Conceitualmente pode ser entendido como especiação verdadeira, surgimento de uma nova espécie, ou como resultado de uma imigração de longa distância de um indivíduo de uma espécie que não estava presente na metacomunidade.
+
+Diferente do parâmetro de imigração, não pode ser estimado diretamente em campo, sua inferência é indireta. Quais são as formas de estimar indiretamente este parâmetro?
+i) ajuste por verossimilhança pela SAD (que pode gerar viés de confirmação)
+ii) por estimativas bayesianas que também dependem da SAD observada, mas levando em conta as distâncias filogeneticas das espécies [CONFIRMAR]
+iii) utilizando a riqueza observada e o modelo neutro EE (que pode gerar viés de confirmação para EE?)
+
+2) Quais são as questão que não estão claras?
+
+a) justifica do motivo de utilizar o modelo neutro clássico - que me parece que a argumentação é similar ao motivo de utilizar a teoria de biogeografia de ilhas como uma primeira aproximação no estudo de comunidades ecológicas em paisagens fragmentadas
+b) parametrização dos modelos para o parâmetro de diversidade. Como evitar viés de confirmação para um modelo ou para outro? Considerar que o modelo EE apresenta considerável limitação computacional para gerar predições.
+
+
