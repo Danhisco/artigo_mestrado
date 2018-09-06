@@ -1,3 +1,20 @@
+## 06 setembro ##
+
+1) Quais os pontos não estão claros até agora?
+A) A questão do uso de dois modelos neutro
+-Argumentação: a) EI - uma primeira abordagem (argumentação similar ao uso de Teoria de Biogeo de ilhas para estudar frag)
+	       b) EE - uma abordagem que considera os efeitos da fragmentação que não estão relacionados com o efeito de filtro
+B) A parametrização de U/theta
+-Argumentação: i) O modelo EE apresenta um método de estimativa de U que não depende da SAD
+	       ii) Por outro lado isso não pode gerar um vies de confirmação para EE?
+	       iii) Como a conversão de parâmetros pode ser suficiente para abordar essa questão?
+C) A questão da abordagem neutra relacionado com a maneira que ela constroi os modelos
+-Argumentação: i) Ao inves de considerar a diferença entre as spp, construímos o conjunto mínimo de assunções sob a hipótese de neutralidade
+	       ii) Então buscamos refutar o modelo afim de avaliar quando é possível que a diferença entre as spp seja relevante
+-Ainda não está muito claro para mim
+-E está totalmente relacionado com A
+D) Quais as críticas a abordagem neutra que justificam a abordagem utilizada quanto: i) o uso de dois modelos neutros, ii) a parametrização dos modelos, iii) ao teste utilizado?
+
 ## 05 setembro ##
 
 1) Identifique a sua ideia:
