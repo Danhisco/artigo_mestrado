@@ -1,3 +1,56 @@
+## 05 setembro ##
+
+1) Identifique a sua ideia:
+
+Avaliaar se a SAD pode ser evidência suficiente para refutar neutralidade
+
+2) Por quê a sua ideia é relevante?
+
+A) A teoria neutra
+
+i) A teoria neutra propõem explicar os padrões de abundância de espécie como resultado da dinâmica de nascimentos e mortes das populações no espaço sob a hipótese de que todas as espécies apresentam as mesmas taxas demográficas per capita (pressuposto de neutralidade).
+
+ii) Isso resulta na caminhada aleatória das populações em qualquer nível de organização, levando à erosão de espécies até a monodominância (chamado de deriva ecológica). 
+
+iii) Para manutenção da diversidade de espécies a teoria pressupõem especiação no conjunto total de espécies (pool regional de espécies ou metacomunidade) e imigração de indivíduos para os subconjuntos de espécies que coexistem em determinado local (comunidade local).
+
+iv) Dentro da proposta da teoria neutra, tenta-se construir o mínimo conjunto de assunções, sob a hipótese de neutralidade, suficiente para explicar o padrão observado.
+
+v) Se o conjunto de assunções não for suficiente para explicar o padrão, então iniciamos a investigação de quais características do sistema devemos adicionar ao modelo.
+
+vi) Essa abordagem propõem-se a ser completar a chamada teoria de nicho que pressupõem que os padrões observados são resultado da interação entre espécies e seu ambiente decorrentes de características específicas das espécies que decorrem de sua história evolutiva particular.
+
+B) Qual o problema com essa abordagem?
+
+i) Um mesmo padrão pode ser resultado de diferentes processos e em geral pode ser influenciado por mais de uma causa.
+
+ii) A abordagem só é informativa quando é refutada, quando não, podemos inferir apenas que um modelo neutro é suficiente para reproduzir o padrão observado.
+
+iii) Pressupostos auxiliares ao de neutralidade podem ser suficientes para descrever o padrão.
+
+iv) Com os testes disponíveis é possível refutar neutralidade apenas se o efeito dos processos de nicho forem muito fortes, a partir da SAD.
+
+v) De maneira geral, para refutar neutralidade é necessário avaliar a variação de abundância das espécies ao longo do tempo, não a relação de abundância entre espécies, como na SAD.
+
+vi) O problema é que esse tipo de evidência não está sempre disponível e requer tempo para ser coletado, além dos aspectos financeiros e técnicos que dificultam tal coleta.
+
+vii) A maioria dos sistemas ecológicos está declinando em função da atividade humana, o que inviabiliza esse tipo de investigação para todos os sistemas biológicos.
+
+viii) Por outro lado a SAD é um padrão que vem sendo coletado em diversos lugares e nos permite realizar estudos longitudinais [?], não à toa têm se aplicado em estudos macroecológicos.
+
+ix) Uma possível abordagem é comparar SADs observadas em comunidades ecológicas onde a priori sabemos que o pressuposto de neutralidade não é uma boa aproximação do observado com a SAD predita por um modelo neutro.
+
+3) Quais pontos não estão claros?
+- A questão da abordagem da teoria neutra em contraste da abordagem da teoria de nicho [A.iv:A.vi]
+- [B.i:B.iii] ?
+- B.ix falta uma conclusão clara e objetiva
+
+4) Quais os próximos passos
+- refinar o texto
+- reler literatura focando nos pontos da sessão 3
+- e concluir a partir de B.ix ligando com o objetivo geral do trabalho que é "avaliar se a SAD..."
+
+
 ## 04 setembro ##
 
 1) Identifique a sua ideia:
