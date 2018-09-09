@@ -1,0 +1,75 @@
+---
+title: "Relatório de Achados Gerais"
+author: "Mori, Danilo Pereira"
+date: "9 de setembro de 2018"
+output: 
+  html_document:
+    toc: true
+---
+
+```{r setup, include=FALSE} 
+knitr::opts_chunk$set(echo = FALSE, tidy = TRUE, include = TRUE, warning = FALSE,cache = TRUE)
+```
+
+## Esquema Dos Métodos
+
+### Matriz de Paisagem
+
+i) landsat 8 => recorte de paisagem de 5 km^2 concêntrico ao sítio de amostragem (Site)
+ii) ajuste de resolução da imagem tal que: densidade de pixels = densidade de indivíduos na área amostrada (DA)  
+  ii.a) portanto o lado da célula (l_cel) = 100/sqrt(DA) metros
+iii) se a porcentagem de cobertura vegetal do pixel for >= 70% => unidade de habitat; caso contrário é unidade de não habitat
+iv) a comunidade local é composta de N (número de indivíduos amostrados) unidades de habitat na região central do recorte de paisagem
+
+### Função de Dispersão
+
+i) partimos de uma distribuição de Laplace para simular a função de dispersão
+ii) determinamos 12 valores de proporção de propágulos que se mantêm até l_cel metros da árvore progenitora (k): 0.99,0.95:0.50,0.25
+iii) então calculou-se a distância média de dispersão (d) que gerava o correspondente percentil
+
+### Taxa de Especiação - U
+
+Dado matriz de paisagem e riqueza observada (S) no respectivo Site, estimamos um valor médio de taxa de especiação (U) para cada nível de k. Para está estimativa utilizamos um método semi-analítico derivado do modelo neutro de espaço explícito descrito em Rosindell et al. 2008 e estimamos 20 réplicas para cada cenário neutro. 
+
+### Equivalência entre grandezas
+
+__i) Parâmetros de dispersão __
+
+Desenvolvemos uma equação que relaciona d com a probabilidade de uma unidade de habitat ser colonizada pela prole de um indivíduo de fora da comunidade local (m) e então calculamos I o número de imigrantes que competem com os indivíduos locais pelas unidades de habitat disponível (Etienne 2005).
+
+Para calcular m a partir do desvio padrão (sd) da função de dispersão, assumimos que as áreas de amostragem são quadradas e distribuição de Laplace:
+
+$$m = sd \frac{1 - e^{-\frac{\sqrt{2} L}{sd}} }{\sqrt{2} L}$$
+
+Onde L = lado da área amostrada.
+
+I se relaciona com m por:
+
+$$ I = m (N - 1) / (1 - m)$$
+
+__ii) Parâmetros de Diversidade__
+
+Para cada U calculamos o respectivo theta por:
+
+$$ \theta = U  (J_M - 1) / (1 - U) $$
+Onde $J_M$ é o número de indivíduos na paisagem e é igual ao produto da área do recorte de paisagem em hectares( 500), DA e porcentagem de unidade de habitat na paisagem (p)
+
+### Desenho Experimental
+
+__i) Sítios de amostragem__
+
+80 sítios de amostragem: 1 SAD observada e 1 matriz de paisagem por sítio
+
+__ii) Predições__
+
+_Modelo Neutro Espacialmente Explícito (EE)_
+
+Para cada combinação de parâmetros U e d, a respectiva matriz de paisagem e o modelo descrito por Rosindell et al. (2008) geramos 100 SADs réplicas
+
+_Modelo Neutro Espacialmente Implícito (EI)_
+
+Para cada combinação de parâmetros $\theta$ e I e a formula de amostragem desenvolvida por Etienne (2005) geramos 100 SADs réplicas
+
+__iii) Comparação com o observado__
+
+Cada SAD réplica foi comparada com a respectiva SAD observada no teste de Kolmogorov-Smirnov (KS). O teste KS é um teste estatístico não paramétrico da hipótese nula de que dois vetores de abundância são amostras de uma mesma distribuição teórica. Contabilizamos o número de SADs réplicas em que não foi possível refutar a hipótese nula com alfa crítico de 0.05 na variável (GOF).
