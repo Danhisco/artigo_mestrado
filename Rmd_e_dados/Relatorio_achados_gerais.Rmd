@@ -198,3 +198,31 @@ __Questões__
 Qual seria k dado d, ou seja, extrapolar a relação para poder inferir qual seria k para determinadas médias de síndrome de dispersão sem precisar simular as funções de dispersão.   
 
 Utilizando a equação matemática estimada seria necessário utilizar k enquanto variável contínua.
+
+### I 
+
+Perguntas: Quais são as estimativas do parâmetro de dispersão de EI obtido em campos? Quais são os valores que simulamos?
+
+#### Gráficos Exploratórios
+
+```{r graf exp I,fig.height=10,fig.width=10}
+l_p <- vector("list",3)
+l_p[[1]] <- ggplot(df_resultados,aes(x=k,y=I)) + 
+  geom_jitter() +
+  geom_boxplot()
+l_p[[2]] <- ggplot(df_resultados,aes(x=J,y=I)) + 
+  geom_point() +
+  geom_smooth(method = "loess",se=FALSE) +
+  labs(y="")
+l_p[[3]] <- ggplot(df_resultados,aes(x=log(J),y=I)) +
+  geom_point() +
+  geom_smooth(method = "loess",se=FALSE) +
+  facet_wrap(~k,ncol = 3,scales="free")
+grid.arrange(l_p[[1]],l_p[[2]],l_p[[3]],
+             layout_matrix = rbind(c(1,1,2,2),
+                                   rep(3,4),
+                                   rep(3,4)
+                                   )
+             )
+```
+
