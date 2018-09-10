@@ -5,10 +5,63 @@ date: "9 de setembro de 2018"
 output: 
   html_document:
     toc: true
+    toc_depth: 4
 ---
 
 ```{r setup, include=FALSE} 
 knitr::opts_chunk$set(echo = FALSE, tidy = TRUE, include = TRUE, warning = FALSE,cache = TRUE)
+```
+
+```{r dados e pacotes,warning=FALSE,message=FALSE,echo=FALSE}
+# library(reshape2) # para mudar formato dos dados
+library(lattice)
+library(gridExtra)
+library(RVAideMemoire) #gráficos diagnóstico dos GLMM
+library(sjPlot) #gráficos de GLMM
+library(MuMIn) # para R^2
+# library(gridExtra)  #pacote para gráficos
+# library(ggplot2)  # idem
+library(sads)
+library(lme4) # pacote de criação dos modelos estatísticos
+# library(bblme) # pacote para comparar os modelos, seleção per se
+library(merTools) # para intervalos de previsao
+library(tidyverse)
+library(broom) # para manipular os modelos
+library(magrittr) # p escrita
+library(MASS)
+library(car)
+# library(plyr) 
+# library(dplyr) 
+df_resultados <- read_csv("/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/df_resultados.csv")
+# df_resultados %>% str
+df_resultados$MN <- factor(df_resultados$MN,levels = c("EI","EE"))
+df_resultados$SiteCode <- factor(df_resultados$SiteCode)
+df_resultados$k <- factor(df_resultados$k,levels=unique(df_resultados$k))
+# df_resultados$k %>% contrasts()
+# df_resultados$MN %>% contrasts()
+
+#### z score ###
+
+f_z <- function(x){
+  m <- base::mean(x,na.rm=TRUE)
+  sd <- sd(x,na.rm=TRUE)
+  output <- (x-m)/sd
+  return(output)
+} 
+
+df_resultados %<>% mutate(GOF.z = f_z(GOF),
+                          DA.z = f_z(DA),
+                          p.z = f_z(p),
+                          S.z = f_z(S),
+                          U.z = f_z(U),
+                          m_.z = f_z(m_),
+                          I.z = f_z(I),
+                          d.z = f_z(d),
+                          k.z0 = as.numeric(as.character(k)),
+                          k.z = f_z(k.z0))
+
+names(df_resultados)[1] <- "Site"
+
 ```
 
 ## Esquema Dos Métodos
@@ -18,7 +71,7 @@ knitr::opts_chunk$set(echo = FALSE, tidy = TRUE, include = TRUE, warning = FALSE
 i) landsat 8 => recorte de paisagem de 5 km^2 concêntrico ao sítio de amostragem (Site)
 ii) ajuste de resolução da imagem tal que: densidade de pixels = densidade de indivíduos na área amostrada (DA)  
   ii.a) portanto o lado da célula (l_cel) = 100/sqrt(DA) metros
-iii) se a porcentagem de cobertura vegetal do pixel for >= 70% => unidade de habitat; caso contrário é unidade de não habitat
+iii) se a porcentagem de cobertura vegetal do pixel for >= 70% então é unidade de habitat; caso contrário é unidade de não habitat
 iv) a comunidade local é composta de N (número de indivíduos amostrados) unidades de habitat na região central do recorte de paisagem
 
 ### Função de Dispersão
@@ -73,3 +126,75 @@ Para cada combinação de parâmetros $\theta$ e I e a formula de amostragem des
 __iii) Comparação com o observado__
 
 Cada SAD réplica foi comparada com a respectiva SAD observada no teste de Kolmogorov-Smirnov (KS). O teste KS é um teste estatístico não paramétrico da hipótese nula de que dois vetores de abundância são amostras de uma mesma distribuição teórica. Contabilizamos o número de SADs réplicas em que não foi possível refutar a hipótese nula com alfa crítico de 0.05 na variável (GOF).
+
+## Parâmetros de Dispersão
+
+### d - distância média de dispersão
+
+Perguntas: Quais as situações biológicas que estamos simulando? Em relação às médias de síndromes de dispersão em floresta intacta? E em floresta fragmentada?
+
+#### Gráficos Exploratórios
+
+```{r graf exp d, fig.width=10}
+l_p <- vector("list",2)
+l_p[[1]] <- ggplot(df_resultados,aes(x=k,y=d)) + 
+  geom_jitter() +
+  geom_boxplot()
+l_p[[2]] <- ggplot(df_resultados,aes(x=DA,y=d)) + 
+  geom_point() +
+  geom_smooth(method = "loess",se=FALSE) +
+  labs(y="")
+do.call("grid.arrange",c(l_p,ncol=2))
+```
+
+__Figura 1__ Distância média de dispersão, k (proporção de propágulos até l_cel metros da planta progenitora) e DA (densidade observada)
+
+#### Tabela de Seleção de Modelos
+
+- distribuição Gamma com função de ligação 'log'
+
+```{r selecao d}
+l_md <- vector("list",length = 4)
+names(l_md) <- c("k+DA","DA","k","1")
+l_md[[1]] <-  glmer(d ~ k + DA.z + (1|Site),family = "Gamma"(link=log),data = df_resultados)
+l_md[[2]] <-  glmer(d ~ DA.z + (1|Site),family = "Gamma"(link=log),data = df_resultados)
+l_md[[3]] <-  glmer(d ~ k + (1|Site),family = "Gamma"(link=log),data = df_resultados)
+l_md[[4]] <-  glmer(d ~ 1 + (1|Site),family = "Gamma"(link=log),data = df_resultados)
+AICctab(l_md)
+```
+
+#### Observado e predito
+
+```{r predito e observado d}
+df_reg <- broom::augment(l_md[[1]])
+df_reg %<>% mutate(predito = exp(.fitted),
+                   std.resid = .resid/sd(.resid),
+                   sqrt.std.resid = sqrt(std.resid))
+## observado e predito ##
+df_reg %>%  ggplot(aes(x=DA.z,y=d)) + geom_point() +
+  geom_line(aes(y=predito),color="red") + facet_wrap(~k,ncol=3,scales="free")
+```
+
+__Figura 2__ Distância média de dispersão (d) e o predito segundo d ~ DA.z + k + (1 | Sítio), family=Gamma(log). Os pontos são as distâncias médias estimados para o determinado percentil (k) de propágulos que permanecem até l_cel metros da planta progenitora; em vermelho o predito.
+
+#### Tabela de efeitos na escala padrão
+
+```{r effects glmm d}
+(df_effect <- data.frame(par.class = c("beta",rep("alfa",length(levels(df_resultados$k)) ) ),
+                        par.VE = c("DA.z",
+                                   paste("k=",levels(df_resultados$k),sep="")),
+                        par.value = c(exp(fixef(l_md[[1]])[13]),
+                                      exp(fixef(l_md[[1]])[1]),
+                                      exp(fixef(l_md[[1]])[2:12]-fixef(l_md[[1]])[1]))
+                        ))
+```
+
+
+#### Status
+
+Análise da variável quase completa. Problemas de convergência não permitiram estimar os intervalos de confiança das estimativas e nem o R^2 do modelo mais plausível.
+
+__Questões__
+Qual seria k dado d, ou seja, extrapolar a relação para poder inferir qual seria k para determinadas médias de síndrome de dispersão sem precisar simular as funções de dispersão.   
+
+Utilizando a equação matemática estimada seria necessário utilizar k enquanto variável contínua.
