@@ -353,7 +353,7 @@ __Figura 3.2__ U ~ k * S_class (group=Site)
 - Utilizamos então a distribuição normal e a função de ligação identidade para a seleção dos modelos
 
 ```{r graf exp logit U}
-df_resultados %<>% mutate(logit_U = log(U/(1-U)),
+df_resultados %<>% mutate(lU = log(U/(1-U)),
                           log_S.z = (log(S) - mean(log(S)))/sd(log(S)))
 
 # não estou conseguindo organizar os Sites por cobertura vegetal no plot, apenas na tabela
@@ -376,16 +376,16 @@ _Tabela de Seleção de Variáveis para descrever logito de U_
 ```{r tabela de selecao logito U}
 l_md <- vector("list",length=10)
 names(l_md) <- c("p * k + S", "p + k + S", "p + S", "k + S", "S", "p * k", "p + k", "p", "k", "1")
-l_md[[1]] <- lmer(logit_U ~ p.z * k + log_S.z + (1 | Site), data = df_resultados)
-l_md[[2]] <- lmer(logit_U ~ p.z + k + log_S.z + (1 | Site), data = df_resultados)
-l_md[[3]] <- lmer(logit_U ~ p.z + log_S.z + (1 | Site), data = df_resultados)
-l_md[[4]] <- lmer(logit_U ~ k + log_S.z + (1 | Site), data = df_resultados)
-l_md[[5]] <- lmer(logit_U ~ log_S.z + (1 | Site), data = df_resultados)
-l_md[[6]] <- lmer(logit_U ~ p.z * k + (1 | Site), data = df_resultados)
-l_md[[7]] <- lmer(logit_U ~ p.z + k + (1 | Site), data = df_resultados)
-l_md[[8]] <- lmer(logit_U ~ p.z + (1 | Site), data = df_resultados)
-l_md[[9]] <- lmer(logit_U ~ k + (1 | Site), data = df_resultados)
-l_md[[10]] <- lmer(logit_U ~ 1 + (1 | Site), data = df_resultados)
+l_md[[1]] <- lmer(lU ~ p.z * k + log_S.z + (1 | Site), data = df_resultados)
+l_md[[2]] <- lmer(lU ~ p.z + k + log_S.z + (1 | Site), data = df_resultados)
+l_md[[3]] <- lmer(lU ~ p.z + log_S.z + (1 | Site), data = df_resultados)
+l_md[[4]] <- lmer(lU ~ k + log_S.z + (1 | Site), data = df_resultados)
+l_md[[5]] <- lmer(lU ~ log_S.z + (1 | Site), data = df_resultados)
+l_md[[6]] <- lmer(lU ~ p.z * k + (1 | Site), data = df_resultados)
+l_md[[7]] <- lmer(lU ~ p.z + k + (1 | Site), data = df_resultados)
+l_md[[8]] <- lmer(lU ~ p.z + (1 | Site), data = df_resultados)
+l_md[[9]] <- lmer(lU ~ k + (1 | Site), data = df_resultados)
+l_md[[10]] <- lmer(lU ~ 1 + (1 | Site), data = df_resultados)
 # selecao #
 AICctab(l_md, weights = TRUE)
 ```
