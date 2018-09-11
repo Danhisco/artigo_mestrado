@@ -105,11 +105,13 @@ Para calcular m a partir do desvio padrão (sd) da função de dispersão, assum
 
 $$m = sd \frac{1 - e^{-\frac{\sqrt{2} L}{sd}} }{\sqrt{2} L}$$
 
-Onde L = lado da área amostrada.
+Onde L = lado da área amostrada. Para corrigir essa equação para paisagens não homogêneas (fragmentadas) utilizamos uma correção de valor:
 
-I se relaciona com m por:
+$$m' = \frac{mp}{1 - (1-p)m} $$
 
-$$ I = m (N - 1) / (1 - m)$$
+Para criar as predições do modelo EI utilizamos a formula de amostragem de Etienne (2005) que utiliza o parâmetro I ao invés de m. I se relaciona com m por:
+
+$$ I = m (J - 1) / (1 - m)$$
 
 __ii) Parâmetros de Diversidade__
 
@@ -527,3 +529,118 @@ ggplot(df_resultados,aes(x=log(J/JM),y=theta)) +
 ```
 
 __Figura 1.2.3__ theta ~ log(J/JM) * k
+
+#### Status
+
+- análise da variável não foi iniciada;
+
+
+## Comparação da predição com o observado (GOF)
+
+### Gráficos exploratórios
+
+#### Efeitos indivíduais das variáveis de interesse
+
+- 3 variáveis de interesse: p, k e MN (classe de modelo neutro)
+
+```{r graf exp GOF 1, fig.width=10,fig.height=4}
+l_p <- vector("list",3)
+l_p[[1]] <- ggplot(df_resultados,aes(x=p,y=GOF)) +
+  geom_point() +
+  geom_smooth(method = "loess",se=FALSE)
+l_p[[2]] <- ggplot(df_resultados,aes(x=k,y=GOF)) +
+  geom_jitter() +
+  geom_boxplot() + labs(y="")
+l_p[[3]] <- ggplot(df_resultados,aes(x=MN,y=GOF)) +
+  geom_jitter() +
+  geom_boxplot() + labs(y="")
+do.call("grid.arrange",c(l_p,ncol=3))
+```
+
+__Figura 1__ GOF e variáveis de interesse p, k ,MN
+
+#### Possíveis interações entre as variáveis
+
+```{r graf exp GOF 21}
+ggplot(df_resultados,aes(x=p,y=GOF)) +
+  geom_point() +
+  geom_smooth(method = "loess",se=FALSE) +
+  facet_wrap(~k,ncol=3) +
+  labs(title="~ p * k")
+```
+
+__Figura 2.1__ GOF ~ p * k
+
+```{r graf exp GOF 22, fig.height=3.5}
+ggplot(df_resultados,aes(x=p,y=GOF)) +
+  geom_point() +
+  geom_smooth(method = "loess",se=FALSE) +
+  facet_wrap(~MN,ncol=2) +
+  labs(title="~ p * MN")
+```
+
+__Figura 2.2__ GOF ~ p * MN
+
+```{r graf exp GOF 23}
+ggplot(df_resultados,aes(x=MN,y=GOF)) +
+  geom_jitter() +
+  geom_boxplot() +
+  facet_wrap(~k,ncol=3) +
+  labs(title="~ MN * k")
+```
+
+__Figura 2.3__ GOF ~ MN * K
+
+```{r graf exp GOF 24}
+print(
+    ggplot(df_resultados,aes(x=p,y=GOF,color=MN)) +
+      geom_point() +
+      geom_smooth(method = "loess",se=FALSE) +
+      facet_wrap(~k,ncol=3) +
+      labs(title="~ p * k * MN") +
+      scale_colour_manual(values = c("Blue", "Red"))
+)
+```
+
+__Figura 2.4__ GOF ~ p * k * MN
+
+
+### Resultados da dissertação
+
+- na dissertação não haviamos gerados os dados para EI
+- assim há duas variáveis de interesse nestas análises: p e k
+- k foi interpretada como variável contínua
+
+#### Seleção de Modelos GOF
+
+```{r tabela selecao GOF}
+df_ad <- df_resultados %>% filter(MN == "EE")
+l_md1 <- vector("list", length = 5)
+names(l_md1) <- c("p * K", "p + K", "K", "p" ,"1")
+l_md1[[1]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k.z + (k.z | Site), 
+                    family = "binomial", data = df_ad)
+l_md1[[2]] <- glmer(cbind(GOF,100-GOF) ~ p.z + k.z + (k.z | Site),
+                    family = "binomial", data = df_ad)
+l_md1[[3]] <- glmer(cbind(GOF,100-GOF) ~ k.z + (k.z | Site),
+                    family = "binomial", data = df_ad)
+l_md1[[4]] <- glmer(cbind(GOF,100-GOF) ~ p.z + (k.z | Site),
+                    family = "binomial", data = df_ad)
+l_md1[[5]] <- glmer(cbind(GOF,100-GOF) ~ 1 + (k.z | Site),
+                    family = "binomial", data = df_ad)
+AICctab(l_md1, weights = TRUE)
+```
+
+#### R2 dos modelos 
+
+__R2 marginal e condicional__
+
+```{r R2 m e c, warning=FALSE,message=FALSE}
+(r2_GOF <- sapply(l_md1, r.squaredGLMM))
+```
+
+__Porcentagem explicada pelos efeitos fixos__
+
+```{r porcentagem R2}
+(r2_GOF[1,]/r2_GOF[2,] * 100) %>% round(3) 
+```
+
