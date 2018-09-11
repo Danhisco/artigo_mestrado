@@ -5,7 +5,7 @@ date: "9 de setembro de 2018"
 output: 
   html_document:
     toc: true
-    toc_depth: 4
+    toc_depth: 5
 ---
 
 ```{r setup, include=FALSE} 
@@ -13,25 +13,16 @@ knitr::opts_chunk$set(echo = FALSE, tidy = TRUE, include = TRUE, warning = FALSE
 ```
 
 ```{r dados e pacotes,warning=FALSE,message=FALSE,echo=FALSE}
-# library(reshape2) # para mudar formato dos dados
-library(lattice)
 library(gridExtra)
-library(RVAideMemoire) #gráficos diagnóstico dos GLMM
-library(sjPlot) #gráficos de GLMM
 library(MuMIn) # para R^2
-# library(gridExtra)  #pacote para gráficos
-# library(ggplot2)  # idem
 library(sads)
 library(lme4) # pacote de criação dos modelos estatísticos
-# library(bblme) # pacote para comparar os modelos, seleção per se
 library(merTools) # para intervalos de previsao
 library(tidyverse)
 library(broom) # para manipular os modelos
 library(magrittr) # p escrita
-library(MASS)
-library(car)
-# library(plyr) 
-# library(dplyr) 
+# library(plyr)
+# library(dplyr)
 df_resultados <- read_csv("/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/df_resultados.csv")
 # df_resultados %>% str
 df_resultados$MN <- factor(df_resultados$MN,levels = c("EI","EE"))
@@ -72,7 +63,7 @@ i) landsat 8 => recorte de paisagem de 5 km^2 concêntrico ao sítio de amostrag
 ii) ajuste de resolução da imagem tal que: densidade de pixels = densidade de indivíduos na área amostrada (DA)  
   ii.a) portanto o lado da célula (l_cel) = 100/sqrt(DA) metros
 iii) se a porcentagem de cobertura vegetal do pixel for >= 70% então é unidade de habitat; caso contrário é unidade de não habitat
-iv) a comunidade local é composta de N (número de indivíduos amostrados) unidades de habitat na região central do recorte de paisagem
+iv) a comunidade local é composta de J (número de indivíduos amostrados) unidades de habitat na região central do recorte de paisagem
 
 ### Função de Dispersão
 
@@ -224,5 +215,196 @@ grid.arrange(l_p[[1]],l_p[[2]],l_p[[3]],
                                    rep(3,4)
                                    )
              )
+```
+
+__Figura 1__ Gráficos Exploratórios de I, k e J (número de indivíduos amostrado)
+
+#### Status
+
+Não iniciei a análise da variável.
+
+## Parâmetros de Diversidade
+
+### U - taxa de especiação
+
+#### Gráficos Exploratórios 
+
+##### Efeitos fixos indivíduais
+
+
+```{r graf exp U 1,fig.width=12,fig.height=5}
+l_p <- vector("list",3)
+l_p[[1]] <- ggplot(df_resultados,aes(x=k,y=U)) +
+  geom_jitter() +
+  geom_boxplot()
+l_p[[2]] <- ggplot(df_resultados,aes(x=p,y=U)) +
+  geom_point() +
+  geom_smooth(method = "loess",se=FALSE) +
+  labs(y="")
+l_p[[3]] <- ggplot(df_resultados,aes(x=S,y=U)) +
+  geom_point() +
+  geom_smooth(method = "loess",se=FALSE) +
+  labs(y="")
+do.call("grid.arrange",c(l_p,ncol=3))
+```
+
+__Figura 1__ Taxa de especiação, k, p e S
+
+##### Interações efeitos fixos
+
+
+```{r graf exp U 21}
+ggplot(df_resultados,aes(x=p,y=U)) +
+  geom_point() +
+  geom_smooth(method = "loess",se=FALSE) +
+  facet_wrap(~k,ncol = 3) +
+  labs(title=" ~ k * p")
+```
+
+__Figura 2.1__ U ~ k * p
+
+```{r graf exp U 22}
+ggplot(df_resultados,aes(x=S,y=U)) +
+  geom_point() +
+  geom_smooth(method = "loess",se=FALSE) +
+  facet_wrap(~k,ncol = 3) +
+  labs(title=" ~ k * S")
+```
+
+__Figura 2.2__ U ~ k * S
+
+
+```{r graf exp 23}
+ggplot(df_resultados,aes(x=p,y=U)) +
+  geom_point(aes(color=S.z)) +
+  scale_color_gradient2() +
+  facet_wrap(~k,ncol=3) +
+  labs(title="~ k * p + S")
+```
+
+__Figura 2.3__ U ~ k * p + S
+
+- Achei estranho que há valores de U baixos para altos valores de S
+- Então pensei em um possível efeito do tamanho amostral: quanto maior J maior a árvore genealógica da comunidade [sob hipótese de monodominância] e assim menor a probabilidade média de imigração necessária para gerar uma mesma riqueza observada
+- O tamanho da metacomunidade ao redor pode ter o mesmo efeito, esse efeito pode ser expresso em termos de relação de J/J_M pois considera-se a coalescência apenas da área amostral e não da paisagem
+
+
+```{r graf exp U 24}
+df_resultados %<>% mutate(J_M = p * DA * 500)
+l_p <- vector("list",4)
+l_p[[1]] <- ggplot(df_resultados,aes(x=J,y=U)) +
+  geom_point()
+l_p[[2]] <- ggplot(df_resultados,aes(x=log(J),y=U)) +
+  geom_point() +
+  labs(y="")
+l_p[[3]] <- ggplot(df_resultados,aes(x=J/J_M,y=U)) +
+  geom_point()
+l_p[[4]] <- ggplot(df_resultados,aes(x=log(J/J_M),y=U)) +
+  geom_point() + 
+  labs(y="")
+do.call("grid.arrange",c(l_p,ncol=2))
+```
+
+__Figura 2.4__ U, J e J/J_M em escala padrão e log
+
+-Parece que há um efeito de log(J), contudo, há correlação entre as variáveis empíricas p, S e J:
+
+```{r graf exp 25,fig.width=10,fig.height=4}
+l_p <- vector("list",3)
+l_p[[1]] <- ggplot(df_resultados,aes(x=p,y=S)) + geom_point()
+l_p[[2]] <- ggplot(df_resultados,aes(x=p,y=J)) + geom_point()
+l_p[[3]] <- ggplot(df_resultados,aes(x=J,y=S)) + geom_point()
+do.call("grid.arrange",c(l_p,ncol=3))
+```
+
+__Figura 2.5__ Relação entre co-variáveis empíricas S, J e p
+
+- Na análise de U consideramos o efeito de S, mas não de J. Eu acredito que vale a investigação se os dois outliers de J (J>5000) não podem estar influênciando muito as estimativas
+
+
+##### Efeitos aleatórios
+
+
+```{r graf exp 31, fig.height=5.75}
+df_resultados %>% mutate(p_class = cut(p,12)) %>% ggplot(aes(x=k,y=U,group=Site)) +
+  geom_line(aes(color=Site)) +
+  # scale_colour_gradient2() +
+  theme(legend.position = "none") +
+  labs(title="~p_class") +
+  facet_wrap(~p_class,ncol=3,scales="free")
+```
+
+__Figura 3.1__ U ~ k * p_class (group=Site)
+
+```{r graf exp 32, fig.height=5.75}
+df_resultados %>% mutate(S_class = cut(S,9)) %>% ggplot(aes(x=k,y=U,group=Site)) +
+  geom_line(aes(color=Site)) +
+  facet_wrap(~S_class,ncol=3,scales="free") +
+  theme(legend.position = "none") +
+  labs(title="~S_class")
+```
+
+
+__Figura 3.2__ U ~ k * S_class (group=Site)
+
+#### Resultados da dissertação
+
+- Para modelar U aplicamos a transformação logito
+- Utilizamos então a distribuição normal e a função de ligação identidade para a seleção dos modelos
+
+```{r graf exp logit U}
+df_resultados %<>% mutate(logit_U = log(U/(1-U)),
+                          log_S.z = (log(S) - mean(log(S)))/sd(log(S)))
+
+# não estou conseguindo organizar os Sites por cobertura vegetal no plot, apenas na tabela
+
+# arrange(df_resultados,p) %>%
+#   ggplot(aes(x=Site,y=logit_U)) +
+#   geom_boxplot() +
+#   geom_point() +
+#   coord_flip() +
+#   labs(x="Fragmento Florestal", y="Logito taxa de especiação necessária para manter a riqueza observada")
+```
+<!--
+__Figura 1__ Logito de U para cada sítio de amostragem ordenado da maior cobertura para a menor
+-->
+
+##### Tabela de Seleção e R2
+
+_Tabela de Seleção de Variáveis para descrever logito de U_
+
+```{r tabela de selecao logito U}
+l_md <- vector("list",length=10)
+names(l_md) <- c("p * k + S", "p + k + S", "p + S", "k + S", "S", "p * k", "p + k", "p", "k", "1")
+l_md[[1]] <- lmer(logit_U ~ p.z * k + log_S.z + (1 | Site), data = df_resultados)
+l_md[[2]] <- lmer(logit_U ~ p.z + k + log_S.z + (1 | Site), data = df_resultados)
+l_md[[3]] <- lmer(logit_U ~ p.z + log_S.z + (1 | Site), data = df_resultados)
+l_md[[4]] <- lmer(logit_U ~ k + log_S.z + (1 | Site), data = df_resultados)
+l_md[[5]] <- lmer(logit_U ~ log_S.z + (1 | Site), data = df_resultados)
+l_md[[6]] <- lmer(logit_U ~ p.z * k + (1 | Site), data = df_resultados)
+l_md[[7]] <- lmer(logit_U ~ p.z + k + (1 | Site), data = df_resultados)
+l_md[[8]] <- lmer(logit_U ~ p.z + (1 | Site), data = df_resultados)
+l_md[[9]] <- lmer(logit_U ~ k + (1 | Site), data = df_resultados)
+l_md[[10]] <- lmer(logit_U ~ 1 + (1 | Site), data = df_resultados)
+# selecao #
+AICctab(l_md, weights = TRUE)
+```
+
+_R2 marginal e condicional da seleção de modelos_
+
+-pelo método de Nakagawa & Schielzeth (2013)
+
+```{r R2 logito U}
+# R2 marginal e condicional #
+(r2_U <- sapply(l_md, r.squaredGLMM))
+```
+
+_Porcentagem da variância explicada pelos efeitos fixos_
+
+- R2m / R2c
+
+```{r porcentagem da variancia explicada efeitos fixos}
+# porcentagem de variância explicada pelo modelo #
+r2_U[1,]/r2_U[2,]
 ```
 
