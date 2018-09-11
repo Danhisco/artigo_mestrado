@@ -57,6 +57,26 @@ names(df_resultados)[1] <- "Site"
 
 ## Esquema Dos Métodos
 
+### Desenho Experimental
+
+__i) Sítios de amostragem__
+
+80 sítios de amostragem; amostragem de indivíduos arbóreos com DBH >= 5cm em bloco único; coordenada central do sítio de amostragem
+
+__ii) Predições__
+
+_Modelo Neutro Espacialmente Explícito (EE)_
+
+Para cada combinação de parâmetros U e d, a respectiva matriz de paisagem e o modelo descrito por Rosindell et al. (2008) geramos 100 SADs réplicas
+
+_Modelo Neutro Espacialmente Implícito (EI)_
+
+Para cada combinação de parâmetros $\theta$ e I e a formula de amostragem desenvolvida por Etienne (2005) geramos 100 SADs réplicas
+
+__iii) Comparação com o observado__
+
+Cada SAD réplica foi comparada com a respectiva SAD observada no teste de Kolmogorov-Smirnov (KS). O teste KS é um teste estatístico não paramétrico da hipótese nula de que dois vetores de abundância são amostras de uma mesma distribuição teórica. Contabilizamos o número de SADs réplicas em que não foi possível refutar a hipótese nula com alfa crítico de 0.05 na variável (GOF).
+
 ### Matriz de Paisagem
 
 i) landsat 8 => recorte de paisagem de 5 km^2 concêntrico ao sítio de amostragem (Site)
@@ -98,25 +118,6 @@ Para cada U calculamos o respectivo theta por:
 $$ \theta = U  (J_M - 1) / (1 - U) $$
 Onde $J_M$ é o número de indivíduos na paisagem e é igual ao produto da área do recorte de paisagem em hectares( 500), DA e porcentagem de unidade de habitat na paisagem (p)
 
-### Desenho Experimental
-
-__i) Sítios de amostragem__
-
-80 sítios de amostragem: 1 SAD observada e 1 matriz de paisagem por sítio
-
-__ii) Predições__
-
-_Modelo Neutro Espacialmente Explícito (EE)_
-
-Para cada combinação de parâmetros U e d, a respectiva matriz de paisagem e o modelo descrito por Rosindell et al. (2008) geramos 100 SADs réplicas
-
-_Modelo Neutro Espacialmente Implícito (EI)_
-
-Para cada combinação de parâmetros $\theta$ e I e a formula de amostragem desenvolvida por Etienne (2005) geramos 100 SADs réplicas
-
-__iii) Comparação com o observado__
-
-Cada SAD réplica foi comparada com a respectiva SAD observada no teste de Kolmogorov-Smirnov (KS). O teste KS é um teste estatístico não paramétrico da hipótese nula de que dois vetores de abundância são amostras de uma mesma distribuição teórica. Contabilizamos o número de SADs réplicas em que não foi possível refutar a hipótese nula com alfa crítico de 0.05 na variável (GOF).
 
 ## Parâmetros de Dispersão
 
@@ -464,3 +465,65 @@ Falta atualizar o método de obtenção do R2m e R2c e recuperar/revisar o texto
 _Questões_
 
 a) Quando a hipótese de equilíbrio é válida? E quando não for ainda é uma boa aproximação utilizar U como taxa de extinção de espécies raras? O quê é uma espécie rara?
+
+
+### Theta
+
+#### Gráficos Exploratórios 
+
+- theta é uma função de U e J_M (que por sua vez é uma função de p e DA)
+- no modelo EI se pressupõem que J_M >> J, o quê para paisagens finitas e fragmentadas pode não ser uma boa aproximação
+- assim, além de avaliar as variáveis de interesse (p e k) vou também avaliar o efeito de: J e J_M, S (uma vez que é uma função de U)
+
+##### Possíveis Variáveis de interesse
+
+```{r graf exp theta 11,fig.height=6,fig.width=9}
+df_resultados %<>% mutate(JM = p * DA * 500, theta = U * (JM - 1)/(1-U))
+l_p <- vector("list",6)
+l_p[[1]] <- ggplot(df_resultados,aes(x=S,y=theta)) +
+  geom_point() + geom_smooth(method="loess",se=FALSE)
+l_p[[2]] <- ggplot(df_resultados,aes(x=k,y=theta)) + 
+  geom_jitter() + geom_boxplot() + labs(y="")
+l_p[[3]] <- ggplot(df_resultados,aes(x=p,y=theta)) + 
+  geom_point() + geom_smooth(method="loess",se=FALSE) + labs(y="")
+l_p[[4]] <- ggplot(df_resultados,aes(x=JM,y=theta)) +
+  geom_point() + geom_smooth(method="loess",se=FALSE)
+l_p[[5]] <- ggplot(df_resultados,aes(x=log(J),y=theta)) +
+  geom_point() + geom_smooth(method="loess",se=FALSE) + labs(y="")
+l_p[[6]] <- ggplot(df_resultados,aes(x=log(J/JM),y=theta)) +
+  geom_point() + geom_smooth(method="loess",se=FALSE) + labs(y="")
+do.call("grid.arrange",c(l_p,ncol=3))
+```
+
+__Figura 1.1__ Theta e possíveis variáveis variáveis de intresse
+
+
+##### Interação entre variáveis
+
+```{r graf exp tehta 121}
+ggplot(df_resultados,aes(x=p,y=theta)) + 
+  geom_point() + geom_smooth(method="loess",se=FALSE) +
+  facet_wrap(~k,ncol=3) +
+  labs(title = "~ p * k")
+```
+
+__Figura 1.2.1__ theta ~ p * k
+
+
+```{r graf exp tehta 122}
+ggplot(df_resultados,aes(x=S,y=theta)) + 
+  geom_point() + geom_smooth(method="loess",se=FALSE) +
+  facet_wrap(~k,ncol=3) +
+  labs(title = "~ S * k")
+```
+
+__Figura 1.2.2__ theta ~ S * k
+
+```{r graf exp tehta 123}
+ggplot(df_resultados,aes(x=log(J/JM),y=theta)) + 
+  geom_point() + geom_smooth(method="loess",se=FALSE) +
+  facet_wrap(~k,ncol=3) +
+  labs(title = "~ log(J/JM) * k")
+```
+
+__Figura 1.2.3__ theta ~ log(J/JM) * k
