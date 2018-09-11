@@ -354,7 +354,7 @@ __Figura 3.2__ U ~ k * S_class (group=Site)
 
 ```{r graf exp logit U}
 df_resultados %<>% mutate(lU = log(U/(1-U)),
-                          log_S.z = (log(S) - mean(log(S)))/sd(log(S)))
+                          lS.z = (log(S) - mean(log(S)))/sd(log(S)))
 
 # não estou conseguindo organizar os Sites por cobertura vegetal no plot, apenas na tabela
 
@@ -376,11 +376,11 @@ _Tabela de Seleção de Variáveis para descrever logito de U_
 ```{r tabela de selecao logito U}
 l_md <- vector("list",length=10)
 names(l_md) <- c("p * k + S", "p + k + S", "p + S", "k + S", "S", "p * k", "p + k", "p", "k", "1")
-l_md[[1]] <- lmer(lU ~ p.z * k + log_S.z + (1 | Site), data = df_resultados)
-l_md[[2]] <- lmer(lU ~ p.z + k + log_S.z + (1 | Site), data = df_resultados)
-l_md[[3]] <- lmer(lU ~ p.z + log_S.z + (1 | Site), data = df_resultados)
-l_md[[4]] <- lmer(lU ~ k + log_S.z + (1 | Site), data = df_resultados)
-l_md[[5]] <- lmer(lU ~ log_S.z + (1 | Site), data = df_resultados)
+l_md[[1]] <- lmer(lU ~ p.z * k + lS.z + (1 | Site), data = df_resultados)
+l_md[[2]] <- lmer(lU ~ p.z + k + lS.z + (1 | Site), data = df_resultados)
+l_md[[3]] <- lmer(lU ~ p.z + lS.z + (1 | Site), data = df_resultados)
+l_md[[4]] <- lmer(lU ~ k + lS.z + (1 | Site), data = df_resultados)
+l_md[[5]] <- lmer(lU ~ lS.z + (1 | Site), data = df_resultados)
 l_md[[6]] <- lmer(lU ~ p.z * k + (1 | Site), data = df_resultados)
 l_md[[7]] <- lmer(lU ~ p.z + k + (1 | Site), data = df_resultados)
 l_md[[8]] <- lmer(lU ~ p.z + (1 | Site), data = df_resultados)
@@ -392,7 +392,7 @@ AICctab(l_md, weights = TRUE)
 
 _R2 marginal e condicional da seleção de modelos_
 
--pelo método de Nakagawa & Schielzeth (2013)
+- pelo método de Nakagawa & Schielzeth (2013)
 
 ```{r R2 logito U}
 # R2 marginal e condicional #
@@ -408,3 +408,59 @@ _Porcentagem da variância explicada pelos efeitos fixos_
 r2_U[1,]/r2_U[2,]
 ```
 
+##### Predito e Intervalo de Confiança
+
+```{r predito e IC modelo U, fig.height=7}
+## Uma regressao entre log_S.z e pz ##
+lm1 <- lm(lS.z ~ p.z, data=df_resultados[duplicated(df_resultados$Site),]) # estima relacao linear entre log S e p.z
+cf1 <- unname(coef(lm1)) ## guarda os coeficientes dessa regressao para usar no bootstrap
+
+## Intervalo de Confiança Bootstrap ##
+# novo conjunto de dados
+df_newdat <- expand.grid(Site=df_resultados$Site[1], 
+                         k=unique(df_resultados$k), 
+                         p.z = seq(min(df_resultados$p.z)*1.1,max(df_resultados$p.z)*1.1, length=50))
+# Adiciona a média de log(S) padronizado para cada cobertura, estimado pela regrassao Sxp
+df_newdat %<>% mutate(lS.z = cf1[1] + cf1[2]*p.z) %>% as.data.frame()
+## Passo 2: crie as função que devem ser calculadas dos modelos a cada simulação
+## Previstos por efeitos fixos e aleatórios
+f1 <- function(.) predict(., newdata=df_newdat)
+## Previstos por efeitos fixos (argumento re.form=~0)
+f2 <- function(.) predict(., newdata=df_newdat, re.form=~0)
+## Os dois bootstraps. Ajuste o argumento ncpus para o numero de cores de seu computador
+md_U <- l_md[["p * k + S"]]
+b3 <- bootMer(md_U, FUN = f1, nsim=1000, parallel="multicore", ncpus=2)
+b4 <- bootMer(md_U, FUN = f2, nsim=1000, parallel="multicore", ncpus=2)
+## calcula as médias e intervalos de confiança quantílicos para cada combinação de preditoras
+## no novo conjunto de dados
+df_newdat$p <- df_newdat$p.z*sd(df_resultados$p) + mean(df_resultados$p)
+df_newdat$mean <- apply(b3$t,2,mean)
+df_newdat$IC.low <- apply(b3$t,2,quantile, 0.025)
+df_newdat$IC.upp <- apply(b3$t,2,quantile, 0.975)
+df_newdat$mean.fixed <- apply(b4$t,2,mean)
+df_newdat$IC.low.fixed <- apply(b4$t,2,quantile, 0.025)
+df_newdat$IC.upp.fixed <- apply(b4$t,2,quantile, 0.975)
+
+## Plots de logito(U) x cobertura standardizada com intervalos de predição ##
+## PI: note que a incerteza total diminuiu um pouco com a adicao da riqueza ao modelo
+## (as faixas cinza claro são mais largas em sua figura antiga, que nao tinha este efeito)
+df_resultados %>%
+  ggplot(aes(x=p,y=lU)) + 
+  geom_ribbon(aes(y = mean, ymin=IC.low, ymax=IC.upp), data=df_newdat, col="gray", alpha=0.5) +
+  geom_ribbon(aes(y=mean, ymin=IC.low.fixed, ymax=IC.upp.fixed), data=df_newdat, col="gray", alpha=0.5) +
+  geom_line(aes(x=p, y=mean.fixed), data=df_newdat) +
+  geom_point() +
+  labs(x="% cobertura vegetal", y = "logito(U)") +
+  facet_wrap(~k,ncol=3)
+```
+
+__Figura 1__ Logito de U pela porcentagem de cobertura vegetal. A linha é a estimativa da tendência, a região cinza mais escuro corresponde ao intervalo de confiança dos efeitos fixos e a região cinza mais clara o intervalo de confiança considerando todo o modelo. 
+
+
+##### Status
+
+Falta atualizar o método de obtenção do R2m e R2c e recuperar/revisar o texto da dissertação dessa sessão
+
+_Questões_
+
+a) Quando a hipótese de equilíbrio é válida? E quando não for ainda é uma boa aproximação utilizar U como taxa de extinção de espécies raras? O quê é uma espécie rara?
