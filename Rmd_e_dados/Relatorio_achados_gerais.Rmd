@@ -118,7 +118,10 @@ __ii) Parâmetros de Diversidade__
 Para cada U calculamos o respectivo theta por:
 
 $$ \theta = U  (J_M - 1) / (1 - U) $$
-Onde $J_M$ é o número de indivíduos na paisagem e é igual ao produto da área do recorte de paisagem em hectares( 500), DA e porcentagem de unidade de habitat na paisagem (p)
+Onde $J_M$ é o número de indivíduos na paisagem:
+
+$$ J_M = 500 p DA $$
+500 é área do recorte de paisagem em hectares
 
 
 ## Parâmetros de Dispersão
@@ -459,6 +462,12 @@ df_resultados %>%
 
 __Figura 1__ Logito de U pela porcentagem de cobertura vegetal. A linha é a estimativa da tendência, a região cinza mais escuro corresponde ao intervalo de confiança dos efeitos fixos e a região cinza mais clara o intervalo de confiança considerando todo o modelo. 
 
+##### Sumário do modelo mais plausível
+
+```{r sumario de md U}
+summary(l_md[[1]])
+```
+
 
 ##### Status
 
@@ -604,6 +613,27 @@ print(
 
 __Figura 2.4__ GOF ~ p * k * MN
 
+```{r gra exp logito GOF 25}
+## remoção de 0 e 100 ##
+df_ad <- df_resultados
+df_ad$GOF[df_ad$GOF==0] <- 0.01
+df_ad$GOF[df_ad$GOF==100] <- 99.99
+## transformação logito ##
+df_ad %<>% mutate(lGOF = log((GOF/100)/(1-(GOF/100)) ))
+# df_ad$lGOF %>% summary
+## gráfico ##
+print(
+    ggplot(df_ad,aes(x=p,y=lGOF,color=MN)) +
+      geom_point() +
+      geom_smooth(method = "loess",se=FALSE) +
+      facet_wrap(~k,ncol=3) +
+      labs(title="~ p * k * MN") +
+      scale_colour_manual(values = c("Blue", "Red"))
+)
+```
+
+
+__Figura 2.5__ Logito GOF ~ p * k * MN
 
 ### Resultados da dissertação
 
@@ -630,17 +660,69 @@ l_md1[[5]] <- glmer(cbind(GOF,100-GOF) ~ 1 + (k.z | Site),
 AICctab(l_md1, weights = TRUE)
 ```
 
+#### Sumário do modelo de GOF
+
+```{r sumario de GOF}
+summary(l_md1[[1]])
+```
+
+
 #### R2 dos modelos 
 
 __R2 marginal e condicional__
 
 ```{r R2 m e c, warning=FALSE,message=FALSE}
-(r2_GOF <- sapply(l_md1, r.squaredGLMM))
+# (r2_GOF <- sapply(l_md1, r.squaredGLMM))
 ```
 
 __Porcentagem explicada pelos efeitos fixos__
 
 ```{r porcentagem R2}
-(r2_GOF[1,]/r2_GOF[2,] * 100) %>% round(3) 
+# (r2_GOF[1,]/r2_GOF[2,] * 100) %>% round(3) 
 ```
 
+
+#### Predito e Intervalo de Confiança
+
+Para plotar é necessário transformar da escala da predição, escala logito, para a escala padrão
+
+```{r estimativa e intervalo de confianaca bootstrap}
+# md_GOF <- l_md1[[1]] # modelo mais plausível de GOF
+# ## novo conjunto de dados ##
+# # objetivo: criar todas as combinações entre as preditoras
+# df_newdat <- expand.grid(Site = df_ad$Site[1],
+#                          k.z = unique(df_ad$k.z),
+#                          p.z = seq(min(df_ad$p.z)*1.1,max(df_ad$p.z)*1.1, length=50)) 
+# ## Funçoes a serem calculadas a cada simulação ##
+# # previsto considerando a estrutura fixa e aleatória #
+# f1 <- function(.) predict(.,newdata=df_newdat)
+# # previsto considerando a estrutura fixa #
+# f2 <- function(.) predict(.,newdata=df_newdat, re.form=~0)
+# ## Os dois bootstraps. Ajuste o argumento ncpus para o numero de cores de seu computador
+# b1 <- bootMer(md_GOF, FUN = f1, nsim=1000, parallel="multicore", ncpus=3)
+# b2 <- bootMer(md_GOF, FUN = f2, nsim=1000, parallel="multicore", ncpus=3)
+# ## calcula as médias e intervalos de confiança quantílicos para cada combinação de preditoras
+# ## no novo conjunto de dados
+# df_newdat$p <- df_newdat$p.z*sd(df_ad$p) + mean(df_ad$p)
+# df_newdat$mean <- apply(b1$t,2,mean)
+# df_newdat$IC.low <- apply(b1$t,2,quantile, 0.025)
+# df_newdat$IC.upp <- apply(b1$t,2,quantile, 0.975)
+# df_newdat$mean.fixed <- apply(b2$t,2,mean)
+# df_newdat$IC.low.fixed <- apply(b2$t,2,quantile, 0.025)
+# df_newdat$IC.upp.fixed <- apply(b2$t,2,quantile, 0.975)
+# ## Plots de GOF/100 x cobertura standardizada com intervalos de predição
+# df_ad %>%
+#     ggplot(aes(x=p,y=GOF/100) ) + 
+#     geom_ribbon(aes(y=mean, ymin=IC.low, ymax=IC.upp), data=df_newdat, col="gray", alpha=0.5) +
+#     geom_ribbon(aes(y=mean, ymin=IC.low.fixed, ymax=IC.upp.fixed), data=df_newdat, col="gray", alpha=0.5) +
+#     geom_line(aes(x=p, y=mean.fixed), data=df_newdat) +
+#     geom_point() +
+#     facet_wrap(~k.z)
+# df_ad$GOF %>% summary
+```
+
+__Figura 1__ 
+
+### Status
+
+- desenvolver a análise dos dados com o conjunto de dados do modelo EI
