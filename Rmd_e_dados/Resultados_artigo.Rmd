@@ -278,7 +278,7 @@ Com isso obtive o erro: 'converge code:0; Model is nearly unidentifiable: very l
 - a transformação z de DA deveria ser o suficiente para lidar com problemas relacionados com escalamento de variáveis; a outra variável explanatória é categórica.
 - vou continuar o estudo com esse modelo como global
 
-_Tabela Selecao de variaveis esplanatorias para descrever 'd'_
+_Tabela Selecao de variaveis para descrever 'd'_
 
 ```{r selecao d}
 l_md <- vector("list",length = 4)
@@ -300,7 +300,7 @@ O modelo global foi o mais plausível. [PROBLEMA DE CONVERGÊNCIA]. E por conta 
 
 Avaliação gráfica do ajuste do modelo:
 
-```{r residuos d}
+```{r predito e observado d}
 df_reg <- broom::augment(l_md[[1]])
 df_reg %<>% mutate(predito = exp(.fitted),
                    std.resid = .resid/sd(.resid),
@@ -363,7 +363,8 @@ c) seleção de modelos
 d) avaliação do modelo selecionado
 e) estudo das estimativas e interpretação
 
-2) n_ref = número de SADs réplicas neutras refutadas
+2) dGOF = delta GOF = log(GOF_EE / GOF_EI)
+- quantas vezes melhor EE pode ser melhor que EI
 
 a) avaliar qual a melhor distribuição de probabilidade
 b) avaliar função de ligação
@@ -378,3 +379,43 @@ b) avaliar função de ligação
 c) seleção de modelos
 d) avaliação do modelo selecionado
 e) estudo das estimativas e interpretação
+
+### dGOF ###
+
+- para explorar uma variável que é a relação entre os GOFs do modelo é necessário 'remover' os zeros observados pois: i) quando dividmos por zero temos uma indeterminação; e ii) quando zero é divido por algo perdemos a variação desse valor pois todos vão para zero.
+- uma maneira de lidar com isso é somar a todos os valores o maior observado de GOF, 100. Assim a variável varia de 100 até 200
+- seguimos com dGOF = EE/EI
+
+#### Análise exploratória ####
+
+```{r graf exp dGOF 1}
+## data frame
+df_ad <- df_resultados %>% select(Site,p,k,k.z,DA,S,S.z,MN,U,GOF) %>% 
+  spread(key=MN,value=GOF) %>% mutate(EE0 = EE + 100, EI0 = EI + 100) %>% 
+  mutate(dGOF = EE0/EI0,
+         orGOF = (EE/100-EE) / (EI/100-EI),
+         log.dGOF = log(dGOF),
+         log.orGOF = log(orGOF),
+         JM = 500 * p * DA, 
+         theta = U * (JM-1) / (1-U))
+## graficos
+df_ad %>% select(Site,p,k,dGOF,log.dGOF) %>% reshape2::melt(id.vars = c("Site","p","k"), variable.name="GOF.type",value.name="GOF.value") %>%
+  ggplot(aes(y=GOF.value,x=p,color=GOF.type)) +
+  geom_point() +
+  facet_wrap(~k,ncol=3)
+```
+
+__Figura__ Graf exp dGOF e log.dGOF
+
+
+```{r graf exp dGOF 2}
+df_ad %>% ggplot(aes(y=dGOF_EI,x=p)) +
+  geom_point() +
+  labs(y="EE/EI") +
+  facet_wrap(~k,ncol=3)
+```
+
+__Figura__ Graf exp dGOF EE/EI
+
+- vou seguir com dGOF = EE/EI
+- Alternativamente posso utilizar a razão de chance: 
