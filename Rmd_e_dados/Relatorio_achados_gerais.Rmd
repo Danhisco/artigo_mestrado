@@ -223,7 +223,7 @@ grid.arrange(l_p[[1]],l_p[[2]],l_p[[3]],
              )
 ```
 
-__Figura 1__ Gráficos Exploratórios de I, k e J (número de indivíduos amostrado)
+__Figura 3__ Gráficos Exploratórios de I, k e J (número de indivíduos amostrado)
 
 #### Status
 
@@ -254,7 +254,7 @@ l_p[[3]] <- ggplot(df_resultados,aes(x=S,y=U)) +
 do.call("grid.arrange",c(l_p,ncol=3))
 ```
 
-__Figura 1__ Taxa de especiação, k, p e S
+__Figura 4__ Taxa de especiação, k, p e S
 
 ##### Interações efeitos fixos
 
@@ -267,7 +267,7 @@ ggplot(df_resultados,aes(x=p,y=U)) +
   labs(title=" ~ k * p")
 ```
 
-__Figura 2.1__ U ~ k * p
+__Figura 5.1__ U ~ k * p
 
 ```{r graf exp U 22}
 ggplot(df_resultados,aes(x=S,y=U)) +
@@ -277,7 +277,7 @@ ggplot(df_resultados,aes(x=S,y=U)) +
   labs(title=" ~ k * S")
 ```
 
-__Figura 2.2__ U ~ k * S
+__Figura 5.2__ U ~ k * S
 
 
 ```{r graf exp 23}
@@ -288,7 +288,7 @@ ggplot(df_resultados,aes(x=p,y=U)) +
   labs(title="~ k * p + S")
 ```
 
-__Figura 2.3__ U ~ k * p + S
+__Figura 5.3__ U ~ k * p + S
 
 - Achei estranho que há valores de U baixos para altos valores de S
 - Então pensei em um possível efeito do tamanho amostral: quanto maior J maior a árvore genealógica da comunidade [sob hipótese de monodominância] e assim menor a probabilidade média de imigração necessária para gerar uma mesma riqueza observada
@@ -311,7 +311,7 @@ l_p[[4]] <- ggplot(df_resultados,aes(x=log(J/J_M),y=U)) +
 do.call("grid.arrange",c(l_p,ncol=2))
 ```
 
-__Figura 2.4__ U, J e J/J_M em escala padrão e log
+__Figura 5.4__ U, J e J/J_M em escala padrão e log
 
 -Parece que há um efeito de log(J), contudo, há correlação entre as variáveis empíricas p, S e J:
 
@@ -323,7 +323,7 @@ l_p[[3]] <- ggplot(df_resultados,aes(x=J,y=S)) + geom_point()
 do.call("grid.arrange",c(l_p,ncol=3))
 ```
 
-__Figura 2.5__ Relação entre co-variáveis empíricas S, J e p
+__Figura 5.5__ Relação entre co-variáveis empíricas S, J e p
 
 - Na análise de U consideramos o efeito de S, mas não de J. Eu acredito que vale a investigação se os dois outliers de J (J>5000) não podem estar influênciando muito as estimativas
 
@@ -340,7 +340,7 @@ df_resultados %>% mutate(p_class = cut(p,12)) %>% ggplot(aes(x=k,y=U,group=Site)
   facet_wrap(~p_class,ncol=3,scales="free")
 ```
 
-__Figura 3.1__ U ~ k * p_class (group=Site)
+__Figura 6.1__ U ~ k * p_class (group=Site)
 
 ```{r graf exp 32, fig.height=5.75}
 df_resultados %>% mutate(S_class = cut(S,9)) %>% ggplot(aes(x=k,y=U,group=Site)) +
@@ -351,7 +351,7 @@ df_resultados %>% mutate(S_class = cut(S,9)) %>% ggplot(aes(x=k,y=U,group=Site))
 ```
 
 
-__Figura 3.2__ U ~ k * S_class (group=Site)
+__Figura 6.2__ U ~ k * S_class (group=Site)
 
 #### Resultados da dissertação
 
@@ -460,7 +460,7 @@ df_resultados %>%
   facet_wrap(~k,ncol=3)
 ```
 
-__Figura 1__ Logito de U pela porcentagem de cobertura vegetal. A linha é a estimativa da tendência, a região cinza mais escuro corresponde ao intervalo de confiança dos efeitos fixos e a região cinza mais clara o intervalo de confiança considerando todo o modelo. 
+__Figura 7__ Logito de U pela porcentagem de cobertura vegetal. A linha é a estimativa da tendência, a região cinza mais escuro corresponde ao intervalo de confiança dos efeitos fixos e a região cinza mais clara o intervalo de confiança considerando todo o modelo. 
 
 ##### Sumário do modelo mais plausível
 
@@ -506,7 +506,7 @@ l_p[[6]] <- ggplot(df_resultados,aes(x=log(J/JM),y=theta)) +
 do.call("grid.arrange",c(l_p,ncol=3))
 ```
 
-__Figura 1.1__ Theta e possíveis variáveis variáveis de intresse
+__Figura 8.1__ Theta e possíveis variáveis variáveis de intresse
 
 
 ##### Interação entre variáveis
@@ -518,7 +518,7 @@ ggplot(df_resultados,aes(x=p,y=theta)) +
   labs(title = "~ p * k")
 ```
 
-__Figura 1.2.1__ theta ~ p * k
+__Figura 8.2.1__ theta ~ p * k
 
 
 ```{r graf exp tehta 122}
@@ -528,7 +528,7 @@ ggplot(df_resultados,aes(x=S,y=theta)) +
   labs(title = "~ S * k")
 ```
 
-__Figura 1.2.2__ theta ~ S * k
+__Figura 8.2.2__ theta ~ S * k
 
 ```{r graf exp tehta 123}
 ggplot(df_resultados,aes(x=log(J/JM),y=theta)) + 
@@ -537,7 +537,7 @@ ggplot(df_resultados,aes(x=log(J/JM),y=theta)) +
   labs(title = "~ log(J/JM) * k")
 ```
 
-__Figura 1.2.3__ theta ~ log(J/JM) * k
+__Figura 8.2.3__ theta ~ log(J/JM) * k
 
 #### Status
 
@@ -566,7 +566,7 @@ l_p[[3]] <- ggplot(df_resultados,aes(x=MN,y=GOF)) +
 do.call("grid.arrange",c(l_p,ncol=3))
 ```
 
-__Figura 1__ GOF e variáveis de interesse p, k ,MN
+__Figura 9__ GOF e variáveis de interesse p, k ,MN
 
 #### Possíveis interações entre as variáveis
 
@@ -578,7 +578,7 @@ ggplot(df_resultados,aes(x=p,y=GOF)) +
   labs(title="~ p * k")
 ```
 
-__Figura 2.1__ GOF ~ p * k
+__Figura 10.1__ GOF ~ p * k
 
 ```{r graf exp GOF 22, fig.height=3.5}
 ggplot(df_resultados,aes(x=p,y=GOF)) +
@@ -588,7 +588,7 @@ ggplot(df_resultados,aes(x=p,y=GOF)) +
   labs(title="~ p * MN")
 ```
 
-__Figura 2.2__ GOF ~ p * MN
+__Figura 10.2__ GOF ~ p * MN
 
 ```{r graf exp GOF 23}
 ggplot(df_resultados,aes(x=MN,y=GOF)) +
@@ -598,7 +598,7 @@ ggplot(df_resultados,aes(x=MN,y=GOF)) +
   labs(title="~ MN * k")
 ```
 
-__Figura 2.3__ GOF ~ MN * K
+__Figura 10.3__ GOF ~ MN * K
 
 ```{r graf exp GOF 24}
 print(
@@ -611,7 +611,7 @@ print(
 )
 ```
 
-__Figura 2.4__ GOF ~ p * k * MN
+__Figura 10.4__ GOF ~ p * k * MN
 
 ```{r gra exp logito GOF 25}
 ## remoção de 0 e 100 ##
@@ -633,7 +633,37 @@ print(
 ```
 
 
-__Figura 2.5__ Logito GOF ~ p * k * MN
+__Figura 10.5__ Logito GOF ~ p * k * MN
+
+
+#### Desempenho dos modelos relativo um ao outro - dGOF
+
+- para explorar uma variável que é a relação entre os GOFs de MN é necessário 'remover' os zeros observados pois: i) quando dividimos por zero temos uma indeterminação; e ii) quando zero é divido por algo perdemos a variação desse valor pois todos vão para zero.
+- uma maneira de lidar com isso é somar a todos os valores o maior observado de GOF, 100. Assim a variável varia de 100 até 200
+- dGOF = EE/EI; além disso é possível avaliar os valores na escala log
+- pensei em utilizar a razão de chances (odds ratio) como variável resposta, mas em alguns casos EI = 0 então a razão de chances é dividido por zero
+- uma vez que utilizamos uma variável que estabelece a relação entre os valores, eu devo descrever no texto dos resultados os valores absolutos de GOF
+
+
+```{r graf exp dGOF 1, fig.height=6, fig.width=9}
+## data frame
+df_ad <- df_resultados %>% select(Site,p,k,k.z,DA,S,S.z,MN,U,GOF) %>% 
+  spread(key=MN,value=GOF) %>% mutate(EE0 = EE + 100, EI0 = EI + 100) %>% 
+  mutate(dGOF = EE0/EI0,
+         orGOF = (EE/100-EE) / (EI/100-EI),
+         log.dGOF = log(dGOF),
+         log.orGOF = log(orGOF),
+         JM = 500 * p * DA, 
+         theta = U * (JM-1) / (1-U))
+## graficos
+df_ad %>% select(Site,p,k,dGOF,log.dGOF) %>% reshape2::melt(id.vars = c("Site","p","k"), variable.name="GOF.type",value.name="GOF.value") %>%
+  ggplot(aes(y=GOF.value,x=p,color=GOF.type)) +
+  geom_point() +
+  labs(y="") +
+  facet_wrap(~k,ncol=3)
+```
+
+__Figura 11__ dGOF = EE/EI e log.dGOF = log(dGOF) pela cobertura vegetal (p) e proporção de propágulos (k)
 
 ### Resultados da dissertação
 
@@ -726,3 +756,4 @@ __Figura 1__
 ### Status
 
 - desenvolver a análise dos dados com o conjunto de dados do modelo EI
+
