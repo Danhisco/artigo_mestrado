@@ -27,6 +27,193 @@ library(tidyverse)
 # df_SAD.obs <- read.table("/home/danilo/Documentos/Doutorado/dados/df_SADs-obs.txt", sep = "\t", header = TRUE)
 ```
 
+### Geração dos dados ###
+
+####  Dados para realizar as simulações ####
+
+TreeCo -> seleção de paisagens: >1ha, amostragem em bloco único.
+
+```{r selecao de trabalhos}
+df_treeco <- read.csv(file = "~/Documents/dissertacao/dados/refIDs_selecionados.csv", head =T, sep = "\t",as.is = FALSE, na.strings = c("","NA")) #yes, >= 1ha
+#df_treeco %>% names
+df_treeco <- df_treeco[,c(80,1,86,7,23,24,28,29,30,26,45,46,49,50)] #selecionando as colunas de interesse
+df_treeco$arrangement %>% table %>% as.data.frame() # levantamentos por tipo de arranjo amostral
+df_treeco %<>% filter(arrangement == "contiguous") #apenas levantamentos realizados em bloco único
+#df_treeco %>% str #são ao todo 113 SiteCode
+```
+
+#### valores para a simulação obtidas a partir de df_SAD.obs ####
+
+```{r df_simulacao: dados para conversão de paisagens}
+### N, DA, S para cada SiteCode a partir de df_SAD.obs ###
+df_SAD.obs0 <- read.csv(file = "/home/danilo/Pasta sem título/dissertacao/dados/data_para_PI_new.csv", header = TRUE, sep = ",") #versão atualizada da planilha com as abundâncias; email: Renato mandou novo .Rdata 22dez
+df_SAD.obs0 %<>% select(SiteCode, sp, N, ha, area_ha, Ntotal, method, forest_type, forest_subtype, state) #organizando e selecionando colunas
+##Vou criar uma planilha de referência para consulta a partir desta aqui
+df_SAD.obs0$SiteCode %<>% factor
+df_SAD.obs0 %<>% filter(N != 0, sp != "morta") # filtrando as espécies mortas e aquelas presentes apenas nos trabalhos florísticos (observou-se a espécie mas não sua abund)
+df_ref0 <- df_SAD.obs0 %>% ddply(., "SiteCode", summarise, S = length(sp), #sumario de df_SAD.obs0, informações de referências de todas os sitecodes
+                                                           N = sum(N), #número total de indivíduos amostradso
+                                                           ha = mean(area_ha), #todos os valores de "area_ha" são os mesmo, portanto média = head(.,n=1)
+                                                           Ntotal_treeco = mean(Ntotal), #número total de indivíduos segundo o TreeCo
+                                                           method = head(method,n=1), #quando tiver internet pesquisar melhor maneira
+                                                           fitofisio_type = head(forest_type,n=1),
+                                                           fitofisio_subtype = head(forest_subtype,n=1),
+                                                           estado = head(state,n=1))
+df_ref0 %>% mutate(N.true = N == Ntotal_treeco) %>% filter(N.true != TRUE) %>% dim #N OK
+df_ref0 %<>% mutate(DA = N/ha) %>% select(SiteCode, S,N,DA,ha,method,fitofisio_type,fitofisio_subtype,estado) #retirando Ntotal_treeco e colocando DA
+#write.table(df_ref0, file = "~/Documents/dissertacao/dados/df_ref0.csv", row.names = FALSE, col.names = TRUE)
+df_ref0 %>% filter(SiteCode %in% df_treeco$SiteCode) -> df_ref # informações de refererência
+df_SAD.obs0 %>% filter(SiteCode %in% df_treeco$SiteCode) -> df_SAD.obs # SADsobs de trabalho
+
+#acoplando df_ref com df_treeco (informações de referência dos levantamentos com as informações sumarizadas de suas SADS)
+df_ref$SiteCode %<>% factor
+df_treeco$SiteCode %<>% factor
+df_ref %>% inner_join(x = df_treeco,y = ., by = "SiteCode") %>% select(refID, ordem, SiteCode, S, N, DA) -> df_simulacao #apenas as informações para ajustar
+#a resolução e realizar a simulação
+#df_simulacao %>% str #ao todo são 113 sitecodes que podem ser usados
+```
+
+
+### Raster -> matrix trinária ###
+
+- de tif para png ajustado (figura cujo número de pixels = DA_obs * área da paisagem)
+
+```{r tif para png ajustado}
+# tabulação dos arquivos de imagem para uso de ferramentos de acoplamento de dados #
+tif.file <- Sys.glob("*.tif") #substituir pela pasta onde os recortes de paisagems estão (.tif)
+tif.file %<>% sapply(., function(x) unname( unlist( strsplit(x, "_", fixed = TRUE) ) ) ) #separando o vetor em 3: refID, estado e ordem segundo a planilha do treeco
+tif.file <- data.frame(row.names = NULL,
+                       refID = unname(sapply(unname(tif.file[1,]), function(x) gsub("ref","",x))), #extraindo o padrão numerico do refID
+                       ordem = unname(sapply(unname(tif.file[3,]), function(x) gsub(".tif","",x))), #extraindo o padrão numerico da ordem
+                       tif.file = colnames(tif.file)) #nome do arquivo
+tif.file %<>% arrange(ordem)
+tif.file %<>% filter(ordem %in% df_simulacao$ordem) #pegando os arquivos em comum aos dois
+tif.file %>% str #dos 113 SiteCodes selecionados, 106 possuem recorte de paisagem
+tif.file$tif.file %<>% as.character()
+
+#acoplando df_simulação com tif.file
+#df_simulacao %>% str
+df_simulacao$ordem %<>% factor #drop levels
+df_simulacao$refID %<>% factor
+df_simulacao %<>% inner_join(x = tif.file, y =. , by = c("ordem", "refID")) %>% select(refID, ordem, SiteCode, S, N, DA, tif.file) #acoplando e colocando em ordem
+
+# funcao tif -> png ajustado #
+func_tif.png <- function(file){
+  raster <- raster(file) #leitura do raster
+  mat_raster <- matrix(data = getValues(raster)/100, ncol=200) #convertendo para matrix
+  savemat(x = mat_raster, filename = gsub(".tif",".png", file)) #salvando como png
+}
+sapply(df_simulacao$tif.file, func_tif.png ) #gera 113 .png, oriundos dos .tif
+
+# repetindo o procedimento para *.png #
+png.file <- Sys.glob("*.png") #os arquivos png
+png.file %<>% sapply(., function(x) unname( unlist( strsplit(x, "_", fixed = TRUE) ) ) ) #separando o vetor em 3: refID, estado e ordem segundo a planilha do treeco
+png.file <- data.frame(row.names = NULL,
+                       refID = unname(sapply(unname(png.file[1,]), function(x) gsub("ref","",x))), #extraindo o padrão numerico do refID
+                       ordem = unname(sapply(unname(png.file[3,]), function(x) gsub(".png","",x))), #extraindo o padrão numerico da ordem
+                       png.file = colnames(png.file)) #nome do arquivo
+png.file %<>% arrange(ordem)
+#png.file %>% str 
+png.file$png.file %<>% as.character()
+df_simulacao %<>% inner_join(x = png.file, y =. , by = c("ordem", "refID")) %>% select(refID, ordem, SiteCode, S, N, DA, tif.file,png.file)
+#df_simulacao %>% str
+df_simulacao$SiteCode %<>% factor
+# funcao png -> png ajustado #
+func_png.ajust <- function(file, densidade){ #utilizo o image magick
+  system(paste(
+    "convert ",file, " -resize ", densidade*500,"@ ", file,  
+    sep = ""
+  ))
+}
+df_simulacao %>% select(SiteCode) %>% table %>% as.data.frame()
+d_ply(df_simulacao, "SiteCode",function(x) func_png.ajust(file = x$png.file, densidade = x$DA) ) # produzindo .png com resolução ajustada e mantendo o nome
+
+# auditoria visual - direto na pasta#
+# apenas ref601_RJ_942.png teve problemas na conversão, acredito que seja algum problema na leitura desse arquivo. Vou seguir desconsiderando essa paisagem
+#df_simulacao %<>% filter(png.file != "ref601_RJ_942.png")
+#df_simulacao$SiteCode %<>% factor #drop level
+#df_simulacao %>% str
+rm(func_tif.png,func_png.ajust)
+
+```
+
+- png com resolução ajustada para matriz de paisagem onde ocorre a simulação do modelo neutro espacialmente explícito
+- a matriz de paisagem apresenta 3 tipos de células: de não habitat; de habitat que não está dentro da área local; e de habitat que está dentro da área da comunidade local.
+- para isso é necessário converter os valores dos pixels do png, que correspondem a porcentagem de cobertura original no pixel original (de 30m2), em ou habitat ou não habitat;
+- estabelecemos que aqueles pixels que originalmente correspondem à pelo menos 70% de cobertura serão denominados de unidades de habitat e os que estiverem abaixo desse valor de unidade de não habitat
+- no centro da matriz de paisagem N unidades de habitat, então, foram convertidas em unidades de habitat da comunidade local.
+
+
+```{r png ajustado para matriz trinaria}
+# png ajustado -> matriz trinária #
+source("/home/danilo/Documents/dissertacao/R_source/func_mat.tri.R")
+source("/home/danilo/Documents/dissertacao/R_source/area_simulada_beta.R")
+d_ply(df_simulacao, "SiteCode",function(x) func_mat.tri(png = x$png.file, abund = x$N)) # para cada .png produz um arquivo .txt com 3 valores(0,1,2), detalhes olhar na função
+
+# colocando na planilha
+txt.file <- Sys.glob("*.txt") #os arquivos .txt
+txt.file %<>% sapply(., function(x) unname( unlist( strsplit(x, "_", fixed = TRUE) ) ) ) #separando o vetor em 3: refID, estado e ordem segundo a planilha do treeco
+txt.file <- data.frame(row.names = NULL,
+                       refID = unname(sapply(unname(txt.file[1,]), function(x) gsub("ref","",x))), #extraindo o padrão numerico do refID
+                       ordem = unname(sapply(unname(txt.file[3,]), function(x) gsub(".txt","",x))), #extraindo o padrão numerico da ordem
+                       txt.file = colnames(txt.file)) #nome do arquivo
+txt.file %<>% arrange(ordem)
+#txt.file %>% str
+txt.file$txt.file %<>% as.character()
+#acoplando com df_simulação
+df_simulacao %<>% inner_join(x = txt.file, y =. , by = c("ordem", "refID")) %>% select(refID, ordem, SiteCode, S, N, DA, tif.file, png.file, txt.file)
+#df_simulacao %>% str
+df_simulacao$SiteCode %<>% factor
+rm(func_mat.tri, area_simulada)
+
+#ver 'comparação visual' em 'auditoria_imagens(tif-png-txt).R'
+#possíveis txt.file com problemas: 
+#ref1425_BA_2296.txt - falha na passagem png_ajustado -> .txt. Vou tentar fazer na mão
+
+individuos <- df_simulacao %>% filter(txt.file == "ref1425_BA_2296.txt") %>% .$N
+func_focal <- function(x) ifelse(length(x[x==1]) >= 5, 1, x[5])
+janela <- matrix(1,3,3)
+raster <- df_simulacao %>% filter(txt.file == "ref1425_BA_2296.txt") %>% .$png.file %>% raster
+mat <- as.matrix(raster)/255 #única paisagem que dá problemas com a forma usual - o único efeito é a mudança na orientação da imagem, a sua
+raster_binario <- raster( matrix(nrow = nrow(mat), ncol = ncol(mat), sapply(mat, function(x) ifelse(x >= 0.7, 1, 0)) ) )
+binario.focal <- as.matrix( focal(raster_binario, janela, func_focal, pad=TRUE, padvalues = 0))
+mat_tri <- try(area_simulada(matriz = binario.focal, N = individuos))
+
+try(write.table(x = mat_tri, 
+file = gsub(".png",".txt", "ref1425_BA_2296.txt"),
+sep = " ", row.names = FALSE, col.names = FALSE))
+
+
+```
+
+- a cobertura vegetal (p) foi definida como 1 - a proporção de unidades de não habitat na paisagem
+
+```{r cobertura vegetal}
+############ cobertura vegetal ############  
+fun_cobertura <- function(X){
+  matriz <- as.matrix(read.table(file = X, header = FALSE, sep = " "))
+  cobertura <- 1-length(matriz[matriz==0])/length(matriz) #cobertura total
+  return(cobertura)
+}
+df_simulacao %<>% mutate(.,cobertura = unname(sapply(.$txt.file,fun_cobertura)) )
+df_simulacao %<>% select(refID, ordem, SiteCode, S, N, DA, cobertura, txt.file)
+#df_simulacao %>% str
+
+rm(png.file,tif.file,txt.file, fun_cobertura)
+```
+
+
+
+### Desenho Experimental ###
+[dado a importância da limitação à dispersão a teoria neutra é uma teoria espacial(Alonso et al. 2006)]
+- 80 SADs amostradas em diferentes locais da mata atlântica que são organizados pela porcentagem de cobertura vegetal (p)
+- dois modelos neutros que diferem em seus pressupostos auxiliares de implementação da limitação à dispersão (MNEI e MNEE)
+- campo de valores da distância média de dispersão (d) varendo dois extremos: i) ausência do agente dispersor e ii) em paisagem não perturbada
+- a partir de d estima-se U utilizando o método semi-análitico desenvolvido por Rosindell et al. (2008) [onde é necessário informar a riqueza observada (S) e matriz de paisagem (que por sua vez é um raster corrigido pela densidade (número de indivíduos/1 ha, DA) e que apresenta uma área central correspondendo a área amostrada ( A_{J} = l_J^2)]
+- são simuladas 20 árvores genealógicas para cada sítio de amostragem e d; utilizamos o U médio para simular as SADs
+- para MNEI: i) d -> m -> m_ -> I]; ii) U -> theta] --> 100 SADs réplicas
+- para MNEE: i) d -> sd]; ii) U] --> 100 SADs réplicas
+
 <!--
 Estrutura do arquivo:
 - Prólogo  
@@ -53,32 +240,10 @@ Estrutura do arquivo:
   Por hora vou utilizar os sítios em que as simulações coalescentes (modelo neutro com espaço explicito) já haviam sido rodadas. Se for necessário/possível acrescentar sítios aos dados, a janela de código a seguir será expandida, por hora vou apenas selecionar aqueles sítios que já foram trabalhados.
 --> 
 
-Como os dados para a simulação coalescente (modelo EE) já foram obtidos no passado, aqui vou apenas simular as SADs para o modelo de espaço implícito (EI). Primeiro seleciono as SADs observadas filtradas e então ajusto o modelo de Etienne 2005 a elas e obtenho theta e m. Então simulo 100 SADs para cada conjunto de parâmetros e comparo cada réplica neutra com a respectiva SAD observada usando o teste de Kolmogorov-Smirnov e contabilizo o número de réplicas onde não foi possível refutar a hipótese nula na variável GOF.
-
-Após a rodada de simulações e comparação realizo a conversão de parâmetros entre EI e EE. Para o modelo EI estimo U, d e seu correspondente percentil de propágulos. Para EE estimo theta e m. Na sessão da conversão de parâmetros eu descrevo melhor como realizei as conversões. Gostaria que vocês confirmassem se: a) fiz a correspondência correta entre 'd', a distância média de dispersão, e o sigma da distribuição de LaPlace; e b) se calculei corretamente o percentil correspondente ao sigma - linhas [252;267] e [296;267].
-
-  
-```{r selecao dos sitios e preparacao das SADs}
-SiteCodes <- as.factor(df_par.Etienne$SiteCode) %>% levels # sitecodes de trabalho
-# convertendo df_SAD.obs em lista para facilitar as operações. 
-l_SAD.obs <- df_SAD.obs[,1:3] %>% filter(SiteCode %in% SiteCodes) %>% droplevels() %>% split(x=.,f=.$SiteCode) # lista de SADs obs
-```
-
-<!--
-### Criação da Matriz de Paisagem ###
-
-  Selecionado os sítios de trabalho é necessário criar a matriz de paisagem onde o modelo neutro de espaço explícito simula a dinâmica ecológica. A matriz de paisagem é oriunda de uma foto de satélite com resolução de 30X30m onde cada pixel representa a cobertura vegetal na área (podendo variar de 0-100). Quando um pixel >= 70 então consideramos que é habitat e quando não for é considerado não habitat.
-
-
-```{r}
-
-```
--->
-
 
 ### Modelo neutro de espaço implícito ###
 
-Anteriormente haviamos usado o modelo de Volkov et al. 2003, contudo, para ficar coerente com o modelo de espaço explícito vamos utilizar a formula de amostragem desenvolvida por Etienne 2005, onde ele a deriva utilizando a abordagem coalescente. Para isso utilizo funções do pacote 'untb' (que precisam da biblioteca PARI/GD), que estimam os parâmetros do modelo, e uma função do pacote 'GUILDS', que simula SADs segundo o mesmo modelo.
+Para manter a coerente com o modelo de espaço explícito vamos utilizar a formula de amostragem desenvolvida por Etienne 2005, derivada a partir da abordagem coalescente. Para isso utilizo funções do pacote 'untb' (que precisam da biblioteca PARI/GD), que estimam os parâmetros do modelo, e uma função do pacote 'GUILDS', que simula SADs segundo o mesmo modelo.
 
 
 ```{r Simulacao Etienne 2005}
@@ -142,7 +307,7 @@ df_par.Etienne$k <- factor(df_par.Etienne$k,
 df_par.Etienne$SiteCode <- factor(df_par.Etienne$SiteCode)
 ## criando variáveis, filtrando e arrumando o df ##
 df_par.Etienne %<>% mutate(d = sd_k / sqrt(2), d_ = sd_k_ / sqrt(2))
-df_par.Etienne %<>% filter(k!="EI") %>% dplyr::select(SiteCode, k, GOF, p, J, S, DA, d,theta_,m_) %>% mutate(I = m_ * (J-1)/(1-m_)) %>% droplevels()
+df_par.Etienne %<>% filter(k!="EI") %>% dplyr::select(SiteCode, k, GOF,U, p, J, S, DA, d,theta_,m_) %>% mutate(I = m_ * (J-1)/(1-m_)) %>% droplevels()
 # df_par.Etienne %>% summary
 ## nest o df ## 
 df_resultados <- df_par.Etienne %>% group_by(SiteCode) %>% nest
@@ -164,7 +329,7 @@ f_SAD.Etienne <- function(df_par){
   l_SAD.rep <- dlply(df_par,"k",function(X) replicate(100,generate.ESF(theta = X$theta_, I = X$I, J = X$J)),.parallel = TRUE)
 }
 #modificar para uma versão que paralelizar, talvez utilizar um llply %>% unlist()
-# registerDoMC(4) # tentatida de paralelizar 1 [TESTAR]
+# registerDoMC(3) # tentatida de paralelizar 1 [TESTAR]
 df_resultados %<>% mutate(SAD_rep = map(data,f_SAD.Etienne))
 #save
 saveRDS(df_resultados,file = "/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/df_resultados.Rdata")
@@ -263,13 +428,14 @@ for(i in 1:nrow(df_resultados)){
   df_S %<>% ddply(.,"k",summarise, S_m = mean(V1), S_sd = sd(V1) )
   # juntando com df_ks.test #
   df_ks.teste[[i]] %<>% inner_join(x.,y=df_S,by="k")
-  df_ks.teste[[i]] %<>% dplyr::select(k,p,J,S,DA,d,theta_,m_,I,GOF,GOF_,S_m,S_sd,KS.D_mean,KS.D_sd,KS.p_mean,KS.p_sd)
+  df_ks.teste[[i]] %<>% dplyr::select(k,p,J,S,DA,d,theta_,m_,I,U,GOF,GOF_,S_m,S_sd,KS.D_mean,KS.D_sd,KS.p_mean,KS.p_sd)
 }
 #adicionando ao df_resultados
 df_resultados %<>% add_column(.,df_ks.teste)
 # armazenando em disco
 df_resultados0 <- df_resultados
 saveRDS(df_resultados0,file = "/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/df_resultados.Rdata")
+# df_resultados <- readRDS(file = "/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/df_resultados.Rdata")
 
 #salvando em csv para upar para o git.
 df_resultados %<>% dplyr::select(SiteCode,df_ks.teste) %>% unnest() %>% as.data.frame()
@@ -351,12 +517,11 @@ df_resultados %<>% gather(MN,GOF,GOF:GOF_)
 df_resultados$MN[df_resultados$MN=="GOF"] <- "EE"
 df_resultados$MN[df_resultados$MN=="GOF_"] <- "EI"
 df_resultados$MN %<>% factor()
-df_resultados %<>% select(SiteCode,k,MN,GOF,p,d,m_,I,J,S,DA,S_m,S_sd,KS.D_mean,KS.D_sd,KS.p_mean,KS.p_sd)
+df_resultados %<>% select(SiteCode,k,MN,U,GOF,p,d,m_,I,J,S,DA,S_m,S_sd,KS.D_mean,KS.D_sd,KS.p_mean,KS.p_sd)
 
 df_resultados %>% ggplot(aes(x=p,y=GOF,color=MN)) + geom_point() + geom_smooth(method = "glm", se=F) + facet_wrap(~k,ncol=4)
 
 write_csv(df_resultados,path = "/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/df_resultados.csv")
-
 ```
 
 
@@ -839,4 +1004,19 @@ df_EE_viaEI %>% ggplot(aes(x=SiteCode,y=theta)) + geom_boxplot() + facet_wrap(~k
 df_temp %>% ggplot(aes(x=SiteCode,y=theta_var)) + geom_boxplot() + facet_wrap(~kernel,nrow = 3)
 ```
 
+
+##### Anexo ####
+
+### Registro de Estudo ###
+
+Como os dados para a simulação coalescente (modelo EE) já foram obtidos no passado, aqui vou apenas simular as SADs para o modelo de espaço implícito (EI). Primeiro seleciono as SADs observadas filtradas e então ajusto o modelo de Etienne 2005 a elas e obtenho theta e m. Então simulo 100 SADs para cada conjunto de parâmetros e comparo cada réplica neutra com a respectiva SAD observada usando o teste de Kolmogorov-Smirnov e contabilizo o número de réplicas onde não foi possível refutar a hipótese nula na variável GOF.
+
+Após a rodada de simulações e comparação realizo a conversão de parâmetros entre EI e EE. Para o modelo EI estimo U, d e seu correspondente percentil de propágulos. Para EE estimo theta e m. Na sessão da conversão de parâmetros eu descrevo melhor como realizei as conversões. Gostaria que vocês confirmassem se: a) fiz a correspondência correta entre 'd', a distância média de dispersão, e o sigma da distribuição de LaPlace; e b) se calculei corretamente o percentil correspondente ao sigma - linhas [252;267] e [296;267].
+
+  
+```{r selecao dos sitios e preparacao das SADs}
+SiteCodes <- as.factor(df_par.Etienne$SiteCode) %>% levels # sitecodes de trabalho
+# convertendo df_SAD.obs em lista para facilitar as operações. 
+l_SAD.obs <- df_SAD.obs[,1:3] %>% filter(SiteCode %in% SiteCodes) %>% droplevels() %>% split(x=.,f=.$SiteCode) # lista de SADs obs
+```
 
