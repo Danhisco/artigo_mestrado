@@ -363,14 +363,160 @@ c) seleção de modelos
 d) avaliação do modelo selecionado
 e) estudo das estimativas e interpretação
 
-2) dGOF = delta GOF = log(GOF_EE / GOF_EI)
-- quantas vezes melhor EE pode ser melhor que EI
+## 2) GOF - número de SADs preditas que não foram refutadas ##
 
 a) avaliar qual a melhor distribuição de probabilidade
 b) avaliar função de ligação
 c) seleção de modelos
 d) avaliação do modelo selecionado
 e) estudo das estimativas e interpretação
+
+- a combinação entre distribuição de probabilidade e função de ligação canonica para porcentagem é a distribuição binomial com a função de ligação logito
+-> exploração gráfica
+
+__EFEITOS FIXOS__
+
+```{r GOF exp graf funcao de ligacao logito}
+## remoção de 0 e 100 ##
+df_ad <- df_resultados
+df_ad$GOF[df_ad$GOF==0] <- 0.01
+df_ad$GOF[df_ad$GOF==100] <- 99.99
+## transformação logito ##
+df_ad %<>% mutate(lGOF = log((GOF/100)/(1-(GOF/100)) ))
+# df_ad$lGOF %>% summary
+## gráfico ##
+print(
+    ggplot(df_ad,aes(x=p,y=lGOF,color=MN)) +
+      geom_point() +
+      geom_smooth(method = "lm",se=FALSE) +
+      facet_wrap(~k,ncol=3) +
+      labs(title="~ p * k * MN") +
+      scale_colour_manual(values = c("Blue", "Red"))
+)
+```
+
+__Figura 1__ logito de GOF ~ p * k * MN 
+
+- para o cenário com menor limitação à dispersão (k=0.25) parece que a linearização de GOF para o modelo EI não é uma boa aproximação, provavelmente o padrão de resíduos não vai ser muito 'comportado'
+
+__EFEITOS ALEATÓRIOS__
+
+- 1|Site
+
+```{r GOF graf exp 2 logito pela estrutura aleatoria1,fig.height=8,fig.width=8}
+df_ad %>% mutate(p.class = cut(p,12)) %>% ggplot(aes(x=Site,y=lGOF)) +
+  geom_jitter() +
+  geom_boxplot() +
+  coord_flip() +
+  theme(axis.text.y = element_blank(),axis.ticks = element_blank(), legend.position="bottom") +
+  facet_wrap(~p.class,ncol=3,scales="free_y")
+```
+
+__Figura 2.1__ logito de GOF ~ site (~p.class)
+
+- MN|Site
+
+```{r GOF graf exp 2 logito pela estrutura aleatoria 2,fig.height=8,fig.width=8}
+df_ad %>% mutate(p.class = cut(p,12)) %>% ggplot(aes(x=Site,y=lGOF,color=MN)) +
+  geom_jitter() +
+  geom_boxplot() +
+  coord_flip() +
+  theme(axis.text.y = element_blank(),axis.ticks = element_blank(), legend.position="bottom") +
+  facet_wrap(~p.class,ncol=3,scales="free_y")
+```
+
+__Figura 2.1__ logito de GOF ~ MN * Site (~p.class)
+
+- como efeito aleatório vamos considerar um intercepto por observações agrupadas por Sítio de amostragem (Site)
+
+__Escolha da estrutura aleatória__
+
+- o modelo cheio vai apresentar interação entre as três variáveis: p + k + MN + p:k + p:MN + MN:k + p:k:MN
+- vou avaliar duas possíveis estruturas aleatórias: 1 | Site e MN | Site
+- obtive erro de convergência: Model failed to converge with max|grad| = 0.00126561 (tol = 0.001, component 1)
+- ao acrescentar " control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)) " não obtive mais erro de convergência
+
+
+```{r GOF escolha estrutura aleatoria}
+l_md <- vector("list",2)
+names(l_md) <- c("1|Site","MN|Site")
+l_md[[1]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k * MN + (1|Site), family = "binomial",data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[2]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k * MN + (MN|Site), family = "binomial",data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+AICctab(l_md,weights=T)
+```
+
+- a estrutura aleatória que considera que há um intercepto para cada modelo neutro por sítio de amostragem é aquela mais plausível
+- alternativamente poderiamos considerar k | Site, contudo seria estimado 1 intercepto para cada duas observações. 1|Site corresponde ao ajustar 1 intercepto para cada 24 observações e MN para cada 12. Na prática a diferença entre 1|Site e MN|Site é de dois parâmetros.
+- vou ajusta-lo e seguir o protocolo de avaliação de Bolker et al. (2008)
+1) Checagem gráfica: 
+i) variância dos dados é homogêneo entre as catergórias? Considerando os efeitos fixos, a variância parece ser homogênea para todos os casos menos quando consideramos o modelo EI, k=0.25 para todo o p
+ii) a resposta é linear com relação ao preditor contínuo? Para a classe citada acima os dados particulamente não se adequam à uma linha com relação à p
+iii) A distribuição de valores dentro do grupos corresponde à distribuição de probabilidade escolhida? Diria que a resposta é: corresponde suficientemente à distribuição escolhida? Para responder isso vou avaliar os resíduos do modelo escolhido
+
+__Diagnóstico do modelo cheio selecionado__
+
+```{r GOF diag1}
+# dados #
+df_reg <- augment(l_md[[2]])
+df_reg[,1] <- df_reg[,1][,1]
+df_reg %<>% mutate(scale.resid = sqrt(abs(.resid)))
+# grafico 
+l_p <- vector("list",2)
+l_p[[1]] <- ggplot(df_reg,aes(x=.fitted,y=.resid)) +
+  geom_point() +
+  geom_smooth(method="loess") +
+  labs(y="residuos")
+  # facet_wrap(~MN,ncol=2)
+l_p[[2]] <- ggplot(df_reg,aes(x=.fitted,y=scale.resid)) +
+  geom_point() +
+  geom_smooth(method="loess") +
+  labs(y="sqrt(|residuos|)")
+  # facet_wrap(~MN,ncol=2)
+do.call("grid.arrange",c(l_p,ncol=2))
+```
+
+__Figura 3.1__ Resíduos contra valores ajustados: 1o painel resíduos contra ajustados; 2o painel _the scale-location plot_
+
+- a variância dos resíduos não está igualmente distribuida ao longo dos valores ajustados; observa-se padrões nos resíduos
+
+```{r GOF diag2,fig.width=10,fig.height=4}
+l_p <- vector("list",3)
+l_p[[1]] <- ggplot(df_reg,aes(x=p.z,y=.resid)) +
+  geom_point() +
+  geom_smooth(method="loess") +
+  labs(y="residuos")
+l_p[[2]] <- ggplot(df_reg,aes(x=MN,y=.resid)) +
+  geom_jitter() +
+  geom_boxplot() +
+  labs(y="")
+l_p[[3]] <- ggplot(df_reg,aes(x=k,y=.resid)) +
+  geom_jitter() +
+  geom_boxplot() +
+  labs(y="")
+do.call("grid.arrange",c(l_p,ncol=3))
+# grid.arrange(l_p[[1]],l_p[[2]],l_p[[3]],l_p[[4]],
+#              layout_matrix=rbind(c(1,2,3),
+#                                  rep(4,3),
+#                                  rep(4,3) )
+#              )
+```
+
+__Figura 3.2__ resíduos contra as variáveis preditoras
+
+```{r GOF diag2}
+ggplot(df_reg,aes(x=p.z,y=.resid,color=MN)) +
+  geom_point() +
+  geom_smooth(method="loess") +
+  labs(y="residuos") +
+  theme(legend.position = "bottom") +
+  facet_wrap(~k,ncol=4)
+```
+
+__Figura 3.3__ resíduos contra as variáveis preditoras
+
+
 
 3) U = probabilidade de especiação segundo modelo EE
 
@@ -379,43 +525,3 @@ b) avaliar função de ligação
 c) seleção de modelos
 d) avaliação do modelo selecionado
 e) estudo das estimativas e interpretação
-
-### dGOF ###
-
-- para explorar uma variável que é a relação entre os GOFs do modelo é necessário 'remover' os zeros observados pois: i) quando dividmos por zero temos uma indeterminação; e ii) quando zero é divido por algo perdemos a variação desse valor pois todos vão para zero.
-- uma maneira de lidar com isso é somar a todos os valores o maior observado de GOF, 100. Assim a variável varia de 100 até 200
-- seguimos com dGOF = EE/EI
-
-#### Análise exploratória ####
-
-```{r graf exp dGOF 1}
-## data frame
-df_ad <- df_resultados %>% select(Site,p,k,k.z,DA,S,S.z,MN,U,GOF) %>% 
-  spread(key=MN,value=GOF) %>% mutate(EE0 = EE + 100, EI0 = EI + 100) %>% 
-  mutate(dGOF = EE0/EI0,
-         orGOF = (EE/100-EE) / (EI/100-EI),
-         log.dGOF = log(dGOF),
-         log.orGOF = log(orGOF),
-         JM = 500 * p * DA, 
-         theta = U * (JM-1) / (1-U))
-## graficos
-df_ad %>% select(Site,p,k,dGOF,log.dGOF) %>% reshape2::melt(id.vars = c("Site","p","k"), variable.name="GOF.type",value.name="GOF.value") %>%
-  ggplot(aes(y=GOF.value,x=p,color=GOF.type)) +
-  geom_point() +
-  facet_wrap(~k,ncol=3)
-```
-
-__Figura__ Graf exp dGOF e log.dGOF
-
-
-```{r graf exp dGOF 2}
-df_ad %>% ggplot(aes(y=dGOF_EI,x=p)) +
-  geom_point() +
-  labs(y="EE/EI") +
-  facet_wrap(~k,ncol=3)
-```
-
-__Figura__ Graf exp dGOF EE/EI
-
-- vou seguir com dGOF = EE/EI
-- Alternativamente posso utilizar a razão de chance: 
