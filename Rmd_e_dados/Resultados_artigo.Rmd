@@ -354,7 +354,6 @@ d) avaliação do modelo selecionado
 e) estudo das estimativas e interpretação
 
 
-
 1) I = número fundamental da imigração (Etienne 2005)
 
 a) avaliar qual a melhor distribuição de probabilidade
@@ -505,7 +504,7 @@ do.call("grid.arrange",c(l_p,ncol=3))
 
 __Figura 3.2__ resíduos contra as variáveis preditoras
 
-```{r GOF diag2}
+```{r GOF diag3}
 ggplot(df_reg,aes(x=p.z,y=.resid,color=MN)) +
   geom_point() +
   geom_smooth(method="loess") +
@@ -514,7 +513,109 @@ ggplot(df_reg,aes(x=p.z,y=.resid,color=MN)) +
   facet_wrap(~k,ncol=4)
 ```
 
-__Figura 3.3__ resíduos contra as variáveis preditoras
+__Figura 3.3__ resíduos contra as variáveis preditoras p * MN * k
+
+```{r GOF diag4}
+ggplot(df_reg,aes(x=MN,y=.resid)) +
+  geom_jitter() +
+  geom_boxplot() +
+  labs(y="residuos") +
+  facet_wrap(~k,ncol=4)
+```
+
+__Figura 3.4__ resíduos contra as variáveis preditoras MN * k
+
+- a partir da visualização dos resíduos do modelo cheio podemos concluir que: i) o modelo está linearizando corretamente os valores observados; ii) a variância dos resíduos é maior para a classe EI e para os níveis extremos de k, e parece haver correlação entre os níveis extremos de k e EI.
+- me parece razoável aceitar o ajuste realizado por este modelo cheio e prosseguirem com ele para a seleção do modelo mais plausível
+
+__Seleção do modelo mais plausível__
+
+Hipóteses a priori:
+
+I) a SAD não é suficiente para refutar neutralidade.
+I.P) portanto, qualquer modelo neutro apresenta boa congruência com o observado independentemente se a SAD observada foi amostrada em contexto ecológio onde o pressuposto de neutralidade não é uma boa aproximação e assim para todo gradiente de cobertura vegetal.
+
+II) nenhum modelo neutro é suficiente para explicar a SAD observada em um gradiente natural de cobertura vegetal.
+II.P) portanto quanto maior a cobertura vegetal melhor a congruência do observado e predito por um modelo neutro.
+
+III) a estrutura espacial da paisagem é necessária para descrever a SAD. 
+III.P) portanto o modelo neutro de espaço explícito (EE) apresenta melhor congruência com o observado do que o modelo neutro de espaço implícito (EI).
+
+IV) um modelo neutro é suficiente para descrever a SAD se corretamente aproximar o processo de limitação à dispersão
+IV.P.a) portanto, existe um valor ótimo de limitação à dispersão onde observamos a maior congruência com o observado
+IV.P.b) portanto, se a fragmentação da paisagem modificar a limitação à dispersão 
+
+```{r GOF selecao de modelos}
+l_md <- vector("list",19)
+names(l_md) <- c("p*k*MN",# modelo cheio
+                 "p*k*MN-p:k:MN", #MC - 3a ordem
+                 "p*(k+MN)","k*(p+MN)","MN*(p+k)", #2 interações
+                 "p*k+MN","p*MN+k","k*MN+p", #1 interação + preditor
+                 "p*k","p*MN","k*MN", #1 interação
+                 "p+k+MN",#aditivo 3
+                 "p+k","p+MN","k+MN", #aditivo 2 
+                 "p","k","MN", #preditor isolado
+                 "1") #nulo
+#modelo cheio
+l_md[[1]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k * MN + (MN|Site), family = "binomial",data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+#modelo cheio - interação 3a ordem
+l_md[[2]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k * MN - p.z:k:MN + (MN|Site), family = "binomial",data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+#2 interações
+l_md[[3]] <- glmer(cbind(GOF,100-GOF) ~ p.z * (k + MN) + (MN|Site), family = "binomial",data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[4]] <- glmer(cbind(GOF,100-GOF) ~ k * (p.z + MN) + (MN|Site), family = "binomial",data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[5]] <- glmer(cbind(GOF,100-GOF) ~ MN * (p.z + k) + (MN|Site), family = "binomial",data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+#1 interação + preditor
+l_md[[6]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k + MN + (MN|Site), family = "binomial",data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[7]] <- glmer(cbind(GOF,100-GOF) ~ p.z * MN + k + (MN|Site), family = "binomial",data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[8]] <- glmer(cbind(GOF,100-GOF) ~ k * MN + p.z + (MN|Site), family = "binomial",data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+#1 interação
+l_md[[9]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k + (1|Site), family = "binomial",data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[10]] <- glmer(cbind(GOF,100-GOF) ~ p.z * MN + (MN|Site), family = "binomial",data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[11]] <- glmer(cbind(GOF,100-GOF) ~ k * MN + (MN|Site), family = "binomial",data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+#aditivo 3
+l_md[[12]] <- glmer(cbind(GOF,100-GOF) ~ p.z + k + MN + (MN|Site), family = "binomial",data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+#aditivo 2
+l_md[[13]] <- glmer(cbind(GOF,100-GOF) ~ p.z + k + (1|Site), family = "binomial",data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[14]] <- glmer(cbind(GOF,100-GOF) ~ p.z + MN + (MN|Site), family = "binomial",data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[15]] <- glmer(cbind(GOF,100-GOF) ~ k + MN + (MN|Site), family = "binomial",data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+#aditivo 1
+l_md[[16]] <- glmer(cbind(GOF,100-GOF) ~ p.z + (1|Site), family = "binomial",data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[17]] <- glmer(cbind(GOF,100-GOF) ~ k + (1|Site), family = "binomial",data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[18]] <- glmer(cbind(GOF,100-GOF) ~ MN + (MN|Site), family = "binomial",data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+# nulo
+l_md[[19]] <- glmer(cbind(GOF,100-GOF) ~ 1 + (1|Site), family = "binomial",data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+AICctab(l_md,weights=T)
+```
+
+
+
+-> seleção do modelo mais plausível:
+a) modelo cheio: p + k + MN + p:k + p:MN + k:MN + p:k:MN [p * k * MN]
+b) modelo cheio - interação 3a ordem: p + k + MN + p:k + p:MN + k:MN [p*MN + p*k + MN*k]
+c) modelo cheio - efeito de p: k + MN + k:MN [k * MN]
+d) modelo cheio - efeito de k: p + MN + p:MN [p * MN]
+e)
+
+
 
 
 
