@@ -1,3 +1,124 @@
+## 04 Setembro ##
+
+Introdução: cadeia argumentativa (blocos mínimos)
+
+i) Fragmentação
+- Remoção de habitat natural leva à diminuição de habitat disponível (diminuição da quantidade de habitat)
+- Leva à diminuição do tamanho e grau de isolamento dos fragmentos florestais remanescentes (fragmentação per se)
+- Inicia um processo de longo prazo que modifica o habitat remanescente associado à região de fronteira com a área de habitat removido (matrix) pela introdução de novos gradientes ecológicos (efeito de borda)
+- Existe correlação entre os três efeitos
+- O efeito de borda atua como um filtro ambiental favorecendo espécies de crescimento rápido e alta dispersão e desfavorecendo espécies associadas com o habitat original
+- o efeito de borda é um dos principais efeitos da remoção de habitat, como se observa de estudos que conseguem dissociar o efeito da diminuição da quantidade de habitat, fragmentação per se e efeito de borda
+- o efeito de borda é contexto dependente, onde fatores como a natureza da matrix e as dinâmicas ecológicas anteriores ao evento de remoção de habitat pode ter grande impacto
+- em geral há pouca informação disponível sobre os sistemas naturais devastados, como por exemplo na Mata Atlântica, estudo que fazem uma primeira descrição da diversidade biológica identificando espécies e sua abundância em determinada área, ocorrem em ritmo menor do que a taxa em que as áreas são devastadas. Portanto, existe uma dificuldade de incorporar efeitos de borda em modelos teóricos pela falta de informação disponível sobre a maior parte das áreas fragmentadas.
+
+ii) Teoria Neutra  
+- Alternativamente podemos nos perguntar:
+"What is the minimum necessary dimensionality of the theory required to characterize a given ecological community to a desired level of realism and precision?"(Hubbell 2005)
+- A teoria neutra (Bell 2001, Hubbell 2001) propõem responder essa perguntar partindo do pressuposto de que todas as espécies apresentam as mesmas taxas demográficas per capita (pressuposto de neutralidade)
+- Dado o pressuposto de neutralidade observamos deriva ecológica a flutuação aleatória da abundância das populações que resulta na lenta perda de espécies até a monodominância
+- Na região biogeográfica, a deriva ecológica é compensada pelo influxo constante de novas espécies por especiação verdadeira, quando uma nova espécie é adicionada ao pool total de espécies, ou pela migração de longa distância.
+- Na escala local, a imigração de indivíduos vindos da região biogeográfica compensa a deriva ecológica;
+- A imigração pode ser conceitualizada como uma probabilidade de um imigrante colonizar uma unidade de habitat na comunidade local (m), pressupondo implicitamente o espaço
+- Ou como uma função de dispersão que relaciona a probabilidade de um propágulo colonizar com a distância entre árvore progenitora e unidade de habitat vago
+- A função de dispersão é utilizada em modelos que consideram explicitamente o espaço, i.e., as distâncias e posições dos indivíduos e das unidades de habitat
+- Modelos neutros de espaço explícito podem ser usadas para estudar a manutenção da diversidade em paisagens fragmentadas (Campos et al. 2012) e seu uso demonstrou que a estrutura da paisagem tem efeito na forma da distribuição de abundância de espécies (SAD) (Campos et al. 2013).
+
+iii) Objetivo
+- um teste da teoria neutra é avaliar a congruência entre a predição de um modelo neutro e o correspondente padrão observado em determinado contexto ecológico (McGill et al. 2006)
+- aqui comparamos SADs observadas em um gradiente de cobertura vegetal com as predições de um modelo neutro de espaço explícito (EE) que utiliza uma transcrição da configuração espacial de habitat e matrix de paisagem onde a SAD foi amostrada e as predições de um modelo neutro de espaço implícito (EI).
+- uma vez que há correspondência formal entre os parâmetros de EE e EI temos uma comparação entre modelos que diferem em considerar a configuração espacial da paisagem e portanto a fragmentação per se
+- Parametrizamos os modelos utilizando uma abordagem baseada em função de dispersão, controlando pela proporção de propágulos que permanece até a vizinhaça da planta progenitora
+- Simulamos situações de alta limitação à dispersão, onde a maior parte dos propágulos permanece na vizinhança da planta progenitora, até distância média de dispersão similares à média de espécies autocóricas. Em paisagens fragmentadas é possível observar tanto o aumento quanto a diminuição da taxa de dispersão, contudo, ainda não é computacionalmente viável simular valores altos de distância média de dispersão para EE (Rosindell et al. 2008)
+- ambos modelos são modelos nulos para a prevalência do efeito de borda e portanto esperamos que a congruência das predições com o observado diminua com a diminuição da cobertura vegetal
+- Contudo de maneira geral, a SAD não é evidência suficiente para refutar neutralidade, o quê pode ser visto como um teste de detecção da existência de mecanismos de nicho (como filtro ambiental e portanto efeito de borda) no conjunto de dados 
+
+
+## 20 Setembro - reunião de orientação ##
+
+1a Parte) Observamos a relação gráfica de logito de GOF e cobertura vegetal (p), função de dispersão (k) e a classe de modelo neutro (MN)
+
+2a Parte) Questão da parametrização atual dos modelos:
+
+i) A parametrização dos modelos leva em conta um valor de imigração estabelecido a priori (k -> d e m); e valor de diversidade que considera a taxa de especiação necessária para manter a riqueza observada no equilíbrio segundo o modelo neutro de espaço explícito (U) [ com isso parametrizamos também o modelo neutro EI
+
+ii) PI: Com a atual parametrização podemos responder a pergunta: O Quanto a estrutura espacial melhora a descrição da SAD na teoria neutra?
+
+iii) PI: uma sequência argumentativa é:
+
+a) Dentro da teoria neutra explicamos determinadas características das comunidades ecológicas considerando que a.i) existe uma comunidade local que recebe imigrantes e estes competem com a prole dos indivíduos locais pelas unidades de habitat a cada evento de morte; a.ii) os imigrantes vem de uma região muitas vezes maior onde ocorre surgimento de novas espécies por especiação verdadeira ou por imigração de longa distâncias de novas espécies.
+
+b) A limitação à dispersão dos indivíduos pode ser conceitualizada como a probabilidade de imigrante colonizar uma unidade de habitat na comunidade local, essa probabilidade independe da posição da unidade de habitat na comunidade local ou da distância da planta progenitora fora da comunidade local até esta unidade de habitat [MODELO NEUTRO DE ESPAÇO IMPLÍCITO - EI]
+
+c) um modelo espacialmente explícito considera a distância e as posições dos indivíduos e assume que a probabilidade de colonização por um propágulo depende da distância entre a unidade de habitat vago e a planta progenitora, assim a limitação à dispersão depende da função de dispersão e da configuração espacial das unidades de habitat e não habitat [MODELO NEUTRO DE ESPAÇO EXPLÍCITO - EE]
+
+d) existe uma relação formal entre os dois modelos onde podemos estabelecer equivalência entre a probabilidade de colonização por propágulos de fora da comunidade local com a função de dispersão
+
+e) de modo que dado parâmetros equivalentes, podemos avaliar influência de se considerar a dispersão no espaço explícito
+
+f) a fragmentação e perda de habitat leva a diminuição da quantidade de habitat disponível para as populações e modifica a configuração espacial da paisagem
+
+
+
+
+## 20 Setembro - Preparação Reunião orientação ##
+
+1) Quais foram as questões que levantei?
+
+a) Como é possível utilizar o modelo EI para estudar fragmentação se ele assume que não há variação no habitat remanescente na paisagem (proporção de habitat disponível)?
+
+b) Considerando que o modelo EI pode ser interpretado como um modelo ilha-continente, poderíamos integrar a questão da variação de habitat remanescente na taxa de imigração para a comunidade local - aumentando o isolamento. Isso seria válido se então a paisagem fosse considerada como "comunidade local"?
+
+c) O equivalente do EI no modelo EE é aquele que considera a paisagem homogênea e infinita
+
+d) aqui utilizamos o modelo EE com paisagem finita e 
+
+## 19 setembro ##
+
+0) Contexto
+
+i) a teoria de biogeografia de ilhas (IBT) também não considera explicitamente a proporção de habitat remanescente
+
+ii) contudo ela pode ser utilizada como uma primeira aproximação para estudar fragmentos ambientais naturais (Laurance 2008)
+
+iii) Perguntas: a) por quê IBT pode ser utilizada como uma primeira aproximação para estudo de fragmentos ambientais?; b) qual a relação de EI com a IBT?; c) É possível utilizar os mesmo motivos que levaram ao uso de IBT ao uso de EI?
+
+1) Por quê IBT pode ser utilizada como uma primeira aproximação para estudo de fragmentos ambientais?
+
+i) Haila 2002 - A CONCEPTUAL GENEALOGY OF FRAGMENTATION RESEARCH: FROM ISLAND BIOGEOGRAPHY TO LANDSCAPE ECOLOGY
+
+Na monografia de MacArthur & Wilson (1967) eles mencionam que as porções contínuas de habitat natural serão cada vez mais parecidos com os insulares por conta da atividade humana que 'quebra' estas porções em porções menores. Quando a pesquisa em fragmentação começou nos anos 70 a analogia metafórica da ilha foi aplicada no estudo, como exemplificado pelo trabalho de Whitcomb et al.:
+
+The starting point for the research project was defined by Whitcomb (1977) as follows: ‘‘Since 1974 we have been examining oak–hickory woodlots in the Maryland Piedmont and Coastal Plains from the perspective of island biogeography.’’ The adoption of the island analogy was justified as follows: ‘‘(i)ntuitively, one would imagine that at least some of the principles regulating species richness on oceanic islands would operate on these mainland ‘habitat islands’ as well.’
+
+
+
+
+## 17 setembro ##
+
+0) contexto
+
+i) na reunião de 13 de setembro verificamos que utilizamos na parametrização do modelo neutro de espaço implícito a variável U que é estimado pelo modelo neutro EE, que depende da configuração espacial da paisagem - ou seja, consideramos indiretamente no modelo de espaço implícito o espaço explicitamente
+
+ii) o modelo EI, modelo clássico de Hubbell, não considera variação da proporção de habitat remanescente e configuração espacial
+
+iii) a motivação para incluir as predições de EI na comparação é poder excluir o efeito da configuração espacial na SAD
+
+DANILO:
+
+a) Considerando que os principais efeitos da fragmentação são: i) diminuição da quantidade de habitat; ii) mudança na configuração espacial; iii) efeito de borda (que pode atuar como um filtro ambiental)
+
+b) dentro da abordagem neutra da criação de modelos (construir o mínimo conjunto de assunções sob a hipótese de neutralidade) é possível criar uma primeira aproximação considerando a existência de i e ii [ iii se as mudanças nas taxas demográficas associados ao habitat não forem espécie especificas]
+
+c) iii depende de variáveis como natureza da matriz; por exemplo
+
+d) ao meu ver, o modelo neutro clássico de Hubbell não é adequado para estudar fragmentação na metacomunidade ou em algum recorte dela, pois não leva em conta i ou ii;
+
+e) me parece que se vamos comparar o modelo EE com algum modelo neutro de espaço implícito, este modelo EI deve considerar pelo menos o efeito da variação da proporção de habitat na metacomunidade
+
+
+
+
 ## 06 setembro ##
 
 1) Quais os pontos não estão claros até agora?
