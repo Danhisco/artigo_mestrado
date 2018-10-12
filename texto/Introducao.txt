@@ -1,3 +1,31 @@
+## 10 de Setembro ##
+
+I) Identifique seu objetivo:
+
+- Escrever o parágrafo que apresenta a questão ecológica que pretendo investigar com os dois modelos teóricos que desenvolvemos: é necessário considerar a configuração espacial para descrever a SAD observada em paisagens fragmentadaS?
+
+- Para isso é necessário apresentar quais os efeitos da remoção de habitat natural nas paisagens naturais e as questões teóricos referentes ao estudo desse fenônemo.
+
+- um ponto de partida é estabelecer que existe correlação entre os três principais efeitos da remoção de habitat natural [i) diminuição da quantidade de habitat disponível; ii) fragmentação per se; e iii) efeito de borda] e não é possível distinguir os efeitos individuais de cada um.
+
+ 
+II) Definição dos efeitos da fragmentação:
+
+a) diminuição da quantidade de habitat: a remoção de habitat natural leva a diminuição da quantidade de habitat disponível para as populações implicando na diminuição de seu tamanho populacional, o quê aumenta o risco de extinção
+
+b) fragmentação per se: mudança na configuração espacial da paisagem 
+- ao remover habitat invariavelmente resulta em aumento no número de fragmentos florestais na paisagem, diminuição do tamanho dos fragmentos florestais e aumento do isolamento dos fragmentos florestais [Fahrig 2003)
+- a divisão de habitat em porções menores e mais isoladas separadas por uma matrix de cobertura transformada pela atividade humana (Haddad et al. 2015)
+
+c) efeito de borda: modificação do habitat remanescente associado à região de fronteira com a área do habitat removido pela introdução de novos gradientes ecológicos que resulta na diminuição das taxas de natalidade e aumento da taxa de mortalidade de espécies associados com o habitat original [portanto atuando como um filtro ambiental]
+
+
+III) Questão sobre os efeitos da fragmentação na manutenção da diversidade:
+
+- Ecologists agree that habitat destruction is detrimental to the maintenance of biodiversity, but they disagree—often strongly—on the extent to which fragmentation itself is to blame (Haddad et al. 2015)
+
+
+
 ## 04 Setembro ##
 
 Introdução: cadeia argumentativa (blocos mínimos)
