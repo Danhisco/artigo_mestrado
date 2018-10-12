@@ -27,7 +27,7 @@ library(broom) # para manipular os modelos
 library(magrittr) # p escrita
 library(MASS)
 library(car)
-# library(plyr) 
+library(DHARMa)
 # library(dplyr) 
 df_resultados <- read_csv("/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/df_resultados.csv")
 # df_resultados %>% str
@@ -456,41 +456,32 @@ iii) A distribuição de valores dentro do grupos corresponde à distribuição 
 
 __Diagnóstico do modelo cheio selecionado__
 
+Reunião 11 de outubro de 2018:
+
+PI recomendou utilizar resíduos quantílicos para diagnosticar o modelo cheio. O pacote DHARMa oferece a possibilidade de utilizar esse recurso
+
 ```{r GOF diag1}
-# dados #
-df_reg <- augment(l_md[[2]])
-df_reg[,1] <- df_reg[,1][,1]
-df_reg %<>% mutate(scale.resid = sqrt(abs(.resid)))
-# grafico 
-l_p <- vector("list",2)
-l_p[[1]] <- ggplot(df_reg,aes(x=.fitted,y=.resid)) +
-  geom_point() +
-  geom_smooth(method="loess") +
-  labs(y="residuos")
-  # facet_wrap(~MN,ncol=2)
-l_p[[2]] <- ggplot(df_reg,aes(x=.fitted,y=scale.resid)) +
-  geom_point() +
-  geom_smooth(method="loess") +
-  labs(y="sqrt(|residuos|)")
-  # facet_wrap(~MN,ncol=2)
-do.call("grid.arrange",c(l_p,ncol=2))
+residuos_GOF <- simulateResiduals(fittedModel = l_md[[2]], n = 1000)
+plot(residuos_GOF)
 ```
 
-__Figura 3.1__ Resíduos contra valores ajustados: 1o painel resíduos contra ajustados; 2o painel _the scale-location plot_
+__Figura 3.1__ Resíduos quantílicos: 1o gráfico qq-plot e teste de aderência dos resíduos com o esperado segundo uniformidade com a distribuição teórica (teste de Kolmogorov-Smirnov); 2o gráfico resíduos contro o previsto, linhas são da regressão quantílica (0.25, 0.50, 0.75) 
 
-- a variância dos resíduos não está igualmente distribuida ao longo dos valores ajustados; observa-se padrões nos resíduos
+- o teste de uniformidade mostra que desvio é significativo apontando para o modelo não prediz corretamente as observações
+- o gráfico dos resíduos conra os valores previstos indica que a variação não está igualmente distribuida (como se pode ver pelas regressões quantílicas)
 
 ```{r GOF diag2,fig.width=10,fig.height=4}
+df_reg <- df_resultados %>% mutate(GOF_q.resid = residuos_GOF$scaledResiduals)
 l_p <- vector("list",3)
-l_p[[1]] <- ggplot(df_reg,aes(x=p.z,y=.resid)) +
+l_p[[1]] <- ggplot(df_reg,aes(x=p.z,y=GOF_q.resid)) +
   geom_point() +
   geom_smooth(method="loess") +
   labs(y="residuos")
-l_p[[2]] <- ggplot(df_reg,aes(x=MN,y=.resid)) +
+l_p[[2]] <- ggplot(df_reg,aes(x=MN,y=GOF_q.resid)) +
   geom_jitter() +
   geom_boxplot() +
   labs(y="")
-l_p[[3]] <- ggplot(df_reg,aes(x=k,y=.resid)) +
+l_p[[3]] <- ggplot(df_reg,aes(x=k,y=GOF_q.resid)) +
   geom_jitter() +
   geom_boxplot() +
   labs(y="")
@@ -505,7 +496,7 @@ do.call("grid.arrange",c(l_p,ncol=3))
 __Figura 3.2__ resíduos contra as variáveis preditoras
 
 ```{r GOF diag3}
-ggplot(df_reg,aes(x=p.z,y=.resid,color=MN)) +
+ggplot(df_reg,aes(x=p.z,y=GOF_q.resid,color=MN)) +
   geom_point() +
   geom_smooth(method="loess") +
   labs(y="residuos") +
@@ -516,7 +507,7 @@ ggplot(df_reg,aes(x=p.z,y=.resid,color=MN)) +
 __Figura 3.3__ resíduos contra as variáveis preditoras p * MN * k
 
 ```{r GOF diag4}
-ggplot(df_reg,aes(x=MN,y=.resid)) +
+ggplot(df_reg,aes(x=MN,y=GOF_q.resid)) +
   geom_jitter() +
   geom_boxplot() +
   labs(y="residuos") +
@@ -606,14 +597,28 @@ l_md[[19]] <- glmer(cbind(GOF,100-GOF) ~ 1 + (1|Site), family = "binomial",data=
 AICctab(l_md,weights=T)
 ```
 
+O modelos cheio foi o único modelo plausível somando peso de evidência próximo de 1. Para fazer a interpretação irei construir um gráfico do predito com intervalo de confiança contra o observado na escala da função de ligação logito.
+
+__Predição e Observado na escala logito__
+
+```{r GOF predicao IC e observado na escala logito}
+md_GOF <- l_md[[1]]
+## novo conjunto de dados: todas as combinações entre as preditoras ##
+df_new.data <- expand.grid(Site = df_resultados$Site[1],
+                          p.z = seq(min(df_resultados$p.z)*1.1,max(df_resultados$p.z)*1.1, length=50),
+                          k = unique(df_resultados$k),
+                          MN = unique(df_resultados$MN))
+## funções para serem calculados a cada simulação ##
+# previsto pelo modelo completo: efeitos aleatórios e fixos #
+f1 <- function(.) predict(.,newdata=df_new.data)
+# previsto pelo modelo completo: fixos #
+f2 <- function(.) predict(.,newdata=df_new.data, re.form=~0)
+## Os dois bootstraps. Ajuste o argumento ncpus para o numero de cores de seu computador
+b1 <- bootMer(md_GOF, FUN = f1, nsim=1000, parallel="multicore", ncpus=3)
+b2 <- bootMer(md_GOF, FUN = f2, nsim=1000, parallel="multicore", ncpus=3)
+```
 
 
--> seleção do modelo mais plausível:
-a) modelo cheio: p + k + MN + p:k + p:MN + k:MN + p:k:MN [p * k * MN]
-b) modelo cheio - interação 3a ordem: p + k + MN + p:k + p:MN + k:MN [p*MN + p*k + MN*k]
-c) modelo cheio - efeito de p: k + MN + k:MN [k * MN]
-d) modelo cheio - efeito de k: p + MN + p:MN [p * MN]
-e)
 
 
 
@@ -626,3 +631,131 @@ b) avaliar função de ligação
 c) seleção de modelos
 d) avaliação do modelo selecionado
 e) estudo das estimativas e interpretação
+
+
+################ DNA Lixo 
+
+#### Desempenho dos modelos relativo um ao outro - dGOF
+
+- para explorar uma variável que é a relação entre os GOFs de MN é necessário 'remover' os zeros observados pois: i) quando dividimos por zero temos uma indeterminação; e ii) quando zero é divido por algo perdemos a variação desse valor pois todos vão para zero.
+- uma maneira de lidar com isso é somar a todos os valores o maior observado de GOF, 100. Assim a variável varia de 100 até 200
+- dGOF = EE/EI; além disso é possível avaliar os valores na escala log
+- pensei em utilizar a razão de chances (odds ratio) como variável resposta, mas em alguns casos EI = 0 então a razão de chances é dividido por zero
+- uma vez que utilizamos uma variável que estabelece a relação entre os valores, eu devo descrever no texto dos resultados os valores absolutos de GOF
+
+
+```{r graf exp dGOF 1, fig.height=6, fig.width=9}
+## data frame
+df_ad <- df_resultados %>% select(Site,p,k,k.z,DA,S,S.z,MN,U,GOF) %>% 
+  spread(key=MN,value=GOF) %>% mutate(EE0 = EE + 100, EI0 = EI + 100) %>% 
+  mutate(dGOF = EE0/EI0,
+         orGOF = (EE/100-EE) / (EI/100-EI),
+         log.dGOF = log(dGOF),
+         log.orGOF = log(orGOF),
+         JM = 500 * p * DA, 
+         theta = U * (JM-1) / (1-U))
+## graficos
+df_ad %>% select(Site,p,k,dGOF,log.dGOF) %>% reshape2::melt(id.vars = c("Site","p","k"), variable.name="GOF.type",value.name="GOF.value") %>%
+  ggplot(aes(y=GOF.value,x=p,color=GOF.type)) +
+  geom_point() +
+  labs(y="") +
+  facet_wrap(~k,ncol=3)
+```
+
+__Figura 11__ dGOF = EE/EI e log.dGOF = log(dGOF) pela cobertura vegetal (p) e proporção de propágulos (k)
+
+- dGOF intrinsicamente perde informação valiosa para entender como as predições dos modelos neutros se aproximam ou não do observado
+- concluímos que manter a variável GOF é a melhor forma de continuar na análise estatística
+
+### Resultados da dissertação
+
+- na dissertação não haviamos gerados os dados para EI
+- assim há duas variáveis de interesse nestas análises: p e k
+- k foi interpretada como variável contínua
+
+#### Seleção de Modelos GOF
+
+```{r tabela selecao GOF}
+df_ad <- df_resultados %>% filter(MN == "EE")
+l_md1 <- vector("list", length = 5)
+names(l_md1) <- c("p * K", "p + K", "K", "p" ,"1")
+l_md1[[1]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k.z + (k.z | Site), 
+                    family = "binomial", data = df_ad)
+l_md1[[2]] <- glmer(cbind(GOF,100-GOF) ~ p.z + k.z + (k.z | Site),
+                    family = "binomial", data = df_ad)
+l_md1[[3]] <- glmer(cbind(GOF,100-GOF) ~ k.z + (k.z | Site),
+                    family = "binomial", data = df_ad)
+l_md1[[4]] <- glmer(cbind(GOF,100-GOF) ~ p.z + (k.z | Site),
+                    family = "binomial", data = df_ad)
+l_md1[[5]] <- glmer(cbind(GOF,100-GOF) ~ 1 + (k.z | Site),
+                    family = "binomial", data = df_ad)
+AICctab(l_md1, weights = TRUE)
+```
+
+#### Sumário do modelo de GOF
+
+```{r sumario de GOF}
+summary(l_md1[[1]])
+```
+
+
+#### R2 dos modelos 
+
+__R2 marginal e condicional__
+
+```{r R2 m e c, warning=FALSE,message=FALSE}
+# (r2_GOF <- sapply(l_md1, r.squaredGLMM))
+```
+
+__Porcentagem explicada pelos efeitos fixos__
+
+```{r porcentagem R2}
+# (r2_GOF[1,]/r2_GOF[2,] * 100) %>% round(3) 
+```
+
+
+#### Predito e Intervalo de Confiança
+
+Para plotar é necessário transformar da escala da predição, escala logito, para a escala padrão
+
+```{r estimativa e intervalo de confianaca bootstrap}
+# md_GOF <- l_md1[[1]] # modelo mais plausível de GOF
+# ## novo conjunto de dados ##
+# # objetivo: criar todas as combinações entre as preditoras
+# df_newdat <- expand.grid(Site = df_ad$Site[1],
+#                          k.z = unique(df_ad$k.z),
+#                          p.z = seq(min(df_ad$p.z)*1.1,max(df_ad$p.z)*1.1, length=50)) 
+# ## Funçoes a serem calculadas a cada simulação ##
+# # previsto considerando a estrutura fixa e aleatória #
+# f1 <- function(.) predict(.,newdata=df_newdat)
+# # previsto considerando a estrutura fixa #
+# f2 <- function(.) predict(.,newdata=df_newdat, re.form=~0)
+# ## Os dois bootstraps. Ajuste o argumento ncpus para o numero de cores de seu computador
+# b1 <- bootMer(md_GOF, FUN = f1, nsim=1000, parallel="multicore", ncpus=3)
+# b2 <- bootMer(md_GOF, FUN = f2, nsim=1000, parallel="multicore", ncpus=3)
+# ## calcula as médias e intervalos de confiança quantílicos para cada combinação de preditoras
+# ## no novo conjunto de dados
+# df_newdat$p <- df_newdat$p.z*sd(df_ad$p) + mean(df_ad$p)
+# df_newdat$mean <- apply(b1$t,2,mean)
+# df_newdat$IC.low <- apply(b1$t,2,quantile, 0.025)
+# df_newdat$IC.upp <- apply(b1$t,2,quantile, 0.975)
+# df_newdat$mean.fixed <- apply(b2$t,2,mean)
+# df_newdat$IC.low.fixed <- apply(b2$t,2,quantile, 0.025)
+# df_newdat$IC.upp.fixed <- apply(b2$t,2,quantile, 0.975)
+# ## Plots de GOF/100 x cobertura standardizada com intervalos de predição
+# df_ad %>%
+#     ggplot(aes(x=p,y=GOF/100) ) + 
+#     geom_ribbon(aes(y=mean, ymin=IC.low, ymax=IC.upp), data=df_newdat, col="gray", alpha=0.5) +
+#     geom_ribbon(aes(y=mean, ymin=IC.low.fixed, ymax=IC.upp.fixed), data=df_newdat, col="gray", alpha=0.5) +
+#     geom_line(aes(x=p, y=mean.fixed), data=df_newdat) +
+#     geom_point() +
+#     facet_wrap(~k.z)
+# df_ad$GOF %>% summary
+```
+
+__Figura 1__ 
+
+### Status
+
+- desenvolver a análise dos dados com o conjunto de dados do modelo EI
+
