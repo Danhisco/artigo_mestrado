@@ -516,8 +516,37 @@ ggplot(df_reg,aes(x=MN,y=GOF_q.resid)) +
 
 __Figura 3.4__ resíduos contra as variáveis preditoras MN * k
 
-- a partir da visualização dos resíduos do modelo cheio podemos concluir que: i) o modelo está linearizando corretamente os valores observados; ii) a variância dos resíduos é maior para a classe EI e para os níveis extremos de k, e parece haver correlação entre os níveis extremos de k e EI.
-- me parece razoável aceitar o ajuste realizado por este modelo cheio e prosseguirem com ele para a seleção do modelo mais plausível
+- uma vez que o modelo cheio não apresentou bom ajuste com os valores observados, então irei explorar alternativas. Primeiramente irei explorar outras funções de ligação e em seguida buscar outras distribuições teóricas
+
+__Seleção do modelo cheio 2: logit, probit e cloglog__
+
+```{r GOF escolha estrutura aleatoria}
+l_md <- vector("list",6)
+names(l_md) <- c("l 1|Site","l MN|Site", 
+                 "p 1|Site","p MN|Site", 
+                 "c 1|Site","c MN|Site")
+l_md[[1]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k * MN + (1|Site), family = "binomial",data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[2]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k * MN + (MN|Site), family = "binomial",data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[3]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k * MN + (1|Site), family = "binomial"(link = probit),data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[4]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k * MN + (MN|Site), family = "binomial"(link = probit),data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[5]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k * MN + (1|Site), family = "binomial"(link = cloglog),data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[6]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k * MN + (MN|Site), family = "binomial"(link = cloglog),data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+AICctab(l_md,weights=T)
+```
+
+o modelo com a função de ligação cloglog foi o único modelo plausível. O diagnóstico do modelo:
+
+```{r diag GOF cloglog1}
+residuos_GOF <- simulateResiduals(fittedModel = l_md[[6]], n = 1000)
+plot(residuos_GOF)
+```
+
 
 __Seleção do modelo mais plausível__
 
