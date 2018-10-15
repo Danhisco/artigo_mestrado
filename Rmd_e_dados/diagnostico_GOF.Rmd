@@ -1,0 +1,136 @@
+---
+title: "Material Suplementar - diagnostico da analise de GOF"
+author: "Mori, Danilo Pereira"
+date: "14 de outubro de 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE} 
+knitr::opts_chunk$set(echo = FALSE, tidy = TRUE, include = TRUE, warning = FALSE,cache = TRUE)
+```
+
+
+```{r r dados e pacotes,warning=FALSE,message=FALSE,echo=FALSE}
+library(sads)
+library(lme4)
+library(magrittr)
+library(DHARMa)
+library(tidyverse)
+library(plyr)
+
+df_resultados <- read_csv("/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/df_resultados.csv")
+# df_resultados %>% str
+df_resultados$MN <- factor(df_resultados$MN,levels = c("EI","EE"))
+df_resultados$SiteCode <- factor(df_resultados$SiteCode)
+df_resultados$k <- factor(df_resultados$k,levels=unique(df_resultados$k))
+# df_resultados$k %>% contrasts()
+# df_resultados$MN %>% contrasts()
+
+#### z score ###
+f_z <- function(x){
+  m <- base::mean(x,na.rm=TRUE)
+  sd <- sd(x,na.rm=TRUE)
+  output <- (x-m)/sd
+  return(output)
+} 
+
+df_resultados %<>% mutate(GOF.z = f_z(GOF),
+                          DA.z = f_z(DA),
+                          p.z = f_z(p),
+                          S.z = f_z(S),
+                          U.z = f_z(U),
+                          m_.z = f_z(m_),
+                          I.z = f_z(I),
+                          d.z = f_z(d),
+                          k.z0 = as.numeric(as.character(k)),
+                          k.z = f_z(k.z0))
+
+names(df_resultados)[1] <- "Site"
+```
+
+
+  A variável resposta é discreta e representa o número de vezes que a predição de um modelo apresentou boa congruência com o observado (GOF), as variáveis preditoras são p (porcentagem de cobertura vegetal), MN (classe do modelo, com dois níveis EE e EI) e k (variável de dispersão com 12 niveis). Para cada sítio de amostragem (Site) simulamos 12 cenários (um para nível de k) para cada modelo (MN). Para analisar GOF começamos com um GLMM binomial logito e duas estruturas aleatórias (1|Site) e (MN|Site), então selecionamos a estrutura aleatória mais plausível considerando o modelo cheio com a interação de terceira ordem entre p, MN e k: 
+
+```{r GOF escolha estrutura aleatoria}
+l_md1 <- vector("list",2)
+names(l_md1) <- c("1|Site","MN|Site")
+l_md1[[1]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k * MN + (1|Site), family = "binomial",data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md1[[2]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k * MN + (MN|Site), family = "binomial",data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+AICctab(l_md1,weights=T)
+```
+
+ O modelo com estrutura aleatória (MN|Site) foi o único plausível. Então fizemos o diagnóstico do modelo utlizando os resíduos quantílicos do pacote DHARMa (REFERENCIA):
+ 
+```{r GOF diag1}
+# dados #
+residuos_GOF <- simulateResiduals(fittedModel = l_md1[[2]], n = 1000)
+plot(residuos_GOF)
+```
+
+__Figura 1__ Resíduos quantílicos: 1o gráfico qq-plot e teste de aderência dos resíduos com o esperado segundo uniformidade com a distribuição teórica (teste de Kolmogorov-Smirnov); 2o gráfico resíduos contro o previsto, linhas são da regressão quantílica (0.25, 0.50, 0.75)
+
+  Pelo QQplot podemos avaliar que a distribuição dos resíduos quantílicos desvia significativamente do esperao segundo uma uniforme. Então comparamos GLMMs binomias com as duas outras funções de ligação canônicas:
+  
+```{r GOF escolha funcao de ligacao}
+l_md2 <- vector("list",3)
+names(l_md2) <- c("logit", 
+                 "probit", 
+                 "cloglog")
+l_md2[[1]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k * MN + (MN|Site), family = "binomial",data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md2[[2]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k * MN + (MN|Site), family = "binomial"(link = probit),data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md2[[3]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k * MN + (MN|Site), family = "binomial"(link = cloglog),data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+AICctab(l_md2,weights=T)
+```  
+
+  O único modelo plausível é aquele com a funçao de ligação cloglog. Repetimos o diagnóstico com os resíduos DHARMa para os três modelos:
+  
+```{r GOF teste de aderencia funcoes de ligacao,fig.height=3.5,fig.width=8}
+# resíduos dos modelos #
+l_residuos2 <- llply(l_md2,function(x) (simulateResiduals(fittedModel = x, n=1000)))
+# gráficos #
+par(mfrow=c(1,3))
+l_ply(l_residuos2,function(x) plotQQunif(x))
+```
+
+__Figura 2__ Testes de aderência à uniformidade dos resíduos quantílicos: 1o painel - logito; 2o painel - probito; 3o painel - cloglog
+  
+  Nenhum das três funções de ligação apresentam bom ajuste e a função de ligação não apresenta grande melhora na aderência dos resíduos à distribuição uniforme. Uma vez que a função de logito apresenta uma facilidade de interpretação por estimar os coeficientes em termos de log da razão de chance (Fox 1997), optamos por continuar com o modelo logito. Então vamos investigar quais as implicações desse desvio da uniformidade. Primeiramente vamos investigar a origem do desvio. Levantamos duas hipóteses de sua origem: a) devido à estrutura aleatória e b) por conta da inflamação de zeros.
+
+#### Investigação da origem dos desvios
+
+__Desvios devido à estrutura aleatória__
+
+  Para lidar com (a) podemos comparar os resíduos do modelo cheio com as duas estruturas aleatórias (1|Site) e (MN|Site):
+  
+```{r comparacao dos residuos das estruturas aleatorias,echo=T}
+# residuos #
+l_residuos1 <- llply(l_md1,function(x) (simulateResiduals(fittedModel = x, n=1000, use.u=F)))
+l_residuos1.1 <- llply(l_md1,function(x) (simulateResiduals(fittedModel = x, n=1000, use.u=T)))
+# gráficos #
+par(mfrow=c(2,2))
+l_ply(l_residuos1,function(x) plotQQunif(x))
+l_ply(l_residuos1.1,function(x) plotQQunif(x))
+```
+
+__Figura 3__ Testes de aderência à uniformidade re-simulando os resíduos gerando novos valores distribuidos segundo uma normal para a estrutura aleatória (primeira linha de gráficos); ou re-simulando os resíduos condicionados à estrutura aleatória (segunda linha de gráficos). A primeira coluna coresponde aos resíduos do modelo com (1|Site) e a segunda coluna ao modelo (MN|Site)
+
+  Há um aumento dos desvios no modelo com a estrutura aleatória mais simples. Os resíduos não condicionados à estrutura aleatória apresentam menor desvios do que aqueles resíduos condicionados à estrutura aleatória.
+  
+
+__Desvios devido à inflamação de zeros__
+
+  Para avaliar o efeito da inflamação de zeros vou utilizar o teste específico disponível no pacote DHARMa:
+
+```{r teste de inflamcao de zeros}
+testZeroInflation(residuos_GOF)
+```
+
+__Figura 4__ Teste de Inflamação de Zeros: o histograma representa o número de zeros esperado se o modelo estiver correto e a linha vermelha os zeros observados.
+
+  O teste indica que há problemas de inflamação por zeros. 
+  
