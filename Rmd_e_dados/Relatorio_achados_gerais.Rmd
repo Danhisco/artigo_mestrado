@@ -21,8 +21,9 @@ library(merTools) # para intervalos de previsao
 library(tidyverse)
 library(broom) # para manipular os modelos
 library(magrittr) # p escrita
-# library(plyr)
-# library(dplyr)
+library(DHARMa)
+library(merTools)
+library(plyr)
 df_resultados <- read_csv("/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/df_resultados.csv")
 # df_resultados %>% str
 df_resultados$MN <- factor(df_resultados$MN,levels = c("EI","EE"))
@@ -680,40 +681,29 @@ AICctab(l_md,weights=T)
 
 ##### Diagnóstico do Modelo Selecioonado
 
+- resíduos quantílicos (DHARMa)
+
 ```{r GOF diag1}
 # dados #
-df_reg <- augment(l_md[[2]])
-df_reg[,1] <- df_reg[,1][,1]
-df_reg %<>% mutate(scale.resid = sqrt(abs(.resid)))
-# grafico 
-l_p <- vector("list",2)
-l_p[[1]] <- ggplot(df_reg,aes(x=.fitted,y=.resid)) +
-  geom_point() +
-  geom_smooth(method="loess") +
-  labs(y="residuos")
-  # facet_wrap(~MN,ncol=2)
-l_p[[2]] <- ggplot(df_reg,aes(x=.fitted,y=scale.resid)) +
-  geom_point() +
-  geom_smooth(method="loess") +
-  labs(y="sqrt(|residuos|)")
-  # facet_wrap(~MN,ncol=2)
-do.call("grid.arrange",c(l_p,ncol=2))
+residuos_GOF <- simulateResiduals(fittedModel = l_md[[2]], n = 1000)
+plot(residuos_GOF)
 ```
 
-__Figura 12.1__ Resíduos contra valores ajustados: 1o painel resíduos contra ajustados; 2o painel _the scale-location plot_
+__Figura 12.1__ Resíduos quantílicos: 1o gráfico qq-plot e teste de aderência dos resíduos com o esperado segundo uniformidade com a distribuição teórica (teste de Kolmogorov-Smirnov); 2o gráfico resíduos contro o previsto, linhas são da regressão quantílica (0.25, 0.50, 0.75) 
 
 
 ```{r GOF diag2,fig.width=10,fig.height=4}
+df_reg <- df_resultados %>% mutate(GOF_q.resid = residuos_GOF$scaledResiduals)
 l_p <- vector("list",3)
-l_p[[1]] <- ggplot(df_reg,aes(x=p.z,y=.resid)) +
+l_p[[1]] <- ggplot(df_reg,aes(x=p.z,y=GOF_q.resid)) +
   geom_point() +
   geom_smooth(method="loess") +
   labs(y="residuos")
-l_p[[2]] <- ggplot(df_reg,aes(x=MN,y=.resid)) +
+l_p[[2]] <- ggplot(df_reg,aes(x=MN,y=GOF_q.resid)) +
   geom_jitter() +
   geom_boxplot() +
   labs(y="")
-l_p[[3]] <- ggplot(df_reg,aes(x=k,y=.resid)) +
+l_p[[3]] <- ggplot(df_reg,aes(x=k,y=GOF_q.resid)) +
   geom_jitter() +
   geom_boxplot() +
   labs(y="")
@@ -729,7 +719,7 @@ __Figura 12.2__ resíduos contra as variáveis preditoras
 
 
 ```{r GOF diag3}
-ggplot(df_reg,aes(x=p.z,y=.resid,color=MN)) +
+ggplot(df_reg,aes(x=p.z,y=GOF_q.resid,color=MN)) +
   geom_point() +
   geom_smooth(method="loess") +
   labs(y="residuos") +
@@ -741,7 +731,7 @@ __Figura 12.3__ resíduos contra as variáveis preditoras p * MN * k
 
 
 ```{r GOF diag4}
-ggplot(df_reg,aes(x=MN,y=.resid)) +
+ggplot(df_reg,aes(x=MN,y=GOF_q.resid)) +
   geom_jitter() +
   geom_boxplot() +
   labs(y="residuos") +
@@ -750,8 +740,61 @@ ggplot(df_reg,aes(x=MN,y=.resid)) +
 
 __Figura 12.4__ resíduos contra as variáveis preditoras MN * k
 
+- o teste de uniformidade mostra que desvio é significativo apontando para o modelo não prediz corretamente as observações
+- o gráfico dos resíduos conra os valores previstos indica que a variação não está igualmente distribuida (como se pode ver pelas regressões quantílicas)
+- parece que o modelo está com dificuldades de fazer um bom ajuste k:0.25 e para MN:EI
+- vou explorar outras funções de ligação para avaliar se o ajuste do modelo pode ficar melhor
 
-#### Seleção de Modelos
+##### Comparação das três funções de ligação canônicas para a distribuição binomial
+
+```{r GOF escolha funcao de ligacao}
+l_md <- vector("list",6)
+names(l_md) <- c("l 1|Site","l MN|Site", 
+                 "p 1|Site","p MN|Site", 
+                 "c 1|Site","c MN|Site")
+l_md[[1]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k * MN + (1|Site), family = "binomial",data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[2]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k * MN + (MN|Site), family = "binomial",data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[3]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k * MN + (1|Site), family = "binomial"(link = probit),data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[4]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k * MN + (MN|Site), family = "binomial"(link = probit),data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[5]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k * MN + (1|Site), family = "binomial"(link = cloglog),data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[6]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k * MN + (MN|Site), family = "binomial"(link = cloglog),data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+AICctab(l_md,weights=T)
+```
+
+- o modelo mais plausível considera a função de ligação cloglog
+
+```{r diag GOF cloglog1}
+l_residuos <- llply(l_md[c(2,4,6)],function(x) (simulateResiduals(fittedModel = x, n=1000)))
+plot(l_residuos[[3]])
+```
+
+__Figura 12.5__ Resíduos quantílicos do modelo com função de ligação cloglog, o único plausível
+
+- não observo melhorar significativa do modelo (figura 12.1 e 12.5)
+- para comparação segue o teste de aderência das três funções de ligação
+
+```{r GOF teste de aderencia funcoes de ligacao,fig.height=3.5,fig.width=8}
+par(mfrow=c(1,3))
+l_ply(l_residuos,function(x) plotQQunif(x))
+```
+
+__Figura 12.6__ Testes de aderência à uniformidade dos resíduos quantílicos: 1o painel - logito; 2o painel - probito; 3o painel - cloglog
+
+- Não diferenças significativas entre as três funções de ligação
+- uma vez que não observamos melhora, optamos prosseguir com a função de ligação logito pois sua interpretação e comunicação é mais fácil.
+
+
+#### Seleção de Variáveis
+
+- comparamos todos os submodelos criados a partir do modelo cheio que considera a interação de terceira ordem entre as variável p, k e MN
+
+##### Seleção do modelo mais plausível
 
 ```{r GOF selecao de modelos}
 l_md <- vector("list",19)
@@ -813,5 +856,66 @@ l_md[[19]] <- glmer(cbind(GOF,100-GOF) ~ 1 + (1|Site), family = "binomial",data=
               control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
 AICctab(l_md,weights=T)
 ```
+
+- O modelos cheio foi o único modelo plausível somando peso de evidência próximo de 1.
+
+##### Estimativas do modelo mais plausível
+
+- segue súmario do modelo mais plausível:
+
+```{r md_GOF sumario}
+md_GOF <- l_md[[1]]
+# fastdisp(md_GOF)
+```
+
+Pontos para avaliação:
+
+i) o erro padrão das estimativas dos coef está baixa com relação a seus valores (quais seriam valores altos?);
+ii) o desvio padrão estimado para a estrutura aleatória indica que existe grande variância dentro das categórias (pesquisar essa questão)
+iii) a correlação intra estrutura aleatória é baixa (pesquisar segundo ponto)
+
+
+```{r md_GOF simulate values fixed effects}
+# simulacao
+fe_GOF <- FEsim(md_GOF,n.sims = 1000)
+
+# grafico #
+plotFEsim(fe_GOF,stat = "mean",intercept = TRUE) + theme_bw() + labs(y="taxa de GOF",x="média do efeito estimado")
+
+# ggplot(fe_GOF) + aes(x = term, ymin = mean - 1.96 * sd, 
+#       ymax = mean + 1.96 * sd, y = mean) + 
+#   geom_pointrange() + 
+#   geom_hline(yintercept = 0, size = I(1.1), color = I("red")) + 
+#   coord_flip() +
+#   theme_bw() + labs(y="taxa de GOF",x="média do efeito estimado")
+```
+
+__Figura 13.1__ Média e Interval de confiança de 95% estimado para cada coeficiente do modelo mais plausível. Método de estimativa a parti de simulação (Gelman & Hill 2006) (?). Intervalo de confiança criado com o desvio padrão da simulação com 1000 ciclos. 
+
+- gráfico com as estimativas dos efeitos fixos; os coeficientes não estão ordenados por relação entre eles 
+- a maior parte dos coeficientes apresenta pequeno intervalo de confiança
+
+__tabela 1__ Efeitos Aleatórios: variância, erro padrão e correlação
+
+```{r variance covariance random effects}
+VarCorr(md_GOF)
+```
+
+
+```{r md_GOF simulate values random effects}
+# simulacao
+re_GOF <- REsim(md_GOF,n.sims = 1000)
+# re_GOF
+
+# grafico
+plotREsim(re_GOF,stat = "mean")
+```
+
+__Figura 13.2__ Média e Intervalo de Confiança de 95% dos parâmetros estimados da estrutura aleatória (MN|Site). 
+
+- parece que existe grande variação entre sítios: há diferentes combinações entre intercepto e inclinação de MN:EE, e.g. valores baixos de intercepto com altos e baixos valores de MN:EE. 
+
+##### Observado e Predito
+
 
 
