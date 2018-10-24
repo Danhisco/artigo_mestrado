@@ -917,5 +917,40 @@ __Figura 13.2__ Média e Intervalo de Confiança de 95% dos parâmetros estimado
 
 ##### Observado e Predito
 
+```{r md_GOF obs e predito, fig.height=7}
+## novo conjunto de dados: todas as combinações entre as preditoras ##
+df_new.data <- expand.grid(Site = df_resultados$Site[1],
+                           p.z = seq(min(df_resultados$p.z)*1.1,max(df_resultados$p.z)*1.1, length=length(unique(df_ad$p))),
+                           k = unique(df_resultados$k),
+                           MN = unique(df_resultados$MN))
+## predicao merTools ##
+df_new.data <- cbind(df_new.data,
+                     predictInterval(md_GOF,newdata = df_new.data,level=0.95,n.sims = 1000,stat = "mean"))
+# add de p na escala padrão #
+df_new.data$p <- df_new.data$p.z*sd(df_ad$p) + mean(df_ad$p)
+# transformando a predicao para escala da observacao #
+# df_new.data %<>% mutate(media = ( 1 / ( 1+exp(-fit) )), upr_media =  (1/(1+exp(-upr))), lwr_media =  (1/(1+exp(-lwr))))
+
+## remoção de 0 e 100 ##
+df_ad <- df_resultados
+df_ad$GOF[df_ad$GOF==0] <- 100/(1+exp(-min(df_new.data$lwr)))
+df_ad$GOF[df_ad$GOF==100] <- 100/(1+exp(-max(df_new.data$upr)))
+## transformação logito ##
+df_ad %<>% mutate(lGOF = log( (GOF/100) / ( 1 - (GOF/100) ) ))
+
+
+## Gráfico ##
+# print(
+#   scale_colour_manual(values = c("Blue", "Red"))
+# )
+ggplot(data=df_new.data,aes(x=p,y=lGOF,color=MN)) + 
+  geom_point(data=df_ad,aes(color=MN)) +
+  geom_ribbon(aes(y = fit, ymin=lwr, ymax=upr,color=MN,fill=MN), alpha=0.5) +
+  geom_line(aes(x=p, y=fit,color=MN)) +
+  facet_wrap(~k,ncol=3) +
+  scale_colour_manual(values = c("Blue", "Red")) + 
+  scale_fill_manual(values = c("Blue", "Red")) +
+  theme(legend.position = "bottom") #+
+```
 
 
