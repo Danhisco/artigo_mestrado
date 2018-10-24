@@ -28,7 +28,8 @@ library(magrittr) # p escrita
 library(MASS)
 library(car)
 library(DHARMa)
-# library(dplyr) 
+library(merTools)
+library(plyr)
 df_resultados <- read_csv("/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/df_resultados.csv")
 # df_resultados %>% str
 df_resultados$MN <- factor(df_resultados$MN,levels = c("EI","EE"))
@@ -543,13 +544,27 @@ AICctab(l_md,weights=T)
 o modelo com a função de ligação cloglog foi o único modelo plausível. O diagnóstico do modelo:
 
 ```{r diag GOF cloglog1}
-residuos_GOF <- simulateResiduals(fittedModel = l_md[[6]], n = 1000)
-plot(residuos_GOF)
+l_residuos <- llply(l_md[c(2,4,6)],function(x) (simulateResiduals(fittedModel = x, n=1000)))
+plot(l_residuos[[3]])
 ```
 
+__Figura 3.5__ Resíduos quantílicos do modelo binomial mais plausível (cloglog)
 
+Os resíduos quantílicos não apresentam boa aderência ao padrão de uniformidade como mostra o teste KS que aponta que o desvio é significante. Para comparação vou plotar os gráficos dos testes de uniformidade para os três modelos binomiais:
+
+```{r GOF diag uniformidade tres binom}
+par(mfrow=c(3,1))
+l_ply(l_residuos,function(x) plotQQunif(x))
+```
+
+__Figura 3.6__
+
+### Comentário sobre GOF ###
+
+  Apesar dos resíduos quantílicos de GOF apresentarem desvio significativo da uniformidade, devido a inflação de zeros, iremos prosseguir com o modelo logito para avaliar os resultados. Concomitantemente iremos investigar como lidar com a infação de zeros, mas quero preparar o script para analisar os dados.
+  
 __Seleção do modelo mais plausível__
-
+<!--
 Hipóteses a priori:
 
 I) a SAD não é suficiente para refutar neutralidade.
@@ -564,6 +579,8 @@ III.P) portanto o modelo neutro de espaço explícito (EE) apresenta melhor cong
 IV) um modelo neutro é suficiente para descrever a SAD se corretamente aproximar o processo de limitação à dispersão
 IV.P.a) portanto, existe um valor ótimo de limitação à dispersão onde observamos a maior congruência com o observado
 IV.P.b) portanto, se a fragmentação da paisagem modificar a limitação à dispersão 
+
+-->
 
 ```{r GOF selecao de modelos}
 l_md <- vector("list",19)
@@ -626,7 +643,60 @@ l_md[[19]] <- glmer(cbind(GOF,100-GOF) ~ 1 + (1|Site), family = "binomial",data=
 AICctab(l_md,weights=T)
 ```
 
-O modelos cheio foi o único modelo plausível somando peso de evidência próximo de 1. Para fazer a interpretação irei construir um gráfico do predito com intervalo de confiança contra o observado na escala da função de ligação logito.
+O modelos cheio foi o único modelo plausível somando peso de evidência próximo de 1.
+
+### roteiro merTools ###
+
+-Sumário do modelo:
+
+```{r md_GOF sumario}
+md_GOF <- l_md[[1]]
+fastdisp(md_GOF)
+```
+
+Pontos para avaliação:
+
+i) o erro padrão das estimativas dos coef está baixa com relação a seus valores (quais seriam valores altos?);
+ii) o desvio padrão estimado para a estrutura aleatória indica que existe grande variância dentro das categórias (PESQUISAR MELHOR ESSA QUESTÃO)
+iii) a correlação intra estrutura aleatória é baixa (pesquisar segundo ponto)
+
+- gráficos dos coeficientes com os erros padrão
+
+PESQUISAR: confint.merMod
+
+"An alternative is to simulate values of the fixed effects from the posterior using the function arm::sim. Our next tool, FEsim, is a convenience wrapper to do this and provide an informative data frame of the results."
+
+```{r md_GOF simulate values fixed effects}
+# simulacao
+fe_GOF <- FEsim(md_GOF,n.sims = 1000)
+# fe_GOF
+# grafico
+plotFEsim(fe_GOF,stat = "mean") + theme_bw() + labs(y="taxa de GOF",x="média do efeito estimado")
+```
+
+__Figura 4__ Mediana dos efeitos estimados pelo modelo mais plausível (modelo logito)
+
+Futuras avaliações:
+
+i) pesquisar a função
+ii) no y ("taxa de GOF") está a inclinação na escala logito? 
+iii) em x está a mediana de cada coef?
+
+- avaliação dos efeitos aleatórios
+
+"The result is a dataframe with estimates of the values of each of the random effects provided by the arm::sim() function. groupID represents the identfiable level for the variable for one random effect, term represents whether the simulated values are for an intercept or which slope, and groupFctr identifies which of the (1|x) terms the values represent"
+"To make unique identifiers for each term, we need to use both the groupID and the groupFctr term in case these two variables use overlapping label names for their groups."
+
+
+```{r md_GOF simulate values random effects}
+# simulacao
+re_GOF <- REsim(md_GOF,n.sims = 1000)
+# re_GOF
+
+# grafico
+plotREsim(re_GOF,stat = "mean")
+```
+
 
 __Predição e Observado na escala logito__
 
