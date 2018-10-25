@@ -1,0 +1,38 @@
+## 25 de Outubro 2015 ##
+I) O quê sei sobre os Resultados?
+
+a) Por quê foram obtidos?
+
+i) um teste tradicional da Teoria Neutra é avaliar a congruência entre a predição de um modelo neutro com a SAD observada em determinada contexto ecológico (McGill et al. 2006)
+
+ii) Em contexto de paisagem fragmentada, esperamos que nenhum modelo neutro seja suficiente para explicar a diversidade ecológica, uma vez que, em paisagens fragmentadas o pressupostos de equivalência funcional não é uma boa aproximação das taxas demográficas das espécies (Gilbert et al. 2006, Laurance et al. 2018). O efeito de borda, principal efeito da remoção de habitat (Haddad et al. 2015), atua como um filtro ambiental (Laurance 2008), processo determínistico (Pardini et al. 2017): algumas espécies apresentam aumento da das taxas de natalidade no habitat degradado da região da borda enquanto aquelas espécies associadas com o habitat original apresentam redução da taxa de natalidade e aumenta da taxa de mortalidade (REFERÊNCIA).
+
+iii) Então, esperamos que a congruência entre a SAD observada e predita segundo um modelo neutro diminua com a diminuição da cobertura vegetal. Assim, além de avaliar se é necessário ou não consideerar explicitamente a configuração espacial da paisagem para descrever a SAD observada (Hubbell 2005), podemos avaliar se o conjunto de dados é suficiente para indicar desvios da neutralidade (Rosindell et al. 2011). 
+
+[[[Adendo - a ideia é vir antes da sessão de GOF (na parte em que falo sobre quais cenários de dispersão estão sendo simulados)]]]
+
+b) Por quê o parâmetro de dispersão é importante na teoria neutra/estudo da fragmentação
+
+i) o parâmetro de dispersão pode mudar a forma da SAD predita no modelo espacialmente explícito, tornando o padrão mais próximo de uma lognormal ou log-series (algum Magurran 2006)
+
+ii) No modelo espacialmente explícito observa-se aumento da congruência da SAR observada com aquelas preditas assumindo funções de dispersão com distâncias médias de dispersão razoáveis com aqueles observadas no local de amostragem (reler Rosindells et al - acho que 2007 ou 2009)
+
+iii) ao considerar equivalência funcional entre as espécies, o principal processo que estrutura a comunidade na escala local é a limitação à dispersão (Condit et al. 2002, Alonso et al. 2006).
+
+iv) A dispersão neutra [procurar artigo sobre se a limitação à dispersão ser neutra ou de nicho] influência na distribuição espacial das espécies - este é um dos principais fatores que influenciam a forma da SAD (McGill 2010 - RELER)
+
+v) em paisagens fragmentadas o agente dispersor pode estar ausente ou modificado de modo que a limitação à dispersão pode se tornar mais severa (REFERÊNCIA)
+
+vi) Além disso "Percolation threshold" (~fragmentação per se) e limitação à dispersão (neutra) (RELER - REFERÊNCIAS).
+
+-> Texto da legenda da figura de md_GOF: observado X predito e IC
+
+i) Para avaliar a congruência entre o esperado segundo um modelo neutro e observado contabilizamos o número de SADs réplicas, geradas em determinado cenário neutro, que apresentam desvio significativo da SAD observada segundo teste de Kolmogorov-Smirnov com alfa crítico de 5%
+
+ii) Agrupamos os dados por sítio de amostragem e permitimos um intercepto livre para cada classe de modelo neutro por sítio de amostragem (i.e. MN|Site)
+
+iii) Comparamos o modelo logístico com a interação de terceira ordem entre porcentagem de cobertura vegetal (eixo x), proporção de propágulos até a vizinhança imediata da planta progenitora (título nos quadrículos) e classe do modelo neutro (EI - espacialmente explícito; EE - espacialmente expĺicito) com todos os submodelos utilizando AIC e peso de evidência (REESCREVER - Referências sobre AIC e peso de evidência)
+
+iv) O modelo de terceira ordem foi o único plausível somando peso de evidência de 1, contudo, os resíduos quantílicos divergem da uniformidade (referência pacote DHARMa). Outras funções de ligação não apresentam diminuição do desvio. Como a regressão quantílica dos resíduos contro o previsto está próximo do esperado (DHARMa) e a avaliação visual da predição e intervalo de confiança de 95% (referência merTools) estão de acordo com o padrão dos dados, optamos por continuar com o modelo logístico pela facilidade de interpretação.
+
+v) O coef de determinação marginal 0.337 enquanto o condicional foi de 0.650  
