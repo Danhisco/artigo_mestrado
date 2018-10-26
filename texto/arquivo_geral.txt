@@ -1,0 +1,59 @@
+### Arquivo Geral ###
+
+Resumo:
+
+- introdução: 
+
+A remoção de habitat leva a diminuição da quantidade de habitat e modificação da configuração espacial da paisagem. 
+
+Avaliamos se é necessário considerar a configuração espacial da paisagem para explicar a manuteção da biodiversidade. 
+
+Comparando a distribuição de abundância de espécies (SAD) amostrada em paisagens em um gradiente de cobertura vegetal com a predição de um modelo neutro de espaço explícito que considera uma transcrição do padrão espacial de distribuição de habitat e não-habitat com um equivalente modelo neutro de espaço implícito. 
+
+- materiais e método: 
+
+Selecionamos 80 trabalhos fitossóciologis que utilizaram amostragem contígua para descrever o componete arbóreo de 
+pelo menos 1 ha na Mata Atlântica. 
+
+Então recortamos uma área de 5 X 5 km2 concêntrica ao sítio de amostragem a partir de fotos áreas da cobertura vegetal. 
+
+Controlamos a limitação à dispersão pela proporção de propágulos que permanece até a vizinhança imediata da planta progenitora (k) e calculamos a propabilidade de um imigrante colonizar uma unidade de habitat disponível na comunidade local (m) e corrigimos pela porcentagem de cobertura vegetal na paisagem (p) a partir de dedução que utiliza a distânca média de dispersão (d) e distribuição teórica da função de dispersão. 
+
+Estimamos a taxa de especiação necessária para manter a riqueza da SAD amostrada no equilíbrio segundo o modelo neutro de espaço explícito dado o recorte de paisagem e função de dispersão.
+
+Utilizamos uma relação formal entre os parâmetros do modelo neutro de espaço implícito e explícito para gerar predições equivalentes.
+
+Comparamos as SADs preditas por esses dois modelos com a SAD observada utilizando um teste de hipótese não-parampétrico.
+
+- resultados e discussão:
+a) Quais as distâncias de dispersão média que simulamos?
+
+Simulamos de alta limitação à dispersão até distâncias médias próximos das observadas para árvores anemocóricas. 
+
+Pergunta: qual a distância média de dispersão na Mata Atlântica? E na mata atlântica em paisagens fragmentadas? Simulamos situções mais próximas do observado em paisagem preservada ou fragmentada?
+
+b) Como a congruência entre o observado e o previsto variou em função da cobertura vegetal, limitação à dispersão e se o modelo neutro considera ou não a configuração espacial da paisagem?
+
+b.1) Por quê os dados foram obtidos? (Qual a motivação?)
+
+b.2)[legenda figura] Como obtemos esses dados? 
+
+b.3) O quê observamos?
+
+O mais plausível é considerar a interação de terceira ordem entre as preditoras: DESCRIÇÃO DOS RESULTADOS [i) há piora da congruência entre o predito segundo o modelo de espaço implícito para distâncias médias de dispersão altas com a diminuição da paisagem; ii) o modelo neutro de espaço explícito é consistetemente melhor, apresenta pouca influência da limitação à dispersão no efeito da cobertura vegetal; iii) a congruência do modelo neutro de espaço implíxito diminui com o aumento da cobertura vegetal para os extremos da limitação à dispersão, padrão oposto para o modelo neutro de espaço explícito; iv) a variância aumenta com o aumento da distância média de dispersão, principalmente para o modelo de espaço implícito onde o efeito da cobertura vegetal se torna bem acentuado no cenário de menor severidade de limitação à dispersão; v) a maior parte da variação dos dados é explicada quando consideramos o sítio de amostragem]
+
+b.4) Quais as implicações? (Quais eram as espectativas teóricas?)
+
+c) Qual o efeito da cobertura vegetal na taxa de especiação para determinada proporção de propágulos até a vizinhança da planta progenitora?
+
+b.1) Por quê os dados foram obtidos? (Qual a motivação para coletar?)
+
+b.2)[legenda figura] Como obtemos esses dados? 
+
+b.3) O quê observamos?
+
+b.4) Quais as implicações? (Quais eram as espectativas teóricas?)
+
+- conclusão:
+
+- referência
