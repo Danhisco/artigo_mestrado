@@ -17,6 +17,7 @@ library(magrittr)
 library(DHARMa)
 library(tidyverse)
 library(plyr)
+library(glmmTMB)
 
 df_resultados <- read_csv("/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/df_resultados.csv")
 # df_resultados %>% str
@@ -99,7 +100,7 @@ l_ply(l_residuos2,function(x) plotQQunif(x))
 
 __Figura 2__ Testes de aderência à uniformidade dos resíduos quantílicos: 1o painel - logito; 2o painel - probito; 3o painel - cloglog
   
-  Nenhum das três funções de ligação apresentam bom ajuste e a função de ligação não apresenta grande melhora na aderência dos resíduos à distribuição uniforme. Uma vez que a função de logito apresenta uma facilidade de interpretação por estimar os coeficientes em termos de log da razão de chance (Fox 1997), optamos por continuar com o modelo logito. Então vamos investigar quais as implicações desse desvio da uniformidade. Primeiramente vamos investigar a origem do desvio. Levantamos duas hipóteses de sua origem: a) devido à estrutura aleatória e b) por conta da inflamação de zeros.
+  Nenhum das três funções de ligação apresentam bom ajuste e a função de ligação não apresenta grande melhora na aderência dos resíduos à distribuição uniforme. Uma vez que a função de logito apresenta uma facilidade de interpretação por estimar os coeficientes em termos de log da razão de chance (Fox 1997), optamos por continuar com o modelo logito. Então vamos investigar quais as implicações desse desvio da uniformidade. Primeiramente vamos investigar a origem do desvio. Levantamos duas hipóteses de sua origem: a) devido à estrutura aleatória e b) por conta da ĩnflação de zeros.
 
 #### Investigação da origem dos desvios
 
@@ -122,15 +123,22 @@ __Figura 3__ Testes de aderência à uniformidade re-simulando os resíduos gera
   Há um aumento dos desvios no modelo com a estrutura aleatória mais simples. Os resíduos não condicionados à estrutura aleatória apresentam menor desvios do que aqueles resíduos condicionados à estrutura aleatória.
   
 
-__Desvios devido à inflamação de zeros__
+__Desvios devido à ĩnflação de zeros__
 
-  Para avaliar o efeito da inflamação de zeros vou utilizar o teste específico disponível no pacote DHARMa:
+  Para avaliar o efeito da ĩnflação de zeros vou utilizar o teste específico disponível no pacote DHARMa:
 
 ```{r teste de inflamcao de zeros}
 testZeroInflation(residuos_GOF)
 ```
 
-__Figura 4__ Teste de Inflamação de Zeros: o histograma representa o número de zeros esperado se o modelo estiver correto e a linha vermelha os zeros observados.
+__Figura 4__ Teste de ĩnflação de Zeros: o histograma representa o número de zeros esperado se o modelo estiver correto e a linha vermelha os zeros observados.
 
-  O teste indica que há problemas de inflamação por zeros. 
+  O teste indica que há problemas de inflação por zeros. Uma alternativa é avaliar se estruturas aleatórias mais complexas diminuam os desvios da uniformidade
+
+#### Estruturas aleatórias alternativas
+
+  Uma possibilidade é considerar a variável k como uma variável contínua (z-transformada) e incorporar seu efeito na estrutura aleatória ao permitir que existe uma inclinação de GOF para k. Existe a possibilidade de incluir uma inclinação e intercepto próprios para cada classe de modelo neutro por sítio de amostragem. Incluindo na comparação k enquanto variável categórica temos 7 opções de modelo cheio: 2 com k como variável categórica [(1|Site) e (MN|Site)]; e 5 com k como variável contínua [(1|Site), (MN|Site), (k.z|Site), (MN+k.z|Site), (MN*k.z|Site)]
   
+
+
+
