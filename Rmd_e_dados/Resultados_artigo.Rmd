@@ -740,10 +740,10 @@ __Figura 14__ Logito de GOF (lGOF) e propoção de cobertura vegetal (p), por pr
 - o gráfico de observado e predito com intervalo de confiança mostra que a estimativa do modelo não está sendo suficiente para 
 
 ```{r md_GOF estruturas aleatorias alternativas}
-l_md <- vector("list",7)
-names(l_md) <- c("l k.f 1|Site","l k.f MN|Site", "l k.z 1|Site", "l k.z MN|Site", "l k.z k.z|Site", "l k.z MN + k.z|Site", "l k.z MN * k.z|Site")
-                 # "p k.f 1|Site","p k.f MN|Site", "p k.z 1|Site", "p k.z MN|Site", "p k.z k.z|Site", "p k.z MN + k.z|Site", "p k.z MN * k.z|Site",
-                 # "c k.f 1|Site","c k.f MN|Site", "c k.z 1|Site", "c k.z MN|Site", "c k.z k.z|Site", "c k.z MN + k.z|Site", "c k.z MN * k.z|Site")
+l_md <- vector("list",21)
+names(l_md) <- c("l k.f 1|Site","l k.f MN|Site", "l k.z 1|Site", "l k.z MN|Site", "l k.z k.z|Site", "l k.z MN + k.z|Site", "l k.z MN * k.z|Site",
+                 "p k.f 1|Site","p k.f MN|Site", "p k.z 1|Site", "p k.z MN|Site", "p k.z k.z|Site", "p k.z MN + k.z|Site", "p k.z MN * k.z|Site",
+                 "c k.f 1|Site","c k.f MN|Site", "c k.z 1|Site", "c k.z MN|Site", "c k.z k.z|Site", "c k.z MN + k.z|Site", "c k.z MN * k.z|Site")
 # logito #
 l_md[[1]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k * MN + (1|Site), family = "binomial",data=df_resultados,
                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
@@ -760,47 +760,172 @@ l_md[[6]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k.z * MN + (MN+k.z|Site), family =
 l_md[[7]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k.z * MN + (MN*k.z|Site), family = "binomial",data=df_resultados,
                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
 # probito #
-# l_md[[8]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k * MN + (1|Site), family = "binomial"(link = probit),data=df_resultados,
-#                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-# l_md[[9]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k * MN + (MN|Site), family = "binomial"(link = probit),data=df_resultados,
-#                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-# l_md[[10]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k.z * MN + (1|Site), family = "binomial"(link = probit),data=df_resultados,
-#                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-# l_md[[11]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k.z * MN + (MN|Site), family = "binomial"(link = probit),data=df_resultados,
-#                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-# l_md[[12]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k.z * MN + (k.z|Site), family = "binomial"(link = probit),data=df_resultados,
-#                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-# l_md[[13]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k.z * MN + (MN+k.z|Site), family = "binomial"(link = probit),data=df_resultados,
-#                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-# l_md[[14]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k.z * MN + (MN*k.z|Site), family = "binomial"(link = probit),data=df_resultados,
-#                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[8]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k * MN + (1|Site), family = "binomial"(link = probit),data=df_resultados,
+                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[9]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k * MN + (MN|Site), family = "binomial"(link = probit),data=df_resultados,
+                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[10]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k.z * MN + (1|Site), family = "binomial"(link = probit),data=df_resultados,
+                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[11]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k.z * MN + (MN|Site), family = "binomial"(link = probit),data=df_resultados,
+                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[12]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k.z * MN + (k.z|Site), family = "binomial"(link = probit),data=df_resultados,
+                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[13]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k.z * MN + (MN+k.z|Site), family = "binomial"(link = probit),data=df_resultados,
+                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[14]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k.z * MN + (MN*k.z|Site), family = "binomial"(link = probit),data=df_resultados,
+                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
 # # cloglog #
-# l_md[[15]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k * MN + (1|Site), family = "binomial"(link = cloglog),data=df_resultados,
-#                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-# l_md[[16]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k * MN + (MN|Site), family = "binomial"(link = cloglog),data=df_resultados,
-#                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-# l_md[[17]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k.z * MN + (1|Site), family = "binomial"(link = cloglog),data=df_resultados,
-#                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-# l_md[[18]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k.z * MN + (MN|Site), family = "binomial"(link = cloglog),data=df_resultados,
-#                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-# l_md[[19]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k.z * MN + (k.z|Site), family = "binomial"(link = cloglog),data=df_resultados,
-#                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-# l_md[[20]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k.z * MN + (MN+k.z|Site), family = "binomial"(link = cloglog),data=df_resultados,
-#                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-# l_md[[21]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k.z * MN + (MN*k.z|Site), family = "binomial"(link = cloglog),data=df_resultados,
-#                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[15]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k * MN + (1|Site), family = "binomial"(link = cloglog),data=df_resultados,
+                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[16]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k * MN + (MN|Site), family = "binomial"(link = cloglog),data=df_resultados,
+                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[17]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k.z * MN + (1|Site), family = "binomial"(link = cloglog),data=df_resultados,
+                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[18]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k.z * MN + (MN|Site), family = "binomial"(link = cloglog),data=df_resultados,
+                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[19]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k.z * MN + (k.z|Site), family = "binomial"(link = cloglog),data=df_resultados,
+                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[20]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k.z * MN + (MN+k.z|Site), family = "binomial"(link = cloglog),data=df_resultados,
+                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[21]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k.z * MN + (MN*k.z|Site), family = "binomial"(link = cloglog),data=df_resultados,
+                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
 AICctab(l_md,weights=T)
 ```
 
+- o único modelo plausível é aquele que considera k como um fator, MN|Site como estrutura aleatória e cloglog como função de ligação. Abaixo deste há a mesma estrutura mas com as funções de ligação probito e logito, respectivamente, contudo, fora do intervalo de plausibilidade. O quarto modelo mais plausível é aquele que considera k como variável contínua e a estrutura aleatória MN * k.z|Site. 
+
+- como o objetivo é avaliar se algumas dessas opções apresenta uma melhora significativa no padrão de resíduos e capacidade de explicar a variação presente nos dados vou comparar esses 4 primeiros modelos, mesmo apenas o primeiro sendo plausível, utilizando os resíduos quantílicos e o R2
+
+__cloglog k como categórica e MN|Site__
+
+```{r cloglog k MN|Site diag}
+residuos_cloglog <- simulateResiduals(fittedModel = l_md[[16]], n = 1000)
+plot(residuos_cloglog)
+```
+
+__Figura 15.1__ Resíduos quantílicos GOF ~ modelo cheio[cloglog, k.f, MN|Site]
+
+```{r R2 cloglog k.f MN|Site}
+r.squaredGLMM(l_md[[16]])
+```
 
 
+__probit k como categórica e MN|Site__
+
+```{r probit k MN|Site diag}
+residuos_probit <- simulateResiduals(fittedModel = l_md[[9]], n = 1000)
+plot(residuos_probit)
+```
+
+__Figura 15.2__ Resíduos quantílicos GOF ~ modelo cheio[cloglog, k.f, MN|Site]
+
+```{r R2 probit k.f MN|Site}
+r.squaredGLMM(l_md[[9]])
+```
 
 
+__logit k como categórica e MN|Site__
 
-3) U = probabilidade de especiação segundo modelo EE
+```{r cloglog k MN|Site diag}
+residuos_logit <- simulateResiduals(fittedModel = l_md[[2]], n = 1000)
+plot(residuos_logit)
+```
 
-a) avaliar qual a melhor distribuição de probabilidade
-b) avaliar função de ligação
-c) seleção de modelos
-d) avaliação do modelo selecionado
-e) estudo das estimativas e interpretação
+__Figura 15.1__ Resíduos quantílicos GOF ~ modelo cheio[cloglog, k.f, MN|Site]
+
+```{r R2 logit k.f MN|Site}
+r.squaredGLMM(l_md[[2]])
+```
+
+
+__logit k como categórica e MN|Site__
+
+```{r logit k.z MN*k.z|Site diag}
+residuos_logit.k <- simulateResiduals(fittedModel = l_md[[7]], n = 1000)
+plot(residuos_logit.k)
+```
+
+```{r R2 logit k.z MN*k.z|Site}
+r.squaredGLMM(l_md[[7]])
+```
+
+A distribuição dos resíduos quantílicos de todos os modelos apresenta desvio significativo da uniformidade. O modelo com MN*k.z|Site e função de ligação logito apresenta uma pequena melhora na aderência dos resíduos à uniformidade, contudo, há uma piora considerável na variância explicada pela estrutura fixa do modelo em comparação com o modelo logito com k enquanto variável categórica e MN|Site. Além disso a regressão quantílica para o modelo logito MN:k.z|Site diverge mais do esperado do que o outro modelo logito MN|Site.
+
+Os modelos com função de ligação logito são aqueles que melhor descrevem a variação dos dados (maior R2c), apesar do modelo cloglog ser o mais plausível. Como o intervalo de confiança da predição é uma qualidade importante do modelo que utilizaremos para analisar os dados vou comparar o modelo mais plausível (cloglog) com o melhor modelo logito, o modelo logito é de interesse por conta da sua facilidade de interpretação. Como a construção de intervalo de confiança utilizando bootMer é muito longo, irei utilizar o pacote merTools para uma primeira comparação entre os dois; entretanto, pelo R2 podemos esperar que a predição do modelo logito englobe a maior parte da variação dos dados.
+
+__Comparação intervalo de predição: cloglog e logit__
+
+```{r comparacao cloglog logit predito IC,fig.height=10}
+## novo conjunto de dados: todas as combinações entre as preditoras ##
+df_new.data <- expand.grid(Site = df_resultados$Site[1],
+                           p.z = seq(min(df_resultados$p.z)*1.1,max(df_resultados$p.z)*1.1, length=length(unique(df_resultados$p))),
+                           k = unique(df_resultados$k),
+                           MN = unique(df_resultados$MN))
+
+### Logit ###
+## predicao merTools ##
+df_nd.logit <- cbind(df_new.data,
+                     predictInterval(l_md[[2]],newdata = df_new.data,level=0.95,n.sims = 1000,stat = "mean"))
+# add de p na escala padrão #
+df_nd.logit$p <- df_new.data$p.z*sd(df_resultados$p) + mean(df_resultados$p)
+
+## remoção de 0 e 100 ##
+df_logit <- df_resultados
+df_logit$GOF[df_logit$GOF==0] <- 100/(1+exp(-min(df_nd.logit$lwr)))
+df_logit$GOF[df_logit$GOF==100] <- 100/(1+exp(-max(df_nd.logit$upr)))
+## transformação logito ##
+df_logit %<>% mutate(lGOF = log( (GOF/100) / ( 1 - (GOF/100) ) ))
+
+## Gráfico ##
+l_p <- vector("list",2)
+l_p[[1]] <- ggplot(data=df_nd.logit,aes(x=p,y=lGOF)) + 
+  geom_point(data=df_logit) +
+  geom_ribbon(aes(y = fit, ymin=lwr, ymax=upr), alpha=0.5) +
+  geom_line(aes(x=p, y=fit)) +
+  labs(title="logit") +
+  facet_grid(k~MN)
+
+### clogclog ###
+## predicao merTools ##
+df_nd.cloglog <- cbind(df_new.data,
+                       predictInterval(l_md[[16]],newdata = df_new.data,level=0.95,n.sims = 1000,stat = "mean"))
+# add de p na escala padrão #
+df_nd.cloglog$p <- df_new.data$p.z*sd(df_resultados$p) + mean(df_resultados$p)
+
+## remoção de 0 e 100 ##
+df_cloglog <- df_resultados
+df_cloglog$GOF[df_cloglog$GOF==0] <- 1-exp(-exp(min(df_nd.cloglog$lwr)))
+df_cloglog$GOF[df_cloglog$GOF==100] <- 1-exp(-exp(max(df_nd.cloglog$upr)))
+## transformação logito ##
+df_cloglog %<>% mutate(cGOF = log(-log(100-GOF)))
+
+## Gráfico ##
+l_p[[2]] <- ggplot(data=df_nd.cloglog,aes(x=p,y=cGOF)) + 
+  geom_point(data=df_cloglog) +
+  geom_ribbon(aes(y = fit, ymin=lwr, ymax=upr), alpha=0.5) +
+  geom_line(aes(x=p, y=fit)) +
+  labs(title="cloglog") +
+  facet_grid(k~MN)
+
+### comparacao ###
+do.call("grid.arrange",c(l_p,ncol=2))
+```
+
+- problemas em plotar na escala cloglog
+- vou deixar rodando o bootMer
+
+```{r IC bootMer logit GOF}
+## novo conjunto de dados: todas as combinações entre as preditoras ##
+df_new.data <- expand.grid(Site = df_resultados$Site[1],
+                           p.z = seq(min(df_resultados$p.z)*1.1,max(df_resultados$p.z)*1.1, length=length(unique(df_resultados$p))),
+                           k = unique(df_resultados$k),
+                           MN = unique(df_resultados$MN))
+# previsto considerando a estrutura fixa e aleatória #
+f1 <- function(.) predict(.,newdata=df_newdat)
+# previsto considerando a estrutura fixa #
+f2 <- function(.) predict(.,newdata=df_newdat, re.form=~0)
+## Os dois bootstraps. Ajuste o argumento ncpus para o numero de cores de seu computador
+b1 <- bootMer(md_GOF, FUN = f1, nsim=1000, parallel="multicore", ncpus=4)
+b2 <- bootMer(md_GOF, FUN = f2, nsim=1000, parallel="multicore", ncpus=4)
+```
+
