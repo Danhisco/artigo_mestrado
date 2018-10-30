@@ -4,7 +4,7 @@ Resumo:
 
 - introdução: 
 
-A remoção de habitat leva a diminuição da quantidade de habitat e modificação da configuração espacial da paisagem. 
+A remoção de habitat leva a diminuição da quantidade de habitat e modificação da configuração espacial da paisagem pela diminuição da área e aumento do isolamento dos fragmentos florestais remanescentes. 
 
 Avaliamos se é necessário considerar a configuração espacial da paisagem para explicar a manuteção da biodiversidade. 
 
@@ -40,7 +40,7 @@ b.2)[legenda figura] Como obtemos esses dados?
 
 b.3) O quê observamos?
 
-O mais plausível é considerar a interação de terceira ordem entre as preditoras: DESCRIÇÃO DOS RESULTADOS [i) há piora da congruência entre o predito segundo o modelo de espaço implícito para distâncias médias de dispersão altas com a diminuição da paisagem; ii) o modelo neutro de espaço explícito é consistetemente melhor, apresenta pouca influência da limitação à dispersão no efeito da cobertura vegetal; iii) a congruência do modelo neutro de espaço implíxito diminui com o aumento da cobertura vegetal para os extremos da limitação à dispersão, padrão oposto para o modelo neutro de espaço explícito; iv) a variância aumenta com o aumento da distância média de dispersão, principalmente para o modelo de espaço implícito onde o efeito da cobertura vegetal se torna bem acentuado no cenário de menor severidade de limitação à dispersão; v) a maior parte da variação dos dados é explicada quando consideramos o sítio de amostragem]
+O mais plausível é considerar a interação de terceira ordem entre as preditoras: DESCRIÇÃO DOS RESULTADOS [i) há piora da congruência entre o predito segundo o modelo de espaço implícito para distâncias médias de dispersão altas com o aumento da cobertura vegetal na paisagem; ii) o modelo neutro de espaço explícito é consistentemente melhor, apresenta pouca influência da limitação à dispersão no efeito da cobertura vegetal; iii) a congruência do modelo neutro de espaço implícito diminui com o aumento da cobertura vegetal para os extremos da limitação à dispersão, padrão oposto para o modelo neutro de espaço explícito; iv) a variância aumenta com o aumento da distância média de dispersão, principalmente para o modelo de espaço implícito onde o efeito da cobertura vegetal se torna bem acentuado no cenário de menor severidade de limitação à dispersão; v) a maior parte da variação dos dados é explicada quando consideramos o sítio de amostragem]
 
 b.4) Quais as implicações? (Quais eram as espectativas teóricas?)
 
