@@ -4,7 +4,7 @@ Resumo:
 
 - introdução: 
 
-A remoção de habitat leva a diminuição da quantidade de habitat e modificação da configuração espacial da paisagem pela diminuição da área e aumento do isolamento dos fragmentos florestais remanescentes. 
+A remoção de habitat leva a modificação da configuração espacial da paisagem pela diminuição da quantidade de habitat total na paisagem e diminuição da área e aumento do isolamento dos fragmentos florestais remanescentes. 
 
 Avaliamos se é necessário considerar a configuração espacial da paisagem para explicar a manuteção da biodiversidade. 
 
