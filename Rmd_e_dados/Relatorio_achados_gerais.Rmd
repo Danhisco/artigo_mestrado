@@ -865,7 +865,7 @@ AICctab(l_md,weights=T)
 
 ```{r md_GOF sumario}
 md_GOF <- l_md[[1]]
-# fastdisp(md_GOF)
+fastdisp(md_GOF)
 ```
 
 Pontos para avaliação:
@@ -940,9 +940,6 @@ df_ad %<>% mutate(lGOF = log( (GOF/100) / ( 1 - (GOF/100) ) ))
 
 
 ## Gráfico ##
-# print(
-#   scale_colour_manual(values = c("Blue", "Red"))
-# )
 ggplot(data=df_new.data,aes(x=p,y=lGOF,color=MN)) + 
   geom_point(data=df_ad,aes(color=MN)) +
   geom_ribbon(aes(y = fit, ymin=lwr, ymax=upr,color=MN,fill=MN), alpha=0.5) +
@@ -950,7 +947,57 @@ ggplot(data=df_new.data,aes(x=p,y=lGOF,color=MN)) +
   facet_wrap(~k,ncol=3) +
   scale_colour_manual(values = c("Blue", "Red")) + 
   scale_fill_manual(values = c("Blue", "Red")) +
-  theme(legend.position = "bottom") #+
+  theme(legend.position = "bottom")
 ```
 
+__Figura 14__ Logito de GOF (lGOF) e propoção de cobertura vegetal (p), por proporção de propágulos que permanece até a planta (k, o título dos quadros) e colorido pela classe de modelo neutro (MN: EI - modelo neutro de espaço implícito; EE - modelo neutro de espaço explícito). A linha central representa a média estimado e a área colorida representa o intervalo de confiança de 95%. 
+
+
+```{r md_GOF obs e predito 2,fig.height=10,fig.width=9}
+l_p <- vector("list",2)
+# merTools
+l_p[[1]] <- ggplot(data=df_new.data,aes(x=p,y=lGOF)) + 
+  geom_point(data=df_ad) +
+  geom_ribbon(aes(y = fit, ymin=lwr, ymax=upr), alpha=0.5) +
+  geom_line(aes(x=p, y=fit)) +
+  labs(title="merTools") +
+  facet_grid(k~MN)
+
+# bootMer
+load(file = "/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/bootMer_md-logit-GOF.Rdata")
+df_new.data1 <- df_new.data
+df_new.data1$p <- df_new.data1$p.z*sd(df_resultados$p) + mean(df_resultados$p) 
+df_new.data1$mean <- apply(b1$t,2,mean)
+df_new.data1$IC.low <- apply(b1$t,2,quantile, 0.025)
+df_new.data1$IC.upp <- apply(b1$t,2,quantile, 0.975)
+df_new.data1$mean.fixed <- apply(b2$t,2,mean)
+df_new.data1$IC.low.fixed <- apply(b2$t,2,quantile, 0.025)
+df_new.data1$IC.upp.fixed <- apply(b2$t,2,quantile, 0.975)
+## Modificação dos dados
+df_ad <- df_resultados
+df_ad$GOF[df_ad$GOF==0] <- 100/(1+exp(-min(df_new.data1$IC.low)))
+df_ad$GOF[df_ad$GOF==100] <- 100/(1+exp(-max(df_new.data1$IC.upp)))
+## transformação logito ##
+df_ad %<>% mutate(lGOF = log( (GOF/100) / ( 1 - (GOF/100) ) ))
+# grafico #
+l_p[[2]] <- ggplot(df_ad,aes(x=p,y=lGOF) ) + 
+    geom_ribbon(aes(y=mean, ymin=IC.low, ymax=IC.upp), data=df_new.data1, col="gray", alpha=0.5) +
+    geom_ribbon(aes(y=mean, ymin=IC.low.fixed, ymax=IC.upp.fixed), data=df_new.data1, col="gray", alpha=0.5) +
+    geom_line(aes(x=p, y=mean.fixed), data=df_new.data1) +
+    geom_point() +
+    labs(title="bootMer",y="") +
+    facet_grid(k~MN)
+do.call("grid.arrange",c(l_p,ncol=2))
+```
+
+__Figura 15__ Comparação entre dois métodos de criação de intervalo de confiança de 95% em torno da média: coluna da esquerda pelo método do merTools e coluna da direita pelo método bootMers.
+
+
+##### Coeficiente de determinação
+
+__tabela 2__ Coeficiente de determinação do modelo mais plausível - R2m (condicional à estrutura fixa); R2c (condicional ao modelo como um todo). Estimativa presente na versão 1.42 do pacote MuMin (Bartoń 2018). 
+  
+```{r R2 mf_GOF, warning=FALSE, message=FALSE}
+r.squaredGLMM(md_GOF)
+```
 
