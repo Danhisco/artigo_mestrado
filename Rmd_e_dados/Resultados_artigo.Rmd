@@ -10,27 +10,20 @@ knitr::opts_chunk$set(echo = FALSE, tidy = TRUE, include = TRUE, warning = FALSE
 ```
 
 ```{r dados e pacotes,warning=FALSE,message=FALSE,echo=FALSE}
-# library(reshape2) # para mudar formato dos dados
-library(lattice)
+library(reshape2)
+library(arm)
 library(gridExtra)
-library(RVAideMemoire) #gráficos diagnóstico dos GLMM
-library(sjPlot) #gráficos de GLMM
-library(MuMIn) # para R^2
-# library(gridExtra)  #pacote para gráficos
-# library(ggplot2)  # idem
-library(sads)
-library(lme4) # pacote de criação dos modelos estatísticos
-# library(bblme) # pacote para comparar os modelos, seleção per se
-library(merTools) # para intervalos de previsao
-library(tidyverse)
-library(broom) # para manipular os modelos
-library(magrittr) # p escrita
-library(MASS)
-library(car)
-library(DHARMa)
+library(MuMIn)
+library(bbmle)
+library(lme4)
 library(merTools)
+library(ggplot2)
+library(broom) 
+library(magrittr)
+library(DHARMa)
 library(plyr)
-df_resultados <- read_csv("/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/df_resultados.csv")
+library(dplyr)
+df_resultados <- readr::read_csv("/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/df_resultados.csv")
 # df_resultados %>% str
 df_resultados$MN <- factor(df_resultados$MN,levels = c("EI","EE"))
 df_resultados$SiteCode <- factor(df_resultados$SiteCode)
@@ -219,12 +212,13 @@ A estrutura aleatória selecionada foi (1|Site).
 O modelo global com distribuição gamma, função de ligação log e estrutura aleatória 1|Site foi o mais plausível. Segue sumário:
 
 ```{r d k R2,echo=TRUE}
-summary(l_md[[3]]) # problema de convergência, indicam para reescalonar as variáveis
+fastdisp(l_md[[3]]) # problema de convergência, indicam para reescalonar as variáveis
 ```
 <!--
 Error: Error in r.squaredGLMM.merMod(X[[i]], ...) : do not know how to calculate variance for this family/link combination
 27jun2018[Válido para lmer, não para normal link=log: acredito que se houver mais níveis de k e melhor distribuidos no campo de parâmetros aumentaria o R^2 de k|Site
 -->
+
 
 _31jun2018_
 - Problema de convergência:
@@ -299,6 +293,14 @@ O modelo global foi o mais plausível. [PROBLEMA DE CONVERGÊNCIA]. E por conta 
 # xyplot(prof_glmm.d , aspect =1.3)
 ```
 
+__Coeficiente de determinação__
+
+```{r}
+r.squaredGLMM(md_d)
+```
+
+
+
 Avaliação gráfica do ajuste do modelo:
 
 ```{r predito e observado d}
@@ -315,37 +317,46 @@ __Figura 1__ Distância média de dispersão (d) e o predito segundo d ~ DA.z + 
 
 Parece que há boa congruência entre o observado e o predito pelo modelo, segue regressão dos resíduos do modelo:
 
-```{r graf residuo d }
-ggplot(df_reg,aes(x=.fitted,y=std.resid)) + 
-  geom_point() +
-  geom_smooth(method = "loess") + 
-  facet_wrap(~k,ncol=3,scales="free")
+```{r graf residuo DHARMA }
+md_d <- l_md[[3]]
+resid_d <- simulateResiduals(md_d,n=1000)
+# plotResiduals(resid_d)
 ```
 
-__Figura 2.1__ standard resíduos ~ ajustado
+__Figura 2.1__ residuos quantílicos pelo predito
 
-```{r graf residuo d 1}
-ggplot(df_reg,aes(x=.fitted,y=sqrt.std.resid)) + 
-  geom_point() +
-  geom_smooth(method = "loess") + 
-  facet_wrap(~k,ncol=3,scales="free")
+
+
+
+O modelo estimado está de acordo com os dados: a predição do modelo está precisa na tendẽncia central dos dados; o modelo explica praticamente toda a variação dos dados (alto R2_). O problema de convergência pode ser que não é necessário considerr a existência de correlação dos dados, talvez seja mais plausível considerar apenas um glm:
+
+```{r comparacao glm e glmm d }
+l_md <- vector("list",2)
+names(l_md) <- c("glm","glmm")
+l_md[[1]] <-  glm(d ~ k + DA.z,family = "Gamma"(link=log),data = df_resultados)
+l_md[[2]] <-  glmer(d ~ k + DA.z + (1|Site),family = "Gamma"(link=log),data = df_resultados)
+# AICctab(l_md,weights=T)
+# summary(lm(coef(l_md[[1]]) ~ fixef(l_md[[2]])-1))
+md_d <- glm(d ~ k + DA.z,family = "Gamma"(link=log),data = df_resultados)
 ```
 
-__Figura 2.2__ sqrt standard resíduos ~ ajustado
+O único modelo plausível é o glmer, contudo não há diferença nas estimativas dos dois modelos. Então vou utilizar o glm para fazer a inferência. Vou plotar a variável de interesse é k mas não a covariável DA.z
 
-_Tabela efeitos estimados na escala padrão (não na escala log)_
-
-```{r effects glmm d}
-(df_effect <- data.frame(par.class = c("beta",rep("alfa",length(levels(df_resultados$k)) ) ),
-                        par.VE = c("DA.z",
-                                   paste("k=",levels(df_resultados$k),sep="")),
-                        par.value = c(exp(fixef(l_md[[1]])[13]),
-                                      exp(fixef(l_md[[1]])[1]),
-                                      exp(fixef(l_md[[1]])[2:12]-fixef(l_md[[1]])[1]))
-                        ))
-
-## falta estimar os intervalos de confiança ##
+```{r tabela das estimativas do glm, message=F}
+# summary(md_d)
+ef_d <- sim(md_d,1000)@coef[,1:12]
+ef_d <- cbind(ef_d[,1], apply(ef_d[,2:12],2,function(x) ef_d[,1]+x)) %>% as.data.frame()
+names(ef_d) <- as.character(c(0.99,seq(0.95,0.5,by=-0.05),0.25))
+inv.link <- family(md_d)$linkinv
+df_ef.d  <- melt(ef_d,value.name = "replica") %>% 
+  ddply(.,"variable",summarise, media0 = mean(replica),lwr0 = quantile(replica,0.025),upr0=quantile(replica,0.975)) %>% 
+  mutate( media = inv.link(media0), IC.975 = inv.link(upr0), IC.025 = inv.link(lwr0))
+df_ef.d[,c(1,5:7)] #%>% ggplot(aes(x=variable,y=media,ymin=IC.025,ymax=IC.975)) + geom_pointrange()
 ```
+
+
+
+
 
 ### A partir daqui trabalho a ser feito ###
 
@@ -914,18 +925,87 @@ do.call("grid.arrange",c(l_p,ncol=2))
 - problemas em plotar na escala cloglog
 - vou deixar rodando o bootMer
 
-```{r IC bootMer logit GOF}
+```{r IC bootMer logit GOF,fig.height=10,fig.width=5}
+md_GOF <- l_md[[2]]
 ## novo conjunto de dados: todas as combinações entre as preditoras ##
 df_new.data <- expand.grid(Site = df_resultados$Site[1],
                            p.z = seq(min(df_resultados$p.z)*1.1,max(df_resultados$p.z)*1.1, length=length(unique(df_resultados$p))),
                            k = unique(df_resultados$k),
                            MN = unique(df_resultados$MN))
 # previsto considerando a estrutura fixa e aleatória #
-f1 <- function(.) predict(.,newdata=df_newdat)
+f1 <- function(.) predict(.,newdata=df_new.data)
 # previsto considerando a estrutura fixa #
-f2 <- function(.) predict(.,newdata=df_newdat, re.form=~0)
+f2 <- function(.) predict(.,newdata=df_new.data, re.form=~0)
 ## Os dois bootstraps. Ajuste o argumento ncpus para o numero de cores de seu computador
 b1 <- bootMer(md_GOF, FUN = f1, nsim=1000, parallel="multicore", ncpus=4)
 b2 <- bootMer(md_GOF, FUN = f2, nsim=1000, parallel="multicore", ncpus=4)
+# save(b1,b2,file="/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/bootMer_md-logit-GOF.Rdata")
+# preparacao dos dados
+df_new.data$p <- df_new.data$p.z*sd(df_resultados$p) + mean(df_resultados$p) 
+df_new.data$mean <- apply(b1$t,2,mean)
+df_new.data$IC.low <- apply(b1$t,2,quantile, 0.025)
+df_new.data$IC.upp <- apply(b1$t,2,quantile, 0.975)
+df_new.data$mean.fixed <- apply(b2$t,2,mean)
+df_new.data$IC.low.fixed <- apply(b2$t,2,quantile, 0.025)
+df_new.data$IC.upp.fixed <- apply(b2$t,2,quantile, 0.975)
+## Modificação dos dados
+df_ad <- df_resultados
+df_ad$GOF[df_ad$GOF==0] <- 100/(1+exp(-min(df_new.data$IC.low)))
+df_ad$GOF[df_ad$GOF==100] <- 100/(1+exp(-max(df_new.data$IC.upp)))
+## transformação logito ##
+df_ad %<>% mutate(lGOF = log( (GOF/100) / ( 1 - (GOF/100) ) ))
+
+df_ad %>%
+    ggplot(aes(x=p,y=lGOF) ) + 
+    geom_ribbon(aes(y=mean, ymin=IC.low, ymax=IC.upp), data=df_new.data, col="gray", alpha=0.5) +
+    geom_ribbon(aes(y=mean, ymin=IC.low.fixed, ymax=IC.upp.fixed), data=df_new.data, col="gray", alpha=0.5) +
+    geom_line(aes(x=p, y=mean.fixed), data=df_new.data) +
+    geom_point() +
+    facet_grid(k~MN)
 ```
+
+__ Efeitos Fixos __
+
+```{r efeitos fixos md_GOF}
+ef_GOF <- arm::sim(md_GOF,1000)
+# ef_GOF %>% str
+
+## Avaliação visual da distribuição dos parâmetros ##
+# ef_GOF@fixef %>% str
+l_ef <- vector("list",12)
+l_ef[[1]] <- data.frame(k = factor(levels(df_resultados$k)[1], levels = levels(df_resultados$k)), 
+                        MN = rep(rep(levels(df_resultados$MN),2),each=1000), 
+                        termo = rep(rep(c("alfa","beta"),each=2),each=1000),
+                        replica = c(ef_GOF@fixef[,1] , #alfa EI
+                                    ef_GOF@fixef[,1] + ef_GOF@fixef[,14], # alfa EE
+                                    ef_GOF@fixef[,2], #beta EI
+                                    ef_GOF@fixef[,2] + ef_GOF@fixef[,26])) #beta EE
+# l_ef[[1]] %>% ddply(.,c("k","MN","termo"), summarise, mean(replica))
+# md_GOF
+for(i in 2:12){
+l_ef[[i]] <- data.frame(k = factor(levels(df_resultados$k)[i], levels = levels(df_resultados$k)), 
+                        MN = rep(rep(levels(df_resultados$MN),2),each=1000), 
+                        termo = rep(rep(c("alfa","beta"),each=2),each=1000),
+                        replica = c(ef_GOF@fixef[,1] + ef_GOF@fixef[,1+i] , #alfa EI
+                                    ef_GOF@fixef[,1] + ef_GOF@fixef[,1+i] + ef_GOF@fixef[,14] + ef_GOF@fixef[,25+i], # alfa EE
+                                    ef_GOF@fixef[,2] + ef_GOF@fixef[,13+i], #beta EI
+                                    ef_GOF@fixef[,2] + ef_GOF@fixef[,13+i] + ef_GOF@fixef[,26] + ef_GOF@fixef[,36+i])) #beta EE
+}
+df_ef <- rbind.fill(l_ef) %>% ddply(.,c("k","MN","termo"),summarise, 
+                                    media = mean(replica), mediana = median(replica), 
+                                    upr = quantile(replica, 0.975), lwr = quantile(replica, 0.025)) 
+f_inv.logit <- function(x) 1/(1+exp(-x))
+df_ef %>% mutate(media.pr = f_inv.logit(media), mediana.pr = f_inv.logit(mediana), upr.pr = f_inv.logit(upr), lwr.pr = f_inv.logit(lwr)) %>% 
+  ggplot(aes(x=termo,y=media.pr,ymin=lwr.pr,ymax=upr.pr,color=MN)) +
+  # ggplot(aes(x=termo,y=media,ymin=lwr,ymax=upr,color=MN)) + 
+  geom_pointrange() + 
+  scale_colour_manual(values = c("Blue", "Red")) +
+  facet_wrap(~k,ncol=3,scales="free")
+
+# ggplot(data=rbind.fill(l_ef),aes(x=termo,y=replica,color=MN)) +
+#   geom_boxplot() + 
+#   scale_colour_manual(values = c("Blue", "Red")) +
+#   facet_wrap(~k,ncol=3)
+```
+
 
