@@ -1,3 +1,123 @@
+## 25 Outubro ##
+
+__1o paragrafo__ [desenvolver melhor]
+- Um aspecto questionado da remoção de habitat é o efeito da configuração espacial da paisagem na manutenção da diversidade (Fahrig 2013).
+- A configuração espacial resulta do processo de remoção de habitat e a chamada fragmentação per se (Villard & Metzger 2014).
+- fragmentação per se é a sub-divisão do habitat remanescente em fragmentos florestais menores e mais isolados com maior relação entre área de borda e área núcleo circundados por cobertura vegetal modificada para o uso humano a matrix (Fahrig 2003, 2017). 
+- Uma dificuldade de distinguir os efeitos da remoção da habitat e fragmentação per se é que eles covariam (Fahrig 2017).
+- Uma abordagem de investigação é utilizar modelos teóricos que diferem na forma em que incorporam o espaço para explicar os padrões de diversidade observados em fragmentos florestais.
+- uma primeira abordagem é entender os fragmentos florestais resultantes como ilhas de habitat circundados por uma matrix inóspita e assim utilizar Teoria de Biogeográfia de Ilhas (MacArthur & Wilson 1969). DESENVOLVER A MECANISTICA DO MODELO PARA CONCLUIR EM: TBI considera a analise na escala local do fragmento amostrado enquanto a paisagem ao redor possui uma dinâmica a parte (RELER Laurance 2008)
+- alternativamente toda a paisagem pode influenciar na dinâmica local, para contornar a problemática de incluir diferentes métricas de paisagem no modelo (para descrever a fragmentação per se) podemos diretamente utilizar a configuração espacial da paisagem.
+
+__2o paragrafo__
+
+## ? ##
+- a teoria neutra (Bell 2001, Hubbell 2001) pode prover modelos teóricos equivalentes que diferem na forma que incorporam o espaço na dinâmica ecológica (Rosindell & Etienne 2011) e dessa forma podemos avaliar se é necessário considerar explicitamente a configuração espacial para descrever a SAD observada (Hubbell 2005a) em paisagens em um gradiente de cobertura vegetal, as métricas de fragmentação são todas correlacionadas com a quantidade de habitat na paisagem (Fahrig 2013).
+
+<!-- Modelo neutro clássico -->
+- O modelo neutro clássico (Hubbell 2001) é análogo à TBI mas considera a especiação neutra na região biogeográfica, dessa forma, é possível deduzir uma fórmula que descreve uma distribuição de abundância de espécies (SAD) em função da taxa de espéciação neutra (U) e do número de indivíduos na paisagem(J_M), assumindo que todos os indivíduos nascem prontos para gerar propágulos e que a comunidade está sempre saturada (pressuposto de soma zero).
+
+- A taxa de especiação U também pode ser interpretada como taxa de imigração de longa distância (Bell 2003)
+
+- Pela hipótese de equivalência funcional, pressuposto central da teoria neutra (Munoz & Huneman 2016), todos os indivíduos apresentam as mesmas taxas demográficas independente da espécie (Hubbell 2005b). 
+
+- Com isso a dinâmica ecológica é influênciada pela variação aleatória na abundância das espécies (deriva ecológica) e pelo surgimento de novas espécies por especiação (Etienne & Alonso 2007a How neutral theory explains estocasticidade). 
+
+- o modelo assume que a escala biogeográfica é influênciada por processos eco-evolutivos enquanto a escala local é influênciada apenas por processos ecológicos (Etienne et al. 2007b the zero-sum por exemplo). 
+
+- Uma aproximação é considerar que os processos em ambas escalas estão em equilíbrio (DESENVOLVER MELHOR) 
+
+- Na escala local a mesma dinâmica ecológica de nascimentos e mortes neutras é observada mas a cada evento de morte seguido de recolonização existe uma probabilidade 'm' de o colonizador seja prole de algum indivíduo da região biogeográfica (Hubbell 2001). 
+
+- A comunidade local depende da imigração de indivíduos da região biogeográfica para manter a diversidade, as comunidades apresentam limitação à dispersão (Alonso et al. 2006)
+
+- Com um conhecido theta, a SAD local pode ser deduzida a partir do número fundamental da dispersão (I) que descreve a competição entre a prole local e a prole do entorno por uma unidade de habitat na comunidade local (Etienne 2005).
+
+- O modelo classico pode ser utilizado para descrever comunidades em paisagens onde o habitat se distribui continuamente, mas é mais comum ser interpretado como um modelo do tipo ilha-continente (Alonso et al. 2006). 
+
+- Com esse modelo é possível gerar predições para a dinâmica ecológica de comunidades em paisagens fragmentadas (Gilbert et al. 2006). 
+
+<!-- Modelo neutro de espaço explícito -->
+- Uma maneira de considerar a configuração espacial da paisagem na dinâmica ecológica é a partir de um modelo neutro de espaço explícito (Rosindell et al. 2008, Campos et al. 2012). 
+
+- Nesses modelos a limitação à dispersão é expressa no nível do indivíduo, a posição e distância dos indivíduos na paisagem influência na probabilidade de um propágulo colonizar uma unidade de habitat disponível (Chisholm & Lichstein 2009). 
+
+-Assim, região biogeográfica e comunidade local se influênciam mutuamente (Rosindell et al. 2008). [Os eventos de especiação podem ocorrer em qualquer lugar da paisagem, inclusive na área da comunidade local (Rosindell et al. 2008)?]
+
+- é possível simular a dinâmica ecológica de comunidades em paisagens fragmentadas e predizer a SAD para determinada configuração espacial, dispersão e taxa de especiação (Campos et al. 2013).
+
+
+__3o paragrafo__
+<!-- Objetivo -->
+## ? ###
+- a teoria neutra (Bell 2001, Hubbell 2001) pode prover modelos teóricos que diferem na forma que incorporam o espaço na dinâmica ecológica (Rosindell & Etienne 2011) e dessa forma podemos avaliar se é necessário considerar explicitamente a configuração espacial para descrever a SAD observada (Hubbell 2005a) em paisagens em um gradiente de cobertura vegetal, as métricas de fragmentação per se são correlacionadas com a quantidade de habitat na paisagem (Fahrig 2013).
+
+- um teste tradicional da Teoria Neutra é avaliar a congruência entre a predição de um modelo neutro com a SAD observada em determinado contexto ecológico (McGill et al. 2006)
+
+<!-- expectativas e possíveis efeitos associados -->
+
+# qualificador 1 #
+- Em contexto de paisagem fragmentada, a teoria neutra oferece modelos nulos para explicar a diversidade ecológica, uma vez que, em paisagens fragmentadas o pressupostos de equivalência funcional não é uma boa aproximação das taxas demográficas das espécies (Gilbert et al. 2006, Laurance et al. 2018). O efeito de borda, principal efeito da remoção de habitat (Haddad et al. 2015), atua como um filtro ambiental (Laurance 2008), processo determínistico (Pardini et al. 2017): [algumas espécies apresentam aumento da das taxas de natalidade no habitat degradado da região da borda enquanto aquelas espécies associadas com o habitat original apresentam redução da taxa de natalidade e aumento da taxa de mortalidade (REFERÊNCIA)].
+# expectativa 1 #
+- Então, esperamos que a probabilidade de não refutar neutralidade a partir da SAD observada aumente com a diminuição da cobertura vegetal, pois o pressupostos de equivalência funcional não é uma boa aproximação.
+
+# qualificador 2 #
+- Uma vez que para refutar neutralidade a partir da SAD é necessário que os desvios da neutralidade sejam grandes (Hammal et al. 2015, Takeuchi & Innan 2015), a probabilidade de refutar neutralidade a partir da SAD observada pode variar em função dos pressupostos auxiliares à neutralidade (REFERÊNCIA1 Etienne & Rosindell 2011) (REFERÊNCIA - aquela revisão de 2015-2017 sobre uso de modelos em ecologia que o McGill et al. fez um comentário falando que eram modelos causalísticos ao inves da 'falsa' dicotomia entre modelos mecanisticos e baseados em processos) 
+# expectativa 2 / qualificador 3 #
+- Sabemos que a configuração espacial modifica a forma de SADs preditas segundo um modelo EE (Campos et al. 2013), o ponto é avaliar se é necessário acrescentar a informação sobre a estrutura espacial para descrever a SAD, uma vez que o modelo neutro EI gera predições que são boas aproximações do observado em diferentes contextos ecológicos (Matthews & Whittaker 2014?). Dado combinação de parâmetros EI pode predizer SADs que variam em forma entre lognormal e log-series (Magurran 2005?), EE mostra a influência da paisagem na comunidade local, contudo as predições não apresentam a mesma versatilidade das predições de EI (Etienne & Rosindell 2011) [, assim comparamos as predições de modelos que diferem em generalidade e especificações].
+# qualificador 4 / 'expecativa' 3 # 
+- ou em função da limitação à dispersão, uma vez que a limitação à dispersão tem grande efeito na formação de padrões macroecológicos (McGill 2010, Chaves 2013) e é o principal processo influenciando na dinâmica local na teoria neutra (Alonso et al. 2006).
+- assim esperamos que a probabilidade de não refutar neutralidade aumente para limitação à dispersão próximas do observado (algum Rosindell et al. 2006-2009)
+- A limitação à dispersão é modulada pelas características da espécie e pelas características da paisagem (REFERÊNCIA). Em paisagens fragmentadas a dispersão de uma espécie pode estar alterada pela exclusão ou modificação de um agente dispersor (REFERENCIA), pela natureza da matrix (REFERÊNCIA) e pela interferência da região de borda (REFERÊNCIA).
+
+# qualificador sobre interação entre as partes #
+- diferença entre os modelos pode se relacionar com a cobertura vegetal, uma vez que os efeitos da configuração espacial podem ser maiores para paisagens com valores intermediários de cobertura vegetal (Villard & Metzger 2014).  
+- a fragmentação per se pode ter grande impacto na forma que as espécies se movimentam na paisagem: i) pelo efeito de borda, que pode modificar a permeabilidade ao fragmento florestal seletivamente ou não (REFERÊNCIA); ii) em função da natureza da matrix e o quanto inóspita é (REFERÊNCIA); iii) há configurações espaciais onde a percolação (?) é inexistente apesar da distância média de dispersão, as populações se tornam isoladas em seus fragmentos florestais (REFERÊNCIA); 
+ 
+<!-- parametrização -->
+- Para parametrizar os modelos utilizamos uma abordagem baseado em função de dispersão,função aleatória que relaciona a probabilidade de colonização de um propágulo em função da distância da planta progenitora e a unidade de habitat vago (Clark et al. 1999 ou Munoz et al. 2013?). 
+- Variamos de cenários de severa limitação à dispersão até a distância média (d) similar à média de espécies anemocoricas (?) (REFERÊNCIA em Munoz et al. 2013)
+- Controlamos pela proporção de propágulos que permanece até a vizinhança imediata da planta progenitora. Dessa maneira pudemos comparar paisagens com diferentes densidades de indivíduos e respeitar o pressuposto de soma-zero, necessário para o modelo neutro de espaço explícito que utilizamos.
+- Deduzimos uma formula que relaciona d com m e corrigindo para a porcentagem de indivíduos na região biogeográfica pudemos calcular I.
+- Não utilizamos a SAD observada para pametrizar os modelos pois para o modelo EI não é necessário pressupor soma-zero, e portanto estabelecer uma área correspondente à paisagem não seria possível (?), e estimar os parâmetros por verossimilhança a partir do padrão testado poderia gerar viés de confirmação.
+- Estimamos U a partir da riqueza observada pressupondo o modelo neutro EE e que o equilíbrio foi atingido na paisagem. 
+- A partir de fórmula disponível para theta (Etienne 2005), calculamos o parâmetro considerando o número de indivíduos da paisagem como produto da densidade observada e da porcentagem de cobertura vegetal na paisagem.
+- Assim estabelecemos equivalência formal entre os modelos. 
+
+<!-- teoria neutra enquanto aproximação de algum componente da dinâmica ecológica -->
+- Outro possível uso da teoria neutra é considera-la como uma aproximação de alguma característica da diversidade ecológica (Rosindell et al. 2011). Dado o equilíbrio dinâmico, U se torna equivalente à taxa de extinção de espécies raras na paisagem (número de espécies com apenas um indivíduo que desaparecem por evento de morte) e uma vez que a teoria neutra faz uma boa aproximação da taxa de extinção de espécies raras em paisagens fragmentadas (Gilbert et al. 2006), provavelmente para aquelas espécies em que a estocastícidade demográfica é muito importante (Magurran & Anderson 2003??) [, podemos aproximar a taxa de extinção de espécies em função da riqueza observada e limitação à dispersão]. Podemos aproximar a taxa de extinção de espécies raras com U ponderado a probabilidade de não ser possível refutar neutralidade do modelo EE. 
+ 	
+
+## Ideias de discussão ##
+- uma vez ue a teoria neutra assume que indivíduos prontos para gerar prole surgem por evento de colonização ela está falando de que tipo de casos? Pensar em classes de idade em função da aptidão para reproduzir: classe diâmetrica e maturidade(?) sexual? Quais processos são mais 'determinantes' em cada uma das fases (pensar além de competição)? Como é possível balancear a predação com a competição (LER algum ecology letters sobre isso - ou uma revisão da Biological Reviews? Pensar em classes de tamanho em função da aptidão para reproduzir(?): classe diâmetrica e maturidade(?) sexual? Como controlar para cada processo? Como esses processos são estudados? considerar: Age structure in neutral theory resolves inconsistencies related to reproductive-size threshold
+- para conectar essa ideia com a comparação entre os dois modelos considerar: The geographic scaling of biotic interactions.
+- é possível relacionar isso com teoria de sucessão em paisagens fragmentadas? 
+- Um dos principais efeitos da remoção de habitat é o débito de espécies, a perda gradual de espécies em função da idade do evento de remoção de habitat (uma referência é o Tilman et al. 1994?), o modelo neutro EE é capaz de prever débito de extinção mesmo desconsiderando a existência de trade-offs e hiearquia competitiva entre as espécies (algum Campos et al. 2015). [ Contudo a existência de débito de extinção e pressuposto de equilíbrio dinâmica são incompatíveis (?) ]
+- espécies de sombra X espécies de borda: considerar um modelo de fragmentação per se 'continuo' (onde as unidades de habitat podem ter diferentes 'qualidades') que prevem tanto a SAD númerica quando a de classe biométrica?
+
+
+## 17 de outubro ##
+-#Fahrig, L. (2017). Ecological Responses to Habitat Fragmentation Per Se. Annu. Rev. Ecol. Evol. Syst, 48, 447–471. https://doi.org/10.1146/annurev-ecolsys-110316:
+
+>Importantly, studies of patch size effects and patch isolation effects do not provide evidence for effects of habitat fragmentation, because both patch size effects and patch isolation effects are inherently confounded with effects of habitat amount
+>Smaller patches have less habitat than larger patches,
+>more isolated patches are more isolated precisely because there is less habitat surrounding them than there is surrounding the less isolated patches (Figura 3).
+[]
+
+
+> effects of habitat fragmentation must be measured at the landscape scale (McGarigal & Cushman 2002; Figure 4), that is, by
+comparing effects of habitat pattern across multiple landscapes while controlling for the total amount of habitat in them.
+[Efeitos da fragmentação de habitat devem comparar efeitos do padrão de habitat entre as diversas paisagens enquanto controla pela quantidade total de habitat (Fahrig 2017)]
+
+-
+
+
+
+<!--
+Ecological Responses to Habitat Fragmentation Per Se - Definições
+-->
+
+
 ## 10 de Setembro ##
 
 I) Identifique seu objetivo:
