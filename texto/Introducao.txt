@@ -8,9 +8,10 @@ __1o paragrafo__ [desenvolver melhor]
 - Uma abordagem de investigação é utilizar modelos teóricos que diferem na forma em que incorporam o espaço para explicar os padrões de diversidade observados em fragmentos florestais.
 - uma primeira abordagem é entender os fragmentos florestais resultantes como ilhas de habitat circundados por uma matrix inóspita e assim utilizar Teoria de Biogeográfia de Ilhas (MacArthur & Wilson 1969). DESENVOLVER A MECANISTICA DO MODELO PARA CONCLUIR EM: TBI considera a analise na escala local do fragmento amostrado enquanto a paisagem ao redor possui uma dinâmica a parte (RELER Laurance 2008)
 - alternativamente toda a paisagem pode influenciar na dinâmica local, para contornar a problemática de incluir diferentes métricas de paisagem no modelo (para descrever a fragmentação per se) podemos diretamente utilizar a configuração espacial da paisagem.
+##PI: gostaria de discutir os dois últimos pontos
 
 __2o paragrafo__
-
+##PI: acho qeu aqui flata uma conexão com parágrafo anterior
 ## ? ##
 - a teoria neutra (Bell 2001, Hubbell 2001) pode prover modelos teóricos equivalentes que diferem na forma que incorporam o espaço na dinâmica ecológica (Rosindell & Etienne 2011) e dessa forma podemos avaliar se é necessário considerar explicitamente a configuração espacial para descrever a SAD observada (Hubbell 2005a) em paisagens em um gradiente de cobertura vegetal, as métricas de fragmentação são todas correlacionadas com a quantidade de habitat na paisagem (Fahrig 2013).
 
@@ -25,19 +26,24 @@ __2o paragrafo__
 
 - o modelo assume que a escala biogeográfica é influênciada por processos eco-evolutivos enquanto a escala local é influênciada apenas por processos ecológicos (Etienne et al. 2007b the zero-sum por exemplo). 
 
+
 - Uma aproximação é considerar que os processos em ambas escalas estão em equilíbrio (DESENVOLVER MELHOR) 
+
 
 - Na escala local a mesma dinâmica ecológica de nascimentos e mortes neutras é observada mas a cada evento de morte seguido de recolonização existe uma probabilidade 'm' de o colonizador seja prole de algum indivíduo da região biogeográfica (Hubbell 2001). 
 
 - A comunidade local depende da imigração de indivíduos da região biogeográfica para manter a diversidade, as comunidades apresentam limitação à dispersão (Alonso et al. 2006)
 
 - Com um conhecido theta, a SAD local pode ser deduzida a partir do número fundamental da dispersão (I) que descreve a competição entre a prole local e a prole do entorno por uma unidade de habitat na comunidade local (Etienne 2005).
+## PI: será que este e os 5 pontos anteriores são necessários para a introdução? Avaliar.
 
 - O modelo classico pode ser utilizado para descrever comunidades em paisagens onde o habitat se distribui continuamente, mas é mais comum ser interpretado como um modelo do tipo ilha-continente (Alonso et al. 2006). 
 
 - Com esse modelo é possível gerar predições para a dinâmica ecológica de comunidades em paisagens fragmentadas (Gilbert et al. 2006). 
+#PI: ok, mas não usamos as previsões deste trabalho. Então acho que o que Gilbert et al mais nos ajudam é em mostrar que muitas previsões do modelo EI não aproximam bem propriedades dos fragemntos, o que foi atribuído pelos autores à efeitos de nicho (condições criadas pela fragmentação que favorecem algumas espécie). A verificar, mas não me lembro que eles tenham também identificado efeitos de limitação á dispersão.
 
 <!-- Modelo neutro de espaço explícito -->
+##PI: aqui tb pensar em uma boa conexão com a parte anterior
 - Uma maneira de considerar a configuração espacial da paisagem na dinâmica ecológica é a partir de um modelo neutro de espaço explícito (Rosindell et al. 2008, Campos et al. 2012). 
 
 - Nesses modelos a limitação à dispersão é expressa no nível do indivíduo, a posição e distância dos indivíduos na paisagem influência na probabilidade de um propágulo colonizar uma unidade de habitat disponível (Chisholm & Lichstein 2009). 
@@ -45,16 +51,18 @@ __2o paragrafo__
 -Assim, região biogeográfica e comunidade local se influênciam mutuamente (Rosindell et al. 2008). [Os eventos de especiação podem ocorrer em qualquer lugar da paisagem, inclusive na área da comunidade local (Rosindell et al. 2008)?]
 
 - é possível simular a dinâmica ecológica de comunidades em paisagens fragmentadas e predizer a SAD para determinada configuração espacial, dispersão e taxa de especiação (Campos et al. 2013).
-
+#PI: a SAD entruo aqui meio bruscamente. Avaliar se não basta explicar a escolha da SAD no aprágrafo seguinte.
 
 __3o paragrafo__
 <!-- Objetivo -->
 ## ? ###
 - a teoria neutra (Bell 2001, Hubbell 2001) pode prover modelos teóricos que diferem na forma que incorporam o espaço na dinâmica ecológica (Rosindell & Etienne 2011) e dessa forma podemos avaliar se é necessário considerar explicitamente a configuração espacial para descrever a SAD observada (Hubbell 2005a) em paisagens em um gradiente de cobertura vegetal, as métricas de fragmentação per se são correlacionadas com a quantidade de habitat na paisagem (Fahrig 2013).
+#PI: um elemnto importante para mim é que o uso de EE ajuda a aavliar o quanto as discrepâncias encontradas em relação ao previsto pelo modelo neutro em paisagens fragmentadas (e.g. Gilbert) se deve a efeitos de nicho ou á limitação à dispersão dentro da paisagem e d comunidade.
 
 - um teste tradicional da Teoria Neutra é avaliar a congruência entre a predição de um modelo neutro com a SAD observada em determinado contexto ecológico (McGill et al. 2006)
 
 <!-- expectativas e possíveis efeitos associados -->
+#PI: fiquei na dúvida se deveria dar retorno sobre isto tb ous e é uma parte que vc usa para guardar ideias. Mas acho que alguns dos pontos que indiquei acima na introdução estão bem contemplados por trechos aqui.
 
 # qualificador 1 #
 - Em contexto de paisagem fragmentada, a teoria neutra oferece modelos nulos para explicar a diversidade ecológica, uma vez que, em paisagens fragmentadas o pressupostos de equivalência funcional não é uma boa aproximação das taxas demográficas das espécies (Gilbert et al. 2006, Laurance et al. 2018). O efeito de borda, principal efeito da remoção de habitat (Haddad et al. 2015), atua como um filtro ambiental (Laurance 2008), processo determínistico (Pardini et al. 2017): [algumas espécies apresentam aumento da das taxas de natalidade no habitat degradado da região da borda enquanto aquelas espécies associadas com o habitat original apresentam redução da taxa de natalidade e aumento da taxa de mortalidade (REFERÊNCIA)].
