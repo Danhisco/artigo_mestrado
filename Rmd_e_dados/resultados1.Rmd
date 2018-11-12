@@ -1,0 +1,384 @@
+---
+title: "Anexo - Análise estatística da probabilidade de não refutar uma predição neutra"
+author: "Mori, Danilo Pereira"
+date: "8 de novembro de 2018"
+output: 
+  html_document:
+    toc: true
+    toc_depth: 5
+---
+
+```{r setup, include=FALSE} 
+knitr::opts_chunk$set(echo = FALSE, tidy = TRUE, include = TRUE, warning = FALSE,cache = TRUE)
+```
+
+```{r dados e pacotes,warning=FALSE,message=FALSE,echo=FALSE}
+library(reshape2)
+library(arm)
+library(gridExtra)
+library(MuMIn)
+library(bbmle)
+library(lme4)
+library(merTools)
+library(ggplot2)
+library(broom) 
+library(magrittr)
+library(DHARMa)
+library(plyr)
+library(dplyr)
+library(tidyr)
+library(purrr)
+df_resultados <- readr::read_csv("/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/df_resultados.csv")
+# df_resultados %>% str
+df_resultados$MN <- factor(df_resultados$MN,levels = c("EI","EE"))
+df_resultados$SiteCode <- factor(df_resultados$SiteCode)
+df_resultados$k <- factor(df_resultados$k,levels=unique(df_resultados$k))
+# df_resultados$k %>% contrasts()
+# df_resultados$MN %>% contrasts()
+
+#### z score ###
+
+f_z <- function(x){
+  m <- base::mean(x,na.rm=TRUE)
+  sd <- sd(x,na.rm=TRUE)
+  output <- (x-m)/sd
+  return(output)
+} 
+
+df_resultados %<>% mutate(GOF.z = f_z(GOF),
+                          DA.z = f_z(DA),
+                          p.z = f_z(p),
+                          S.z = f_z(S),
+                          U.z = f_z(U),
+                          m_.z = f_z(m_),
+                          I.z = f_z(I),
+                          d.z = f_z(d),
+                          k.z0 = as.numeric(as.character(k)),
+                          k.z = f_z(k.z0))
+
+names(df_resultados)[1] <- "Site"
+
+```
+
+
+Esqueleto ideia cheia: a) variáveis e modelo utilizado (o background do livro); b) modelo cheio: diagnóstico; c) inferência estatística; d) código para a figura X - Probabilidade de não refutar neutralidade.
+
+# Anexo - inferência estatística #
+
+## Introdução ##
+
+- Contabilizamos o número de SADs neutras que não apresentaram diferença significativa da SAD observada e calculamos a probabilidade de não refutar neutralidade a partir da SAD observada em um gradiente de fragmentação(Pr_Nref).
+- Utilizamos um modelo generalizado misto binomial com função de ligação logito para uma primeira abordagem de análise e avaliamos os possíveis efeitos da proporção de cobertura vegetal na paisagem (p), proporção de propágulos que permanecem até a vizinhança imediata da planta progenitora (k) e o tipo de modelo neutro que gerou a predição testada (MN) (figura 1).
+- Agrupamos os dados por sítio de amostragem e permitimos que cada modelo neutro tivesse um intercepto próprio. Calculamos o coeficiente de determinação marginal e condicional ao agrupamento dos dados (R2m e R2c)[?].
+
+```{r GOF exp graf funcao de ligacao logito}
+## remoção de 0 e 100 ##
+df_ad <- df_resultados
+df_ad$GOF[df_ad$GOF==0] <- 0.01
+df_ad$GOF[df_ad$GOF==100] <- 99.99
+## transformação logito ##
+df_ad %<>% mutate(lGOF = log((GOF/100)/(1-(GOF/100)) ))
+# df_ad$lGOF %>% summary
+## gráfico ##
+print(
+    ggplot(df_ad,aes(x=p,y=lGOF,color=MN)) +
+      geom_point() +
+      # geom_smooth(method = "lm",se=FALSE) +
+      facet_wrap(~k,ncol=3) +
+      labs(y="logito(Pr_Nref)") +
+      scale_colour_manual(values = c("Blue", "Red"))
+)
+```
+
+__Figura 1__ logito de GOF ~ p * k * MN. EI: modelo neutro de espaço implícito; EE: modelo neutro de espaço explícito
+
+## testes preliminares ##
+
+### Seleção do modelo cheio ##
+
+Há duas formas de agrupar os dados: primeiro pelo sítio de amostragem (Site); e então por MN (MN|Site) (figura 2).
+
+```{r as duas formas de agrupar os dados,fig.width=10}
+l_p <- vector("list",2)
+l_p[[1]] <- mutate(df_ad,p.class = cut(p,12)) %>% ggplot(aes(x=Site,y=lGOF)) +
+  geom_jitter() +
+  geom_boxplot() +
+  coord_flip() +
+  labs(y="logito(Pr_Nref)",x="Sítio de Amostragem",title="(1|Site)") +
+  theme(axis.text.y = element_blank(),axis.ticks = element_blank(), legend.position="bottom") +
+  facet_wrap(~p.class,ncol=3,scales="free_y")
+l_p[[2]] <- mutate(df_ad,p.class = cut(p,12)) %>% ggplot(aes(x=Site,y=lGOF,color=MN)) +
+  geom_jitter() +
+  geom_boxplot() +
+  coord_flip() +
+  labs(y="logito(Pr_Nref)",x="",title="(MN|Site)") +
+  theme(axis.text.y = element_blank(),axis.ticks = element_blank(), legend.position="none") +
+  scale_colour_manual(values = c("Blue", "Red")) +
+  facet_wrap(~p.class,ncol=3,scales="free_y")
+do.call("grid.arrange",c(l_p,ncol=2))
+```
+
+__Figura 2__ Os dados agrupados por sítio de amostragem: (1|Site); (MN|Site). Ordenamos os sítios pela cobertura vegetal, os quadros estão dividos em 12 classes de cobertura vegetal (título do quadrículo). A maioria das amostras foi tomada em paisagens com alta proporção de cobertura vegetal (figura 2 (0.917,1]). 
+
+__Tabela 1__ Seleção da estrutura aleatória mais plausível
+
+```{r GOF escolha estrutura aleatoria}
+l_md1 <- vector("list",2)
+names(l_md1) <- c("1|Site","MN|Site")
+l_md1[[1]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k * MN + (1|Site), family = "binomial",data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md1[[2]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k * MN + (MN|Site), family = "binomial",data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+AICctab(l_md1,weights=T)
+```
+
+ O modelo com estrutura aleatória (MN|Site) foi o único plausível. Então fizemos o diagnóstico do modelo utlizando os resíduos quantílicos do pacote DHARMa (REFERENCIA):
+ 
+```{r GOF diag1}
+# dados #
+residuos_GOF <- simulateResiduals(fittedModel = l_md1[[2]], n = 1000)
+plot(residuos_GOF)
+```
+
+__Figura 3__ Resíduos quantílicos: 1o gráfico qq-plot e teste de aderência dos resíduos com o esperado segundo uniformidade com a distribuição teórica (teste de Kolmogorov-Smirnov); 2o gráfico resíduos contro o previsto, linhas são da regressão quantílica (0.25, 0.50, 0.75)
+
+  Pelo QQplot podemos avaliar que a distribuição dos resíduos quantílicos desvia significativamente do esperao segundo uma uniforme. Então comparamos GLMMs binomias com as duas outras funções de ligação canônicas:
+  
+__Tabela 2__ Comparação das funções de ligação para o modelo binomial para o modelo cheio  
+  
+```{r GOF escolha funcao de ligacao}
+l_md2 <- vector("list",3)
+names(l_md2) <- c("logit", 
+                  "probit", 
+                  "cloglog")
+l_md2[[1]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k * MN + (MN|Site), family = "binomial",data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md2[[2]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k * MN + (MN|Site), family = "binomial"(link = probit),data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md2[[3]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k * MN + (MN|Site), family = "binomial"(link = cloglog),data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+AICctab(l_md2,weights=T)
+```  
+
+  O único modelo plausível é aquele com a funçao de ligação cloglog. Repetimos o diagnóstico com os resíduos DHARMa para os três modelos:
+  
+```{r GOF teste de aderencia funcoes de ligacao,fig.height=3.5,fig.width=8}
+# resíduos dos modelos #
+l_residuos2 <- llply(l_md2,function(x) (simulateResiduals(fittedModel = x, n=1000)))
+# gráficos #
+par(mfrow=c(1,3))
+l_ply(l_residuos2,function(x) plotQQunif(x))
+```
+
+__Figura 4__ Testes de aderência à uniformidade dos resíduos quantílicos: 1o painel - logito; 2o painel - probito; 3o painel - cloglog
+  
+  Nenhum das três funções de ligação apresentam bom ajuste e a função de ligação não apresenta grande melhora na aderência dos resíduos à distribuição uniforme. Uma vez que a função de logito apresenta uma facilidade de interpretação por estimar os coeficientes em termos de log da razão de chance (Fox 1997), optamos por continuar com o modelo logito. Então vamos investigar quais as implicações desse desvio da uniformidade. Primeiramente vamos investigar a origem do desvio. Levantamos duas hipóteses de sua origem: a) devido à estrutura aleatória e b) por conta da ĩnflação de zeros.
+
+#### Investigação da origem dos desvios
+
+__Desvios devido à estrutura aleatória__
+
+  Para lidar com (a) podemos comparar os resíduos do modelo cheio com as duas estruturas aleatórias (1|Site) e (MN|Site):
+  
+```{r comparacao dos residuos das estruturas aleatorias,echo=T}
+# residuos #
+l_residuos1 <- llply(l_md1,function(x) (simulateResiduals(fittedModel = x, n=1000, use.u=F)))
+l_residuos1.1 <- llply(l_md1,function(x) (simulateResiduals(fittedModel = x, n=1000, use.u=T)))
+# gráficos #
+par(mfrow=c(2,2))
+l_ply(l_residuos1,function(x) plotQQunif(x))
+l_ply(l_residuos1.1,function(x) plotQQunif(x))
+```
+
+__Figura 5__ Testes de aderência à uniformidade re-simulando os resíduos gerando novos valores distribuidos segundo uma normal para a estrutura aleatória (primeira linha de gráficos); ou re-simulando os resíduos condicionados à estrutura aleatória (segunda linha de gráficos). A primeira coluna coresponde aos resíduos do modelo com (1|Site) e a segunda coluna ao modelo (MN|Site)
+
+  Há um aumento dos desvios no modelo com a estrutura aleatória mais simples. Os resíduos não condicionados à estrutura aleatória apresentam menor desvios do que aqueles resíduos condicionados à estrutura aleatória.
+  
+
+__Desvios devido à ĩnflação de zeros__
+
+  Para avaliar o efeito da ĩnflação de zeros vou utilizar o teste específico disponível no pacote DHARMa:
+
+```{r teste de inflamcao de zeros}
+testZeroInflation(residuos_GOF)
+```
+
+__Figura 6__ Teste de ĩnflação de Zeros: o histograma representa o número de zeros esperado se o modelo estiver correto e a linha vermelha os zeros observados.
+
+  O teste indica que há problemas de inflação por zeros. Uma alternativa é avaliar se estruturas aleatórias mais complexas diminuam os desvios da uniformidade.
+
+#### Estruturas aleatórias alternativas
+
+  Uma possibilidade é considerar a variável k como uma variável contínua (z-transformada) e incorporar seu efeito na estrutura aleatória ao permitir que existe uma inclinação de GOF para k. Existe a possibilidade de incluir uma inclinação e intercepto próprios para cada classe de modelo neutro por sítio de amostragem. Incluindo na comparação k enquanto variável categórica temos 7 opções de modelo cheio: 2 com k como variável categórica [(1|Site) e (MN|Site)]; e 5 com k como variável contínua [(1|Site), (MN|Site), (k.z|Site), (MN+k.z|Site), (MN*k.z|Site)].
+  
+__Tabela 3__ Comparação de modelos cheios com estruturas aleatórias alternativas considerando k enquanto variável categórica e contínua.
+  
+```{r estruuraas aleatórias alternativas}
+l_md <- vector("list",7)
+names(l_md) <- c("k.f 1|Site","k.f MN|Site", "k.z 1|Site", "k.z MN|Site", " k.z k.z|Site", " k.z MN + k.z|Site", "k.z MN * k.z|Site")
+l_md[[1]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k * MN + (1|Site), family = "binomial",data=df_resultados,
+                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[2]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k * MN + (MN|Site), family = "binomial",data=df_resultados,
+                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[3]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k.z * MN + (1|Site), family = "binomial",data=df_resultados,
+                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[4]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k.z * MN + (MN|Site), family = "binomial",data=df_resultados,
+                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[5]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k.z * MN + (k.z|Site), family = "binomial",data=df_resultados,
+                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[6]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k.z * MN + (MN+k.z|Site), family = "binomial",data=df_resultados,
+                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[7]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k.z * MN + (MN*k.z|Site), family = "binomial",data=df_resultados,
+                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+AICctab(l_md,weights=T)
+```
+
+ O modelo com k enquanto variável categórica e (MN|Site) foi o único plausível. Como a ideia é avaliar o padrão dos resíduos vou comparar a aderência à uniformidade dos resíduos dos dois modelos mais plausíveis:
+
+```{r residuos estruturas aleatorias mais plausiveis}
+l_residuos3 <- llply(l_md[c(2,7)],function(x) (simulateResiduals(fittedModel = x, n=1000, use.u=F)))
+par(mfrow=c(1,2))
+l_ply(l_residuos3,function(x) plotQQunif(x))
+```
+
+__Figura 7__ Teste de aderência à uniformidade dos resíduos quantílicos do modelo com k enquanto variável categórica estrutura aleatória MN|Site (primeiro gráfico); e do modelo com k enquanto variável contínua e estrutura aleatória k*MN|Site (segundo gráfico).
+
+  Ambos os modelos apresentam desvios significativos do espero para a hipótese de uniformidade, o modelo com k enquanto variável continua parece apresentar uma melhor adequência do que aquele que considera k enquanto variável categórica. Outro aspecto importante dos modelos mistos é a quantidade de variação que eles explicam dos dados, para avaliar essa questão é possível utilizar a função r.squaredGLMM() do pacote MuMIn (REFERÊNCIA) que implementa o coeficiente de determinação marginal e condicional à estrutura aleatória (REFERÊNCIA Nakagawa):
+  
+```{r rr squared k cat e k cont,message=FALSE}
+(l_R2 <- llply(l_md[c(2,7)],function(x) r.squaredGLMM(x)))
+```
+
+O modelo mais plausível apresenta a maior porcentagem de coeficiente de explicação marginal, mostrando que os efeitos fixos conseguem explicar melhor a variação dos dados quando consideramos k enquanto variável categórica. E mesmo com mais de 33 coeficientes a mais que o modelo onde k é uma variável contínua, é o modelo mais plausível mesmo quando utilizamos da parcimônia (tabela 1). Portanto, apesar do modelo com estrutura aleatória k*MN|Site apresentar a distribuição dos resíduos quantílicos mais próxima à esperada segundo uniformidade, uma vez que o desvio da uniformidade é significativo e considerando que AIC e R2 iremos utilizar o modelo com k enquanto variável categórica e estrutura aleatória MN|Site.
+
+## Avaliação das hipóteses estatística ##
+
+  Buscamos avaliar qual o modelo mais simples que melhor descreve os padrões dos dados. Comparamos o modelo cheio, com interação de terceira ordem das variáveis preditoras (p, k e MN), com todos os sub-modelos derivados deste.  
+
+__Tabela 4__ Comparação das hipóteses estatísticas para descrever o efeito das variáveis preditoras na probabilidade de não refutar neutralidade. 
+
+```{r GOF selecao de modelos}
+l_md <- vector("list",19)
+names(l_md) <- c("p*k*MN",# modelo cheio
+                 "p*k*MN-p:k:MN", #MC - 3a ordem
+                 "p*(k+MN)","k*(p+MN)","MN*(p+k)", #2 interações
+                 "p*k+MN","p*MN+k","k*MN+p", #1 interação + preditor
+                 "p*k","p*MN","k*MN", #1 interação
+                 "p+k+MN",#aditivo 3
+                 "p+k","p+MN","k+MN", #aditivo 2 
+                 "p","k","MN", #preditor isolado
+                 "1") #nulo
+#modelo cheio
+l_md[[1]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k * MN + (MN|Site), family = "binomial",data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+#modelo cheio - interação 3a ordem
+l_md[[2]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k * MN - p.z:k:MN + (MN|Site), family = "binomial",data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+#2 interações
+l_md[[3]] <- glmer(cbind(GOF,100-GOF) ~ p.z * (k + MN) + (MN|Site), family = "binomial",data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[4]] <- glmer(cbind(GOF,100-GOF) ~ k * (p.z + MN) + (MN|Site), family = "binomial",data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[5]] <- glmer(cbind(GOF,100-GOF) ~ MN * (p.z + k) + (MN|Site), family = "binomial",data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+#1 interação + preditor
+l_md[[6]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k + MN + (MN|Site), family = "binomial",data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[7]] <- glmer(cbind(GOF,100-GOF) ~ p.z * MN + k + (MN|Site), family = "binomial",data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[8]] <- glmer(cbind(GOF,100-GOF) ~ k * MN + p.z + (MN|Site), family = "binomial",data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+#1 interação
+l_md[[9]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k + (1|Site), family = "binomial",data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[10]] <- glmer(cbind(GOF,100-GOF) ~ p.z * MN + (MN|Site), family = "binomial",data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[11]] <- glmer(cbind(GOF,100-GOF) ~ k * MN + (MN|Site), family = "binomial",data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+#aditivo 3
+l_md[[12]] <- glmer(cbind(GOF,100-GOF) ~ p.z + k + MN + (MN|Site), family = "binomial",data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+#aditivo 2
+l_md[[13]] <- glmer(cbind(GOF,100-GOF) ~ p.z + k + (1|Site), family = "binomial",data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[14]] <- glmer(cbind(GOF,100-GOF) ~ p.z + MN + (MN|Site), family = "binomial",data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[15]] <- glmer(cbind(GOF,100-GOF) ~ k + MN + (MN|Site), family = "binomial",data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+#aditivo 1
+l_md[[16]] <- glmer(cbind(GOF,100-GOF) ~ p.z + (1|Site), family = "binomial",data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[17]] <- glmer(cbind(GOF,100-GOF) ~ k + (1|Site), family = "binomial",data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[18]] <- glmer(cbind(GOF,100-GOF) ~ MN + (MN|Site), family = "binomial",data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+# nulo
+l_md[[19]] <- glmer(cbind(GOF,100-GOF) ~ 1 + (1|Site), family = "binomial",data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+AICctab(l_md,weights=T)
+```
+
+O único modelo plausível é aquele que considera a interação de terceira ordem entre as variáveis preditoras.
+
+
+```{r md_GOF predito e observado,fig.width=10}
+# coisas a fazer: otimizar o copia e cola aqui #
+
+# novos dados 
+df_new.data <- expand.grid(Site = df_resultados$Site[1],
+                           p.z = seq(min(df_resultados$p.z)*1.1,max(df_resultados$p.z)*1.1, length=length(unique(df_resultados$p))),
+                           k = unique(df_resultados$k),
+                           MN = unique(df_resultados$MN))
+# bootMer
+load(file = "/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/bootMer_md-logit-GOF.Rdata")
+df_new.data1 <- df_new.data
+df_new.data1$p <- df_new.data1$p.z*sd(df_resultados$p) + mean(df_resultados$p) 
+# logit
+# df_new.data1$mean <- apply(b1$t,2,mean)
+# df_new.data1$IC.low <- apply(b1$t,2,quantile, 0.025)
+# df_new.data1$IC.upp <- apply(b1$t,2,quantile, 0.975)
+# df_new.data1$mean.fixed <- apply(b2$t,2,mean)
+# df_new.data1$IC.low.fixed <- apply(b2$t,2,quantile, 0.025)
+# df_new.data1$IC.upp.fixed <- apply(b2$t,2,quantile, 0.975)
+#inv logit
+df_new.data1$mean.invlogit <- invlogit(apply(b1$t,2,mean)) * 100
+df_new.data1$IC.low.invlogit <- invlogit(apply(b1$t,2,quantile, 0.025)) * 100
+df_new.data1$IC.upp.invlogit <- invlogit(apply(b1$t,2,quantile, 0.975)) * 100
+df_new.data1$mean.fixed.invlogit <- invlogit(apply(b2$t,2,mean)) * 100
+df_new.data1$IC.low.fixed.invlogit <- invlogit(apply(b2$t,2,quantile, 0.025)) * 100
+df_new.data1$IC.upp.fixed.invlogit <- invlogit(apply(b2$t,2,quantile, 0.975)) * 100
+## Modificação dos dados
+# df_ad <- df_resultados
+# df_ad$GOF[df_ad$GOF==0] <- 100/(1+exp(-min(df_new.data1$IC.low)))
+# df_ad$GOF[df_ad$GOF==100] <- 100/(1+exp(-max(df_new.data1$IC.upp)))
+# ## transformação logito ##
+# df_ad %<>% mutate(lGOF = log( (GOF/100) / ( 1 - (GOF/100) ) ))
+# grafico #
+l_p <- vector("list",2)
+l_p[[1]] <- ggplot(filter(df_ad,k %in% levels(df_ad$k)[1:6]),aes(x=p,y=GOF) ) + 
+    geom_ribbon(aes(y=mean.invlogit, ymin=IC.low.invlogit, ymax=IC.upp.invlogit), 
+                data=filter(df_new.data1,k %in% levels(df_ad$k)[1:6]), 
+                fill="grey15", alpha=0.5) +
+    geom_ribbon(aes(y=mean.invlogit, ymin=IC.low.fixed.invlogit, ymax=IC.upp.fixed.invlogit), 
+                data=filter(df_new.data1,k %in% levels(df_ad$k)[1:6]), 
+                fill="white", alpha=0.5) +
+    geom_line(aes(x=p, y=mean.fixed.invlogit), data=filter(df_new.data1,k %in% levels(df_ad$k)[1:6]),color="red") +
+    geom_point() +
+    labs(y="Número de predições não refutadas",x="% cobertura vegetal") +
+    facet_grid(k~MN)
+l_p[[2]] <- ggplot(filter(df_ad,k %in% levels(df_ad$k)[7:12]),aes(x=p,y=GOF) ) + 
+    geom_ribbon(aes(y=mean.invlogit, ymin=IC.low.invlogit, ymax=IC.upp.invlogit), 
+                data=filter(df_new.data1,k %in% levels(df_ad$k)[7:12]), 
+                fill="grey15", alpha=0.5) +
+    geom_ribbon(aes(y=mean.invlogit, ymin=IC.low.fixed.invlogit, ymax=IC.upp.fixed.invlogit), 
+                data=filter(df_new.data1,k %in% levels(df_ad$k)[7:12]), 
+                fill="white", alpha=0.5) +
+    geom_line(aes(x=p, y=mean.fixed.invlogit), data=filter(df_new.data1,k %in% levels(df_ad$k)[7:12]),color="red") +
+    geom_point() +
+    labs(y="",x="% cobertura vegetal") +
+    theme(axis.text.y = element_blank(),axis.ticks = element_blank()) +
+    facet_grid(k~MN)
+do.call("grid.arrange",c(l_p,ncol=2))
+```
+
+__Figura 8__ Número de predições não refutadas a partir da SAD observada e teste de Kolmogorov-Smirnov em função da % de cobertura vegetal. Os quadros estão dividos pelo modelo neutro que gerou as predições (colunas EI e EE) e pela proporção de propágulos que permanece até a vizinhança imediata da planta progenitora (linhas 0.99,...,0.25). A linha vermelha é a probabilidade de não refutar uma predição neutra, a região em branco ao redor da linha vermelha é o intervalo de confiança de 95% marginal ao agrupamento dos dados pelo sítio de amostragem, a região em cinza é o intervalo de confiança de 95% condicional ao agrupamento dos dados pelo sítio de amostragem. 
