@@ -23,6 +23,8 @@ library(magrittr)
 library(DHARMa)
 library(plyr)
 library(dplyr)
+library(tidyr)
+library(purrr)
 df_resultados <- readr::read_csv("/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/df_resultados.csv")
 # df_resultados %>% str
 df_resultados$MN <- factor(df_resultados$MN,levels = c("EI","EE"))
@@ -351,21 +353,10 @@ inv.link <- family(md_d)$linkinv
 df_ef.d  <- melt(ef_d,value.name = "replica") %>% 
   ddply(.,"variable",summarise, media0 = mean(replica),lwr0 = quantile(replica,0.025),upr0=quantile(replica,0.975)) %>% 
   mutate( media = inv.link(media0), IC.975 = inv.link(upr0), IC.025 = inv.link(lwr0))
-df_ef.d[,c(1,5:7)] #%>% ggplot(aes(x=variable,y=media,ymin=IC.025,ymax=IC.975)) + geom_pointrange()
+df_ef.d[,c(1,5:7)] #%>% ggplot(aes(x=variable,y=media,ymin=IC.025,ymax=IC.975)) + geom_pointrange() # existe grande variação entre sítios que é explicada em função da densidade
 ```
 
-
-
-
-
-### A partir daqui trabalho a ser feito ###
-
-0) Continuar análise de d - distância média de dispersão
-
-d) avaliação do modelo selecionado
-e) estudo das estimativas e interpretação
-
-
+<!--
 1) I = número fundamental da imigração (Etienne 2005)
 
 a) avaliar qual a melhor distribuição de probabilidade
@@ -373,6 +364,7 @@ b) avaliar função de ligação
 c) seleção de modelos
 d) avaliação do modelo selecionado
 e) estudo das estimativas e interpretação
+-->
 
 ## 2) GOF - número de SADs preditas que não foram refutadas ##
 
@@ -428,7 +420,7 @@ __Figura 2.1__ logito de GOF ~ site (~p.class)
 - MN|Site
 
 ```{r GOF graf exp 2 logito pela estrutura aleatoria 2,fig.height=8,fig.width=8}
-df_ad %>% mutate(p.class = cut(p,12)) %>% ggplot(aes(x=Site,y=lGOF,color=MN)) +
+mutate(df_ad,p.class = cut(p,12)) %>% ggplot(aes(x=Site,y=lGOF,color=MN)) +
   geom_jitter() +
   geom_boxplot() +
   coord_flip() +
@@ -937,9 +929,10 @@ f1 <- function(.) predict(.,newdata=df_new.data)
 # previsto considerando a estrutura fixa #
 f2 <- function(.) predict(.,newdata=df_new.data, re.form=~0)
 ## Os dois bootstraps. Ajuste o argumento ncpus para o numero de cores de seu computador
-b1 <- bootMer(md_GOF, FUN = f1, nsim=1000, parallel="multicore", ncpus=4)
-b2 <- bootMer(md_GOF, FUN = f2, nsim=1000, parallel="multicore", ncpus=4)
+# b1 <- bootMer(md_GOF, FUN = f1, nsim=1000, parallel="multicore", ncpus=4)
+# b2 <- bootMer(md_GOF, FUN = f2, nsim=1000, parallel="multicore", ncpus=4)
 # save(b1,b2,file="/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/bootMer_md-logit-GOF.Rdata")
+load(file = "/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/bootMer_md-logit-GOF.Rdata")
 # preparacao dos dados
 df_new.data$p <- df_new.data$p.z*sd(df_resultados$p) + mean(df_resultados$p) 
 df_new.data$mean <- apply(b1$t,2,mean)
@@ -964,7 +957,124 @@ df_ad %>%
     facet_grid(k~MN)
 ```
 
+__Figura 16__ observado e predito na escala da função de ligação 
+
+```{r md_GOF predito e observado,fig.width=10}
+# coisas a fazer: otimizar o copia e cola aqui #
+
+# novos dados 
+df_new.data <- expand.grid(Site = df_resultados$Site[1],
+                           p.z = seq(min(df_resultados$p.z)*1.1,max(df_resultados$p.z)*1.1, length=length(unique(df_resultados$p))),
+                           k = unique(df_resultados$k),
+                           MN = unique(df_resultados$MN))
+# bootMer
+load(file = "/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/bootMer_md-logit-GOF.Rdata")
+df_new.data1 <- df_new.data
+df_new.data1$p <- df_new.data1$p.z*sd(df_resultados$p) + mean(df_resultados$p) 
+# logit
+# df_new.data1$mean <- apply(b1$t,2,mean)
+# df_new.data1$IC.low <- apply(b1$t,2,quantile, 0.025)
+# df_new.data1$IC.upp <- apply(b1$t,2,quantile, 0.975)
+# df_new.data1$mean.fixed <- apply(b2$t,2,mean)
+# df_new.data1$IC.low.fixed <- apply(b2$t,2,quantile, 0.025)
+# df_new.data1$IC.upp.fixed <- apply(b2$t,2,quantile, 0.975)
+#inv logit
+df_new.data1$mean.invlogit <- invlogit(apply(b1$t,2,mean)) * 100
+df_new.data1$IC.low.invlogit <- invlogit(apply(b1$t,2,quantile, 0.025)) * 100
+df_new.data1$IC.upp.invlogit <- invlogit(apply(b1$t,2,quantile, 0.975)) * 100
+df_new.data1$mean.fixed.invlogit <- invlogit(apply(b2$t,2,mean)) * 100
+df_new.data1$IC.low.fixed.invlogit <- invlogit(apply(b2$t,2,quantile, 0.025)) * 100
+df_new.data1$IC.upp.fixed.invlogit <- invlogit(apply(b2$t,2,quantile, 0.975)) * 100
+## Modificação dos dados
+# df_ad <- df_resultados
+# df_ad$GOF[df_ad$GOF==0] <- 100/(1+exp(-min(df_new.data1$IC.low)))
+# df_ad$GOF[df_ad$GOF==100] <- 100/(1+exp(-max(df_new.data1$IC.upp)))
+# ## transformação logito ##
+# df_ad %<>% mutate(lGOF = log( (GOF/100) / ( 1 - (GOF/100) ) ))
+# grafico #
+l_p <- vector("list",2)
+l_p[[1]] <- ggplot(filter(df_ad,k %in% levels(df_ad$k)[1:6]),aes(x=p,y=GOF) ) + 
+    geom_ribbon(aes(y=mean.invlogit, ymin=IC.low.invlogit, ymax=IC.upp.invlogit), 
+                data=filter(df_new.data1,k %in% levels(df_ad$k)[1:6]), 
+                fill="grey15", alpha=0.5) +
+    geom_ribbon(aes(y=mean.invlogit, ymin=IC.low.fixed.invlogit, ymax=IC.upp.fixed.invlogit), 
+                data=filter(df_new.data1,k %in% levels(df_ad$k)[1:6]), 
+                fill="white", alpha=0.5) +
+    geom_line(aes(x=p, y=mean.fixed.invlogit), data=filter(df_new.data1,k %in% levels(df_ad$k)[1:6]),color="red") +
+    geom_point() +
+    labs(y="Número de predições não refutadas",x="% cobertura vegetal") +
+    facet_grid(k~MN)
+l_p[[2]] <- ggplot(filter(df_ad,k %in% levels(df_ad$k)[7:12]),aes(x=p,y=GOF) ) + 
+    geom_ribbon(aes(y=mean.invlogit, ymin=IC.low.invlogit, ymax=IC.upp.invlogit), 
+                data=filter(df_new.data1,k %in% levels(df_ad$k)[7:12]), 
+                fill="grey15", alpha=0.5) +
+    geom_ribbon(aes(y=mean.invlogit, ymin=IC.low.fixed.invlogit, ymax=IC.upp.fixed.invlogit), 
+                data=filter(df_new.data1,k %in% levels(df_ad$k)[7:12]), 
+                fill="white", alpha=0.5) +
+    geom_line(aes(x=p, y=mean.fixed.invlogit), data=filter(df_new.data1,k %in% levels(df_ad$k)[7:12]),color="red") +
+    geom_point() +
+    labs(y="",x="% cobertura vegetal") +
+    theme(axis.text.y = element_blank(),axis.ticks = element_blank()) +
+    facet_grid(k~MN)
+do.call("grid.arrange",c(l_p,ncol=2))
+```
+
+__Figura 17__ Número de predições não refutadas a partir da SAD observada e teste de Kolmogorov-Smirnov em função da % de cobertura vegetal. Os quadros estão dividos pelo modelo neutro que gerou as predições (colunas EI e EE) e pela proporção de propágulos que permanece até a vizinhança imediata da planta progenitora (linhas 0.99,...,0.25). A linha vermelha é a probabilidade de não refutar uma predição neutra, a região em branco ao redor da linha vermelha é o intervalo de confiança de 95% marginal ao agrupamento dos dados pelo sítio de amostragem, a região em cinza é o intervalo de confiança de 95% condicional ao agrupamento dos dados pelo sítio de amostragem. 
+
+
 __ Efeitos Fixos __
+
+- uma vez que o modelo plausível é de terceira ordem eu posso ajustar um glm logito glm(cbind(GOF,100-GOF) ~ p.z,family=binomial) para cada subpopulação dos dados (group_by=(MN,k)):
+
+```{r glm by MN e k}
+# modelo binomial para aplicar em cada group_by(MN,k)
+fun_map <- function(df){
+  glm(cbind(GOF,100-GOF) ~ p.z, family = binomial, data = df)
+}
+
+# glm(cbind(GOF,100-GOF) ~ p.z, family = binomial, data = df_resultados) %>% confint() %>% as.data.frame()
+
+# aplicando a função do modelo binomial para cada group_by(MN,k)
+df_coef.ef <- df_resultados %>% 
+  group_by(MN,k) %>% nest() %>%
+  mutate(md = map(data, fun_map),
+         coef = map(md,tidy), # GLM binomial aplicado para cada sítio;
+         IC = map(md,as.data.frame(confint)) #profile likelihood ratio CI
+         ) 
+
+# df único 
+df_coef.ef %<>% select(MN,k,coef,IC) %>% 
+  unnest() %>% as.data.frame() %>% 
+  select(MN,k,term,estimate, value.2.5.., value.97.5..) # retornando ao formato data frame 
+
+# transformando para a escala padrão
+f_inv.logit <- function(x) 1/(1+exp(-x))
+df_coef.ef %<>% mutate(media.pr = f_inv.logit(estimate),
+                       lwr.pr = f_inv.logit(value.2.5..),
+                       upr.pr = f_inv.logit(value.97.5..))
+
+# calculo da deriva 
+f_deriv.p <- function(X){
+  alfa <- X[1,3]
+  beta <- X[2,3]
+}
+
+df_coef.ef %>% select(MN,k,term,estimate,value.2.5..) %>% dcast(MN+k~term,value.var="estimate")
+# ,value.2.5..,value.97.5..; ,value.var = c("estimate","value.2.5..","value.97.5..")
+# gráfico das estimativas para cada subpopulação
+# df_coef.ef %>% summary
+df_coef.ef %>% 
+  ggplot(aes(x=k,y=media.pr,ymin=lwr.pr,ymax=upr.pr,colour=MN)) +
+  # ggplot(aes(x=k,y=estimate,ymin=value.2.5..,ymax=value.97.5..,colour=MN)) +
+  # ggplot(aes(x=k,y=media,ymin=lwr,ymax=upr,color=MN)) +
+  geom_hline(yintercept = 0,colour="green") +
+  geom_pointrange() + 
+  scale_colour_manual(values = c("Blue", "Red")) +
+  facet_wrap(~term,ncol=1,scales="free")
+```
+
+__Figura 16.2__  Estimativas lineares da probabilidade média da
+
 
 ```{r efeitos fixos md_GOF}
 ef_GOF <- arm::sim(md_GOF,1000)
