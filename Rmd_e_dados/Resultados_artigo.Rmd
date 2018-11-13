@@ -14,6 +14,7 @@ library(reshape2)
 library(arm)
 library(gridExtra)
 library(MuMIn)
+library(doMC)
 library(bbmle)
 library(lme4)
 library(merTools)
@@ -25,6 +26,9 @@ library(plyr)
 library(dplyr)
 library(tidyr)
 library(purrr)
+```
+
+```{r organização dos dados}
 df_resultados <- readr::read_csv("/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/df_resultados.csv")
 # df_resultados %>% str
 df_resultados$MN <- factor(df_resultados$MN,levels = c("EI","EE"))
@@ -54,8 +58,8 @@ df_resultados %<>% mutate(GOF.z = f_z(GOF),
                           k.z = f_z(k.z0))
 
 names(df_resultados)[1] <- "Site"
-
 ```
+
 
 <!--
 Ideia geral dos métodos:
@@ -993,7 +997,7 @@ df_new.data1$IC.upp.fixed.invlogit <- invlogit(apply(b2$t,2,quantile, 0.975)) * 
 # df_ad %<>% mutate(lGOF = log( (GOF/100) / ( 1 - (GOF/100) ) ))
 # grafico #
 l_p <- vector("list",2)
-l_p[[1]] <- ggplot(filter(df_ad,k %in% levels(df_ad$k)[1:6]),aes(x=p,y=GOF) ) + 
+l_p[[1]] <- ggplot(filter(df_resultados,k %in% levels(df_ad$k)[1:6]),aes(x=p,y=GOF) ) + 
     geom_ribbon(aes(y=mean.invlogit, ymin=IC.low.invlogit, ymax=IC.upp.invlogit), 
                 data=filter(df_new.data1,k %in% levels(df_ad$k)[1:6]), 
                 fill="grey15", alpha=0.5) +
@@ -1004,7 +1008,7 @@ l_p[[1]] <- ggplot(filter(df_ad,k %in% levels(df_ad$k)[1:6]),aes(x=p,y=GOF) ) +
     geom_point() +
     labs(y="Número de predições não refutadas",x="% cobertura vegetal") +
     facet_grid(k~MN)
-l_p[[2]] <- ggplot(filter(df_ad,k %in% levels(df_ad$k)[7:12]),aes(x=p,y=GOF) ) + 
+l_p[[2]] <- ggplot(filter(df_resultados,k %in% levels(df_ad$k)[7:12]),aes(x=p,y=GOF) ) + 
     geom_ribbon(aes(y=mean.invlogit, ymin=IC.low.invlogit, ymax=IC.upp.invlogit), 
                 data=filter(df_new.data1,k %in% levels(df_ad$k)[7:12]), 
                 fill="grey15", alpha=0.5) +
@@ -1022,7 +1026,101 @@ do.call("grid.arrange",c(l_p,ncol=2))
 __Figura 17__ Número de predições não refutadas a partir da SAD observada e teste de Kolmogorov-Smirnov em função da % de cobertura vegetal. Os quadros estão dividos pelo modelo neutro que gerou as predições (colunas EI e EE) e pela proporção de propágulos que permanece até a vizinhança imediata da planta progenitora (linhas 0.99,...,0.25). A linha vermelha é a probabilidade de não refutar uma predição neutra, a região em branco ao redor da linha vermelha é o intervalo de confiança de 95% marginal ao agrupamento dos dados pelo sítio de amostragem, a região em cinza é o intervalo de confiança de 95% condicional ao agrupamento dos dados pelo sítio de amostragem. 
 
 
-__ Efeitos Fixos __
+#### Efeitos fixos
+
+Existem pelo menos 3 maneiras de avaliar a estimativa dos parâmetros do modelo estatístico: a) dividir os dados pelas variáveis categóricas k e MN e então ajustar um glm com distribuição binomial e função de ligação logito e, se os resíduos forem similares, utilizar as estimativas dos glms como aproximações dos parâmetros utilizados; b) utilizar a amostragem a posteori disponível em merTools; c) encontrar uma maneira de estimar a partir do bootMer, que possibilita associar a estimativa com a incerteza marginal e condicional aos efeitos aleatórios.
+
+Vou começar avaliando a opção c por ser mais completa, caso não seja possível sigo para a opção a e então a opção b.
+
+##### bootMer 
+
+```{r coef e intervalo de confianca bootmer parte 1 }
+# funcao para aplicar e extrair coef de um lm para cada réplica
+f_coef.bootMer <- function(df_=df_new.data,X){
+  lm.data <- cbind(X,df_new.data)
+  names(lm.data)[1] <- "replica"
+  lm.object <- coef(lm(replica ~ p.z*k*MN,data = lm.data))
+  return(lm.object)
+}
+
+# replicas dos coeficientes armazenados em um df
+# teste <- f_coef.bootMer1(X=b1$t[1,])
+# str(df_new.data)
+registerDoMC(3)
+df_lm.coef1 <- adply(b1$t,1,function(a) f_coef.bootMer(X=a),.parallel = TRUE) %>% select(-X1)
+# summary(df_lm.coef1)
+df_lm.coef2 <- adply(b2$t,1,function(a) f_coef.bootMer(X=a),.parallel = TRUE) %>% select(-X1)
+
+# coeficientes -> parâmetros da regressão
+## para os resultados marginais
+l_ef1 <- vector("list",12)
+l_ef1[[1]] <- data.frame(k = factor(levels(df_resultados$k)[1], levels = levels(df_resultados$k)), 
+                         MN = rep(rep(levels(df_resultados$MN),2),each=1000), 
+                         termo = rep(rep(c("alfa","beta"),each=2),each=1000),
+                         replica = c(df_lm.coef1[,1] , #alfa EI
+                                     df_lm.coef1[,1] + df_lm.coef1[,14], # alfa EE
+                                     df_lm.coef1[,2], #beta EI
+                                     df_lm.coef1[,2] + df_lm.coef1[,26])) #beta EE
+# l_ef[[1]] %>% ddply(.,c("k","MN","termo"), summarise, mean(replica))
+# md_GOF
+for(i in 2:12){
+l_ef1[[i]] <- data.frame(k = factor(levels(df_resultados$k)[i], levels = levels(df_resultados$k)), 
+                         MN = rep(rep(levels(df_resultados$MN),2),each=1000), 
+                         termo = rep(rep(c("alfa","beta"),each=2),each=1000),
+                         replica = c(df_lm.coef1[,1] + df_lm.coef1[,1+i] , #alfa EI
+                                     df_lm.coef1[,1] + df_lm.coef1[,1+i] + df_lm.coef1[,14] + df_lm.coef1[,25+i], # alfa EE
+                                     df_lm.coef1[,2] + df_lm.coef1[,13+i], #beta EI
+                                     df_lm.coef1[,2] + df_lm.coef1[,13+i] + df_lm.coef1[,26] + df_lm.coef1[,36+i])) #beta EE
+}
+df_ef1 <- rbind.fill(l_ef1) %>% ddply(.,c("k","MN","termo"),summarise, 
+                                    media = mean(replica), mediana = median(replica), 
+                                    upr = quantile(replica, 0.975), lwr = quantile(replica, 0.025)) 
+# visualizacao
+l_p <- vector("list",2)
+l_p[[1]] <- ggplot(df_ef1,aes(x=k,y=media,ymin=lwr,ymax=upr,colour=MN)) +
+  # ggplot(aes(x=k,y=estimate,ymin=value.2.5..,ymax=value.97.5..,colour=MN)) +
+  # ggplot(aes(x=k,y=media,ymin=lwr,ymax=upr,color=MN)) +
+  geom_hline(yintercept = 0,colour="green") +
+  geom_pointrange() + 
+  scale_colour_manual(values = c("Blue", "Red")) +
+  facet_wrap(~termo,ncol=1,scales="free")
+
+
+## para os resultados condicionais
+l_ef2 <- vector("list",12)
+l_ef2[[1]] <- data.frame(k = factor(levels(df_resultados$k)[1], levels = levels(df_resultados$k)), 
+                         MN = rep(rep(levels(df_resultados$MN),2),each=1000), 
+                         termo = rep(rep(c("alfa","beta"),each=2),each=1000),
+                         replica = c(df_lm.coef2[,1] , #alfa EI
+                                     df_lm.coef2[,1] + df_lm.coef2[,14], # alfa EE
+                                     df_lm.coef2[,2], #beta EI
+                                     df_lm.coef2[,2] + df_lm.coef2[,26])) #beta EE
+# l_ef[[1]] %>% ddply(.,c("k","MN","termo"), summarise, mean(replica))
+# md_GOF
+for(i in 2:12){
+l_ef2[[i]] <- data.frame(k = factor(levels(df_resultados$k)[i], levels = levels(df_resultados$k)), 
+                         MN = rep(rep(levels(df_resultados$MN),2),each=1000), 
+                         termo = rep(rep(c("alfa","beta"),each=2),each=1000),
+                         replica = c(df_lm.coef2[,1] + df_lm.coef2[,1+i] , #alfa EI
+                                     df_lm.coef2[,1] + df_lm.coef2[,1+i] + df_lm.coef2[,14] + df_lm.coef2[,25+i], # alfa EE
+                                     df_lm.coef2[,2] + df_lm.coef2[,13+i], #beta EI
+                                     df_lm.coef2[,2] + df_lm.coef2[,13+i] + df_lm.coef2[,26] + df_lm.coef2[,36+i])) #beta EE
+}
+df_ef2 <- rbind.fill(l_ef2) %>% ddply(.,c("k","MN","termo"),summarise, 
+                                    media = mean(replica), mediana = median(replica), 
+                                    upr = quantile(replica, 0.975), lwr = quantile(replica, 0.025)) 
+# visualizacao
+l_p[[2]] <- ggplot(df_ef2,aes(x=k,y=media,ymin=lwr,ymax=upr,colour=MN)) +
+  # ggplot(aes(x=k,y=estimate,ymin=value.2.5..,ymax=value.97.5..,colour=MN)) +
+  # ggplot(aes(x=k,y=media,ymin=lwr,ymax=upr,color=MN)) +
+  geom_hline(yintercept = 0,colour="green") +
+  geom_pointrange() + 
+  scale_colour_manual(values = c("Blue", "Red")) +
+  facet_wrap(~termo,ncol=1,scales="free")
+do.call("grid.arrange",c(l_p,ncol=2))
+```
+
+
 
 - uma vez que o modelo plausível é de terceira ordem eu posso ajustar um glm logito glm(cbind(GOF,100-GOF) ~ p.z,family=binomial) para cada subpopulação dos dados (group_by=(MN,k)):
 
