@@ -997,25 +997,27 @@ df_new.data1$IC.upp.fixed.invlogit <- invlogit(apply(b2$t,2,quantile, 0.975)) * 
 # df_ad %<>% mutate(lGOF = log( (GOF/100) / ( 1 - (GOF/100) ) ))
 # grafico #
 l_p <- vector("list",2)
-l_p[[1]] <- ggplot(filter(df_resultados,k %in% levels(df_ad$k)[1:6]),aes(x=p,y=GOF) ) + 
+l_p[[1]] <- ggplot(filter(df_resultados,k %in% levels(df_resultados$k)[1:6]),aes(x=p,y=GOF) ) + 
     geom_ribbon(aes(y=mean.invlogit, ymin=IC.low.invlogit, ymax=IC.upp.invlogit), 
-                data=filter(df_new.data1,k %in% levels(df_ad$k)[1:6]), 
+                data=filter(df_new.data1,k %in% levels(df_resultados$k)[1:6]), 
                 fill="grey15", alpha=0.5) +
     geom_ribbon(aes(y=mean.invlogit, ymin=IC.low.fixed.invlogit, ymax=IC.upp.fixed.invlogit), 
-                data=filter(df_new.data1,k %in% levels(df_ad$k)[1:6]), 
+                data=filter(df_new.data1,k %in% levels(df_resultados$k)[1:6]), 
                 fill="white", alpha=0.5) +
-    geom_line(aes(x=p, y=mean.fixed.invlogit), data=filter(df_new.data1,k %in% levels(df_ad$k)[1:6]),color="red") +
+    geom_line(aes(x=p, y=mean.fixed.invlogit), 
+              data=filter(df_new.data1,k %in% levels(df_resultados$k)[1:6]),color="red") +
     geom_point() +
     labs(y="Número de predições não refutadas",x="% cobertura vegetal") +
     facet_grid(k~MN)
-l_p[[2]] <- ggplot(filter(df_resultados,k %in% levels(df_ad$k)[7:12]),aes(x=p,y=GOF) ) + 
+l_p[[2]] <- ggplot(filter(df_resultados,k %in% levels(df_resultados$k)[7:12]),aes(x=p,y=GOF) ) + 
     geom_ribbon(aes(y=mean.invlogit, ymin=IC.low.invlogit, ymax=IC.upp.invlogit), 
-                data=filter(df_new.data1,k %in% levels(df_ad$k)[7:12]), 
+                data=filter(df_new.data1,k %in% levels(df_resultados$k)[7:12]), 
                 fill="grey15", alpha=0.5) +
     geom_ribbon(aes(y=mean.invlogit, ymin=IC.low.fixed.invlogit, ymax=IC.upp.fixed.invlogit), 
-                data=filter(df_new.data1,k %in% levels(df_ad$k)[7:12]), 
+                data=filter(df_new.data1,k %in% levels(df_resultados$k)[7:12]), 
                 fill="white", alpha=0.5) +
-    geom_line(aes(x=p, y=mean.fixed.invlogit), data=filter(df_new.data1,k %in% levels(df_ad$k)[7:12]),color="red") +
+    geom_line(aes(x=p, y=mean.fixed.invlogit), 
+              data=filter(df_new.data1,k %in% levels(df_resultados$k)[7:12]),color="red") +
     geom_point() +
     labs(y="",x="% cobertura vegetal") +
     theme(axis.text.y = element_blank(),axis.ticks = element_blank()) +
@@ -1052,75 +1054,53 @@ df_lm.coef1 <- adply(b1$t,1,function(a) f_coef.bootMer(X=a),.parallel = TRUE) %>
 df_lm.coef2 <- adply(b2$t,1,function(a) f_coef.bootMer(X=a),.parallel = TRUE) %>% select(-X1)
 
 # coeficientes -> parâmetros da regressão
-## para os resultados marginais
-l_ef1 <- vector("list",12)
-l_ef1[[1]] <- data.frame(k = factor(levels(df_resultados$k)[1], levels = levels(df_resultados$k)), 
-                         MN = rep(rep(levels(df_resultados$MN),2),each=1000), 
-                         termo = rep(rep(c("alfa","beta"),each=2),each=1000),
-                         replica = c(df_lm.coef1[,1] , #alfa EI
-                                     df_lm.coef1[,1] + df_lm.coef1[,14], # alfa EE
-                                     df_lm.coef1[,2], #beta EI
-                                     df_lm.coef1[,2] + df_lm.coef1[,26])) #beta EE
-# l_ef[[1]] %>% ddply(.,c("k","MN","termo"), summarise, mean(replica))
-# md_GOF
-for(i in 2:12){
-l_ef1[[i]] <- data.frame(k = factor(levels(df_resultados$k)[i], levels = levels(df_resultados$k)), 
-                         MN = rep(rep(levels(df_resultados$MN),2),each=1000), 
-                         termo = rep(rep(c("alfa","beta"),each=2),each=1000),
-                         replica = c(df_lm.coef1[,1] + df_lm.coef1[,1+i] , #alfa EI
-                                     df_lm.coef1[,1] + df_lm.coef1[,1+i] + df_lm.coef1[,14] + df_lm.coef1[,25+i], # alfa EE
-                                     df_lm.coef1[,2] + df_lm.coef1[,13+i], #beta EI
-                                     df_lm.coef1[,2] + df_lm.coef1[,13+i] + df_lm.coef1[,26] + df_lm.coef1[,36+i])) #beta EE
+## funcao para combinar e sumarizar as replicas de cada coeficiente
+f_par.md3ordem <- function(df_coef,df_=df_resultados){
+  l_ef <- vector("list",12)
+  l_ef[[1]] <- data.frame(k = factor(levels(df_$k)[1], levels = levels(df_$k)), 
+                          MN = rep(rep(levels(df_$MN),2),each=1000), 
+                          termo = rep(rep(c("alfa","beta"),each=2),each=1000),
+                          replica = c(df_coef[,1] , #alfa EI
+                                      df_coef[,1] + df_coef[,14], # alfa EE
+                                      df_coef[,2], #beta EI
+                                      df_coef[,2] + df_coef[,26])) #beta EE  
+  for(i in 2:12){
+  l_ef[[i]] <- data.frame(k = factor(levels(df_$k)[i], levels = levels(df_$k)), 
+                           MN = rep(rep(levels(df_$MN),2),each=1000), 
+                           termo = rep(rep(c("alfa","beta"),each=2),each=1000),
+                           replica = c(df_coef[,1] + df_coef[,1+i] , #alfa EI
+                                       df_coef[,1] + df_coef[,1+i] + df_coef[,14] + df_coef[,25+i], # alfa EE
+                                       df_coef[,2] + df_coef[,13+i], #beta EI
+                                       df_coef[,2] + df_coef[,13+i] + df_coef[,26] + df_coef[,36+i])) #beta EE
+  }
+  df_ef <- rbind.fill(l_ef) %>% ddply(.,c("k","MN","termo"),summarise, 
+                                       media = mean(replica), mediana = median(replica), 
+                                       upr = quantile(replica, 0.975), lwr = quantile(replica, 0.025)) 
+return(df_ef)
 }
-df_ef1 <- rbind.fill(l_ef1) %>% ddply(.,c("k","MN","termo"),summarise, 
-                                    media = mean(replica), mediana = median(replica), 
-                                    upr = quantile(replica, 0.975), lwr = quantile(replica, 0.025)) 
-# visualizacao
+## data frame com ambas estimativas
+df_ef <- cbind(f_par.md3ordem(df_coef = df_lm.coef1),
+               f_par.md3ordem(df_coef = df_lm.coef2)[,4:7])
+names(df_ef)[8:11] <- c("media.m","mediana.m","upr.m","lwr.m")
+
+## gráfico dos dois intervalos ##
 l_p <- vector("list",2)
-l_p[[1]] <- ggplot(df_ef1,aes(x=k,y=media,ymin=lwr,ymax=upr,colour=MN)) +
-  # ggplot(aes(x=k,y=estimate,ymin=value.2.5..,ymax=value.97.5..,colour=MN)) +
-  # ggplot(aes(x=k,y=media,ymin=lwr,ymax=upr,color=MN)) +
-  geom_hline(yintercept = 0,colour="green") +
-  geom_pointrange() + 
+l_p[[1]] <- ggplot(filter(df_ef,termo == "alfa"),aes(x=k,y=invlogit(media),color=MN)) +
+  geom_linerange(aes(ymin=invlogit(lwr),ymax=invlogit(upr))) +
+  geom_crossbar(aes(x=k,ymin=invlogit(lwr.m),ymax=invlogit(upr.m))) +
   scale_colour_manual(values = c("Blue", "Red")) +
-  facet_wrap(~termo,ncol=1,scales="free")
-
-
-## para os resultados condicionais
-l_ef2 <- vector("list",12)
-l_ef2[[1]] <- data.frame(k = factor(levels(df_resultados$k)[1], levels = levels(df_resultados$k)), 
-                         MN = rep(rep(levels(df_resultados$MN),2),each=1000), 
-                         termo = rep(rep(c("alfa","beta"),each=2),each=1000),
-                         replica = c(df_lm.coef2[,1] , #alfa EI
-                                     df_lm.coef2[,1] + df_lm.coef2[,14], # alfa EE
-                                     df_lm.coef2[,2], #beta EI
-                                     df_lm.coef2[,2] + df_lm.coef2[,26])) #beta EE
-# l_ef[[1]] %>% ddply(.,c("k","MN","termo"), summarise, mean(replica))
-# md_GOF
-for(i in 2:12){
-l_ef2[[i]] <- data.frame(k = factor(levels(df_resultados$k)[i], levels = levels(df_resultados$k)), 
-                         MN = rep(rep(levels(df_resultados$MN),2),each=1000), 
-                         termo = rep(rep(c("alfa","beta"),each=2),each=1000),
-                         replica = c(df_lm.coef2[,1] + df_lm.coef2[,1+i] , #alfa EI
-                                     df_lm.coef2[,1] + df_lm.coef2[,1+i] + df_lm.coef2[,14] + df_lm.coef2[,25+i], # alfa EE
-                                     df_lm.coef2[,2] + df_lm.coef2[,13+i], #beta EI
-                                     df_lm.coef2[,2] + df_lm.coef2[,13+i] + df_lm.coef2[,26] + df_lm.coef2[,36+i])) #beta EE
-}
-df_ef2 <- rbind.fill(l_ef2) %>% ddply(.,c("k","MN","termo"),summarise, 
-                                    media = mean(replica), mediana = median(replica), 
-                                    upr = quantile(replica, 0.975), lwr = quantile(replica, 0.025)) 
-# visualizacao
-l_p[[2]] <- ggplot(df_ef2,aes(x=k,y=media,ymin=lwr,ymax=upr,colour=MN)) +
-  # ggplot(aes(x=k,y=estimate,ymin=value.2.5..,ymax=value.97.5..,colour=MN)) +
-  # ggplot(aes(x=k,y=media,ymin=lwr,ymax=upr,color=MN)) +
-  geom_hline(yintercept = 0,colour="green") +
-  geom_pointrange() + 
+  # labs(y="probabilidade média de não refutar neutralidade") +
+  theme(legend.position = "none")
+l_p[[2]] <- ggplot(filter(df_ef,termo == "beta"),aes(x=k,y=invlogit(media),color=MN)) +
+  geom_linerange(aes(ymin=invlogit(lwr),ymax=invlogit(upr))) +
+  geom_crossbar(aes(x=k,ymin=invlogit(lwr.m),ymax=invlogit(upr.m))) +
   scale_colour_manual(values = c("Blue", "Red")) +
-  facet_wrap(~termo,ncol=1,scales="free")
-do.call("grid.arrange",c(l_p,ncol=2))
+  # labs(y="probabilidade média de não refutar neutralidade") +
+  theme(legend.position = "bottom")
+do.call("grid.arrange",c(l_p,ncol=1))
 ```
 
-
+- coisas que precisam ser feitas: avaliar a qualidade das regressões lineares ajustadas às réplicas - posso plotar o boxplot do R2 para o bootMer condional e marginal
 
 - uma vez que o modelo plausível é de terceira ordem eu posso ajustar um glm logito glm(cbind(GOF,100-GOF) ~ p.z,family=binomial) para cada subpopulação dos dados (group_by=(MN,k)):
 
