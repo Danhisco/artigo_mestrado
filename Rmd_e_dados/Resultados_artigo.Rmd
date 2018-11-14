@@ -1036,8 +1036,8 @@ Vou começar avaliando a opção c por ser mais completa, caso não seja possív
 
 ##### bootMer 
 
-```{r coef e intervalo de confianca bootmer parte 1 }
-# funcao para aplicar e extrair coef de um lm para cada réplica
+```{r coef e intervalo de confianca bootmer parte 1}
+## funcao para aplicar e extrair coef de um lm para cada réplica
 f_coef.bootMer <- function(df_=df_new.data,X){
   lm.data <- cbind(X,df_new.data)
   names(lm.data)[1] <- "replica"
@@ -1046,14 +1046,10 @@ f_coef.bootMer <- function(df_=df_new.data,X){
 }
 
 # replicas dos coeficientes armazenados em um df
-# teste <- f_coef.bootMer1(X=b1$t[1,])
-# str(df_new.data)
 registerDoMC(3)
 df_lm.coef1 <- adply(b1$t,1,function(a) f_coef.bootMer(X=a),.parallel = TRUE) %>% select(-X1)
-# summary(df_lm.coef1)
 df_lm.coef2 <- adply(b2$t,1,function(a) f_coef.bootMer(X=a),.parallel = TRUE) %>% select(-X1)
 
-# coeficientes -> parâmetros da regressão
 ## funcao para combinar e sumarizar as replicas de cada coeficiente
 f_par.md3ordem <- function(df_coef,df_=df_resultados){
   l_ef <- vector("list",12)
@@ -1084,21 +1080,35 @@ df_ef <- cbind(f_par.md3ordem(df_coef = df_lm.coef1),
 names(df_ef)[8:11] <- c("media.m","mediana.m","upr.m","lwr.m")
 
 ## gráfico dos dois intervalos ##
-l_p <- vector("list",2)
+l_p <- vector("list",4)
 l_p[[1]] <- ggplot(filter(df_ef,termo == "alfa"),aes(x=k,y=invlogit(media),color=MN)) +
   geom_linerange(aes(ymin=invlogit(lwr),ymax=invlogit(upr))) +
   geom_crossbar(aes(x=k,ymin=invlogit(lwr.m),ymax=invlogit(upr.m))) +
   scale_colour_manual(values = c("Blue", "Red")) +
-  # labs(y="probabilidade média de não refutar neutralidade") +
+  labs(y="invlogit(alfa)") +
   theme(legend.position = "none")
-l_p[[2]] <- ggplot(filter(df_ef,termo == "beta"),aes(x=k,y=invlogit(media),color=MN)) +
+l_p[[3]] <- ggplot(filter(df_ef,termo == "beta"),aes(x=k,y=invlogit(media),color=MN)) +
   geom_linerange(aes(ymin=invlogit(lwr),ymax=invlogit(upr))) +
   geom_crossbar(aes(x=k,ymin=invlogit(lwr.m),ymax=invlogit(upr.m))) +
   scale_colour_manual(values = c("Blue", "Red")) +
-  # labs(y="probabilidade média de não refutar neutralidade") +
+  labs(y="invlogit(beta)") +
   theme(legend.position = "bottom")
-do.call("grid.arrange",c(l_p,ncol=1))
+l_p[[2]] <- ggplot(filter(df_ef,termo == "alfa"),aes(x=k,y=media,color=MN)) +
+  geom_linerange(aes(ymin=lwr,ymax=upr)) +
+  geom_crossbar(aes(x=k,ymin=lwr.m,ymax=upr.m)) +
+  scale_colour_manual(values = c("Blue", "Red")) +
+  labs(y="alfa") +
+  theme(legend.position = "none")
+l_p[[4]] <- ggplot(filter(df_ef,termo == "beta"),aes(x=k,y=media,color=MN)) +
+  geom_linerange(aes(ymin=lwr,ymax=upr)) +
+  geom_crossbar(aes(x=k,ymin=lwr.m,ymax=upr.m)) +
+  scale_colour_manual(values = c("Blue", "Red")) +
+  labs(y="beta") +
+  theme(legend.position = "bottom")
+do.call("grid.arrange",c(l_p,ncol=2))
 ```
+
+__Figura 18__ Probabilidade média de não refutar (alfa) e o efeito da porcentagem de cobertura vegetal (p) na probabilidade de não refutar neutralidade (beta) pela proporção de propágulos até a vizinhança imediata da planta progenitora (k) e pelo modelo neutro que gerou a predição neutra (MN), em azul MN de espaço explícito e em vermelho MN de espaço explícito. As linhas horizontais são os efeitos médios, a caixa representa o intervalo de confiança de 95% (IC) para as predições marginais aos efeitos aleatórios e a linha vertical representa IC para as predições condicionais aos efeitos aleatórios do modelo mais plausível. Na coluna da direita os alfas e betas estão na escala da respostae, em porcentagens; na coluna da direita os parâmetros estão na escala da função de ligação. Os ICs e a média foram estimados a partir do ajuste de uma regressão linear considerando a interação de terceira ordem entre as preditoras (p, k e MN) para cada réplica do bootstrap da predição do modelo plausível, que está na escala da função de ligação; somou-se os vetores de coeficienes réplicas para obter os respectivos alfas e betas para cada combinação entre k e MN, então calculou-se as médias e os quantis para 2.5% e 97.5% dos coeficientes estimados. O coeficiente de determinação de todos as regressões lineares foi igual a 1.
 
 - coisas que precisam ser feitas: avaliar a qualidade das regressões lineares ajustadas às réplicas - posso plotar o boxplot do R2 para o bootMer condional e marginal
 
