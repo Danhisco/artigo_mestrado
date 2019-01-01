@@ -8,6 +8,11 @@ output:
     toc_depth: 5
 ---
 
+<style>
+body {
+text-align: justify}
+</style>
+
 ```{r setup, include=FALSE} 
 knitr::opts_chunk$set(echo = FALSE, tidy = TRUE, include = TRUE, warning = FALSE,cache = TRUE)
 ```
@@ -15,6 +20,7 @@ knitr::opts_chunk$set(echo = FALSE, tidy = TRUE, include = TRUE, warning = FALSE
 ```{r dados e pacotes,warning=FALSE,message=FALSE,echo=FALSE}
 library(gridExtra)
 library(MuMIn) # para R^2
+library(doMC)
 library(sads)
 library(lme4) # pacote de criação dos modelos estatísticos
 library(merTools) # para intervalos de previsao
@@ -76,7 +82,7 @@ Para cada combinação de parâmetros $\theta$ e I e a formula de amostragem des
 
 __iii) Comparação com o observado__
 
-Cada SAD réplica foi comparada com a respectiva SAD observada no teste de Kolmogorov-Smirnov (KS). O teste KS é um teste estatístico não paramétrico da hipótese nula de que dois vetores de abundância são amostras de uma mesma distribuição teórica. Contabilizamos o número de SADs réplicas em que não foi possível refutar a hipótese nula com alfa crítico de 0.05 na variável (GOF).
+Cada SAD réplica foi comparada com a respectiva SAD observada no teste de Kolmogorov-Smirnov (KS). O teste KS é um teste estatístico não paramétrico da hipótese nula de que dois vetores de abundância são amostras de uma mesma distribuição teórica. Contabilizamos o número de SADs réplicas em que não foi possível refutar a hipótese nula com alfa crítico de 0.05 na variável.
 
 ### Matriz de Paisagem
 
@@ -89,8 +95,8 @@ iv) a comunidade local é composta de J (número de indivíduos amostrados) unid
 ### Função de Dispersão
 
 i) partimos de uma distribuição de Laplace para simular a função de dispersão
-ii) determinamos 12 valores de proporção de propágulos que se mantêm até l_cel metros da árvore progenitora (k): 0.99,0.95:0.50,0.25
-iii) então calculou-se a distância média de dispersão (d) que gerava o correspondente percentil
+ii) determinamos 12 valores de proporção de propágulos que se mantêm até a vizinhança imediata (l_cel metros) da árvore progenitora (k): 0.99,0.95:0.50,0.25
+iii) então estimamos a distância média de dispersão (d) que gerava o correspondente percentil, a parti de uma função baseada em simulação e quantis. 
 
 ### Taxa de Especiação - U
 
@@ -102,7 +108,7 @@ __i) Parâmetros de dispersão __
 
 Desenvolvemos uma equação que relaciona d com a probabilidade de uma unidade de habitat ser colonizada pela prole de um indivíduo de fora da comunidade local (m) e então calculamos I o número de imigrantes que competem com os indivíduos locais pelas unidades de habitat disponível (Etienne 2005).
 
-Para calcular m a partir do desvio padrão (sd) da função de dispersão, assumimos que as áreas de amostragem são quadradas e distribuição de Laplace:
+Para calcular m a partir do desvio padrão (sd) da função de dispersão, assumimos que as áreas de amostragem são quadradas e a dispersão pode ser aproximada por uma distribuição de Laplace:
 
 $$m = sd \frac{1 - e^{-\frac{\sqrt{2} L}{sd}} }{\sqrt{2} L}$$
 
@@ -113,6 +119,7 @@ $$m' = \frac{mp}{1 - (1-p)m} $$
 Para criar as predições do modelo EI utilizamos a formula de amostragem de Etienne (2005) que utiliza o parâmetro I ao invés de m. I se relaciona com m por:
 
 $$ I = m (J - 1) / (1 - m)$$
+
 
 __ii) Parâmetros de Diversidade__
 
@@ -451,17 +458,90 @@ df_newdat$IC.upp.fixed <- apply(b4$t,2,quantile, 0.975)
 ## Plots de logito(U) x cobertura standardizada com intervalos de predição ##
 ## PI: note que a incerteza total diminuiu um pouco com a adicao da riqueza ao modelo
 ## (as faixas cinza claro são mais largas em sua figura antiga, que nao tinha este efeito)
+
+## Danilo 28dez2018: A primeira figura de U deve ser o observado na escala padrão, para o leitor poder avaliar a congruência entre predito pelo modelo estatístico e o observado [permite ponderar a estimativa dos efeitos]
+
+### preparação dos dados ###
+
+df_newdat %<>% mutate(std_mean = arm::invlogit(mean),
+                     std_IC.low = arm::invlogit(IC.low),
+                     std_IC.upp = arm::invlogit(IC.upp),
+                     std_mean.fixed = arm::invlogit(mean.fixed),
+                     std_IC.low.fixed = arm::invlogit(IC.low),
+                     std_IC.upp.fixed = arm::invlogit(IC.upp.fixed))
+
+### logito(U) ###
+# df_resultados %>%
+#   ggplot(aes(x=p,y=lU)) + 
+#   geom_ribbon(aes(y = mean, ymin=IC.low, ymax=IC.upp), data=df_newdat, col="gray", alpha=0.5) +
+#   geom_ribbon(aes(y=mean, ymin=IC.low.fixed, ymax=IC.upp.fixed), data=df_newdat, col="gray", alpha=0.5) +
+#   geom_line(aes(x=p, y=mean.fixed), data=df_newdat) +
+#   geom_point() +
+#   labs(x="% cobertura vegetal", y = "logito(U)") +
+#   facet_wrap(~k,ncol=3)
+
+### U ###
 df_resultados %>%
-  ggplot(aes(x=p,y=lU)) + 
-  geom_ribbon(aes(y = mean, ymin=IC.low, ymax=IC.upp), data=df_newdat, col="gray", alpha=0.5) +
-  geom_ribbon(aes(y=mean, ymin=IC.low.fixed, ymax=IC.upp.fixed), data=df_newdat, col="gray", alpha=0.5) +
-  geom_line(aes(x=p, y=mean.fixed), data=df_newdat) +
+  ggplot(aes(x=p,y=U)) + 
+  geom_ribbon(aes(y = std_mean, ymin=std_IC.low, ymax=std_IC.upp), data=df_newdat, fill="grey15", alpha=0.5) +
+  geom_ribbon(aes(y=std_mean, ymin=std_IC.low.fixed, ymax=std_IC.upp.fixed), data=df_newdat, fill="white", alpha=0.5) +
+  geom_line(aes(x=p, y=std_mean.fixed), data=df_newdat,color="red") +
   geom_point() +
-  labs(x="% cobertura vegetal", y = "logito(U)") +
+  labs(x="% cobertura vegetal", y = "U") +
   facet_wrap(~k,ncol=3)
 ```
 
-__Figura 7__ Logito de U pela porcentagem de cobertura vegetal. A linha é a estimativa da tendência, a região cinza mais escuro corresponde ao intervalo de confiança dos efeitos fixos e a região cinza mais clara o intervalo de confiança considerando todo o modelo. 
+__Figura 7__ U pela porcentagem de cobertura vegetal. A linha vermelha é a estimativa da média, a região em branco representa o intervalo de confiança de 95% marginal ao agrupamento dos dados; e a região em cinza representa o intervalo de confiança de 95% condicional ao agrupamento dos dados.
+
+
+```{r coef U e IC bootmer 1}
+f_coef.bootMer <- function(df_=df_newdat,X){
+  lm.data <- cbind(X,df_newdat)
+  names(lm.data)[1] <- "replica"
+  lm.object <- coef(lm(replica ~ p.z * k, data = lm.data))
+  return(lm.object)
+}
+
+# replicas dos coeficientes armazenados em um df
+registerDoMC(3)
+df_lm.coef1 <- adply(b3$t,1,function(a) f_coef.bootMer(X=a),.parallel = TRUE) %>% select(-X1)
+df_lm.coef2 <- adply(b4$t,1,function(a) f_coef.bootMer(X=a),.parallel = TRUE) %>% select(-X1)
+
+## funcao para combinar e sumarizar as replicas de cada coeficiente
+f_par.md2ordem <- function(df_coef,df_=df_resultados){
+  l_ef <- vector("list",12)
+  l_ef[[1]] <- data.frame(k = factor(levels(df_$k)[1], levels = levels(df_$k)), 
+                          termo = rep(rep(c("intercepto","inclinação"),each=2),each=1000),
+                          replica = c(df_coef[,1] , #alfa EI
+                                      df_coef[,1] + df_coef[,14], # alfa EE
+                                      df_coef[,2], #beta EI
+                                      df_coef[,2] + df_coef[,26])) #beta EE  
+  for(i in 2:12){
+  l_ef[[i]] <- data.frame(k = factor(levels(df_$k)[i], levels = levels(df_$k)), 
+                           MN = rep(rep(levels(df_$MN),2),each=1000), 
+                           termo = rep(rep(c("intercepto","inclinação"),each=2),each=1000),
+                           replica = c(df_coef[,1] + df_coef[,1+i] , #alfa EI
+                                       df_coef[,1] + df_coef[,1+i] + df_coef[,14] + df_coef[,25+i], # alfa EE
+                                       df_coef[,2] + df_coef[,13+i], #beta EI
+                                       df_coef[,2] + df_coef[,13+i] + df_coef[,26] + df_coef[,36+i])) #beta EE
+  }
+  df_ef <- rbind.fill(l_ef) %>% ddply(.,c("k","MN","termo"),summarise, 
+                                       media = mean(replica), mediana = median(replica), 
+                                       upr = quantile(replica, 0.975), lwr = quantile(replica, 0.025)) 
+return(df_ef)
+}
+## data frame com ambas estimativas
+df_ef <- cbind(f_par.md3ordem(df_coef = df_lm.coef1),
+               f_par.md3ordem(df_coef = df_lm.coef2)[,4:7])
+names(df_ef)[8:11] <- c("media.m","mediana.m","upr.m","lwr.m")
+
+
+```
+
+
+__Figura 8__ Efeitos estimados de p, k e S para descrever logito(U). 
+
+
 
 ##### Sumário do modelo mais plausível
 
@@ -880,7 +960,7 @@ iii) a correlação intra estrutura aleatória é baixa (pesquisar segundo ponto
 fe_GOF <- FEsim(md_GOF,n.sims = 1000)
 
 # grafico #
-plotFEsim(fe_GOF,stat = "mean",intercept = TRUE) + theme_bw() + labs(y="taxa de GOF",x="média do efeito estimado")
+plotFEsim(fe_GOF,stat = "mean",intercept = TRUE) + theme_bw() + labs(y="logito(prob de não refutar)",x="coef")
 
 # ggplot(fe_GOF) + aes(x = term, ymin = mean - 1.96 * sd, 
 #       ymax = mean + 1.96 * sd, y = mean) + 
@@ -992,6 +1072,43 @@ do.call("grid.arrange",c(l_p,ncol=2))
 
 __Figura 15__ Comparação entre dois métodos de criação de intervalo de confiança de 95% em torno da média: coluna da esquerda pelo método do merTools e coluna da direita pelo método bootMers.
 
+```{r obs e predito escala resposta,fig.width=10}
+#inv logit
+df_new.data1$mean.invlogit <- invlogit(apply(b1$t,2,mean)) * 100
+df_new.data1$IC.low.invlogit <- invlogit(apply(b1$t,2,quantile, 0.025)) * 100
+df_new.data1$IC.upp.invlogit <- invlogit(apply(b1$t,2,quantile, 0.975)) * 100
+df_new.data1$mean.fixed.invlogit <- invlogit(apply(b2$t,2,mean)) * 100
+df_new.data1$IC.low.fixed.invlogit <- invlogit(apply(b2$t,2,quantile, 0.025)) * 100
+df_new.data1$IC.upp.fixed.invlogit <- invlogit(apply(b2$t,2,quantile, 0.975)) * 100
+# grafico #
+l_p <- vector("list",2)
+l_p[[1]] <- ggplot(filter(df_ad,k %in% levels(df_ad$k)[1:6]),aes(x=p,y=GOF) ) + 
+    geom_ribbon(aes(y=mean.invlogit, ymin=IC.low.invlogit, ymax=IC.upp.invlogit), 
+                data=filter(df_new.data1,k %in% levels(df_ad$k)[1:6]), 
+                fill="grey15", alpha=0.5) +
+    geom_ribbon(aes(y=mean.invlogit, ymin=IC.low.fixed.invlogit, ymax=IC.upp.fixed.invlogit), 
+                data=filter(df_new.data1,k %in% levels(df_ad$k)[1:6]), 
+                fill="white", alpha=0.5) +
+    geom_line(aes(x=p, y=mean.fixed.invlogit), data=filter(df_new.data1,k %in% levels(df_ad$k)[1:6]),color="red") +
+    geom_point() +
+    labs(y="Número de predições não refutadas",x="% cobertura vegetal") +
+    facet_grid(k~MN)
+l_p[[2]] <- ggplot(filter(df_ad,k %in% levels(df_ad$k)[7:12]),aes(x=p,y=GOF) ) + 
+    geom_ribbon(aes(y=mean.invlogit, ymin=IC.low.invlogit, ymax=IC.upp.invlogit), 
+                data=filter(df_new.data1,k %in% levels(df_ad$k)[7:12]), 
+                fill="grey15", alpha=0.5) +
+    geom_ribbon(aes(y=mean.invlogit, ymin=IC.low.fixed.invlogit, ymax=IC.upp.fixed.invlogit), 
+                data=filter(df_new.data1,k %in% levels(df_ad$k)[7:12]), 
+                fill="white", alpha=0.5) +
+    geom_line(aes(x=p, y=mean.fixed.invlogit), data=filter(df_new.data1,k %in% levels(df_ad$k)[7:12]),color="red") +
+    geom_point() +
+    labs(y="",x="% cobertura vegetal") +
+    theme(axis.text.y = element_blank(),axis.ticks = element_blank()) +
+    facet_grid(k~MN)
+do.call("grid.arrange",c(l_p,ncol=2))
+```
+
+__Figura 16__ Número de predições não refutadas a partir da SAD observada e teste de Kolmogorov-Smirnov em função da % de cobertura vegetal. Os quadros estão dividos pelo modelo neutro que gerou as predições (colunas EI e EE) e pela proporção de propágulos que permanece até a vizinhança imediata da planta progenitora (linhas 0.99,...,0.25). A linha vermelha é a probabilidade de não refutar uma predição neutra, a região em branco ao redor da linha vermelha é o intervalo de confiança de 95% marginal ao agrupamento dos dados pelo sítio de amostragem, a região em cinza é o intervalo de confiança de 95% condicional ao agrupamento dos dados pelo sítio de amostragem.
 
 ##### Coeficiente de determinação
 
@@ -1001,3 +1118,91 @@ __tabela 2__ Coeficiente de determinação do modelo mais plausível - R2m (cond
 r.squaredGLMM(md_GOF)
 ```
 
+##### Parâmetros da hipótese estatística
+
+ Para cada quadro da figura 16 é possível estimar a média e intervalo de confiança de 95% condicional e marginal à estrutura aleatória da probabilidade média (alfa) e o efeito da cobertura vegetal (beta) na probabilidade de não refutar neutralidade:
+
+```{r coef e intervalo de confianca bootmer parte 1}
+f_coef.bootMer <- function(df_=df_new.data,X){
+  lm.data <- cbind(X,df_new.data)
+  names(lm.data)[1] <- "replica"
+  lm.object <- coef(lm(replica ~ p.z*k*MN,data = lm.data))
+  return(lm.object)
+}
+
+# replicas dos coeficientes armazenados em um df
+registerDoMC(3)
+df_lm.coef1 <- adply(b1$t,1,function(a) f_coef.bootMer(X=a),.parallel = TRUE) %>% select(-X1)
+df_lm.coef2 <- adply(b2$t,1,function(a) f_coef.bootMer(X=a),.parallel = TRUE) %>% select(-X1)
+
+## funcao para combinar e sumarizar as replicas de cada coeficiente
+f_par.md3ordem <- function(df_coef,df_=df_resultados){
+  l_ef <- vector("list",12)
+  l_ef[[1]] <- data.frame(k = factor(levels(df_$k)[1], levels = levels(df_$k)), 
+                          MN = rep(rep(levels(df_$MN),2),each=1000), 
+                          termo = rep(rep(c("intercepto","inclinação"),each=2),each=1000),
+                          replica = c(df_coef[,1] , #alfa EI
+                                      df_coef[,1] + df_coef[,14], # alfa EE
+                                      df_coef[,2], #beta EI
+                                      df_coef[,2] + df_coef[,26])) #beta EE  
+  for(i in 2:12){
+  l_ef[[i]] <- data.frame(k = factor(levels(df_$k)[i], levels = levels(df_$k)), 
+                           MN = rep(rep(levels(df_$MN),2),each=1000), 
+                           termo = rep(rep(c("intercepto","inclinação"),each=2),each=1000),
+                           replica = c(df_coef[,1] + df_coef[,1+i] , #alfa EI
+                                       df_coef[,1] + df_coef[,1+i] + df_coef[,14] + df_coef[,25+i], # alfa EE
+                                       df_coef[,2] + df_coef[,13+i], #beta EI
+                                       df_coef[,2] + df_coef[,13+i] + df_coef[,26] + df_coef[,36+i])) #beta EE
+  }
+  df_ef <- rbind.fill(l_ef) %>% ddply(.,c("k","MN","termo"),summarise, 
+                                       media = mean(replica), mediana = median(replica), 
+                                       upr = quantile(replica, 0.975), lwr = quantile(replica, 0.025)) 
+return(df_ef)
+}
+## data frame com ambas estimativas
+df_ef <- cbind(f_par.md3ordem(df_coef = df_lm.coef1),
+               f_par.md3ordem(df_coef = df_lm.coef2)[,4:7])
+names(df_ef)[8:11] <- c("media.m","mediana.m","upr.m","lwr.m")
+
+
+## gráfico dos dois intervalos ##
+# l_p <- vector("list",2)
+# l_p[[1]] <- ggplot(filter(df_ef,termo == "alfa"),aes(x=k,y=invlogit(media),color=MN)) +
+#   geom_linerange(aes(ymin=invlogit(lwr),ymax=invlogit(upr))) +
+#   geom_crossbar(aes(x=k,ymin=invlogit(lwr.m),ymax=invlogit(upr.m))) +
+#   scale_colour_manual(values = c("Blue", "Red")) +
+#   labs(y="invlogit(alfa)") +
+#   theme(legend.position = "none")
+# l_p[[3]] <- ggplot(filter(df_ef,termo == "beta"),aes(x=k,y=invlogit(media),color=MN)) +
+#   geom_linerange(aes(ymin=invlogit(lwr),ymax=invlogit(upr))) +
+#   geom_crossbar(aes(x=k,ymin=invlogit(lwr.m),ymax=invlogit(upr.m))) +
+#   scale_colour_manual(values = c("Blue", "Red")) +
+#   labs(y="invlogit(beta)") +
+#   theme(legend.position = "bottom")
+# l_p[[1]] <- ggplot(df_ef,aes(x=k,y=media)) +
+  # geom_linerange(aes(ymin=lwr,ymax=upr)) +
+  # geom_crossbar(aes(x=k,ymin=lwr.m,ymax=upr.m)) +
+  # scale_colour_manual(values = c("Blue", "Red")) +
+  # labs(y="logito(Probabilidade de não refutar uma predição neutra") +
+  # facet_grid(termo~MN)
+  # theme(legend.position = "none")
+# l_p[[2]] <- ggplot(filter(df_ef,termo == "beta"),aes(x=k,y=media,color=MN)) +
+#   geom_linerange(aes(ymin=lwr,ymax=upr)) +
+#   geom_crossbar(aes(x=k,ymin=lwr.m,ymax=upr.m)) +
+#   scale_colour_manual(values = c("Blue", "Red")) +
+#   labs(y="beta") +
+#   facet_wrap(~MN,ncol=2)
+#   theme(legend.position = "none")
+# do.call("grid.arrange",c(l_p,ncol=2))
+```
+
+```{r graf 17,fig.height=8}
+ggplot(df_ef,aes(x=k,y=media)) +
+  geom_linerange(aes(ymin=lwr,ymax=upr)) +
+  geom_crossbar(aes(x=k,ymin=lwr.m,ymax=upr.m)) +
+  # scale_colour_manual(values = c("Blue", "Red")) +
+  labs(y="logito(Probabilidade de não refutar uma predição neutra)",x="proporção de propágulos até a vizinhança imediata da planta progenitora") +
+  facet_grid(termo~MN)
+```
+
+__Figura 17__ Probabilidade média de não refutar (alfa) e o efeito da porcentagem de cobertura vegetal (p) na probabilidade de não refutar neutralidade (beta) pela proporção de propágulos até a vizinhança imediata da planta progenitora (k) e pelo modelo neutro que gerou a predição neutra (MN), em azul MN de espaço explícito e em vermelho MN de espaço explícito. As linhas horizontais são os efeitos médios, a caixa representa o intervalo de confiança de 95% (IC) para as predições marginais aos efeitos aleatórios e a linha vertical representa IC para as predições condicionais aos efeitos aleatórios do modelo mais plausível. Na coluna da direita os alfas e betas estão na escala da respostae, em porcentagens; na coluna da direita os parâmetros estão na escala da função de ligação. Os ICs e a média foram estimados a partir do ajuste de uma regressão linear considerando a interação de terceira ordem entre as preditoras (p, k e MN) para cada réplica do bootstrap da predição do modelo plausível, que está na escala da função de ligação; somou-se os vetores de coeficienes réplicas para obter os respectivos alfas e betas para cada combinação entre k e MN, então calculou-se as médias e os quantis para 2.5% e 97.5% dos coeficientes estimados. O coeficiente de determinação de todos as regressões lineares foi igual a 1.
