@@ -11,6 +11,7 @@ knitr::opts_chunk$set(echo = FALSE, tidy = TRUE, include = TRUE, warning = FALSE
 
 ```{r dados e pacotes,warning=FALSE,message=FALSE,echo=FALSE}
 library(reshape2)
+library(MASS)
 library(arm)
 library(gridExtra)
 library(MuMIn)
@@ -28,7 +29,7 @@ library(tidyr)
 library(purrr)
 ```
 
-```{r organização dos dados}
+```{r organização dos dados,warning=FALSE,message=FALSE}
 df_resultados <- readr::read_csv("/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/df_resultados.csv")
 # df_resultados %>% str
 df_resultados$MN <- factor(df_resultados$MN,levels = c("EI","EE"))
@@ -54,6 +55,7 @@ df_resultados %<>% mutate(GOF.z = f_z(GOF),
                           m_.z = f_z(m_),
                           I.z = f_z(I),
                           d.z = f_z(d),
+                          J.z = f_z(J),
                           k.z0 = as.numeric(as.character(k)),
                           k.z = f_z(k.z0))
 
@@ -69,7 +71,7 @@ ii) estimar taxa de especiação necessária para manter a riqueza no equilíbri
 iii) simular SADs neutras segundo MNEI e MNEE a partir dos mesmo parâmetros
 -->
 
-## Estrutura dos Resultados Completos: ##
+__ Estrutura dos Resultados Completos: __
 
 I) parâmetros de dispersão:
 
@@ -96,8 +98,6 @@ IV) Anexo 1: código auxiliar
 - segue a mesma ordem das variáveis
 - é o local onde eu desenvolvo a análise dos dados
 
-
-Notas: até o momento desenvolvi parte da análise dos dados para I.A
 
 <!-- Esqueleto dos resultados 1
 
@@ -161,8 +161,9 @@ Para faciltar o ajuste dos modelos mistos aplicamos a transformação z nas vari
 
 #### Anexo 1: código auxiliar ####
 
-##### I) parâmetros de dispersão #####
-__I.A) distância média de dispersão (d)__
+##### Materiais e Método
+
+###### distância média de dispersão (d)
 
 Exploração gráfica
 
@@ -324,6 +325,213 @@ __Figura 1__ Distância média de dispersão (d) e o predito segundo d ~ DA.z + 
 Parece que há boa congruência entre o observado e o predito pelo modelo, segue regressão dos resíduos do modelo:
 
 ```{r graf residuo DHARMA }
+md_d <- l_md[[1]]
+resid_d <- simulateResiduals(md_d,n=1000)
+# plotResiduals(resid_d)
+```
+
+__Figura 2.1__ residuos quantílicos pelo predito
+
+
+
+
+O modelo estimado está de acordo com os dados: a predição do modelo está precisa na tendẽncia central dos dados; o modelo explica praticamente toda a variação dos dados (alto R2_). O problema de convergência pode ser que não é necessário considerr a existência de correlação dos dados, talvez seja mais plausível considerar apenas um glm:
+
+```{r comparacao glm e glmm d }
+l_md <- vector("list",2)
+names(l_md) <- c("glm","glmm")
+l_md[[1]] <-  glm(d ~ k + DA.z,family = "Gamma"(link=log),data = df_resultados)
+l_md[[2]] <-  glmer(d ~ k + DA.z + (1|Site),family = "Gamma"(link=log),data = df_resultados)
+AICctab(l_md,weights=T)
+summary(lm(coef(l_md[[1]]) ~ fixef(l_md[[2]])-1))
+md_d <- glm(d ~ k + DA.z,family = "Gamma"(link=log),data = df_resultados)
+```
+
+O único modelo plausível é o glmer, contudo não há diferença nas estimativas dos dois modelos. Então vou utilizar o glm para fazer a inferência. Vou plotar a variável de interesse é k mas não a covariável DA.z
+
+```{r tabela das estimativas do glm, message=F}
+# summary(md_d)
+ef_d <- sim(md_d,1000)@coef[,1:12]
+ef_d <- cbind(ef_d[,1], apply(ef_d[,2:12],2,function(x) ef_d[,1]+x)) %>% as.data.frame()
+names(ef_d) <- as.character(c(0.99,seq(0.95,0.5,by=-0.05),0.25))
+inv.link <- family(md_d)$linkinv
+df_ef.d  <- reshape2::melt(ef_d,value.name = "replica") %>% 
+  ddply(.,"variable",summarise, media0 = mean(replica),lwr0 = quantile(replica,0.025),upr0=quantile(replica,0.975)) %>% 
+  mutate( media = inv.link(media0), IC.975 = inv.link(upr0), IC.025 = inv.link(lwr0))
+ggplot(data=df_ef.d[,c(1,5:7)], aes(x=variable,y=media)) + geom_pointrange(aes(y = media, ymin=IC.025, ymax=IC.975)) # +
+  # geom_ribbon(aes(y = fit, ymin=lwr, ymax=upr), alpha=0.5) +
+# existe grande variação entre sítios que é explicada em função da densidade
+```
+
+<!--
+-->
+ I = número fundamental da imigração (Etienne 2005)
+
+a) avaliar qual a melhor distribuição de probabilidade
+b) avaliar função de ligação
+c) seleção de modelos
+d) avaliação do modelo selecionado
+e) estudo das estimativas e interpretação
+
+###### distância média de dispersão (d)
+
+Exploração gráfica
+
+```{r matrixplot I}
+# ,fig.width=10
+car::scatterplotMatrix(~I+p+d+k+J,data=df_resultados)
+# hist(sqrt(df_resultados$I),breaks = 60)
+
+```
+
+  O número fundamental da dispersão (I) depende do tamanho da amostra (J) e de m, probabilidade de um imigrante colonizar uma unidade de habitat na comunidade local. Essa probabilidade é deduzida a partir de um equação que relaciona a distância média de dispersão (d) e J, então corrigimos essa estimativa para a proporção de habitat da paisagem, para incluir a falta de indivíduos na paisagem ao redor da comunidade local caso tenha ocorrido remoção de habitat. Obtemos d a partir da proporção de propágulos que permanece até a vizinhança imediata da planta progenitora (k). Estabelecemos a priori os valores de k para utilizar em todas as paisagens, assim podemos comparar paisagens com diferentes densidades de indivíduos (para não violar o pressuposto de soma-zero).
+  O efeito de J pode ser incluido na variação do agrupamento de sítio de amostragem, as variáveis mais importantes são p, k e d. Uma possibilidade é permitir que para cada agrupamento de dados pelo sítio de amostragem, seja possível existir uma inclinação para d. Então o modelo cheio é I ~ p.z + d.z + k + (d.z|Site).
+
+```{r graf I}
+df_resultados %>% mutate(p_class = as.factor(cut(p,12))) %>% filter(p_class == levels(p_class)[9]) %>% #%in% levels(p_class)[c(9,12)] 
+  ggplot(aes(x=d.z,y=sqrt(I))) + 
+  geom_smooth(method = "lm") +
+  geom_point() +
+  # geom_boxplot() +
+  facet_wrap(~Site,ncol=4,scales="free_x")
+```
+
+Figura A1. Gráficos quantile-quantile para três distribuições teóricas (normal, lognormal e gamma) e a variável d (metros) e z-transformada (d.z). Para a distribuição gamma utilizei ajustamos apenas a variável d, uma vez que o domínio da distribuição não contempla valores menores do que zero.
+
+A distribuição que melhor se adequa aos dados é a distribuição gamma: i) ajusta maior porção dos dados em comparação com a normal (segunda melhor distribuição) e ii) consegue capturar a variação nas caudas da distribuição de valores obervados (em especial para valores pequenos), diferente da normal. Contudo, para comparar os resíduos eu vou construir duas classes de modelos cheio: uma normal e outra gamma.
+
+O objetivo é avaliar o efeito da variável k na distância média de dispersão (d), para isso o modelo cheio vai considerar a variável DA, uma vez que k é definido como a proporção de propágulos até l_cel metros da planta progenitora. A largura da célula de simulação (l_cel) = 100/sqrt(DA) (PERGUNTA:devo utilizar DA ou a transformação de DA = I( 100/sqrt(DA) )? ).
+
+_Tabela Seleção da distribuição de probabiliade e estrutura aleatória_
+
+```{r d k}
+# df_resultados %>% str
+## Seleção da estrutura eleatória ##
+l_md <- vector("list",length = 9)
+names(l_md) <- c("log Gamma 1|Site","log Gamma d.z|Site","log Gamma",
+                 "normal 1|Site","normal d.z|Site", "normal",
+                 "log normal 1|Site","log normal d.z|Site", "log normal")
+l_md[[1]] <-  glmer(I ~ p.z + d.z + k + (1|Site),family = "Gamma"(link=log),data = df_resultados)
+l_md[[2]] <-  glmer(I ~ p.z + d.z + k + (d.z|Site),family = "Gamma"(link=log),data = df_resultados)
+l_md[[3]] <-  glm(I ~ p.z + d.z + k,family = "Gamma"(link=log),data = df_resultados)
+l_md[[4]] <-  lmer(I ~ p.z + d.z + k + (1|Site), data = df_resultados)
+l_md[[5]] <-  lmer(I ~ p.z + d.z + k + (d.z|Site), data = df_resultados)
+l_md[[6]] <-  lm(I ~ p.z + d.z + k, data = df_resultados)
+l_md[[7]] <-  glmer(I ~ p.z + d.z + k + (1|Site),family = "gaussian"(link=log),data = df_resultados)
+l_md[[8]] <-  glmer(I ~ p.z + d.z + k + (d.z|Site),family = "gaussian"(link=log),data = df_resultados)
+l_md[[9]] <-  glm(I ~ p.z + d.z + k,family = "gaussian"(link=log),data = df_resultados)
+AICctab(l_md,weights=T)
+```
+<!--
+A estrutura aleatória selecionada foi (1|Site).
+-->
+
+O modelo global com distribuição gamma, função de ligação log e estrutura aleatória 1|Site foi o mais plausível. Segue sumário:
+
+```{r d k R2,echo=TRUE}
+# fastdisp(l_md[[2]]) # problema de convergência, indicam para reescalonar as variáveis
+md_I <- update(l_md[[2]],control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+summary(l_md[[2]]) # problema de convergência, indicam para reescalonar as variáveis
+summary(md_I)
+
+
+```
+<!--
+Error: Error in r.squaredGLMM.merMod(X[[i]], ...) : do not know how to calculate variance for this family/link combination
+27jun2018[Válido para lmer, não para normal link=log: acredito que se houver mais níveis de k e melhor distribuidos no campo de parâmetros aumentaria o R^2 de k|Site
+-->
+
+
+_16nov2018_
+- Problema de convergência:
+convergence code: 0
+Model failed to converge with max|grad| = 148.862 (tol = 0.001, component 1)
+Model is nearly unidentifiable: very large eigenvalue
+ - Rescale variables?
+failure to converge in 10000 evaluations
+
+```{r comparacao modelo cheio }
+l_md <- vector("list",2)
+names(l_md) <- c("d.z","-d.z")
+l_md[[1]] <-  glmer(I ~ p.z + d.z + k + (1|Site),family = "Gamma"(link=log),data = df_resultados)
+l_md[[2]] <-  glmer(I ~ p.z + k + (1|Site),family = "Gamma"(link=log),data = df_resultados)
+AICctab(l_md)
+```
+
+
+
+PRÓXIMOS PASSOS PARA MELHORAR AJUSTE: uma alternativa fácil é reajustar a partir das estimativas feitas pelo modelo com problema de convergência e/ou modificar o otimizador.
+PERGUNTAS NORTEADORAS: i) o aviso de problema de convergência é um falso positivo? 
+
+Ben Bolker: Since the likelihood differs by <0.1 between the model fits, and the largest relative differences in the parameters are of the order of about 10^(-4), I would say that you have successfully demonstrated that the warning is a false positive and you can proceed with your initial model.
+
+
+<!--
+[pasta GLMM (...) scale issues] Some common examples:
+
+-Some columns of our data might be different orders of magnitude to others, for instance gender might be encoded as a binary variable, while income might be stored in whole-dollar amounts.
+
+-An outcome might be extremely rare
+
+-The impact of variable X1 on Y could be orders of magnitude greater than the impact of variable X2. That is, it’s not the scale of the data that is causing issues so much as the scale of the parameters.
+
+
+-->
+
+
+Foram estimados 13 parâmetros e seus respectivos erro-padrão. Os resíduos escalonados variam de -3.956 até 6.554, pelos valores dos quantils parece que a distribuição dos resíduos não é simétrica ao redor da estimativa. Há dois avisos sobre convergência: a) Model failed to converge with max|grad|=4.11797 (tol = 0.001, component 1); b) Modelo is nearly unidentifiable: very large eigenvalue - Rescale variables?
+
+25jun2018:
+Para lidar com b modifiquei DA -> DA.z nos modelos globais
+Com isso obtive o erro: 'converge code:0; Model is nearly unidentifiable: very large eigenvalue - Rescale variables?
+- a transformação z de DA deveria ser o suficiente para lidar com problemas relacionados com escalamento de variáveis; a outra variável explanatória é categórica.
+- vou continuar o estudo com esse modelo como global
+
+_Tabela Selecao de variaveis para descrever 'd'_
+
+```{r selecao d}
+l_md <- vector("list",length = 4)
+names(l_md) <- c("k+DA","DA","k","1")
+l_md[[1]] <-  glmer(d ~ k + DA.z + (1|Site),family = "Gamma"(link=log),data = df_resultados)
+l_md[[2]] <-  glmer(d ~ DA.z + (1|Site),family = "Gamma"(link=log),data = df_resultados)
+l_md[[3]] <-  glmer(d ~ k + (1|Site),family = "Gamma"(link=log),data = df_resultados)
+l_md[[4]] <-  glmer(d ~ 1 + (1|Site),family = "Gamma"(link=log),data = df_resultados)
+AICctab(l_md)
+```
+
+O modelo global foi o mais plausível. [PROBLEMA DE CONVERGÊNCIA]. E por conta disso não consigo avaliar o ajuste visualmente:
+
+```{r echo=TRUE}
+# prof_glmm.d <- profile(l_md[[3]])
+
+# xyplot(prof_glmm.d , aspect =1.3)
+```
+
+__Coeficiente de determinação__
+
+```{r}
+r.squaredGLMM(md_d)
+```
+
+
+
+Avaliação gráfica do ajuste do modelo:
+
+```{r predito e observado d}
+df_reg <- broom::augment(l_md[[1]])
+df_reg %<>% mutate(predito = exp(.fitted),
+                   std.resid = .resid/sd(.resid),
+                   sqrt.std.resid = sqrt(std.resid))
+## observado e predito ##
+df_reg %>%  ggplot(aes(x=DA.z,y=d)) + geom_point() +
+  geom_line(aes(y=predito),color="red") + facet_wrap(~k,ncol=3,scales="free")
+```
+
+__Figura 1__ Distância média de dispersão (d) e o predito segundo d ~ DA.z + k + (1 | Sítio), family=Gamma. Os pontos são as distâncias médias estimados para o determinado percentil (k) de propágulos que permanecem até l_cel metros da planta progenitora; em vermelho o predito.
+
+Parece que há boa congruência entre o observado e o predito pelo modelo, segue regressão dos resíduos do modelo:
+
+```{r graf residuo DHARMA }
 md_d <- l_md[[3]]
 resid_d <- simulateResiduals(md_d,n=1000)
 # plotResiduals(resid_d)
@@ -360,15 +568,7 @@ df_ef.d  <- melt(ef_d,value.name = "replica") %>%
 df_ef.d[,c(1,5:7)] #%>% ggplot(aes(x=variable,y=media,ymin=IC.025,ymax=IC.975)) + geom_pointrange() # existe grande variação entre sítios que é explicada em função da densidade
 ```
 
-<!--
-1) I = número fundamental da imigração (Etienne 2005)
 
-a) avaliar qual a melhor distribuição de probabilidade
-b) avaliar função de ligação
-c) seleção de modelos
-d) avaliação do modelo selecionado
-e) estudo das estimativas e interpretação
--->
 
 ## 2) GOF - número de SADs preditas que não foram refutadas ##
 
@@ -1110,100 +1310,247 @@ do.call("grid.arrange",c(l_p,ncol=2))
 
 __Figura 18__ Probabilidade média de não refutar (alfa) e o efeito da porcentagem de cobertura vegetal (p) na probabilidade de não refutar neutralidade (beta) pela proporção de propágulos até a vizinhança imediata da planta progenitora (k) e pelo modelo neutro que gerou a predição neutra (MN), em azul MN de espaço explícito e em vermelho MN de espaço explícito. As linhas horizontais são os efeitos médios, a caixa representa o intervalo de confiança de 95% (IC) para as predições marginais aos efeitos aleatórios e a linha vertical representa IC para as predições condicionais aos efeitos aleatórios do modelo mais plausível. Na coluna da direita os alfas e betas estão na escala da respostae, em porcentagens; na coluna da direita os parâmetros estão na escala da função de ligação. Os ICs e a média foram estimados a partir do ajuste de uma regressão linear considerando a interação de terceira ordem entre as preditoras (p, k e MN) para cada réplica do bootstrap da predição do modelo plausível, que está na escala da função de ligação; somou-se os vetores de coeficienes réplicas para obter os respectivos alfas e betas para cada combinação entre k e MN, então calculou-se as médias e os quantis para 2.5% e 97.5% dos coeficientes estimados. O coeficiente de determinação de todos as regressões lineares foi igual a 1.
 
-- coisas que precisam ser feitas: avaliar a qualidade das regressões lineares ajustadas às réplicas - posso plotar o boxplot do R2 para o bootMer condional e marginal
 
-- uma vez que o modelo plausível é de terceira ordem eu posso ajustar um glm logito glm(cbind(GOF,100-GOF) ~ p.z,family=binomial) para cada subpopulação dos dados (group_by=(MN,k)):
+  A tendềncia geral é robusta à variação na limitação à dispersão, mas boa parte da variação está associada com o sítio de amostragem e não é descrita pelo efeito da cobertura vegetal da paisagem nos dados (figura 17). O sinal de que a fragmentação leva à diminuição da congruência entre predito e observado explica pouca variação apresentada nos dados. A maior parte da variação está associada com o sítio de amostragem. Além disso, o modelo misto não consegue prever boa parte da variação dos dados, o coeficiente de determinação condicional não é superior à 70% (figura 17). No nível do sítio de amostragem é possível estabelecer diferentes relações entre as variáveis preditoras k (enquanto variável contínua) e MN (EE;EI). Podemos ter até 4 parâmetros por modelo estatístico (alfa (média), alfa_MN:EE (diferença média); k.z (inclinação), k.z_MN:EE(diferença média na inclinação)), avaliaremos o efeito de p e S na estimativa destes parâmetros.
+  
+JUSTIFICATIVA: Introdução: "how confounding factors have either masked the detection/prevented the predicted fragmentation effects(Ewers & Didham 2006, Villard & Metzger 2014, Collins et al. 2017)?"
+  
+  Uma possibilidade é avaliar o efeito da limitação à dispersão para cada sítio de amostragem separadamente, permitindo explicar a probabilidade de não refutar uma predição neutra como resultado da classe de modelo neutro (EE e EI) e de k como variável contínua. Podemos selecionar os coeficientes do modelo mais plausível e avaliar os modelos ajustados: i) o coeficiente de explicação (R2); ii) probabilidade dos resíduos quantílicos apresentarem distribuição uniforme; iii) métrica de incerteza da estimativa do parâmetro (e.g. IC). Esperamos que os três itens sejam independente  de p e S. Então avaliamos os coeficientes ajustados em função da cobertura vegetal.
 
-```{r glm by MN e k}
-# modelo binomial para aplicar em cada group_by(MN,k)
-fun_map <- function(df){
-  glm(cbind(GOF,100-GOF) ~ p.z, family = binomial, data = df)
+
+Sequência de trabalho:
+
+i) agrupar dados pelo sítio de amostragem
+ii) criar função que executa a seleção dos modelos e retorna: a) estimativa dos coeficientes do modelo mais plausível; b) coeficiente de determinação (R2); c) se os resíduos quantílicos aderem à uniformidade (resid)
+iii) aplicar teste de pressupostos estatísticos: a) variação explicada pelo modelo não apresenta influência da cobertura vegetal e do número de espécies observado; b) 
+iv) descrição do padrão dos coeficientes (regressão linear: logito(U) ~ p * term)
+
+
+```{r glm por site para Pr(nao refutar)}
+# teste
+# df <- filter(df_resultados,Site==unique(df_resultados$Site)[80])
+# função com as hipóteses estatísticas
+# função aplicada para cada site
+f_glm.Site <- function(df){
+  # ajustar modelos concorrentes
+  # seleção de modelos
+  f_ <- function(X){
+      l_ <- vector("list",5)
+      names(l_) <- c("k * MN","k + MN","k","MN","1")
+      l_[[1]] <- glm(cbind(GOF,100-GOF) ~ k.z * MN, family = binomial, data = X)
+      l_[[2]] <- glm(cbind(GOF,100-GOF) ~ k.z + MN, family = binomial, data = X)
+      l_[[3]] <- glm(cbind(GOF,100-GOF) ~ k.z, family = binomial, data = X)
+      l_[[4]] <- glm(cbind(GOF,100-GOF) ~ MN, family = binomial, data = X)
+      l_[[5]] <- glm(cbind(GOF,100-GOF) ~ 1, family = binomial, data = X)
+      return(l_)
+    } 
+  l_md <- f_(X=df) #filter(df_resultados,Site=="BAjuss") #X=df
+  names_like.md <- row.names.data.frame(AICctab(l_md))
+  dAIC_like.md <- AICctab(l_md)$dAICc
+  if( length(dAIC_like.md[dAIC_like.md<2]) == 1 ){
+    # modelo mais plausível
+    md_like <- l_md[[ names_like.md[1] ]]
+    # coef
+    df_md <- tidy(md_like)
+    # deviance ~ R2
+    df_md$deviance <- summary(md_like)$deviance
+    # resíduos quantílicos e teste de uniformidade
+    resid_md.like <- simulateResiduals(md_like,n=1000)  
+    df_md$p_test.uni <- testUniformity(resid_md.like,plot = F)$p.value
+    # output = df resumo
+    return(df_md)
+  } else {
+    df_md1 <- data.frame(term = "#l_md[dAIC<=2]>1", 
+                         estimate = "#l_md[dAIC<=2]>1",
+                         std.error = "#l_md[dAIC<=2]>1", 
+                         statistic = "#l_md[dAIC<=2]>1", 
+                         p.value="#l_md[dAIC<=2]>1", 
+                         deviance="#l_md[dAIC<=2]>1", 
+                         p_test.uni="#l_md[dAIC<=2]>1")
+    return(df_md1)
+  }
 }
+# armazenamento dos dados 
+# f_glm.Site(df = filter(df_resultados,Site=="BAjuss"))
+df_Pr.Site <- ddply(df_resultados,"Site",function(a) f_glm.Site(df=a)) %>% inner_join(x=.,y=unique(df_resultados[,c(1,6,10,11)]),by="Site")
+# df_Pr.Site$term %>% table
 
-# glm(cbind(GOF,100-GOF) ~ p.z, family = binomial, data = df_resultados) %>% confint() %>% as.data.frame()
-
-# aplicando a função do modelo binomial para cada group_by(MN,k)
-df_coef.ef <- df_resultados %>% 
-  group_by(MN,k) %>% nest() %>%
-  mutate(md = map(data, fun_map),
-         coef = map(md,tidy), # GLM binomial aplicado para cada sítio;
-         IC = map(md,as.data.frame(confint)) #profile likelihood ratio CI
-         ) 
-
-# df único 
-df_coef.ef %<>% select(MN,k,coef,IC) %>% 
-  unnest() %>% as.data.frame() %>% 
-  select(MN,k,term,estimate, value.2.5.., value.97.5..) # retornando ao formato data frame 
-
-# transformando para a escala padrão
-f_inv.logit <- function(x) 1/(1+exp(-x))
-df_coef.ef %<>% mutate(media.pr = f_inv.logit(estimate),
-                       lwr.pr = f_inv.logit(value.2.5..),
-                       upr.pr = f_inv.logit(value.97.5..))
-
-# calculo da deriva 
-f_deriv.p <- function(X){
-  alfa <- X[1,3]
-  beta <- X[2,3]
-}
-
-df_coef.ef %>% select(MN,k,term,estimate,value.2.5..) %>% dcast(MN+k~term,value.var="estimate")
-# ,value.2.5..,value.97.5..; ,value.var = c("estimate","value.2.5..","value.97.5..")
-# gráfico das estimativas para cada subpopulação
-# df_coef.ef %>% summary
-df_coef.ef %>% 
-  ggplot(aes(x=k,y=media.pr,ymin=lwr.pr,ymax=upr.pr,colour=MN)) +
-  # ggplot(aes(x=k,y=estimate,ymin=value.2.5..,ymax=value.97.5..,colour=MN)) +
-  # ggplot(aes(x=k,y=media,ymin=lwr,ymax=upr,color=MN)) +
-  geom_hline(yintercept = 0,colour="green") +
-  geom_pointrange() + 
-  scale_colour_manual(values = c("Blue", "Red")) +
-  facet_wrap(~term,ncol=1,scales="free")
+# gráfico
+# df_Pr.Site %>% filter(std.error > 400) 
+# outliers <- c("PRdiam2","PRanto15","PRanto4")
+# gráfico sem outliers
+df_Pr.Site %>% filter(term != "#l_md[dAIC<=2]>1" & std.error < 400) %>% 
+  ggplot(aes(x=p,y=estimate,size=std.error)) +
+  geom_point() +
+  geom_smooth(se=FALSE,color="red",method="lm") +
+  facet_wrap(~term, ncol=2,scales="free")
 ```
 
-__Figura 16.2__  Estimativas lineares da probabilidade média da
+__Figura 19__ Interceptos(intercept, MNEE) e Inclinação(k.z, k.z:MNEE) estimados do modelo mais plausível para cada sítio de amostragem pela cobertura vegetal.
+
+Para utilizar esses dados é válido avaliar se (i) a probabilidade de resíduos aderirem à uniformidade, (ii) a deviance e (iii) o erro padrão das estimativas sejam independentes da cobertura vegetal, a variável preditora de interesse.
+
+Ideia para avaliar com PI
 
 
-```{r efeitos fixos md_GOF}
-ef_GOF <- arm::sim(md_GOF,1000)
-# ef_GOF %>% str
+## 3) Taxa de especiação, U ##
 
-## Avaliação visual da distribuição dos parâmetros ##
-# ef_GOF@fixef %>% str
-l_ef <- vector("list",12)
-l_ef[[1]] <- data.frame(k = factor(levels(df_resultados$k)[1], levels = levels(df_resultados$k)), 
-                        MN = rep(rep(levels(df_resultados$MN),2),each=1000), 
-                        termo = rep(rep(c("alfa","beta"),each=2),each=1000),
-                        replica = c(ef_GOF@fixef[,1] , #alfa EI
-                                    ef_GOF@fixef[,1] + ef_GOF@fixef[,14], # alfa EE
-                                    ef_GOF@fixef[,2], #beta EI
-                                    ef_GOF@fixef[,2] + ef_GOF@fixef[,26])) #beta EE
-# l_ef[[1]] %>% ddply(.,c("k","MN","termo"), summarise, mean(replica))
-# md_GOF
-for(i in 2:12){
-l_ef[[i]] <- data.frame(k = factor(levels(df_resultados$k)[i], levels = levels(df_resultados$k)), 
-                        MN = rep(rep(levels(df_resultados$MN),2),each=1000), 
-                        termo = rep(rep(c("alfa","beta"),each=2),each=1000),
-                        replica = c(ef_GOF@fixef[,1] + ef_GOF@fixef[,1+i] , #alfa EI
-                                    ef_GOF@fixef[,1] + ef_GOF@fixef[,1+i] + ef_GOF@fixef[,14] + ef_GOF@fixef[,25+i], # alfa EE
-                                    ef_GOF@fixef[,2] + ef_GOF@fixef[,13+i], #beta EI
-                                    ef_GOF@fixef[,2] + ef_GOF@fixef[,13+i] + ef_GOF@fixef[,26] + ef_GOF@fixef[,36+i])) #beta EE
-}
-df_ef <- rbind.fill(l_ef) %>% ddply(.,c("k","MN","termo"),summarise, 
-                                    media = mean(replica), mediana = median(replica), 
-                                    upr = quantile(replica, 0.975), lwr = quantile(replica, 0.025)) 
-f_inv.logit <- function(x) 1/(1+exp(-x))
-df_ef %>% mutate(media.pr = f_inv.logit(media), mediana.pr = f_inv.logit(mediana), upr.pr = f_inv.logit(upr), lwr.pr = f_inv.logit(lwr)) %>% 
-  ggplot(aes(x=termo,y=media.pr,ymin=lwr.pr,ymax=upr.pr,color=MN)) +
-  # ggplot(aes(x=termo,y=media,ymin=lwr,ymax=upr,color=MN)) + 
-  geom_pointrange() + 
-  scale_colour_manual(values = c("Blue", "Red")) +
-  facet_wrap(~k,ncol=3,scales="free")
+Gráficos exploratório
 
-# ggplot(data=rbind.fill(l_ef),aes(x=termo,y=replica,color=MN)) +
-#   geom_boxplot() + 
-#   scale_colour_manual(values = c("Blue", "Red")) +
-#   facet_wrap(~k,ncol=3)
+
+```{r taxa de especiacao U}
+# opções para modelar U:
+df_resultados %<>% mutate(lU = log(U/(1-U)),
+                          lS.z = (log(S) - mean(log(S)))/sd(log(S)))
+
+car::scatterplotMatrix(~U+lU+p.z+lS.z,data=df_resultados)
+
+# df_resultados %>% ggplot(aes(x=k,y=U)) + geom_boxplot()
+# 
+# df_resultados %>% ggplot(aes(y=lU,x=log(S))) +
+#   geom_point() +
+#   geom_smooth(se=F,method='loess',color="red") +
+#   facet_wrap(~k,ncol=3,scales="free")
 ```
 
+figura 20. Taxa de especiação e preditoras continuas
+
+
+Para modelar U aplicamos uma transformação logito e tomando U enquanto probabilidade média de especiação (U e lU). As preditoras p.z esta z-transformada e lS.z é o log da riqueza z-transformado. Segue gráfico de lU pela preditora
+
+### Diagnóstico do modelo cheio ###
+
+O modelo cheio de U descreve lU ~ p*k + S + (1|Site). Segue diagnóstico do modelo cheio com distribuição lmer:
+
+```{r md U e residuos quantilicos}
+# modelo linear
+md_U <- lmer(lU ~ p.z * k + lS.z + (1|Site), data=df_resultados)
+
+# residuos quantilicos
+residuos_U <- simulateResiduals(fittedModel = md_U, n = 1000)
+plot(residuos_U)
+```
+
+figura 21. Resíduos quantílicos do modelo cheio lU ~ p.z * k + l.S_z
+
+O teste de aderência à uniformidade mostra que há desvio significativo; a regressão quantílica parece estar ok. Então o modelo cheio pode não ser apropriado para descrever a relação entre as variáveis, mais testes são necessários para avaliar a origem do desvio. Vou prosseguir com o lmer.
+
+
+### Seleção de modelos e coeficiente de determinação ###
+
+
+```{r tabela de selecao logito U}
+l_md <- vector("list",length=10)
+names(l_md) <- c("p * k + S", "p + k + S", "p + S", "k + S", "S", "p * k", "p + k", "p", "k", "1")
+l_md[[1]] <- lmer(lU ~ p.z * k + lS.z + (1 | Site), data = df_resultados)
+l_md[[2]] <- lmer(lU ~ p.z + k + lS.z + (1 | Site), data = df_resultados)
+l_md[[3]] <- lmer(lU ~ p.z + lS.z + (1 | Site), data = df_resultados)
+l_md[[4]] <- lmer(lU ~ k + lS.z + (1 | Site), data = df_resultados)
+l_md[[5]] <- lmer(lU ~ lS.z + (1 | Site), data = df_resultados)
+l_md[[6]] <- lmer(lU ~ p.z * k + (1 | Site), data = df_resultados)
+l_md[[7]] <- lmer(lU ~ p.z + k + (1 | Site), data = df_resultados)
+l_md[[8]] <- lmer(lU ~ p.z + (1 | Site), data = df_resultados)
+l_md[[9]] <- lmer(lU ~ k + (1 | Site), data = df_resultados)
+l_md[[10]] <- lmer(lU ~ 1 + (1 | Site), data = df_resultados)
+# selecao #
+AICctab(l_md, weights = TRUE)
+```
+
+O modelo cheio apresentou a única hipótese plausível acumulando todo o peso de evidência.
+
+
+```{r R2 logito U}
+# R2 marginal e condicional #
+(r2_U <- sapply(l_md, r.squaredGLMM))
+```
+
+
+O modelo mais plausível apresenta o maior coeficiente de determinação condicional e marginal. O modelo que considera apenas p*k acumula apenas 5% de coeficiente de determinação marginal, enquanto o modelo que considera apenas S explica cerca de 31% da variação total. O modelo onde há o efeito aditivo de p e S acumula mais do que a soma do modelo com apenas p e S. Assim boa parte da variação explicada pelo modelo está associada com a riqueza observada e parte da correlação desta com a cobertura vegetal da paisagem.  
+
+
+### Intervalo de confiança do modelo mais plausível ###
+
+```{r IC U}
+## Uma regressao entre log_S.z e pz ##
+lm1 <- lm(lS.z ~ p.z, data=df_resultados[duplicated(df_resultados$Site),]) # estima relacao linear entre log S e p.z
+cf1 <- unname(coef(lm1)) ## guarda os coeficientes dessa regressao para usar no bootstrap
+
+## Intervalo de Confiança Bootstrap ##
+# novo conjunto de dados
+df_newdat <- expand.grid(Site=df_resultados$Site[1],
+                         k=unique(df_resultados$k),
+                         p.z = seq(min(df_resultados$p.z)*1.1,max(df_resultados$p.z)*1.1, length=50))
+# Adiciona a média de log(S) padronizado para cada cobertura, estimado pela regrassao Sxp
+df_newdat %<>% mutate(lS.z = cf1[1] + cf1[2]*p.z) %>% as.data.frame()
+## Passo 2: crie as função que devem ser calculadas dos modelos a cada simulação
+## Previstos por efeitos fixos e aleatórios
+f1 <- function(.) predict(., newdata=df_newdat)
+## Previstos por efeitos fixos (argumento re.form=~0)
+f2 <- function(.) predict(., newdata=df_newdat, re.form=~0)
+## Os dois bootstraps. Ajuste o argumento ncpus para o numero de cores de seu computador
+md_U <- l_md[["p * k + S"]]
+# b3 <- bootMer(md_U, FUN = f1, nsim=1000, parallel="multicore", ncpus=2)
+# b4 <- bootMer(md_U, FUN = f2, nsim=1000, parallel="multicore", ncpus=2)
+# save(b3,b4,file="/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/bootMer_md-U.Rdata")
+load(file = "/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/bootMer_md-U.Rdata")
+## calcula as médias e intervalos de confiança quantílicos para cada combinação de preditoras
+## no novo conjunto de dados
+df_newdat$p <- df_newdat$p.z*sd(df_resultados$p) + mean(df_resultados$p)
+df_newdat$mean <- apply(b3$t,2,mean)
+df_newdat$IC.low <- apply(b3$t,2,quantile, 0.025)
+df_newdat$IC.upp <- apply(b3$t,2,quantile, 0.975)
+df_newdat$mean.fixed <- apply(b4$t,2,mean)
+df_newdat$IC.low.fixed <- apply(b4$t,2,quantile, 0.025)
+df_newdat$IC.upp.fixed <- apply(b4$t,2,quantile, 0.975)
+
+## Gráfico
+
+df_resultados %>%
+  ggplot(aes(x=p,y=lU)) +
+  geom_ribbon(aes(y = mean, ymin=IC.low, ymax=IC.upp), data=df_newdat, fill="grey15", alpha=0.5) +
+  geom_ribbon(aes(y=mean, ymin=IC.low.fixed, ymax=IC.upp.fixed), data=df_newdat, fill="white", alpha=0.5) +
+  geom_line(aes(x=p, y=mean.fixed), data=df_newdat,color="red") +
+  geom_point() +
+  labs(x="% cobertura vegetal", y = "logito(U)") +
+  facet_wrap(~k,ncol=3)
+```
+
+figura 22. logito(U) p e k 
+
+Avaliar os efeitos a partir do bootstrap e a partir do merTools para S
+
+
+
+## 4) Viés de estimativa da riqueza ##
+
+23 março de 2019
+
+Quando desenvolvi os dados de MNEI eu substitui as informações da riqueza estimado de MNEE para o correspodente. Não há motivo para questionar se cometi o mesmo erro para GOF uma vez que eles diferem em seu perfil e me recordo de fazer uma bateria de auditorias na época. Contudo, vi que os .Rmds não estão organizados e se faz necessário organizar tudo para pelo menos ter dos dados brutos (SAD obs, mapas de cobetura vegetal concentricos à área amostrada) até as SADs preditas segundo os modelos neutros e a taxa de especiação; uma sessão para a primeira sessão de análise dos dados (teste KS e riqueza das espécies simuladas). 
+
+Pretendo acertar os .Rmds de geração dos dados quando for fazer os métodos pois não estou com tempo para isso agora, além de que quero aproveitar o embalo das reuniões de orientação com PI. Assim, não irei juntar os dados e (re)fazer uma auditoria geral de tudo (GOF está ok), vou pelo caminho direto que é construir um df com a riqueza de MNEE de df antigos (que sei que estão corretos) com a riqueza para MNEI de 
+
+```{r}
+## df_ com a S_EI ##
+df_bias.S_EI <- df_resultados %>% filter(MN == "EI") %>% select(Site,S_m,S_sd,k,MN) %>% unique
+
+## df_ com S_EE correto ##
+load("/home/danilo/Documentos/Doutorado/dados/l_dados_brutos.Rdata")
+# l_dados_brutos %>% names
+df_bias.S_EE <- l_dados_brutos[[1]] %>% ddply(.variables = c("SiteCode","kernel"),summarise,
+                                              S_m = mean(S),S_sd = sd(S))
+names(df_bias.S_EE)[1:2] <- c("Site","k")
+df_bias.S_EE$MN <- "EE"
+# remoção de sites não utilizados
+df_bias.S_EE %<>% filter(Site %in% levels(df_resultados$Site))
+
+## df_ para análise dos dados ##
+df_bias.S <- df_resultados %>% select(Site,k,MN,GOF,U,S,p,m_,J,DA)
+df_bias.S %<>% inner_join(x=.,
+                        y=rbind(df_bias.S_EI,df_bias.S_EE),
+                        by = c("Site","k","MN"))
+df_bias.S$Site %<>% as.factor()
+# df_bias.S %>% str
+
+
+```
 
