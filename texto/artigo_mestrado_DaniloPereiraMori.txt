@@ -1,0 +1,508 @@
+﻿Conteúdo:
+
+
+1) Introdução        1
+Stepping Stones        2
+a) Apresentação da teoria neutra        3
+a.1) Limitação à dispersão do espaço implícito ao explícito        3
+b) Fragmentação        5
+2) Objetivo        6
+1) O predito por um modelo neutro e o observado divergem com o aumento da fragmentação?        7
+2) É necessário informar a configuração espacial da paisagem ou um modelo que considera o efeito da diminuição da quantidade de habitat e o aumento do isolamento na paisagem é suficiente para descrever as SADs observadas em um gradiente de cobertura vegetal?        9
+3) Teoria neutra enquanto aproximação de uma característica da dinâmica ecológica regional.        10
+3) Material e Métodos        12
+Modelos Neutros        12
+4) Resultados        14
+É necessário informar a configuração espacial da paisagem para descrever as SADs observadas em um gradiente de cobertura vegetal segundo a Teoria Neutra?        17
+A congruência entre o observado e predito segundo um modelo neutro diminui com a perda de habitat na paisagem, como esperado se o pressuposto de neutralidade for uma aproximação ruim para paisagens fragmentadas?        18
+Qual o papel da limitação à dispersão na descrição do padrão observado no gradiente de cobertura vegetal?        19
+
+
+## Título ##
+
+
+## Resumo ##
+
+
+1) Introdução
+
+
+
+
+
+
+
+
+
+
+Stepping Stones
+## Pré-reunião 21 de março ##                 
+
+
+<!-- 1a: apresentação das ideias gerais; status: primeiro rascunho ok! -->
+A destruição e degradação dos ecossistemas naturais é um fenômeno que ocorre em escala global e é uma das principais ameaças à manutenção da diversidade biológica (Haddad et al. 2015). Com a destruição e degradação dos ecossistemas as paisagens naturais se tornam fragmentadas: há a redução da área disponível para as populações (redução da quantidade de habitat) e a aglomeração do habitat remanescente em fragmentos florestais menores e mais isolados embebidos por matrix de diferentes qualidades para as populações naturais (fragmentação per se, Fahrig 2003; 2017). Os efeitos da redução da quantidade de habitat na paisagem independente da fragmentação per se são bem documentados[a][b] e são negativos (Fahrig 2013, Pimm et al. 2014). Os efeitos da fragmentação per se independentes da quantidade de habitat são controversos (Fahrig 2017; Fahrig et al. 2019; Fletcher et al. 2018), em parte pois as métricas de fragmentação per se são correlacionadas com as de quantidade de habitat na paisagem, tornando a separação dos efeitos dos dois fenômenos um desafio (Villard & Metzger 2014). Outro ponto de divergência para entender os efeitos da fragmentação per se é a extrapolação de observações em fragmentos florestais, onde efeito de borda apresenta predominância (Fletcher et al. 2018), para a escala da paisagem (Fahrig 2019).[c][d] 
+<!-- 2a: HAH; status: Avaliação de PI -->         [e]
+Para Fahrig (2013) uma abordagem parcimoniosa para explicar a diversidade biológica observada em um sítio de amostragem em paisagem fragmentada é em função da quantidade de habitat remanescente na paisagem, hipótese da quantidade de habitat (HAH). HAH pressupõem que o fragmento florestal não delimita populações na paisagem e o único mecanismo necessário é o efeito de área amostrada, onde para qualquer região de habitat contínuo, quanto maior a área, maior o número de indivíduos, e para dada distribuição de abundância de espécies (SAD), maior o número de espécies (Fahrig 2013). Então quanto maior a área do fragmento florestal estudado maior a amostra de indivíduos tomada do pool de espécies da paisagem; e quanto maior a área de habitat na paisagem ao redor do fragmento estudado maior a amostra de indivíduos do pool de espécies regional potencialmente fornecedores de imigrantes para o fragmento florestal estudado. Combinando estes dois efeitos de área, temos que quanto maior a área de habitat na paisagem maior a amostra de indivíduos do pool de espécies regional (fig. 4, Fahrig 2013; Haddad et al. 2017; Rabelo et al. 2018); de maneira similar, quanto maior a área do sítio de amostragem maior a amostra de indivíduos do pool de espécies da paisagem. A primeira motivação para HAH é que a magnitude do efeito da fragmentação per se, na escala da paisagem, comparado ao efeito da redução de habitat na paisagem na manutenção da diversidade biológica é ínfima [f](Fahrig 2003, 2017).[g] A segunda motivação para HAH é mudar o foco da pesquisa em fragmentação da escala do fragmento florestal para a da paisagem (Fahrig 2018), assim para HAH Fahrig (2013) hipotetiza a influência de um atributo da paisagem (quantidade de habitat remanescente) na área do sítio de amostragem, abordagem similar ao de estudos tradicionais em ecologia (e.g. Bell 2003).[h]
+
+
+
+
+<!-- 3a: Hipótese da Configuração de Habitat (HCH); status: stepping stones suficiente; organizando ideias-->
+
+
+
+
+
+
+#2o SS - 18 abril 2019 #
+- Se o fragmento florestal delimita em algum grau as populações, então com a diminuição da quantidade de habitat e o aumento do isolamento do fragmento há:
+        i) diminuição da capacidade de suporte do fragmento que leva ao aumento da probabilidade de extinção devida à diminuição do tamanho das populações (devido ao vortex de extinção[i])
+        ii) diminuição da taxa de imigração por conta do aumento das distâncias médias entre o habitat remanescente (os fragmentos remanescentes), para dada capacidade de dispersão, que leva ao aumento da probabilidade de extinção pela diminuição do efeito resgate e diminuição da probabilidade de recolonização pela redução do efeito de massa
+- Nesse contexto a particular configuração espacial do habitat, resultado da perda de habitat e fragmentação per se em determinado momento (Villard & Metzger 2014), pode ser determinante para a movimentação dos indivíduos entre fragmentos, sendo assim determinante para a manutenção das metapopulações na paisagem e portanto para os padrões de diversidade observada em paisagens fragmentadas (Hipótese da Configuração de Habitat, HCH).
+- Há duas hipóteses de quando a configuração espacial de habitat pode ser relevante: i) quando a diminuição da quantidade de habitat leva a paisagem a ultrapassar um limiar de fragmentação (Swift & Hannon 2010); ii) entre o limiar de fragmentação e o limiar de extinção (Vllard & Metzger 2014). .
+
+
+
+
+<!-- 4a: a abordagem que utilizamos para testar HAH e HCH; status: rascunhos e delimitações em andamento --> 
+
+
+# 2o SS #
+- Um desafio de testar as hipóteses com dados observacionais é que a quantidade de habitat e fragmentação per se são tipicamente correlacionados em paisagens não experimentais, nesse contexto uma abordagem é utilizar modelos teóricos que pressupõem paisagens hipotéticas distintas (Hanski 2015). 
+- Partimos da Teoria Neutra Ecológica (Hubbell 2001) para criar modelos que pressupõem diferentes influências da paisagem na dinâmica de nascimentos e mortes (dinâmica ecológica) da área do sítio de amostragem. Teoria Neutra Ecológica é uma teoria baseada em indivíduos que explica os padrões de diversidade como resultado da deriva ecológica (variação aleatória das abundâncias das espécies), dispersão (movimentação dos indivíduos no espaço) e especiação neutra (especiação por mutação pontual ou dispersão de longa distância) (Rosindell et al. 2011). 
+- O modelo neutro de espaço implícito (MNEI) pressupõem uma metacomunidade de J_M indivíduos onde a deriva ecológica e especiação neutra estão em equilíbrio, no qual em um sítio de amostragem há a probabilidade m de que um dos J indivíduos seja substituído por um indivíduo da metacomunidade (Hubbell 2001). Uma vez que a dinâmica ecológica regional da metacomunidade e a dinâmica ecológica local do sítio de amostragem estão em equilíbrio então cada um dos J indivíduos presentes no sítio de amostragem podem ser rastreados até seu ancestral que uma vez imigraram para o sítio de amostragem e o conjunto destes imigrantes formam uma amostra de indivíduos da metacomunidade (Etienne & Olff 2004). Assim, se a metacomunidade está contida na paisagem e existe uma relação direta entre quantidade de habitat e número de indivíduos (efeito de área amostral), então MNEI é uma metáfora[j] para HAH pois J_M é proporcional ao número de indivíduos na paisagem e J é proporcional ao número de indivíduos no sítio de amostragem. 
+
+
+
+
+# 1o SS #
+- Um teste de HAH com dados observacionais é possível a partir do uso de modelos teóricos que pressupõem paisagens hipotéticas distintas (Hanski 2015). Criamos dois modelos teóricos derivados da Teoria Neutra Ecológica (Hubbell 2001) um modelo neutro de espaço implícito (MNEI) que pressupõem que a paisagem é homogênea (revisado por Prevedello et al. 2016) e um modelo neutro de espaço explícito (MNEE) que considera a transcrição da configuração espacial da paisagem (Campos et al. 2013) onde a amostra de diversidade foi observada.
+
+
+<!-- 5a parte: descrição dos dados utilizados; parametrização dos modelos; status: rascunho --> 
+
+
+
+
+
+
+
+
+
+
+
+
+% Fragmentação %
+
+
+## Antes reunião 21 de março ##
+a) Apresentação da teoria neutra
+        A teoria neutra ecológica (ENT) (Bell 2001, Hubbell 2001) é uma teoria eficiente para estudar o efeito da estocasticidade demográfica na manutenção da diversidade, i.e. a coexistência de diversas espécies (Alonso et al. 2006, Marquet et al. 2014). Central à ETN é o pressuposto de equivalência funcional (neutralidade), que afirma que todas as espécies de um mesmo nível trófico apresentam as mesmas taxas demográficas per capita (Hubbell 2005a, Connoly et al. 2017). A abordagem de ETN se basea em oferecer uma estrutura teórica mínima de onde modelos mais complexos são derivados (Rosindell et al. 2012), com objetivo de avaliar até onde o pressuposto de neutralidade é suficiente para reproduzir determinado padrão macroecológico (Hubbell 2005a-b). Nesse aspecto, a teoria pode ter dois usos distintos: i) prover modelos nulos para a prevalência de nicho para explicar o padrão observado; ou ii) como aproximação de uma característica do sistema sob estudo (Rosindell et al. 2011).
+
+
+a.1) Limitação à dispersão do espaço implícito ao explícito
+- modelo neutro clássico (Hubbell 2001); mecanismos na teoria neutra (Alonso et al. 2006; Chave and Alonso 2007); limitação à dispersão: de m para d (Chisholm and Lichstein 2009; Condit et al. 2002; Etienne 2005 (I - número de indivíduos que competem com com os indivíduos locais por espaço na comunidade local) ) e proporção de indivíduos que permanece até a vizinhança imediata da planta progenitora (competição entre vizinhos; limitação espacial da teoria neutra (Etienne and Rosindell 2011) e demanda por construir relação entre modelos de campo médio e de espaço explícito (Azaele et al. 2016).
+
+
+<!-- Qual a explicação a teoria neutra oferece? -->
+
+
+## pré campanha fev2019 ##
+
+
+-O modelo neutro desenvolvido por Hubbell (2001) (MNEI) explica os padrões de diversidade de espécies nos ecossistemas naturais baseada na relação entre áreas, expressa na forma de escalas (comunidade local X metacomunidade) (Munoz et al. 2016). Neste modelo uma metacomunidade com J_M indivíduos está sujeita à nascimentos e mortes ao acaso (pressuposto de neutralidade); a qualquer evento de nascimento existe uma probabilidade de um recém nascido ser de uma nova espécie na metacomunidade (taxa de especiação U) (Condit et al. 2012). Mantida estas condições a distribuição de abundância de espécies atinge um equilíbrio dinâmico com flutuações aleatórias  (Condit et al. 2012). É necessário apenas um parâmetro para descrever a dinâmica da metacomunidade nestas condições \theta\ = (J_M - 1) * U/(1-U) (Condit et al. 2012). O modelo pressupõem que limitação à dispersão é negligenciável (panmítica), e a probabilidade de colonização de uma unidade de habitat é a mesma para a prole de todos os indivíduos da metacomunidade (Hubbell 2001?). Uma primeira abordagem para conceitualizar a limitação à dispersão é considerar uma subárea dentro da metacomunidade, a comunidade local. Na comunidade local, a colonização de uma unidade de habitat depende da origem do propágulo, se da metacomunidade, m; se for da comunidade local, 1-m (Hubbell 2001). Fala-se que a comunidade é estruturada por limitação à dispersão quando m é menor do que 1 (Alonso et al. 2006). 
+Uma limitação espacial de MNEI é que a comunidade local é limitada à dispersão enquanto a metacomunidade, coleção de todas as comunidades locais sob-influência mútua, é panmítica (Etienne & Rosindell 2011). Uma maneira de relaxar este pressuposto é definir a limitação à dispersão em termos de função de dispersão (Munhoz et al. 2013). A função de dispersão relaciona a probabilidade de colonização de um indivíduo em função da distância entre unidade de habitat disponível e planta progenitora (Clark et al. 1999?). CONTINUAR: 
+
+
+
+
+## Primeira versão ##
+
+
+O input de espécies por dispersão ou especiação para a escala de observação contrabalancea a perda de espécies por deriva ecológica (Etienne & Alonso 2006-7), a prevalência de dispersão e especiação é influenciada pela escala de observação (Condit et al. 2012).
+
+
+Pressupondo especiação neutra por mutação (revisado por REFERÊCIA), ENT pressupõem que quanto maior a área maior a importância de especiação e dispersão de longa distância e menor a de imigração de curta distância (Condit et al. 2012).
+
+
+O modelo neutro espacialmente implícito (MNEI) aproxima essa condição para a existência de duas escalas a comunidade local (área observada) e a região biogeográfica descrita pelo parâmetro fenomelógico theta (produto do número de indivíduos na região biogeográfica e da taxa de especiação) (Hubbell 2001, Etienne 2005).
+
+
+A comunidade local está sob chuva de propágulos da prole dos indivíduos da comunidade local e da região biogeográfica (Alonso et al. 2006).
+
+
+[a relação entre o parâmetro m e theta permitem o modelo neutro espacialmente explícito ajustar SADs lognormal e logseries (Magurran & Anderson 2002?)].
+
+
+O modelo neutro espacialmente explícito (MNEE) relaxa o pressuposto de desacoplamento entre a dinâmica local e regional considerando que a limitação à dispersão é descrita pela probabilidade de colonização em função da distância entre planta progenitora e unidade de habitat vago (Condit et al. 2002, Chave et al. ____).
+
+
+No modelo espacialmente explicito em toda unidade de habitat pode ocorrer um evento de input de espécies (evento de especiação verdadeira ou de dispersão de longa distância), a probabilidade de ocorrer na área da comunidade local ou na paisagem ao redor da comunidade local depende da relação entre área da comunidade local e área de habitat na paisagem (Rosindell et al. 2008, Campos et al. 2012).
+
+
+MNEE apresenta pouca versatilidade para ajustar o campo de parâmetros onde MNEI apresenta boa congruência com o observado em diferentes contextos ecológicos (Etienne & Rosindell, 2011).
+
+
+Em parte é explicado pois a configuração espacial da paisagem influencia na forma da SAD (Campos et al. 2013)
+
+
+
+
+
+
+b) Fragmentação
+
+
+- os efeitos da fragmentação nos sistemas ecológicos podem ser agrupados em determinísticos, onde é possível predizer a variação na abundância em função de alguma característica da espécie; e estocásticos, se os eventos demográficos ocorrem independente das características da espécie  (Pardini et al. 2017; Vellend et al. 2014).
+
+
+- uma das consequências imediatas da remoção de habitat nativo é a redução do tamanho populacional das espécies na paisagem (Fahrig 2003). Concomitantemente há a modificação da configuração espacial do habitat disponível para o estabelecimentos das espécies (configuração espacial; Fahrig 2003, Villard & Metzger 2014)) e a degradação do habitat associado às áreas de borda dos fragmentos florestais remanescentes (efeito de borda; Ewers & Didham 2006, Haddad et al. 2015).
+
+
+- quanto menor o tamanho populacional mais importante o efeito da estocasticidade demográfica e ambiental na coexistência das espécies (revisado por Pardini et al. 2017). 
+- O aumento do risco de extinção local pelo aumento do isolamento das populações nos fragmentos florestais resultantes (revisado Villard & Metzger 2014?).
+- Outra consequência da fragmentação é a diminuição da diversidade de habitats para as populações naturais e criação de outros tipos de habitat pelo efeito de borda (REFERÊNCIA). Isso pode resultar na probabilidade diferenciada de colonização, persistência e produção de propágulos determinado pela habilidade da espécie em tolerar as condições abióticas de determinada área (filtro ambiental; Kraft et al. 2011, Putkker et al. 2014, Pontarp et al. 2018). Além disso pode existir o efeito indireto da variação na composição em outros níveis tróficos (REFERÊNCIA) e outros efeitos determinísticos[k][l]
+
+
+
+
+
+
+
+
+
+
+2) Objetivo[m]
+
+
+- O objetivo do trabalho é explicar a diversidade biológica dos indivíduos arbóreos observada em um gradiente de cobertura vegetal na Floresta Atlântica Brasileira, sob o ponto de vista de ETN.
+-A Floresta Atlântica Brasileira ocupa cerca de 16% de sua área original é caracterizado por fragmentos florestais menores de 50 ha, onde quase metade da área remanescente a distância de 100 m da borda do fragmento e com uma distância média 1440 m entre fragmentos florestais adjacentes (Ribeiro et al. 2009). A configuração espacial resultado do histórico de conversão de habitat em matrix e ocupação do espaço (Villard & Metzger 2014?).[n]
+-Utilizamos a distribuição de abundância de espécies (SAD) como a descrição de diversidade biológica da comunidade arbórea observada em paisagens com diferentes graus de fragmentação. A SAD pode ser utilizada para estudar a relação entre espécies comuns e raras em determinada área (McGill et al. 2007).
+- Comparamos um modelo neutro onde a heterogeneidade espacial e as distâncias são explicitamente consideradas na dinâmica ecológica pela informação da configuração espacial da paisagem (modelo neutro de espaço explícito, MNEE) com um modelo neutro de espaço implícito (MNEI). MNEI pressupõem que a comunidade local e a região em seu entorno (metacomunidade) são bem misturadas (panmíticas) (Azaele et al. 2016), a limitação à dispersão é conceitualizada como a probabilidade de um indivíduo da metacomunidade colonizar uma unidade de habitat na comunidade local (m) (Munhoz et al. 2013).
+- Parametrizamos a dispersão pela função de dispersão (Munhoz et al. 2013), onde a probabilidade de colonização depende da distância entre planta progenitora e unidade de habitat vago (Clark et al. 1999). Variamos a proporção de propágulos que permanece até a vizinhança imediata da planta progenitora (k). Desenvolvemos uma função que estima a distância média necessária para obter determinado k (d), pressupondo distribuição de probabilidade exponencial negativa. [o]
+- Deduzimos uma relação entre d e m (Chisholm & Lichstein 2009), então corrigimos o efeito da diminuição da chuva de propágulos da metacomunidade para a comunidade local devido a perda de indivíduos pela remoção de habitat original. A correção é uma aproximação uma vez que considera p e não a forma particular configuração espacial.
+- Estimamos a taxa de especiação na paisagem necessária para manter a riqueza observada na área amostrada (U) com uma abordagem semi-análitica a partir de MNEE (Rosindell et al. 2008). A estimativa se baseia em simular uma árvore genealógica da comunidade local em uma paisagem com particular configuração espacial sob a hipótese de ausência de especiação, que no equilíbrio resulta em monodominância. Com a árvore genealógica é possível obter uma equação que relaciona a probabilidade média de uma colonização ocorrer por um singleton (espécie com apenas um indivíduo) por evento de nascimento (apêndice Rossindell et al. 2008).[p]
+- Uma vez que a paisagem utilizada para estimar U corresponde a metacomunidade de MNEI, o número de indivíduos na metacomunidade (J_M) é igual ao produto da área da paisagem, DA e p e podemos obter theta. 
+- Selecionamos da base de dados TreeCo (REFERÊNCIA) trabalhos fitossociológicos que descreveram pelo menos 1 ha de uma comunidade arbórea na mata atlântica e criamos mapas de habitat e não habitat a partir da transcrição de imagens do LandSAT8  de cobertura vegetal ( Referência)
+
+
+- simulamos 12 cenários de limitação à dispersão da onde a maior parte dos propágulos permanece até a vizinhança imediata da planta progenitora até distâncias médias similares à mediana de dispersão de autocóricas (Munhoz et al. 2013). 
+-Construímos transcrições da configuração espacial da paisagem a partir de fotos áreas da cobertura vegetal de uma paisagem de 500 ha em torno da área amostrada com resolução de 30m2/pixel (sítio de amostragem, Site). Ajustamos a resolução da imagem para que o número de pixels da paisagem seja proporcional a densidade de indivíduos observada na comunidade local (DA). Consideramos unidade de habitat, área disponível para a colonização por qualquer indivíduo (pressuposto de neutralidade), se o pixel corresponder a pelo menos 70% de cobertura vegetação.[q] A cobertura vegetal da paisagem (p) corresponde a proporção de unidades de habitat na paisagem.
+-Comparamos a SAD observada e predita por um modelo neutro com um  teste frequentista que permite testar a hipótese de que a SAD observada e predita por um modelo neutro são amostras de uma mesma distribuição teórica. Então utilizamos um GLMM binomial para descrever o número de predições neutras não refutadas e particionar a variação entre o sítio de amostragem e o efeito de p, k e a classe do modelo neutro (MN).
+
+
+
+
+
+
+
+
+-Lima et al. 2015[r]
+
+
+Dividimos o trabalho em 3 partes:
+1) O predito por um modelo neutro e o observado divergem com o aumento da fragmentação?
+# Pré-campanha 2019fev: #
+
+
+-Há evidências experimentais de que em paisagens fragmentadas o pressuposto de fragmentação não é uma boa aproximação das taxas demográficas observadas em espécies arbóreas (Gilbert et al. 2006; Laurance et al. 2018). Pois a variação na abundância das espécies da comunidade local (turnover temporal) observada em fragmentos é mais rápida do que a prevista por um modelo neutro de campo médio (Gilbert et al. 2006). O alto dinamismo ocorre principalmente nas regiões sob efeito de borda (Laurance et al. 2008). O efeito de borda é caracterizado pela associação de diversos processos determinísticos (Pardini et al. 2017). Contudo, a extensão do efeito de borda depende de diversos fatores idiossincráticos (Didham & Ewers 2006; Collins et al. 2017), e os processos estocásticos (estocasticidade demográfica e ambiental) iniciados pela remoção de habitat natural e resultante configuração espacial podem ter grande influência na estruturação das comunidades locais. Assim, se o efeito de borda apresenta grande influência na estrutura da comunidade (Haddad et al. 2015), o pressuposto de neutralidade não deve ser uma boa aproximação e nenhuma predição neutra deve apresentar boa congruência com o observado (Holyoak & Loreau 2006).
+
+
+# Primeira Versão #
+
+
+O pressuposto de equivalência funcional não é uma boa aproximação das taxas demográficas das espécies em paisagens fragmentadas (Gilbert et al. 2006, Laurance et al. 2018).[s] O principal efeito da fragmentação é a degradação do habitat associado à área de fronteira com a matriz (Haddad et al. 2015)[t], por conta da introdução de novos gradientes ecológicos pela influência do processo de transformação do habitat perdido, efeito de borda (Confounding factors in detection and prevention of fragmentation effects by matrix 2006). Esse habitat degradado apresenta características bióticas e abióticas distintas do habitat original, atuando como um filtro ambiental, processo determinístico, para as espécies com grande associação ao habitat original (REFERÊNCIA (Metzger, Laurance), Pardini et al. 2017). Isso gera alto dinamismo na área do fragmento sob influência da matriz (Laurance 2008), o turnover de espécies (variação na abundância) ocorre acima do previsto pela teoria neutra (Gilbert & 2018).[u]         Por outro lado, a SAD é um padrão previsto por diferentes hipóteses (McGill et al. 2007) e pode ser necessário grandes desvios da neutralidade para gerar sinais na SAD a partir dos atuais testes ( & Alonso 2015). Nesse contexto, A teoria neutra pode prover modelos nulos para a detecbilidade da existência de diferenças entre as espécies (nicho) no conjunto de dados empíricos utilizados (Rosindell et al. 2012).[v][w] Assim, dado a prevalência do efeito de borda nas paisagens fragmentadas (Haddad et al. 2015, Haddad et al. 2017a), podemos avaliar se a SAD observada em um gradiente de fragmentação pode ser evidência suficiente para refutar neutralidade.[x]
+
+
+2) É necessário informar a configuração espacial da paisagem ou um modelo que considera o efeito da diminuição da quantidade de habitat e o aumento do isolamento na paisagem é suficiente para descrever as SADs observadas em um gradiente de cobertura vegetal? 
+# Pré-campanha 2019fev: #
+
+
+- argumento de Fahrig para questionar o efeito da configuração espacial na fragmentação
+- contra-questionamento e respostas: Villard & Metzger 2014; Haddad et al. 2015; Haddad et al. 2017b; Tem um com dados observacionais também
+- maneiras de avaliar o efeito da fragmentação utilizando modelos baseados em indivíduos: Brudvig et al. 2017 + teoria neutra [?]; Connoly et al. 2017 (MN: pressuposto central de neutralidade variando os pressupostos auxiliares) [a relação entre pressupostos auxiliares e hipóteses distintas deve ser explorado na introdução]
+- abordagem da teoria neutra: avaliar até onde a aproximação de neutralidade é suficiente para explicar o padrão observado (Hubbell 2004). 
+- Então simplificamos um modelo que considera a configuração espacial (MNEE) para um que incorpora em seus parâmetros o efeito da redução da quantidade de habitat e do aumento do isolamento do fragmento resultante (MNEI). 
+
+
+
+
+# primeira versão #
+A teoria neutra permite gerar modelos teóricos que compartilham o pressuposto central de neutralidade e diferem em seus pressupostos auxiliares (Cornell & 2017). Uma fonte de divergência entre predito e observado[y] pode ser a forma com que o espaço é conceitualizado na dinâmica ecológica (Etienne et al. 2011). O modelo neutro clássico (continente-ilha) assume uma comunidade local sob chuva dos propágulos de uma região biogeográfica panmítica cuja diversidade resulta do balanço estocástico entre extinção e especiação (Hubbel 2001). Esse modelo considera implicitamente o espaço e se assemelha aos primeiros modelos utilizados para explicar o efeito da fragmentação nos ecossistemas terrestres (MacArthur & Wilson, 1967; Laurance 2008). No modelo neutro espacialmente explícito[z] a probabilidade de colonização depende da escala de origem do indivíduo progenitor,[aa] m[ab] para indivíduos da região biogeográfica e 1-m para indivíduos da comunidade local (Alonso et al. 2006). 
+Alternativamente podemos considerar um modelo neutro espacialmente explícito, onde a probabilidade de colonização depende da distância entre planta progenitora e unidade de habitat vago (Rosindell et al. 2008). Esse modelo assume explicitamente a configuração espacial da paisagem na dinâmica ecológica, com a matriz atuando como barreira para a colonização (Campos et al. 2012). O modelo neutro de espaço explícito pode prever a existência de débito de extinção (Claudino et al. 2015) e mostra que a configuração espacial da paisagem tem influência na forma da SAD (Campos et al. 2013)[ac]. Aqui comparamos estes dois modelos para avaliar, com dados observacionais, se a fragmentação per se[ad] apresenta algum efeito na manutenção da diversidade (Fahrig 2013, 2017). O modelo neutro espacialmente explícito considera o efeito da configuração espacial e portanto o efeito conjunto da diminuição da quantidade de habitat na paisagem, da variação no isolamento e tamanho das porções de habitat remanescente na paisagem e a forma particular da distribuição de habitat na paisagem (REFERÊNCIA). O modelo neutro espacialmente implícito considera o efeito do isolamento em seu parâmetro de imigração (Munoz et al. 2013) e o efeito da diminuição de habitat na paisagem como redução no tamanho da região biogeográfica (em número de indivíduos). Para possibilitar a comparação deduzimos uma relação entre os parâmetros de imigração dos dois modelos (Chisholm & Lichstein, 2009; Munoz et al. 2013). Para o parâmetro de diversidade utilizamos a abordagem semi-analítica do modelo neutro espacialmente explícito (Rosindell et al. 2008) para estimar a taxa de especiação necessária para obter uma determinada riqueza no equilíbrio assumindo uma configuração espacial da paisagem e parâmetro de dispersão. O efeito da redução da cobertura vegetal na paisagem está na diminuição do número de indivíduos na região biogeográfica (J_M, Hubbell 2001), que corresponde a área da paisagem.[ae]
+
+
+3) Teoria neutra enquanto aproximação de uma característica da dinâmica ecológica regional.[af][ag]
+
+
+
+
+# Primeira Versão #
+???? Caderno
+
+
+
+
+
+
+
+
+<!-- Ponto de vista da fragmentação -->
+
+
+A configuração espacial da paisagem influencia na conectividade funcional entre as populações na paisagem (Villard & Metzger 2014) modificando o tipo de dinâmica regional do pool de espécies (May et al. 2013, Fukami 2015).
+
+
+A relação formal entre os parâmetros de dispersão de MNEE – MNEI permite abstrair o efeito do espaço para a imigração entre a área de observação e a área ao redor (Chisholm & Lichstein 2009). Contudo, estes modelos diferem em como pressupõem o funcionamento da dinâmica regional (Fukami 2005): MNEI pressupõem que os fragmentos estão apenas sob influência da região biogeográfica mas não há influência entre os fragmentos que compõem a região biogeográfica (Hubbell 2001); MNEE pressupõem que a imigração depende da distância entre as unidades de habitat e a capacidade de dispersão (Rosindell et al. 2008), permitindo a imigração entre fragmentos florestais.
+
+
+A pressunção do tipo de dinâmica ecológica regional explica a diferença conceitual entre os parâmetros de imigração. O parâmetro m descreve a limitação à dispersão da comunidade local, então é uma propriedade da escala de observação. A função de dispersão descreve a probabilidade de colonização de um indivíduo em função da posição da planta progenitora e da distância da unidade de habitat vago, portanto a dispersão é uma propriedade do indivíduo.
+
+
+O parâmetro m é corrigido pela proporção da cobertura vegetal na paisagem pois assim considera o efeito da diminuição do fornecimento de competidores da paisagem pelo espaço da comunidade local com os indivíduos locais (Etienne 2005, Munoz et al. 2013).
+
+
+Assim, MNEI pressupõem uma dinâmica regional do tipo continente-ilha, com o parâmetro de dispersão corrigido para o aumento do isolamento e o parâmetro de diversidade corrigido para a diminuição do número de indivíduos na dinâmica regional (efeito de área). Já MNEE pressupõm uma dinâmica regional do tipo metacomunidade, onde a conectividade funcional depende da configuração espacial de habitat e não habitat da paisagem e da função de dispersão que descreve a probabilidade de colonização em função da distância da planta progenitora e unidade de habitat.
+
+
+<!-- A aproximação -->
+
+
+Para paisagens fragmentadas um modelo neutro de espaço implícito prediziu corretamente a taxa de extinção de espécies raras (Gilbert et al. 2006). Essas espécies podem ser aquelas mais suscetíveis à estocasticidade demográfica (REFERÊNCIA Magurran ____).
+
+
+A teoria neutra pode ser utilizado como aproximação de alguma característica de ecossistemas (Rosindell et al. 2012).
+
+
+A estimativa de taxa de especiação do modelo neutro espacialmente explícito pode ser utilizado como uma aproximação da taxa de extinção de espécies raras, pois o modelo pressupõem equilíbrio dinâmico (Alonso & Etienne 2006-7). Além disso, MNEE explicitamente considera a particular configuração espacial da paisagem para estimar a taxa de especiação (Campos et al. 2012).
+
+
+Assim é possível avaliar, condicionado à qualidade com que MNEE prediz o observado, a descrição da taxa de especiação em função da riqueza observada, cobertura vegetal e configuração espacial.
+                          
+
+
+
+
+3) Material e Métodos
+## Pré campanha Fev2019 ##
+Modelos Neutros
+
+
+- Existem duas formas de implementar MNEI: a partir de cadeias markovianas onde acompanhamos a dinâmica ecológica indo para frente no tempo; e a partir da abordagem coalescente onde acompanhamos a dinâmica ecológica até o equilíbrio indo para trás no tempo (Azaele et al. 2016). A abordagem coalescente permite simular MNEE com diferentes distribuições de probabilidade subjacentes na função de dispersão (Azaele et al. 2016), característica se desejamos estudar limitação à dispersão em um contexto de paisagem (Clark et al. 1999?). E MNEE coalescente vem sendo aplicado no estudo dos efeitos espaciais da fragmentação (Campos et al. 2012, 2013, Claudino et al. 2015). Assim, utilizamos a abordagem coalescente para modelar MNEI, com a formula de amostragem de Etienne (2005), e MNEE com a simulação coalescente de Rosindell et al. (2008).
+- A fórmula de de amostragem de Etienne (2005) deduz uma expressão exata para a probabilidade multivariada de observar uma determinada distribuição de abundância em função de \theta\, \I\ e \J\. Esta dedução se baseia em duas observações: i) todo indivíduo na comunidade local pode ser rastreado no tempo até um único ancestral que uma vez migrou para a comunidade local; ii) o conjunto de ancestrais forma uma amostra da região biogeográfica onde existe apenas especiação e extinção. O número de imigrantes que compete por espaço na comunidade local com a prole dos indivíduos residentes (I) se relaciona com a probabilidade de imigração para comunidade local (m) por I = m(J_1)/(1-m).
+- A simulação coalescente de Rosindell et al. (2008) tem como objetivo reconstruir a árvore genealógica dos indivíduos presentes na área da comunidade local até o momento de especiação
+da comunidade local rastreando a origem dos indivíduos até o momento de especiação (descrita pela taxa de especiação, U) ou até coalescerem um uma linhagem que em algum momento do passado especiou.
+
+
+descrita por Rosidell et al. (2008) implementa MNEE, nela rastreamos os indivíduos presentes na área local até sua especiação ou coalescência em linhagens, o objetivo da simulação é construir a árvore genealógica da comunidade local, assim
+
+
+Na abordagem coalescente acompanhamos os indivíduos em determinada área em retrocesso até eles especiarem ou coalescerem em uma única linhagem (Rossindell et al. 2008).
+
+
+
+
+
+
+ é a implementação coalescente de MNEI, sua dedução parte de duas observações: i)) todos os indivíduos que estão na comunidade local uma vez migraram da metacomunidade para lá ou como imigrantes ou como 
+
+
+
+
+## Primeira versão ##                          
+1) Predições neutras:
+- Relação entre modelos neutros
+        -MNEE considera a configuração espacial e efeito de área
+        -MNEI considerando apenas o efeito de área
+        -MNEE foi utilizado para parametrizar ambos os modelos:
+
+
+A limitação à dispersão foi parametrizada pela proporção de propágulos que permanecem até a planta progenitora (que considera explicitamente a posição e distância das unidades de habitat);
+O número fundamental da diversidade (theta) foi obtido a partir da taxa de especiação necessária para obter a riqueza observada segundo os pressupostos de MNEE.
+A taxa de especiação pode ser entendido como o efeito conjunto de migração de longa distância (Bell 2003, Etienne et al. 2007), que introduz espécies novas na paisagem a cada 10e? Anos oriundas de uma região biogeográfica maior (Nathan 2006).
+A prevalência de migração de longa distância e especiação verdadeira (o surgimento de novas espécies no pool geral de espécies) varia com o tamanho da área de influência (Condit et al. 2012).
+O parâmetro de diversidade de MNEI (theta) pode ser calculado a partir de U e do número de indivíduos na paisagem.
+
+
+É possível construir uma relação formal entre os parâmetros dos modelos a partir de seus pressupostos.
+
+
+Com isso geramos predições de um modelo que considera a distância e posições das unidades de habitat (MNEE) com um modelo que aproxima o espaço por duas áreas panmíticas, onde a probabilidade de colonização não varia em função de distâncias (MNEI).
+
+
+
+
+Alternativamente, poderíamos informar o parâmetro de migração e estimar o theta necessário para obter a SAD observada (Etienne 2005). Contudo, isso iria criar um viés de confirmação, uma vez que utilizamos a fonte de comparação (SAD) para parametrizar o modelo por verossimilhança (McGill 200_). Além disso, o pressuposto de soma-zero pode ser relaxado para o modelo espacialmente implícito (Etienne et al. 2007?), pressuposto necessário para MNEE que utilizamos (Rosindell et al. 2008).
+
+
+Ao parametrizar a diversidade de MNEI pela estimativa de MNEE da taxa de especiação (U) comparamos as predições de modelos neutros que diferem apenas em considerar ou não a configuração espacial.
+Assim é possível avaliar se é necessário acrescentar complexidade para descrever a distribuição de abundância de espécies observada em um gradiente de fragmentação (Hubbell 2005).
+
+
+
+
+4) Resultados
+
+
+        Para descrever a probabilidade de não refutar uma predição neutra o mais plausível é considerar a interação de terceira ordem entre a porcentagem de cobertura vegetal da paisagem (p), o tipo de modelo neutro que gera a predição (MN) e a proporção de propágulos que permanece até a vizinhança imediata da planta progenitora (k) assumido pelo modelo (anexo 1)[ah][ai]. O coeficiente de determinação condicional (R2c) ao agrupamento dos dados é aproximadamente o dobro do coeficiente de determinação marginal ao agrupamento dos dados (R2m), R2c = 0.650, R2m = 0.337, indicando que boa parte da variação explicada pelo modelo está associada ao sítio de amostragem e não ao efeito da interação de terceira ordem entre as variáveis preditoras [aj](anexo 1). Essa afirmação é corroborada pelo intervalo de confiança condicional ao agrupamento dos dados que engloba boa parte das observações (figura X). O modelo estatístico mais plausível apresenta distribuição dos resíduos quantílicos diferente do esperado segundo uma distribuição uniforme o quê indica que o modelo pode não estar fazendo um bom ajuste dos dados (REFERÊNCIA[ak])[al], a variação observada é superior ao previsto pelo modelo (overdispersion)[am]. Avaliamos formas alternativas de modelar os dados e não observamos melhora significativa na aderência da distribuição dos resíduos à uniformidade (anexo 1). Como o modelo descreve a tendência geral observada nos dados (figura X), consideramos-o suficiente para realizar as inferências estatísticas com o log da razão da chance de não refutar uma predição neutra (figura X+1).
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Figura X. Número de predições neutras não refutadas a partir da SAD observada e teste de Kolmogorov-Smirnov em função da porcentagem de cobertura vegetal da paisagem. Os quadros estão divididos pelo modelo neutro que gerou as predições (EI = modelo neutro de espaço implícito; EE = modelo neutro de espaço explícito) e pela proporção de propágulos que permanece até a vizinhança imediata da planta progenitora (linhas 0.99,...,0.25). A linha vermelha é a probabilidade de não refutar uma predição neutra, a região em branco ao redor da linha vermelha é o intervalo de confiança bootstrap (IC) de 95% marginal ao agrupamento dos dados pelo sítio de amostragem, a região em cinza é o IC de 95% condicional ao agrupamento dos dados pelo sítio de amostragem.
+
+
+  
+
+Figura X+1[an][ao]. Probabilidade média (alfa - intercepto) e o efeito da porcentagem de cobertura vegetal na probabilidade de não refutar neutralidade (beta - inclinação) pela proporção de propágulos até a vizinhança imediata da planta progenitora (k) e pelo modelo neutro que gerou a predição neutra (MN), em azul MN de espaço explícito e em vermelho MN de espaço explícito. As linhas horizontais são os efeitos médios, a caixa representa o intervalo de confiança de 95% (IC) para as predições marginais aos efeitos aleatórios e a linha vertical representa IC para as predições condicionais aos efeitos aleatórios do modelo mais plausível. Os ICs e a média foram estimados a partir do ajuste de uma regressão linear considerando a interação de terceira ordem entre as preditoras (p, MN e k) para cada réplica do bootstrap da predição do modelo plausível, que está na escala da função de ligação; somou-se os vetores de coeficientes réplicas para obter os respectivos interceptos e inclinações para cada painel da figura X, então calculou-se as médias e os quantis para 2.5% e 97.5% dos coeficientes estimados. O coeficiente de determinação de todos as regressões lineares foi igual a 1.
+
+
+
+
+É necessário informar a configuração espacial da paisagem para descrever as SADs observadas em um gradiente de cobertura vegetal segundo a Teoria Neutra?
+
+
+O log da razão da chance média de não refutar uma predição neutra (intercepto)[ap] é sempre alta para o modelo neutro de espaço explícito (EE) apresentando pouco efeito de k (figura X+1, primeiro painel). O modelo neutro de espaço explícito[aq] (EI), por outro lado, apresenta intercepto próxima de zero para o cenário de dispersão mais severo (k=0.99), aumentando gradualmente até k=0.65 onde atinge o pico se tornando próximo do observado para EE, porém inferior (figura X+1, primeiro painel). Com a diminuição da severidade da limitação à dispersão (k=[0.6;0.25]) o intercepto diminui, em especial para k=0.25 onde o valor se torna negativo (figura X+1 , primeiro painel). O intervalo de confiança condicional ao sítio de amostragem das estimativas de log razão da chance média de não refutar uma predição neutra é bem abrangente para EE englobando a estimativa para EI exceto para k=0.25; já o intervalo de confiança marginal ao sítio de amostragem de EE nunca engloba as estimativas de EI (figura X+1, primeiro painel). O intervalo de confiança condicional ao sítio de amostragem para EI é menos abrangente englobando a estimativa para EE para k entre 0.8 e 0.6 (figura X+1, primeiro painel). [ar]
+O efeito de p no log da razão da chance de não refutar uma predição neutra (inclinação) para EE apresenta sempre valores positivos próximos de zero para todos os cenários de dispersão com pouca variação entre os valores, exceto para k=0.25 onde a inclinação se aproxima de 1 (figura X+1, segundo painel). O intervalo de confiança[as] marginal e condicional ao sítio de amostragem coincidem para ambos modelos, contudo, para EE ele é mais abrangente do que para EI. A inclinação de EI é próxima de -1 para o cenário de limitação à dispersão mais severo (k=0.99) e vai se apŕoximando de zero com o aumento da dispersão (k=[0.99,0.85]); para k entre 0.8 e 0.6 a inclinação se torna positiva com a estimativa de inclinação de EI sendo superior ao de EE para k=0.7 e k=0.65 (o pico da inclinação de EI) (figura X+1, segundo painel). A partir de k=0.55 a inclinação de EI se torna negativa chegando próximo de -3.5 para k=0.25. De k=0.95 até k=0.55 há sobreposição do intervalo de confiança da inclinação de ambos os modelos e para k=0.6 a inclinação estimado para os dois modelos coincide (figura X+1,segundo painel)
+O modelo EE apresenta pouca variação entre os diferentes cenários de limitação à dispersão (k) para o intercepto e inclinação (figura X+1) e apresenta moda no número de predições neutras não refutadas próximo de 100, valor máximo (figura X). Já EI apresenta variação associada à k sendo que para os cenários de limitação à dispersão extremos (k=0.99, limitação à dispersão severa; e k=0.25, pouca limitação à dispersão) as estimativas de EI (intercepto e inclinação) são inferiores aos de EE, em especial para o cenário de limitação à dispersão menos severo (figura X+1). Para valores intermediários de limitação à dispersão as estimativas de EI e EE se aproximam, onde o intercepto de EI nunca é superior ao de EE (figura X+1). EI não apresenta uma moda de número de predições neutras não refutadas, exceto para k=0.25 onde a maior parte dos sítios apresenta zero predições neutras não refutadas (figura X). De maneira geral, EE gera predições que são mais próximas do observado em comparação às predições geradas por EI, para todo p e k, portanto, podemos afirmar que para descrever as SADs observadas no gradiente de cobertura vegetal observado é necessário informar a configuração espacial da paisagem para descrever a SAD segundo a Teoria Neutra.
+
+
+                          
+A congruência entre o observado e predito segundo um modelo neutro diminui com a perda de habitat na paisagem, como esperado se o pressuposto de neutralidade for uma aproximação ruim para paisagens fragmentadas?
+
+
+        A inclinação de EE é positiva para todo k, contudo, o intervalo de confiança engloba zero e valores negativos, exceto para o cenário de limitação à dispersão menos severo (k=0.25) onde a inclinação se aproxima de 1 (figura X+1). Parte desse comportamento se deve ao intercepto de EE que é sempre alto (figura X+1). A maior inclinação de EE ocorre quando há a maior variação no número de predições neutras não refutadas (figura X). A inclinação de EI apresenta um padrão monotônico em função de k negativo para valores extremos de limitação à dispersão (k=0.9 e k<=0.55) apresentando valores positivos de inclinação para limitação à dispersão intermediária (figura X+1). Para o cenário de limitação à dispersão menos severo (k=0.25) é bimodal: para paisagens com baixa proporção de cobertura vegetal (p>=0.25) a tendência é que todas as predições neutras não sejam refutadas, apos esse valor de p, a moda é que todas as predições neutras não sejam refutadas (figura X). Esse padrão se reflete em inclinação negativa acentuada em relação aos demais valores de k (figura X+1).
+        A hipótese de trabalho afirma que a congruência entre o observado e predito segundo um modelo neutro diminuiria com a diminuição da cobertura vegetal na paisagem. O sinal de desvios da neutralidade parece ser bem sútil para EE, uma vez que a maior parte das simulações neutras geraram predições com alta probabilidade de não serem refutadas a partir da SAD observada. Para o modelo EI os desvios da neutralidade dependem da limitação à dispersão observada na paisagem. Quando a maior parte dos propágulos permanece na área imediata da planta progenitora (k=0.99) há uma tendência geral da congruência entre o predito e observado diminua com o aumento da cobertura vegetal, o oposto previsto segundo a hipótese de trabalho. Esse efeito diminui tornando-se positivo, corroborando a hipótese de trabalho, com o aumento da distância média de dispersão. Contudo, para distâncias médias de dispersão similar à média de árvores dispersas pelo vento (VER O NOME, Munhoz et al. 2013), onde apenas 1/4 da prole permanecendo na área da planta progenitora e vizinhança imediata, o efeito de p torna-se acentuadamente negativo (Figura X+1), refutando a hipótese de trabalho.
+
+
+
+
+Qual o papel da limitação à dispersão na descrição do padrão observado no gradiente de cobertura vegetal?
+
+
+        A limitação à dispersão tem pouco efeito para MNEE, onde apresenta aumento da variância observada (figura X), com pouca influência no intercepto e inclinação de p (figura X+1). A maior parte da variação está associada com o sítio de amostragem, enquanto que os efeitos fixos correspondem à pouca variação (figura X; R2m e R2c).
+        
+        Observamos efeito de k no intercepto e inclinação de MNEI, para valores intermediários os dois modelos apresentam tendências similares, divergindo para valores extremos de limitação à dispersão simulada (figura X+1). k apresenta grande efeito na variância dos dados, para limitação à dispersão severa, há variação igualmente distribuída em torno da tendência geral de diminuição da probabilidade de não refutar neutralidade com o aumento da cobertura vegetal (figura X, X+1). Quando a inclinação em p torna-se positiva, a maior parte dos sítios apresenta alto número de predições neutras não refutadas para todo o gradiente; e para limitação à dispersão menos severa (k=0.25) o padrão se torna bimodal (figura X).
+        
+        Consideramos diferentes hipóteses estatísticas para descrever a relação entre as preditoras, consideramos k enquanto categórica e contínua. Para k enquanto categórica, houve duas possíveis formas de agrupar os dados: com apenas um intercepto ou com um intercepto por modelo neutro. Para k enquanto continua, além das duas anteriores, houve a possibilidade de considerar o efeito aditivo e a interação de k com MN. A hipótese mais plausível para o GLMM foi a que considera k enquanto variável categórica e com um intercepto por modelo neutro por sítio de amostragem (Material Complementar). Se para cada sítio for possível uma relação entre as variáveis preditoras MN e k, enquanto variável contínua torna o modelo mais flexível, contudo essa relação não é a mais plausível considerando todos os sítios de amostragem e a relação entre os sítios estabelecida pela cobertura vegetal.
+
+
+
+
+        Se compararmos as hipóteses estatística por sítio é possível estabelecer diferentes relações entre as preditoras MN e k (enquanto variável contínua). [RESULTADOS PRELIMINARES] Dos sítios em que apenas um modelo estatístico foi plausível (68 sítios), todos apresentaram um intercepto por modelo neutro (MN), desses 63 sítios apresentaram efeito de k e em 33 sítios observamos diferença na inclinação de k entre os modelos neutros (Anexo 1). [[ É possível avaliar como as estimativas destes modelos variam em função da cobertura vegetal : qual o propósito dessa avaliação? O quê é possível avaliar aqui que não é no GLMM? Como varia a congruência em função de mecanismos de Janzenn-Cornell ]]
+
+
+
+
+
+
+[a]? Melhor termo?
+[b]me parece mais adequado falar que possuem maior magnitude e são negativos
+[c]colocar em algum lugar o ponto de que vamos focar em comunidade arbórea - ou falar da questão central do estrato arbóreo para o funcionamento dos ecossistemas...algo assim
+[d]ou ainda da Floresta Atlântica Brasileira
+[e]Intro diferente: 
+Se as populações não são delimitadas pelo fragmento florestal e o efeito de área amostral é o mecanismo predominante, então a quantidade de habitat remanescente na paisagem é suficiente para explicar a diversidade biológica observada em paisagens fragmentadas (Hipótese da Quantidade de Habitat, HAH; Fahrig 2013).
+[f]A polémica está quente e estão saindo muitos artigos rebatendo a fahrigh. Verificar se na literatura bem recente qual o acordo sobre a importância relativa destes dois efeitos. Será que todos concordam que é ínfimo mesmo?
+[g]Versão extendida:
+
+
+"A primeira motivação para HAH é quanto ao sinal e magnitude do efeito da fragmentação per se independente da quantidade de habitat na paisagem na abundância, ocorrência e ocupação das espécies. Para a formulação de HAH, Fahrig (2013) concluiu que o efeito da fragmentação per se só eram significativos quando correlacionados com a quantidade de habitat na paisagem. Posteriormente em uma revisão de trabalhos que haviam especificamente controlados pela quantidade de habitat na paisagem, Fahrig (2017) observou que a maior parte dos trabalhos não apresentam nenhum efeito (>70%) e dos que haviam apresentado efeito mais de 3/4 eram positivos. Além disso, em meta-análise de teses de HAH observou-se que a fragmentação per se, independente da quantidade de habitat, apresenta efeito positivo e de baixa magnitude (Martin 2018)."
+[h]É necessário colocar aqui?
+[i]com a diminuição dos tamanhos populacionais há o aumento da estocasticidade demográfica que leva a erosão da diversidade fenotípica que por sua vez reduz a capacidade de particular população se adaptar às mudanças que ocorrem no fragmento devido ao efeito de borda (Baguette et al. 2013)
+[j]termo correto?
+[k]trocar por trecho de ideia 2
+[l]Efeito de borda (Pardini et al. 2017)
+[m]avaliar o que deve ir no objetivo e o que fica melhor nos métodos
+[n]Adicionar a descrição das áreas maiores mais preservadas?
+[o]metodo
+[p]métodos
+[q]métodos
+[r]conteudo da resposta do quarto comentário do Paulo
+
+
+"Não entendi o argumento aqui. Se SADs são pouco sensíveis por que usá-las?"
+
+
+Pode ser o final da introdução dos objetivos
+[s]Isto já é uma proposição amplamente aceita? E em paisagens pouco fragmentadas, aceita-se que o modelo neutro é melhor? Aqui acho que é importante expressar bem o estado atual de conhecimento, que pode ser que ainda não muita certeza, apenas alguns achados empíricos sugestivos. Para além disso, é preciso justificar a relevância desta questão: afinal, pq é importante avaliar se modelo neutro não é bm para prever padrões em paisagens fragmentadas?
+[t]isto é mais importante que a perda de habitat e isolamento?
+[u]Acho que a mensagem principal aqui é que a paisagem fragmentada atua como um filtro ambiental, favorecendo algumas espécies mais generalistas e mesmo de matriz. No casod e árvores, deve favorecer pioneiras.
+[v]Não entendi o argumento aqui. Se SADs são pouco sensíveis por que usá-las?
+[w]Paulo, até onde eu devo ser crítico ao utilizar a SAD enquanto padrão informativo?
+
+
+Há evidências de que para observar desvios da neutralidade a partir da SAD é necessário que a dinâmica ecológica subjacente seja muito distinta segundo um modelo neutro; não há consenso sobre qual a melhor maneira de comparar a SAD observada com o padrão predito por diferentes modelos;  e a dinâmica ecológico foi simulada por modelos que incorporam desvios da neutralidade pela introdução da existência de nicho (Hammal et al. 2015; Takeuchi & Innan 2015). 
+
+
+Parece que o melhor caminho para refutar neutralidade é utilizar dados de dinâmica ecológica (Engen, Solbu & Sæther 2017), como de census ecológicos (Condit 1995).
+
+
+Por outro lado a SAD é um padrão abundante que permite fazer uma primeira investigação da diversidade ecológica (REFERÊNCIA). E boa parte da Floresta Atlântica Brasileira é sub-amostrada com regiões melhor descritas que outras e com chances de não serem descritas no futuro (Lima et al. 2015).
+[x]Não entendi como esta conclusão deriva das afirmativas anteriores
+[y]Predito e esperado pelo que? Não seria uma divergência com relação aos pressupostos auxiliares?
+[z]implícito?
+[aa]O que é isto?
+[ab]m é uma probabilidade ou taxa sem unidades, então não entendi como pode ser uma escala.
+[ac]Acho esta uma informação fundamental. Se a configuração espacial pode por si afetar o formato da SAD sob dinâmica neutra, será que o mau desempenho do modelo neutro em paisagens fragmentadas não se deve ao terem usado o MNEI?
+[ad]Interessante esta sacada, mas fiquei na dúvida se não há nenhum efeito de fragmentação per se no MNEI. O isolamento no MNEI foi calculado pelo kernel de dispersão do MNEE e da cobertura na paisagen. Então o MNEI não teria uma aproximação do efeito da fragmentação?
+[ae]me parece mais que isto é para os métodos
+[af]Entendi que aqui vc tem a coletânea de informações que acha importante para esta parte. Mas ainda não entendi a linha de argumentos que quer seguir. Me parece que ainda é só uma coletânea, confere?
+[ag]sim! A parte de U ainda estou começando a ler as coisas. Seria legal falar um pouco sobre isso em reunião
+[ah]análise estatística completa
+[ai]i) avaliação de formas alternativas de modelar os dados; ii) tabela de seleção
+[aj]e todos os outros efeitos fixos, não?
+[ak]Referência do pacote DHARMa
+[al]Talvez o ajuste esteja bom mas algumas estimativasde efeitos é que estejam imprecisas. Precisamos ver com Melina quais as consequẽncias desse desvio.
+[am]atualizar o Relatório achados gerais com o teste de overdispersion ao inves do teste de inflação de zeros
+[an]i) aumentar a fonte dos caracteres da figura; ii) alfa e beta ou intercepto e inclinação?
+[ao]Talvez separar os quadros por modelo neutro, então ficar com 2 quadros para o intercepto e 2 para a inclinação
+[ap]O intercepto de uma regressão não é a chance média, e sima chance no menor valor de X
+[aq]implícito?
+[ar]Como o modelo selecionado inclui interação, fica difícil interpretar os interceptos.
+[as]Intervalos dos previstos ou das estimativas das inclinações? Nos egundo caso é esperado, pois não há efeito aleatório nas inclinações.
