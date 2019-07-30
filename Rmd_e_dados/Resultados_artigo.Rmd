@@ -1525,9 +1525,9 @@ Avaliar os efeitos a partir do bootstrap e a partir do merTools para S
 
 23 março de 2019
 
-Quando desenvolvi os dados de MNEI eu substitui as informações da riqueza estimado de MNEE para o correspodente. Não há motivo para questionar se cometi o mesmo erro para GOF uma vez que eles diferem em seu perfil e me recordo de fazer uma bateria de auditorias na época. Contudo, vi que os .Rmds não estão organizados e se faz necessário organizar tudo para pelo menos ter dos dados brutos (SAD obs, mapas de cobetura vegetal concentricos à área amostrada) até as SADs preditas segundo os modelos neutros e a taxa de especiação; uma sessão para a primeira sessão de análise dos dados (teste KS e riqueza das espécies simuladas). 
+Quando desenvolvi os dados de MNEI eu substitui as informações da riqueza estimado de MNEE para o correspodente. Não há motivo para questionar se cometi o mesmo erro para GOF uma vez que eles diferem em seu perfil e me recordo de fazer uma bateria de auditorias na época. Contudo, vi que os .Rmds não estão organizados e se faz necessário organizar tudo para o futuro.
 
-Pretendo acertar os .Rmds de geração dos dados quando for fazer os métodos pois não estou com tempo para isso agora, além de que quero aproveitar o embalo das reuniões de orientação com PI. Assim, não irei juntar os dados e (re)fazer uma auditoria geral de tudo (GOF está ok), vou pelo caminho direto que é construir um df com a riqueza de MNEE de df antigos (que sei que estão corretos) com a riqueza para MNEI de 
+Pretendo acertar os .Rmds de geração dos dados quando for fazer os métodos pois não estou com tempo para isso agora, além de que quero aproveitar o embalo das reuniões de orientação com PI. Assim, não irei juntar os dados e (re)fazer uma auditoria geral de tudo (GOF está ok), vou pelo caminho direto que é construir um df com a riqueza de MNEE de df antigos (que sei que estão corretos) com a riqueza para MNEI de df_resultados.
 
 ```{r}
 ## df_ com a S_EI ##
@@ -1551,6 +1551,11 @@ df_bias.S %<>% inner_join(x=.,
 df_bias.S$Site %<>% as.factor()
 # df_bias.S %>% str
 
+write.csv(df_bias.S,file = "/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/df_bias_S.csv",row.names = FALSE)
 
+ggplot(df_bias.S,aes(x=S,y=S_m,color=MN)) + 
+  geom_point() + 
+  geom_abline(intercept = 0,slope=1,color="red") +
+  facet_wrap(~k,ncol=3,scales = "free")
 ```
 
