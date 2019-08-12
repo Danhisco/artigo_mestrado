@@ -1,0 +1,171 @@
+---
+title: "Bateria de simulacoes k045-030"
+author: "Mori, Danilo Pereira"
+date: "5 de agosto de 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE} 
+knitr::opts_chunk$set(echo = FALSE, tidy = TRUE, include = TRUE, warning = FALSE,cache = TRUE,message = FALSE)
+```
+
+
+```{r global packages}
+library(doMC)
+library(magrittr)
+library(tidyverse)
+library(plyr)
+```
+
+
+
+Sequência de trabalho:
+
+1) data frame de referência - FEITO
+2) estabelecer matrix de paisagem
+3) estabelecer programa coalescent
+4) estimar U médio e variância
+5) simular 100 SADs
+6) teste KS: GOF, p-valor_medio,_var
+
+Produto final: data frame
+Site; S; N; k; d; U; U_var; S_med; S_var; GOF; p.valor_med; p.valor_var; MN
+
+## Data Frame Referência ##
+
+k = 0.45:0.35 by = 0.05
+
+```{r data frame referencia}
+df_referencia <- read_csv("/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/df_resultados.csv") %>% 
+  select(SiteCode, p, J, S, DA) %>% unique %>% arrange(p)
+k <- rep(c(0.45,0.40,0.35,0.30),each=80)
+df_referencia %<>% cbind(.,k)
+```
+
+```{r d estimado}
+#guardando os níveis de kernel 
+df_referencia$kernel_type <- "laplace"
+df_referencia$kernel_code <- "2"
+df_referencia %<>% mutate(dist_0 = 100/sqrt(DA)) 
+df_referencia$d <- NA
+# df_referencia %>% str
+
+## estimando os sigmas ##
+source("/home/danilo/Documentos/Doutorado/artigo_mestrado/R_source/utility_functions.R")
+
+# funcao para paralelizar
+func_llply <- function(i,data_frame=df_referencia){
+  # df_temp <- data_frame
+  sigma <- sigkernel(kernel = data_frame[i,"kernel_type"], 
+                     p = data_frame[i,"k"], 
+                     distance = data_frame[i,"dist_0"], 
+                     density = data_frame[i,"DA"],
+                     sigma.min=1e-6, 
+                     sigma.max=1e6)$root  
+}
+
+
+# funcao para paralelizar #
+# paralelizando e armazensando os dados #
+registerDoMC(2)
+replica.sim <- as.list(1:dim(df_referencia)[1])
+resultados <- llply(.data = replica.sim, .fun = func_llply, .parallel = TRUE)
+df_referencia$d <- unlist(resultados)
+
+df_referencia %>% ggplot(aes(x=k,y=d,group=k)) +
+  geom_boxplot() + geom_jitter()
+# save(df_resultados,file="df_resultados-kernel_estimado.Rdata")
+```
+__Figura 1__ Distância média de dispersão (d) ~ proporção de propágulos até a vizinhança imediata da planta progenitora (k)
+
+## Preparação para o Programa Coalescente ##
+- o compilado e as imagens precisam estar na mesma pasta
+
+2) Estabelecer matriz de paisagem 
+
+```{r txt file matriz de paisagem}
+load("/home/danilo/Documentos/Documentos/projetos/dissertacao/cluster/df_dados-DaniloPMori.Rdata")
+df_referencia %<>% left_join(x=.,
+                            y=unique(select(df_resultados,SiteCode,txt.file)), 
+                            by="SiteCode")
+rm(df_rep.U,df_resultados)
+# df_referencia %>% str
+#vizualição das paisagens
+for(i in 1:80){
+  image(
+    as.matrix(read.table(file = paste("/home/danilo/Documentos/Doutorado/artigo_mestrado/simulacao/",
+                                          df_referencia[i,"txt.file"],sep="") ) ),
+    axes=FALSE)
+  title(main=df_referencia[i,"SiteCode"])
+}
+```
+
+3) Estabelecer o programa coalescente
+
+```{r setup simulacao}
+#função para rodar a simulação
+source("/home/danilo/Documentos/Doutorado/artigo_mestrado/R_source/dinamica_coalescente_beta.R") 
+#diretorio da simulacao
+setwd("/home/danilo/Documentos/Doutorado/artigo_mestrado/simulacao/")
+```
+
+## Estimativa de U ##
+
+Número de Réplicas = 10
+
+```{r preparacao e piloto}
+### Preparação
+func1 <- function(x,replicas=10) {
+  x$U <- NA
+  x <- x[rep(1:dim(x)[1],each=replicas),]
+}
+df_referencia %<>% func1()
+
+# piloto
+df_temp <- df_referencia
+aviao <- dinamica_coalescente(U = 1.25e-06, # U mínimo para começar a simulação 
+                              S = df_temp[1,"S"], # S observada 
+                              N_simul = 1, # número de réplicas por simulação - sempre 1
+                              seed = as.numeric(Sys.time()), # semente diferente para cada simulação
+                              disp_range = df_temp[1,"d"], # distância média em metros
+                              disp_kernel = df_temp[1,"kernel_code"], # 2=laplace
+                              landscape = df_temp[1,"txt.file"]) # código da matriz de paisagem
+
+```
+
+Não foi possível rodar a simulação.
+
+O programa coalescente não consegue carregar uma biblioteca (libgsl.so.19). Se fizer uma busca no terminal com:
+
+sudo find -name / "libgsl.so.*" 
+
+
+```{r simulacao U}
+### for da simulação ##
+# valores de k
+k_factor <- unique(k)
+for(a in 1:length(k_factor)){
+  # por k
+  df_simU <- df_referencia %>% filter(k == k_factor[1])
+  ### funcao para paralelizar o programa
+  op <- options(digits.secs=6)
+  funcao_imigracao <- function(i,df_temp=df_simU){
+    aviao <- list()
+    aviao <- dinamica_coalescente(U = 1.25e-06, 
+                                  S = df_temp[i,"S"], 
+                                  N_simul = 1, 
+                                  seed = as.numeric(Sys.time()), 
+                                  disp_range = df_temp[i,"d"], 
+                                  disp_kernel = df_temp[i,"kernel_code"], 
+                                  landscape = df_temp[i,"txt.file"])
+    return(aviao$U_est)
+  }  
+  # paralelização da simulacao
+  registerDoMC(4)
+  replica.sim <- as.list(1:dim(df_simU)[1])
+  sim.coal_U <- llply(.data = replica.sim, .fun = funcao_imigracao, .parallel = TRUE)
+  df_simU[,"U"] <- unlist(sim.coal_U)
+  save(df_simU, 
+       file=paste(c("df_simU__k",k_factor[a],".Rdata"),collapse = ""))
+}
+```
