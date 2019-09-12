@@ -6,7 +6,7 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE} 
-knitr::opts_chunk$set(echo = FALSE, tidy = TRUE, include = TRUE, warning = FALSE,cache = TRUE)
+knitr::opts_chunk$set(echo = FALSE, tidy = TRUE, include = TRUE, warning = FALSE,cache = TRUE,message = FALSE)
 ```
 
 ```{r dados e pacotes,warning=FALSE,message=FALSE,echo=FALSE}
@@ -23,10 +23,10 @@ library(ggplot2)
 library(broom) 
 library(magrittr)
 library(DHARMa)
-library(plyr)
-library(dplyr)
 library(tidyr)
 library(purrr)
+library(plyr)
+library(dplyr)
 ```
 
 ```{r organização dos dados,warning=FALSE,message=FALSE}
@@ -62,512 +62,69 @@ df_resultados %<>% mutate(GOF.z = f_z(GOF),
 names(df_resultados)[1] <- "Site"
 ```
 
+#################################################################################
+######################### código ajuda artigo ###################################
+#################################################################################
 
-<!--
-Ideia geral dos métodos:
+## 1a parte descrição dos levantamentos fito
 
-i) estabelecer valores do parâmetro de dispersão a priori;
-ii) estimar taxa de especiação necessária para manter a riqueza no equilíbrio a partir do método de MNEE
-iii) simular SADs neutras segundo MNEI e MNEE a partir dos mesmo parâmetros
--->
+```{r figura 1, fig.width=8, fig.height=5, fig.align="center"}
+df_plot <- df_resultados %>% filter(k=="0.99" & MN=="EE") %>% dplyr::select(Site, p, S,p.z,S.z) %>% unique
 
-__ Estrutura dos Resultados Completos: __
+# avaliando as curvas pelo quantiles
+df_plot %<>% mutate(terceiro_quantil = ifelse(p>quantile(df_plot$p,probs=0.75),">_3oQ","<_3oQ")) 
 
-I) parâmetros de dispersão:
+l_p <- vector("list",6)
+l_p[[1]] <- ggplot(df_plot, aes(x=p)) +
+  geom_histogram(bins=30) +
+  geom_vline(xintercept = c(quantile(df_plot$p,probs = c(0.25,0.50,0.75))),color="red")
+  # geom_density()
+l_p[[2]] <- ggplot(df_plot, aes(x=p.z)) +
+  geom_histogram(bins=30) +
+  geom_vline(xintercept = c(quantile(df_plot$p.z,probs = c(0.25,0.50,0.75))),color="red")
+  # geom_density()
+l_p[[3]] <- ggplot(df_plot, aes(x=S)) +
+  geom_histogram(bins=30) +
+  geom_vline(xintercept = quantile(df_plot$S,probs = c(0.25,0.50,0.75)),color="red")
+l_p[[4]] <- ggplot(df_plot, aes(x=S.z)) +
+  geom_histogram(bins=30) +
+  geom_vline(xintercept = c(quantile(df_plot$S.z,probs = c(0.25,0.50,0.75))),color="red")
+l_p[[5]] <- ggplot(df_plot, aes(x=p,y=S)) +
+  geom_hline(yintercept = quantile(df_plot$S,probs = c(0.25,0.50,0.75)),color="red") +
+  geom_vline(xintercept = quantile(df_plot$p,probs = c(0.25,0.50,0.75)),color="red") +
+  geom_point() + 
+  geom_smooth()
+l_p[[6]] <- ggplot(df_plot, aes(x=p.z,y=S.z)) +
+  geom_hline(yintercept = quantile(df_plot$S.z,probs = c(0.25,0.50,0.75)),color="red") +
+  geom_vline(xintercept = quantile(df_plot$p.z,probs = c(0.25,0.50,0.75)),color="red") +
+  geom_point() + 
+  geom_smooth()
+# do.call("grid.arrange",c(l_p,ncol=3))
+grid.arrange(l_p[[1]],l_p[[2]],l_p[[3]],l_p[[4]],l_p[[5]],l_p[[6]],
+             layout_matrix = rbind(c(1,1,3,3,5,5),
+                                   c(2,2,4,4,6,6) )
+             )
 
-  a) distância média de dispersão (d)
-
-  b) número fundamental da dispersão (I)
-- com isso podemos avaliar quais as situações biológicas de limitação à dispersão que a simulação está ocorrendo para os dois modelos neutros
-<!--
-distância média de dispersão ~ k * p + (k|Site) ou k_factor * p + (1|Site) [modelo completo se houver mais níveis de k e estiverem igualmente espaçados - segunda etapa] 
--->
-
-II) Congruência do predito com o observado
-- a ideia central do artigo é: "Avaliar se a SAD pode ser evidência suficiente para refutar neutralidade"
-- assim optei por mudar a variável de congruência de GOF, que avalia quantas predições neutras foram refutadas por cenário neutro
-- para n_ref = número de predições neutras refutadas por cenário neutro
-
-III) taxa de especiação necessária para manter a riqueza observada no equilíbrio dinâmico segundo um modelo neutro espacialmente explícito (U)
-- a teoria neutra pode ser uma boa aproximaçaõ para descrever a taxa de extinção de espécies raras em ambientes fragmentados
-- o modelo neutro coalescente é uma boa aproximação para descrever o comportamento dos sistemas biológicos em diferentes contextos de fragmentação (Campos et al.)
-- no modelo coalescente o equilíbrio dinâmico é observado, nesse cenário a taxa de surgimento de singletons por evento de morte se igual à taxa de extinção de singletons
-- assim, a estimativa de taxa de especiação necessária para manter a riqueza observada no equilíbrio pode ser uma aproximação da taxa de extinção das espécies raras na paisagem.
-
-IV) Anexo 1: código auxiliar
-- segue a mesma ordem das variáveis
-- é o local onde eu desenvolvo a análise dos dados
-
-
-<!-- Esqueleto dos resultados 1
-
-a) MNEI por verossimilhança
--GOF) Se MNEI tiver seus parâmetros livres ele sempre apresentara boa congruência com o observado?
--theta) Se o ajuste dos parâmetros informa algo além da SAD em si, esperamos observar efeito positivo de p, pois para maiores coberturas vegetais há mais indivíduos na região biogeográfica.
--m) Idem, esperamos observar efeito positivo de p, uma vez que quanto menor a cobertura vegetal de uma paisagem menor a concetividade entre as manchas de habitat (REFERÊNCIA)
-
-b) Conversão de parâmetros de imigração
--par{MNEI} -> par{MNEE} [parâmetros com maior interpretação biológica - que permite a parametrização a partir de valores observados]
--distância médias de dispersão -> m segundo uma simulação coalescente em paisagem fragmentada.
-
-c) Estimando U a partir de uma simulação coalescente
-- 20 valores de U a partir de cada nível de d [MM]
-- U -> theta, pela formula de conversão de theta [MM]
-- U ~ p * d + (d | Site) [ou a formula que estamos utilizando]
-
-d) Congruência do observado entre os modelos neutros consideramos mesmo conjunto de parâmetros
-[MM]: estabelecemos distâncias de dispersões segundo diferentes cenários de limitação à dispersão médio (d), que parametrizados com valores observados na natureza para diferentes sindromes de dispersão. Para cada nível de d estimamos a taxa de especiação necessária para manter a riqueza observada, sob a hipótese de equilíbrio dinâmico, (U - singleton/evento de morte) segundo MNEE. Utilizamos o par U e d para gerar SADs segundo MNEE e convertemos U e d em theta e m, respectivamente, para gerar SADs segundo MNEI. Para cada MN geramos 100 SADs réplicas que comparamos com a respectiva SAD observada pelo teste de Kolmogorov-Smirnov; contabilizamos o número de vezes que não foi possível refutar a hipótese nula de que a SAD réplica e SAD observada são amostras de uma mesma distribuição teórica na variável GOF (Goodness-of-fit). Temos 80 sítios de amostragens, 30 rodadas de simulação para cada nível de MN (EE e EI).
-
-- GOF ~ p * d * MN + (d | Site / MN)
-MN: factor 2 levels: EE, EI
-d: numeric 30 valores para todas as simulações
-
-e) Parâmetro a posteori: espécies input (Condit et al. 2012)
-- spp_I ~ p * d + (d|Site)
-- GOF ~ spp_I * d * MN + (d | Site / MN)
-
-
--->
-
-
-
-<!-- última paragráfo de material e métodos
-
-Organizamos os resultados em 3 blocos de dados, aqueles para MNEE, MNEI e MNEE + MNEI. As variáveis resposta são: GOF, $\theta$, m, U, spp_I e d. As variáveis indepedentes são cobertura vegetal (p) e função de dispersão, que está sendo expressa de forma categorica(k), assim, podemos avaliar tanto os dados de MNEE, quanto para MNEE + MNEI; e de forma contínua d (distância média de dispersão da função de dispersão), para os dados de MNEE. Convertemos os parâmetros de MNEE U e d em $\theta'$, m'; e $\theta$ e m de MNEI em  U' e (d' e k'), considerando que $J_M$ = número de indivíduos na paisagem. Quando houve mais de uma observação para um mesmo Sítio de amostragem, então utilizamos a variável Sítio como variável categórica dos efeitos aleatórios do modelo linear; quando a função de dispersão foi categória utilizamos (1|Site) e  (d|Site) se ela foi contínua. Assim, temos duas maneiras de partir a variação prevista pelo modelo. O $R_m^2$ é a variação explicada pelos efeitos fixos do modelo, ou seja, p e/ou a variável relacionada à limitação à dispersão (k ou d) ('R quadrado marginal'); já o R quadrado condicional, $R_c^2$, é a variação associado tanto às variáveis de efeito fixo quanto ao efeito aleatório (sítio de amostragem). 
-Acredito que uma métrica de comparação entre $R^2$ para GLM e GLMM seria considerar a razão $R_{GLMM}^2 = R_m^2 / R_c^2$? -->
-
-<!--
-## Sessão antiga, 18jun ##
-Introdução da sessão de resultados:
-
-Vou explorar o terceiro bloco de dados c(MNEE, MNEI), em anexo a análise dos dados para o conjunto de dados MNEE e MNEI. MNEE e MNEI diferem na forma que implementam a teoria neutra e na forma com que estimam os parâmetros a priori simulação. Assim, unir os resultados em uma mesma análise de dados tem que ser feita considerando a origem dos dados, para adequar com os resultados de MNEE organizei os dados pela proporção da chuva de propágulos que permanece até a área imediata a da copa da árvore progenitora (l_cel metros). Incluindo os dados de MNEI, são 13 níveis na variável "k", o primeiro nível é aquele com cenário de limitação à dispersão mais rigoroso (=0.99), o penúltimo nível é o cenário de limitação à dispersão menos realista (=0.25) e o último nível são os dados de MNEI. Em análise exploratória observamos que mesmo com valores razoáveis de m, MNEI apresentou d's superiores ao de MNEE em escala log (anexo) e como d está relacionado com a proporção de propágulos até a área imediata da planta progenitora (k) ordenei os níveis de "k" agrupando os valores de MNEI juntos no último nível. Existe grande variação no parâmetro 'm' estimado por verossimilhança, contudo, essa variação não apresenta efeito de p (anexo), então, não considerar a variação interna de m em MNEI não deve interferir na análise dos dados. Em anexo, há as análises auxiliares que inclui dos outros conjuntos de dados.
-i) Os dois modelos conseguem apresentar boa congruência com o observado? 
-ii) Se sim quais as característica da paisagem e da relação com a área amostrada que propiciam esse resultado? 
-iii) Em cenários de limitação à dispersão biologicamente realistas o modelo neutro apresente boa congruência com os dados?
-iv) Qual o efeito da fragmentação na diversidade da paisagem segundo o predito neutro?
-
-
-## Esqueleto dos resultados - 18jun ##
-
-a) resultados para os parâmetros de imigração para as distâncias simuladas: m, I e k. Tentar incluir os valores estimados em campo
-b) v ~ p * par_imig + S + (par_imig | Site); par_imig = d, m, I, k
-c) GOF ~ p * MN * par_imig + S + (par_imig | Site / MN) 
-
-
--->
-<!--
-Para faciltar o ajuste dos modelos mistos aplicamos a transformação z nas variáveis contínuas: 
--->
-
-#### Anexo 1: código auxiliar ####
-
-##### Materiais e Método
-
-###### distância média de dispersão (d)
-
-Exploração gráfica
-
-```{r graf d}
-# x11()
-par(mfrow=c(3,2))
-## d e d.z ##
-# ~ norm
-qqp(df_resultados$d, "norm",ylab="d (metros)") 
-qqp(df_resultados$d.z, "norm",ylab="d.z (Z(d))") 
-# ~ lnorm
-qqp(df_resultados$d, "lnorm",ylab="d (metros)")
-qqp(df_resultados$d.z, "lnorm",ylab="d.z (Z(d))")
-# ~ gamma
-fit_gamma1 <- fitdistr(df_resultados$d, "gamma")
-qqp(df_resultados$d, "gamma", shape = fit_gamma1$estimate[[1]], rate = fit_gamma1$estimate[[2]],ylab="d (metros)")
-## d.z ##
-# ~ norm
-# ~ lnorm
-# ~ gamma
 ```
 
-Figura A1. Gráficos quantile-quantile para três distribuições teóricas (normal, lognormal e gamma) e a variável d (metros) e z-transformada (d.z). Para a distribuição gamma utilizei ajustamos apenas a variável d, uma vez que o domínio da distribuição não contempla valores menores do que zero.
+Figura 1. Apêndice 1- Análise Estatística completa. Na primeira linha há as variáveis na escala padrão; na segunda linha as variáveis após transformação Z (centra a média em zero e desloca a variação para o centro da distribuição REVISÃO). As linhas em vermelho equivalem ao quantil de 0.25%, 0.50% e 0.75% da amostra.
 
-A distribuição que melhor se adequa aos dados é a distribuição gamma: i) ajusta maior porção dos dados em comparação com a normal (segunda melhor distribuição) e ii) consegue capturar a variação nas caudas da distribuição de valores obervados (em especial para valores pequenos), diferente da normal. Contudo, para comparar os resíduos eu vou construir duas classes de modelos cheio: uma normal e outra gamma.
-
-O objetivo é avaliar o efeito da variável k na distância média de dispersão (d), para isso o modelo cheio vai considerar a variável DA, uma vez que k é definido como a proporção de propágulos até l_cel metros da planta progenitora. A largura da célula de simulação (l_cel) = 100/sqrt(DA) (PERGUNTA:devo utilizar DA ou a transformação de DA = I( 100/sqrt(DA) )? ).
-
-_Tabela Seleção da distribuição de probabiliade e estrutura aleatória_
-
-```{r d k}
-# df_resultados %>% str
-## Seleção da estrutura eleatória ##
-l_md <- vector("list",length = 8)
-names(l_md) <- c("Gamma 1|Site","Gamma k|Site",
-                 "log.Gamma 1|Site","log.Gamma k|Site",
-                 "normal 1|Site","normal k|Site",
-                 "log.normal 1|Site","log.normal k|Site")
-l_md[[1]] <-  glmer(d ~ k + DA.z + (1|Site),family = "Gamma",data = df_resultados)
-l_md[[2]] <-  glmer(d ~ k.z + DA.z + (k.z|Site),family = "Gamma",data = df_resultados)
-l_md[[3]] <-  glmer(d ~ k + DA.z + (1|Site),family = "Gamma"(link=log),data = df_resultados)
-l_md[[4]] <-  glmer(d ~ k.z + DA.z + (k.z|Site),family = "Gamma"(link=log),data = df_resultados)
-l_md[[5]] <-  glmer(d ~ k + DA.z * (1|Site),family = "gaussian",data = df_resultados)
-l_md[[6]] <-  glmer(d ~ k.z + DA.z + (k.z|Site),family = "gaussian",data = df_resultados)
-l_md[[7]] <-  glmer(d ~ k + DA.z + (1|Site),family = "gaussian"(link=log),data = df_resultados)
-l_md[[8]] <-  glmer(d ~ k.z + DA.z + (k.z|Site),family = "gaussian"(link=log),data = df_resultados)
-AICctab(l_md,weights=T)
-```
-<!--
-A estrutura aleatória selecionada foi (1|Site).
--->
-
-O modelo global com distribuição gamma, função de ligação log e estrutura aleatória 1|Site foi o mais plausível. Segue sumário:
-
-```{r d k R2,echo=TRUE}
-fastdisp(l_md[[3]]) # problema de convergência, indicam para reescalonar as variáveis
-```
-<!--
-Error: Error in r.squaredGLMM.merMod(X[[i]], ...) : do not know how to calculate variance for this family/link combination
-27jun2018[Válido para lmer, não para normal link=log: acredito que se houver mais níveis de k e melhor distribuidos no campo de parâmetros aumentaria o R^2 de k|Site
--->
-
-
-_31jun2018_
-- Problema de convergência:
-convergence code: 0
-Model is nearly unidentifiable: very large eigenvalue
- - Rescale variables?
-ajuda: ?convergence
-
-"
-if you do see convergence warnings, and want to trouble-shoot/double-check the results, the following steps are recommended (examples are given below):
-
-double-check the model specification and the data for mistakes
-
-center and scale continuous predictor variables (e.g. with scale)
-
-check for singularity: if any of the diagonal elements of the Cholesky factor are zero or very small, the convergence testing methods may be inappropriate (see examples)
-
-double-check the Hessian calculation with the more expensive Richardson extrapolation method (see examples)
-
-restart the fit from the apparent optimum, or from a point perturbed slightly away from the optimum
-
-try all available optimizers (e.g. several different implementations of BOBYQA and Nelder-Mead, L-BFGS-B from optim, nlminb, ...) via the allFit() function, see ‘5.’ in the examples. While this will of course be slow for large fits, we consider it the gold standard; if all optimizers converge to values that are practically equivalent, then we would consider the convergence warnings to be false positives.
-"
-
-
-A única variável contínua que não foi rescalonada foi a resposta d, se aplicar transformação z em d, a variável resposta terá números negativos. Utilizando a variável DA ao inves de DA.z piora o caso. Alternativamente busquei simplificar o modelo: a) retirando a variável DA.z; e b) retirando o último nível de k (contudo como é um factor não há de fazer muita diferença) - para ambos não houve melhora.
-
-PRÓXIMOS PASSOS PARA MELHORAR AJUSTE: uma alternativa fácil é reajustar a partir das estimativas feitas pelo modelo com problema de convergência e/ou modificar o otimizador.
-PERGUNTAS NORTEADORAS: i) o aviso de problema de convergência é um falso positivo? 
-
-Ben Bolker: Since the likelihood differs by <0.1 between the model fits, and the largest relative differences in the parameters are of the order of about 10^(-4), I would say that you have successfully demonstrated that the warning is a false positive and you can proceed with your initial model.
-
-
-<!--
-[pasta GLMM (...) scale issues] Some common examples:
-
--Some columns of our data might be different orders of magnitude to others, for instance gender might be encoded as a binary variable, while income might be stored in whole-dollar amounts.
-
--An outcome might be extremely rare
-
--The impact of variable X1 on Y could be orders of magnitude greater than the impact of variable X2. That is, it’s not the scale of the data that is causing issues so much as the scale of the parameters.
-
-
--->
-
-
-Foram estimados 13 parâmetros e seus respectivos erro-padrão. Os resíduos escalonados variam de -3.956 até 6.554, pelos valores dos quantils parece que a distribuição dos resíduos não é simétrica ao redor da estimativa. Há dois avisos sobre convergência: a) Model failed to converge with max|grad|=4.11797 (tol = 0.001, component 1); b) Modelo is nearly unidentifiable: very large eigenvalue - Rescale variables?
-
-25jun2018:
-Para lidar com b modifiquei DA -> DA.z nos modelos globais
-Com isso obtive o erro: 'converge code:0; Model is nearly unidentifiable: very large eigenvalue - Rescale variables?
-- a transformação z de DA deveria ser o suficiente para lidar com problemas relacionados com escalamento de variáveis; a outra variável explanatória é categórica.
-- vou continuar o estudo com esse modelo como global
-
-_Tabela Selecao de variaveis para descrever 'd'_
-
-```{r selecao d}
-l_md <- vector("list",length = 4)
-names(l_md) <- c("k+DA","DA","k","1")
-l_md[[1]] <-  glmer(d ~ k + DA.z + (1|Site),family = "Gamma"(link=log),data = df_resultados)
-l_md[[2]] <-  glmer(d ~ DA.z + (1|Site),family = "Gamma"(link=log),data = df_resultados)
-l_md[[3]] <-  glmer(d ~ k + (1|Site),family = "Gamma"(link=log),data = df_resultados)
-l_md[[4]] <-  glmer(d ~ 1 + (1|Site),family = "Gamma"(link=log),data = df_resultados)
-AICctab(l_md)
-```
-
-O modelo global foi o mais plausível. [PROBLEMA DE CONVERGÊNCIA]. E por conta disso não consigo avaliar o ajuste visualmente:
-
-```{r echo=TRUE}
-# prof_glmm.d <- profile(l_md[[3]])
-
-# xyplot(prof_glmm.d , aspect =1.3)
-```
-
-__Coeficiente de determinação__
+  A cobertura vegetal mínima é de 0.0074, o quantil de 25% é de 0.2916, a média é 0.6727 e o quantil de 75% é de 0.9216 (figura 1). A riqueza observada variou de 26 até 230, o quantil de 25% é de 73.75, a média é 105.85, e o quantil de 75% é 134. Há um vies na amostra que apresenta mais trabalhos em paisagens com alta cobertura vegetal do que em baixas, por exemplo, o primeiro 1/4 da amostra está entre 0.00 e 0.30, enquanto o último 1/4 está comprimido entre 0.92 e 1 (figura 1). A riqueza observada apresenta um outro padrão com uma tendência central e uma assimetria para a esquerda [REVISAR]: 50% da amostra está entre 73 e 134 com média próxima de 100; o primeiro 1/4 da amostra está entre 26 e 73 enquanto o último 1/4 varia entre 134 e 230, o range do 1o quarto equivalente à metade do range do último quarto da amostra. Há certa covariação entre p e S: o último quarto de p está acima de 
 
 ```{r}
-r.squaredGLMM(md_d)
-```
-
-
-
-Avaliação gráfica do ajuste do modelo:
-
-```{r predito e observado d}
-df_reg <- broom::augment(l_md[[1]])
-df_reg %<>% mutate(predito = exp(.fitted),
-                   std.resid = .resid/sd(.resid),
-                   sqrt.std.resid = sqrt(std.resid))
-## observado e predito ##
-df_reg %>%  ggplot(aes(x=DA.z,y=d)) + geom_point() +
-  geom_line(aes(y=predito),color="red") + facet_wrap(~k,ncol=3,scales="free")
-```
-
-__Figura 1__ Distância média de dispersão (d) e o predito segundo d ~ DA.z + k + (1 | Sítio), family=Gamma. Os pontos são as distâncias médias estimados para o determinado percentil (k) de propágulos que permanecem até l_cel metros da planta progenitora; em vermelho o predito.
-
-Parece que há boa congruência entre o observado e o predito pelo modelo, segue regressão dos resíduos do modelo:
-
-```{r graf residuo DHARMA }
-md_d <- l_md[[1]]
-resid_d <- simulateResiduals(md_d,n=1000)
-# plotResiduals(resid_d)
-```
-
-__Figura 2.1__ residuos quantílicos pelo predito
-
-
-
-
-O modelo estimado está de acordo com os dados: a predição do modelo está precisa na tendẽncia central dos dados; o modelo explica praticamente toda a variação dos dados (alto R2_). O problema de convergência pode ser que não é necessário considerr a existência de correlação dos dados, talvez seja mais plausível considerar apenas um glm:
-
-```{r comparacao glm e glmm d }
-l_md <- vector("list",2)
-names(l_md) <- c("glm","glmm")
-l_md[[1]] <-  glm(d ~ k + DA.z,family = "Gamma"(link=log),data = df_resultados)
-l_md[[2]] <-  glmer(d ~ k + DA.z + (1|Site),family = "Gamma"(link=log),data = df_resultados)
-AICctab(l_md,weights=T)
-summary(lm(coef(l_md[[1]]) ~ fixef(l_md[[2]])-1))
-md_d <- glm(d ~ k + DA.z,family = "Gamma"(link=log),data = df_resultados)
-```
-
-O único modelo plausível é o glmer, contudo não há diferença nas estimativas dos dois modelos. Então vou utilizar o glm para fazer a inferência. Vou plotar a variável de interesse é k mas não a covariável DA.z
-
-```{r tabela das estimativas do glm, message=F}
-# summary(md_d)
-ef_d <- sim(md_d,1000)@coef[,1:12]
-ef_d <- cbind(ef_d[,1], apply(ef_d[,2:12],2,function(x) ef_d[,1]+x)) %>% as.data.frame()
-names(ef_d) <- as.character(c(0.99,seq(0.95,0.5,by=-0.05),0.25))
-inv.link <- family(md_d)$linkinv
-df_ef.d  <- reshape2::melt(ef_d,value.name = "replica") %>% 
-  ddply(.,"variable",summarise, media0 = mean(replica),lwr0 = quantile(replica,0.025),upr0=quantile(replica,0.975)) %>% 
-  mutate( media = inv.link(media0), IC.975 = inv.link(upr0), IC.025 = inv.link(lwr0))
-ggplot(data=df_ef.d[,c(1,5:7)], aes(x=variable,y=media)) + geom_pointrange(aes(y = media, ymin=IC.025, ymax=IC.975)) # +
-  # geom_ribbon(aes(y = fit, ymin=lwr, ymax=upr), alpha=0.5) +
-# existe grande variação entre sítios que é explicada em função da densidade
-```
-
-<!--
--->
- I = número fundamental da imigração (Etienne 2005)
-
-a) avaliar qual a melhor distribuição de probabilidade
-b) avaliar função de ligação
-c) seleção de modelos
-d) avaliação do modelo selecionado
-e) estudo das estimativas e interpretação
-
-###### distância média de dispersão (d)
-
-Exploração gráfica
-
-```{r matrixplot I}
-# ,fig.width=10
-car::scatterplotMatrix(~I+p+d+k+J,data=df_resultados)
-# hist(sqrt(df_resultados$I),breaks = 60)
 
 ```
 
-  O número fundamental da dispersão (I) depende do tamanho da amostra (J) e de m, probabilidade de um imigrante colonizar uma unidade de habitat na comunidade local. Essa probabilidade é deduzida a partir de um equação que relaciona a distância média de dispersão (d) e J, então corrigimos essa estimativa para a proporção de habitat da paisagem, para incluir a falta de indivíduos na paisagem ao redor da comunidade local caso tenha ocorrido remoção de habitat. Obtemos d a partir da proporção de propágulos que permanece até a vizinhança imediata da planta progenitora (k). Estabelecemos a priori os valores de k para utilizar em todas as paisagens, assim podemos comparar paisagens com diferentes densidades de indivíduos (para não violar o pressuposto de soma-zero).
-  O efeito de J pode ser incluido na variação do agrupamento de sítio de amostragem, as variáveis mais importantes são p, k e d. Uma possibilidade é permitir que para cada agrupamento de dados pelo sítio de amostragem, seja possível existir uma inclinação para d. Então o modelo cheio é I ~ p.z + d.z + k + (d.z|Site).
-
-```{r graf I}
-df_resultados %>% mutate(p_class = as.factor(cut(p,12))) %>% filter(p_class == levels(p_class)[9]) %>% #%in% levels(p_class)[c(9,12)] 
-  ggplot(aes(x=d.z,y=sqrt(I))) + 
-  geom_smooth(method = "lm") +
-  geom_point() +
-  # geom_boxplot() +
-  facet_wrap(~Site,ncol=4,scales="free_x")
-```
-
-Figura A1. Gráficos quantile-quantile para três distribuições teóricas (normal, lognormal e gamma) e a variável d (metros) e z-transformada (d.z). Para a distribuição gamma utilizei ajustamos apenas a variável d, uma vez que o domínio da distribuição não contempla valores menores do que zero.
-
-A distribuição que melhor se adequa aos dados é a distribuição gamma: i) ajusta maior porção dos dados em comparação com a normal (segunda melhor distribuição) e ii) consegue capturar a variação nas caudas da distribuição de valores obervados (em especial para valores pequenos), diferente da normal. Contudo, para comparar os resíduos eu vou construir duas classes de modelos cheio: uma normal e outra gamma.
-
-O objetivo é avaliar o efeito da variável k na distância média de dispersão (d), para isso o modelo cheio vai considerar a variável DA, uma vez que k é definido como a proporção de propágulos até l_cel metros da planta progenitora. A largura da célula de simulação (l_cel) = 100/sqrt(DA) (PERGUNTA:devo utilizar DA ou a transformação de DA = I( 100/sqrt(DA) )? ).
-
-_Tabela Seleção da distribuição de probabiliade e estrutura aleatória_
-
-```{r d k}
-# df_resultados %>% str
-## Seleção da estrutura eleatória ##
-l_md <- vector("list",length = 9)
-names(l_md) <- c("log Gamma 1|Site","log Gamma d.z|Site","log Gamma",
-                 "normal 1|Site","normal d.z|Site", "normal",
-                 "log normal 1|Site","log normal d.z|Site", "log normal")
-l_md[[1]] <-  glmer(I ~ p.z + d.z + k + (1|Site),family = "Gamma"(link=log),data = df_resultados)
-l_md[[2]] <-  glmer(I ~ p.z + d.z + k + (d.z|Site),family = "Gamma"(link=log),data = df_resultados)
-l_md[[3]] <-  glm(I ~ p.z + d.z + k,family = "Gamma"(link=log),data = df_resultados)
-l_md[[4]] <-  lmer(I ~ p.z + d.z + k + (1|Site), data = df_resultados)
-l_md[[5]] <-  lmer(I ~ p.z + d.z + k + (d.z|Site), data = df_resultados)
-l_md[[6]] <-  lm(I ~ p.z + d.z + k, data = df_resultados)
-l_md[[7]] <-  glmer(I ~ p.z + d.z + k + (1|Site),family = "gaussian"(link=log),data = df_resultados)
-l_md[[8]] <-  glmer(I ~ p.z + d.z + k + (d.z|Site),family = "gaussian"(link=log),data = df_resultados)
-l_md[[9]] <-  glm(I ~ p.z + d.z + k,family = "gaussian"(link=log),data = df_resultados)
-AICctab(l_md,weights=T)
-```
-<!--
-A estrutura aleatória selecionada foi (1|Site).
--->
-
-O modelo global com distribuição gamma, função de ligação log e estrutura aleatória 1|Site foi o mais plausível. Segue sumário:
-
-```{r d k R2,echo=TRUE}
-# fastdisp(l_md[[2]]) # problema de convergência, indicam para reescalonar as variáveis
-md_I <- update(l_md[[2]],control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-summary(l_md[[2]]) # problema de convergência, indicam para reescalonar as variáveis
-summary(md_I)
-
-
-```
-<!--
-Error: Error in r.squaredGLMM.merMod(X[[i]], ...) : do not know how to calculate variance for this family/link combination
-27jun2018[Válido para lmer, não para normal link=log: acredito que se houver mais níveis de k e melhor distribuidos no campo de parâmetros aumentaria o R^2 de k|Site
--->
-
-
-_16nov2018_
-- Problema de convergência:
-convergence code: 0
-Model failed to converge with max|grad| = 148.862 (tol = 0.001, component 1)
-Model is nearly unidentifiable: very large eigenvalue
- - Rescale variables?
-failure to converge in 10000 evaluations
-
-```{r comparacao modelo cheio }
-l_md <- vector("list",2)
-names(l_md) <- c("d.z","-d.z")
-l_md[[1]] <-  glmer(I ~ p.z + d.z + k + (1|Site),family = "Gamma"(link=log),data = df_resultados)
-l_md[[2]] <-  glmer(I ~ p.z + k + (1|Site),family = "Gamma"(link=log),data = df_resultados)
-AICctab(l_md)
-```
-
-
-
-PRÓXIMOS PASSOS PARA MELHORAR AJUSTE: uma alternativa fácil é reajustar a partir das estimativas feitas pelo modelo com problema de convergência e/ou modificar o otimizador.
-PERGUNTAS NORTEADORAS: i) o aviso de problema de convergência é um falso positivo? 
-
-Ben Bolker: Since the likelihood differs by <0.1 between the model fits, and the largest relative differences in the parameters are of the order of about 10^(-4), I would say that you have successfully demonstrated that the warning is a false positive and you can proceed with your initial model.
-
-
-<!--
-[pasta GLMM (...) scale issues] Some common examples:
-
--Some columns of our data might be different orders of magnitude to others, for instance gender might be encoded as a binary variable, while income might be stored in whole-dollar amounts.
-
--An outcome might be extremely rare
-
--The impact of variable X1 on Y could be orders of magnitude greater than the impact of variable X2. That is, it’s not the scale of the data that is causing issues so much as the scale of the parameters.
-
-
--->
-
-
-Foram estimados 13 parâmetros e seus respectivos erro-padrão. Os resíduos escalonados variam de -3.956 até 6.554, pelos valores dos quantils parece que a distribuição dos resíduos não é simétrica ao redor da estimativa. Há dois avisos sobre convergência: a) Model failed to converge with max|grad|=4.11797 (tol = 0.001, component 1); b) Modelo is nearly unidentifiable: very large eigenvalue - Rescale variables?
-
-25jun2018:
-Para lidar com b modifiquei DA -> DA.z nos modelos globais
-Com isso obtive o erro: 'converge code:0; Model is nearly unidentifiable: very large eigenvalue - Rescale variables?
-- a transformação z de DA deveria ser o suficiente para lidar com problemas relacionados com escalamento de variáveis; a outra variável explanatória é categórica.
-- vou continuar o estudo com esse modelo como global
-
-_Tabela Selecao de variaveis para descrever 'd'_
-
-```{r selecao d}
-l_md <- vector("list",length = 4)
-names(l_md) <- c("k+DA","DA","k","1")
-l_md[[1]] <-  glmer(d ~ k + DA.z + (1|Site),family = "Gamma"(link=log),data = df_resultados)
-l_md[[2]] <-  glmer(d ~ DA.z + (1|Site),family = "Gamma"(link=log),data = df_resultados)
-l_md[[3]] <-  glmer(d ~ k + (1|Site),family = "Gamma"(link=log),data = df_resultados)
-l_md[[4]] <-  glmer(d ~ 1 + (1|Site),family = "Gamma"(link=log),data = df_resultados)
-AICctab(l_md)
-```
-
-O modelo global foi o mais plausível. [PROBLEMA DE CONVERGÊNCIA]. E por conta disso não consigo avaliar o ajuste visualmente:
-
-```{r echo=TRUE}
-# prof_glmm.d <- profile(l_md[[3]])
-
-# xyplot(prof_glmm.d , aspect =1.3)
-```
-
-__Coeficiente de determinação__
-
-```{r}
-r.squaredGLMM(md_d)
-```
-
-
-
-Avaliação gráfica do ajuste do modelo:
-
-```{r predito e observado d}
-df_reg <- broom::augment(l_md[[1]])
-df_reg %<>% mutate(predito = exp(.fitted),
-                   std.resid = .resid/sd(.resid),
-                   sqrt.std.resid = sqrt(std.resid))
-## observado e predito ##
-df_reg %>%  ggplot(aes(x=DA.z,y=d)) + geom_point() +
-  geom_line(aes(y=predito),color="red") + facet_wrap(~k,ncol=3,scales="free")
-```
-
-__Figura 1__ Distância média de dispersão (d) e o predito segundo d ~ DA.z + k + (1 | Sítio), family=Gamma. Os pontos são as distâncias médias estimados para o determinado percentil (k) de propágulos que permanecem até l_cel metros da planta progenitora; em vermelho o predito.
-
-Parece que há boa congruência entre o observado e o predito pelo modelo, segue regressão dos resíduos do modelo:
-
-```{r graf residuo DHARMA }
-md_d <- l_md[[3]]
-resid_d <- simulateResiduals(md_d,n=1000)
-# plotResiduals(resid_d)
-```
-
-__Figura 2.1__ residuos quantílicos pelo predito
 
 
 
 
-O modelo estimado está de acordo com os dados: a predição do modelo está precisa na tendẽncia central dos dados; o modelo explica praticamente toda a variação dos dados (alto R2_). O problema de convergência pode ser que não é necessário considerr a existência de correlação dos dados, talvez seja mais plausível considerar apenas um glm:
 
-```{r comparacao glm e glmm d }
-l_md <- vector("list",2)
-names(l_md) <- c("glm","glmm")
-l_md[[1]] <-  glm(d ~ k + DA.z,family = "Gamma"(link=log),data = df_resultados)
-l_md[[2]] <-  glmer(d ~ k + DA.z + (1|Site),family = "Gamma"(link=log),data = df_resultados)
-# AICctab(l_md,weights=T)
-# summary(lm(coef(l_md[[1]]) ~ fixef(l_md[[2]])-1))
-md_d <- glm(d ~ k + DA.z,family = "Gamma"(link=log),data = df_resultados)
-```
 
-O único modelo plausível é o glmer, contudo não há diferença nas estimativas dos dois modelos. Então vou utilizar o glm para fazer a inferência. Vou plotar a variável de interesse é k mas não a covariável DA.z
 
-```{r tabela das estimativas do glm, message=F}
-# summary(md_d)
-ef_d <- sim(md_d,1000)@coef[,1:12]
-ef_d <- cbind(ef_d[,1], apply(ef_d[,2:12],2,function(x) ef_d[,1]+x)) %>% as.data.frame()
-names(ef_d) <- as.character(c(0.99,seq(0.95,0.5,by=-0.05),0.25))
-inv.link <- family(md_d)$linkinv
-df_ef.d  <- melt(ef_d,value.name = "replica") %>% 
-  ddply(.,"variable",summarise, media0 = mean(replica),lwr0 = quantile(replica,0.025),upr0=quantile(replica,0.975)) %>% 
-  mutate( media = inv.link(media0), IC.975 = inv.link(upr0), IC.025 = inv.link(lwr0))
-df_ef.d[,c(1,5:7)] #%>% ggplot(aes(x=variable,y=media,ymin=IC.025,ymax=IC.975)) + geom_pointrange() # existe grande variação entre sítios que é explicada em função da densidade
-```
 
+
+##################################################################################
 
 
 ## 2) GOF - número de SADs preditas que não foram refutadas ##
