@@ -1,0 +1,213 @@
+---
+title: 'Apêndice 1'
+author: "Mori, Danilo"
+date: "14 de setembro de 2019"
+output: 
+  html_document:
+    toc: true
+    toc_depth: 5
+---
+
+<style>
+body {
+text-align: justify}
+</style>
+
+```{r setup, include=FALSE} 
+knitr::opts_chunk$set(echo = FALSE, tidy = TRUE, include = TRUE, warning = FALSE,cache = TRUE)
+```
+
+```{r pacotes,warning=FALSE,message=FALSE,echo=FALSE}
+library(gridExtra)
+library(tidyverse)
+library(magrittr)
+library(plyr)
+library(DHARMa) # resíduos quantilicos
+library(lme4) # pacote de criação dos modelos estatísticos
+library(bbmle)
+```
+
+
+## Análise Estatística Completa
+
+```{r preparacao dos dados,warning=FALSE,message=FALSE}
+### leitura ###
+df_resultados <- readr::read_csv("/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/df_resultados.csv")
+# df_resultados %>% str
+
+### padronização ###
+names(df_resultados)[1] <- "Site"
+# para o resultada das simulações de k[0.45;0.30]
+df_resultados.k045_030 <- filter(df_resultados,k=="0.99") %>% dplyr::select(-k) %>% unique
+df_resultados.k045_030[,"GOF"] <- NA
+df_bateria <- data_frame(Site=gl(80,4*2,labels=unique(df_resultados.k045_030$Site)), 
+                         k=gl(4,80*2,labels = seq(0.45,0.30,-0.05)), 
+                         MN=gl(2,4*80,labels = c("EE","EI")) )
+df_resultados.k045_030 %<>% left_join(x=df_bateria,y=.,by = c("Site","MN"))
+# dim(df_resultados) == dim(df_resultados.k045_030) 
+df_resultados %<>% rbind(.,df_resultados.k045_030)
+## fatores
+df_resultados$Site <- factor(df_resultados$Site)
+df_resultados$k <- factor(df_resultados$k,levels=unique(df_resultados$k))
+df_resultados$k.0 = as.numeric(as.character(df_resultados$k))
+df_resultados$MN <- factor(df_resultados$MN,levels = c("EE","EI"))
+# df_resultados$k %>% contrasts()
+# df_resultados$MN %>% contrasts()
+
+### z score ### 
+f_z <- function(x){
+  m <- base::mean(x,na.rm=TRUE)
+  sd <- sd(x,na.rm=TRUE)
+  output <- (x-m)/sd
+  return(output)
+} 
+# names(df_resultados)
+df_resultados.z <- as.data.frame(apply(df_resultados[c(6:12,19)],2,f_z))
+names(df_resultados.z) <- sapply(names(df_resultados[c(6:12,19)]), function(x) paste(x,".z",sep=""))
+df_resultados %<>% cbind(.,df_resultados.z)
+### Summary ###
+# summary(df_resultados)
+# str(df_resultados)
+# head(df_resultados)
+
+## rm
+# ls()
+rm(list=c("df_bateria","f_z","df_resultados.k045_030","df_resultados.z"))
+```
+
+### Descrição dos Levantamentos Selecionados
+
+```{r figura 1, fig.width=8, fig.height=5, fig.align="center"}
+df_plot <- df_resultados %>% dplyr::filter(k=="0.99" & MN=="EE") %>% dplyr::select(Site, p, S,p.z,S.z) %>% unique
+
+# avaliando as curvas pelo quantiles
+# df_plot %<>% mutate(terceiro_quantil = ifelse(p>quantile(df_plot$p,probs=0.75),">_3oQ","<_3oQ")) 
+l_p <- vector("list",6)
+l_p[[1]] <- ggplot(df_plot, aes(x=p)) +
+  geom_histogram(bins=30) +
+  geom_vline(xintercept = c(quantile(df_plot$p,probs = c(0.25,0.50,0.75))),color="red")
+  # geom_density()
+l_p[[2]] <- ggplot(df_plot, aes(x=p.z)) +
+  geom_histogram(bins=30) +
+  geom_vline(xintercept = c(quantile(df_plot$p.z,probs = c(0.25,0.50,0.75))),color="red")
+  # geom_density()
+l_p[[3]] <- ggplot(df_plot, aes(x=S)) +
+  geom_histogram(bins=30) +
+  geom_vline(xintercept = quantile(df_plot$S,probs = c(0.25,0.50,0.75)),color="red")
+l_p[[4]] <- ggplot(df_plot, aes(x=S.z)) +
+  geom_histogram(bins=30) +
+  geom_vline(xintercept = c(quantile(df_plot$S.z,probs = c(0.25,0.50,0.75))),color="red")
+l_p[[5]] <- ggplot(df_plot, aes(x=p,y=S)) +
+  geom_hline(yintercept = quantile(df_plot$S,probs = c(0.25,0.50,0.75)),color="red") +
+  geom_vline(xintercept = quantile(df_plot$p,probs = c(0.25,0.50,0.75)),color="red") +
+  geom_point() + 
+  geom_smooth(method="lm")
+l_p[[6]] <- ggplot(df_plot, aes(x=p.z,y=S.z)) +
+  geom_hline(yintercept = quantile(df_plot$S.z,probs = c(0.25,0.50,0.75)),color="red") +
+  geom_vline(xintercept = quantile(df_plot$p.z,probs = c(0.25,0.50,0.75)),color="red") +
+  geom_point() + 
+  geom_smooth(method="lm")
+# do.call("grid.arrange",c(l_p,ncol=3))
+grid.arrange(l_p[[1]],l_p[[2]],l_p[[3]],l_p[[4]],l_p[[5]],l_p[[6]],
+             layout_matrix = rbind(c(1,1,3,3,5,5),
+                                   c(2,2,4,4,6,6) )
+             )
+
+```
+
+Figura 1. Apêndice 1- Análise Estatística completa. Na primeira linha há as variáveis na escala padrão; na segunda linha as variáveis após transformação Z (centra a média em zero e desloca a variação para o centro da distribuição REVISÃO). As linhas em vermelho equivalem ao quantil de 0.25%, 0.50% e 0.75% da amostra. S = riqueza observada; p = proporção de cobertura vegetal na paisagem
+
+  A proporção de cobertura vegetal variou de 0.0074 até 1, o quantil de 25% é de 0.2916, a média é 0.6727 e o quantil de 75% é de 0.9216 (figura 1). A riqueza observada variou de 26 até 230, o quantil de 25% é de 73.75, a média é 105.85, e o quantil de 75% é 134 (figura 1). Há um vies na amostra que apresenta mais trabalhos em paisagens com alta cobertura vegetal do que em baixas, por exemplo, o primeiro 1/4 da amostra está entre 0.00 e 0.30, enquanto o último 1/4 está comprimido entre 0.92 e 1 (figura 1). A riqueza observada apresenta um outro padrão com uma tendência central e uma assimetria para a esquerda [REVISAR]: 50% da amostra está entre 73 e 134 com média e mediana próximos de 100; o primeiro 1/4 da amostra está entre 26 e 73 enquanto o último 1/4 varia entre 134 e 230, o range do 1o quarto equivale à metade do range do último quarto da amostra. Há certa covariação entre p e S: o último quarto de p varia acima do quantil de 25%; enquanto o primeiro quarto de p varia até a mediana de S. Porém os 50% centrais de cada variável estão representadas em todo o gradiente de variação da outra, e.g., entre o quantil de 25% e 75% de p observamos S que varia desde de valores inferiores à 50 até superiores à 200; e um padrão se observa para S. Para realizar a análise estatística aplicamos a transformaçaõ Z em p e S. A transformação Z centraliza no zero a média da distribuição e converte da escala da variável para a de desvio-padrões; dessa forma torna-se mais direta a interpretação de modelos lineares generalizados hierarquicos (REF 2006). Essa transformação move a variação para a região central da distribuição mantendo a relação geral entre as observações (figura 1). Não há motivos a priori para pensar que a predição dos modelos pode ser influênciada pela covariação entre p e S. [DÚVIDA] Paulo, lembro que discutimos sobre a relação entre teste frequentista e o efeito de S * p; me recordo de algo como que ao utilizar o p-valor estariamos de alguma forma ponderando isso [DÚVIDA].
+
+### Congruência entre SAD observada e predita
+
+  Consideramos que um modelo neutro não foi refutado quando o p-valor for maior ou igual à 5%. Contabilizamos o número de predições não refutadas (Goodness-of-fit) e modelamos a probabilidade de uma predição não ser refutada usando um modelo logito. Agrupamos os dados pelo Sítio de observação (Site). É possível agrupar os dados considerando um intercepto por sítio (1|Site); 1 intercepto por modelo neutro (MN|Site); ou com 1 intercepto e 1 inclinação para k por modelo neutro (k*MN|Site). Na última opção k precisa ser interpretado como variável contínua. Um protocolo de seleção de modelos hierarquicos pode ser encontrado em Zuur et al. 2009 onde se recomenda comparar formas alternativas de agrupar os dados a partir do modelo cheio da relação entre as preditoras. O modelo cheio proposto foi com a interação de terceiro grau entre as preditoras p, k e MN. Comparamos todas as combinações possíveis por verossimilhança [DÚVIDA] se entendo corretamente, os parametros da estrutura aleatória são estimados pelo R2 e os estrutura fixa por algo similar à verossimilhança; ai precisa utilizar o parâmetro REML=TRUE [DÚVIDA]
+
+Tabela 1 __Qual o melhor modelo cheio?__
+  
+```{r tabela 1 comparacao da estrutura aleatoria de GOF, echo=TRUE}
+l_md.cheio <- vector("list",5)
+names(l_md.cheio) <- c("k.z 1|Site","k.z MN|Site","k.z k.z*MN|Site","k.f 1|Site","k.f MN|Site")
+l_md.cheio[[1]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k.0.z * MN + (1|Site), family = "binomial",data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md.cheio[[2]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k.0.z * MN + (MN|Site), family = "binomial",data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md.cheio[[3]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k.0.z * MN + (k.0.z*MN|Site), family = "binomial",data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md.cheio[[4]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k * MN + (1|Site), family = "binomial",data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md.cheio[[5]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k * MN + (MN|Site), family = "binomial",data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+AICctab(l_md.cheio,weights=T)
+```
+
+O modelo estatístico com k como fator e agrupamento dos dados como MN|Site foi o único plausível.
+
+```{r GOF selecao de modelos}
+l_md.selecao <- vector("list",19)
+names(l_md.selecao) <- c("p*k*MN",# modelo cheio
+                         "p*k*MN-p:k:MN", #MC - 3a ordem
+                         "p*(k+MN)","k*(p+MN)","MN*(p+k)", #2 interações
+                         "p*k+MN","p*MN+k","k*MN+p", #1 interação + preditor
+                         "p*k","p*MN","k*MN", #1 interação
+                         "p+k+MN",#aditivo 3
+                         "p+k","p+MN","k+MN", #aditivo 2 
+                         "p","k","MN", #preditor isolado
+                         "1") #nulo
+#modelo cheio
+l_md.selecao[[1]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k * MN + (MN|Site), family = "binomial",data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+#modelo cheio - interação 3a ordem
+l_md.selecao[[2]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k * MN - p.z:k:MN + (MN|Site), family = "binomial",data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+#2 interações
+l_md.selecao[[3]] <- glmer(cbind(GOF,100-GOF) ~ p.z * (k + MN) + (MN|Site), family = "binomial",data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md.selecao[[4]] <- glmer(cbind(GOF,100-GOF) ~ k * (p.z + MN) + (MN|Site), family = "binomial",data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md.selecao[[5]] <- glmer(cbind(GOF,100-GOF) ~ MN * (p.z + k) + (MN|Site), family = "binomial",data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+#1 interação + preditor
+l_md.selecao[[6]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k + MN + (MN|Site), family = "binomial",data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md.selecao[[7]] <- glmer(cbind(GOF,100-GOF) ~ p.z * MN + k + (MN|Site), family = "binomial",data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md.selecao[[8]] <- glmer(cbind(GOF,100-GOF) ~ k * MN + p.z + (MN|Site), family = "binomial",data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+#1 interação
+l_md.selecao[[9]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k + (1|Site), family = "binomial",data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md.selecao[[10]] <- glmer(cbind(GOF,100-GOF) ~ p.z * MN + (MN|Site), family = "binomial",data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md.selecao[[11]] <- glmer(cbind(GOF,100-GOF) ~ k * MN + (MN|Site), family = "binomial",data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+#aditivo 3
+l_md.selecao[[12]] <- glmer(cbind(GOF,100-GOF) ~ p.z + k + MN + (MN|Site), family = "binomial",data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+#aditivo 2
+l_md.selecao[[13]] <- glmer(cbind(GOF,100-GOF) ~ p.z + k + (1|Site), family = "binomial",data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md.selecao[[14]] <- glmer(cbind(GOF,100-GOF) ~ p.z + MN + (MN|Site), family = "binomial",data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md.selecao[[15]] <- glmer(cbind(GOF,100-GOF) ~ k + MN + (MN|Site), family = "binomial",data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+#aditivo 1
+l_md.selecao[[16]] <- glmer(cbind(GOF,100-GOF) ~ p.z + (1|Site), family = "binomial",data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md.selecao[[17]] <- glmer(cbind(GOF,100-GOF) ~ k + (1|Site), family = "binomial",data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md.selecao[[18]] <- glmer(cbind(GOF,100-GOF) ~ MN + (MN|Site), family = "binomial",data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+# nulo
+l_md.selecao[[19]] <- glmer(cbind(GOF,100-GOF) ~ 1 + (1|Site), family = "binomial",data=df_resultados,
+              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+AICctab(l_md.selecao,weights=T)
+```
+
+
+
+
+
+
+
+
