@@ -125,7 +125,7 @@ Figura 1. Apêndice 1- Análise Estatística completa. Na primeira linha há as 
 
 __Tabela 1__ Qual o melhor modelo cheio?
   
-```{r tabela 1 comparacao da estrutura aleatoria de GOF, echo=TRUE}
+```{r tabela 1 comparacao da estrutura aleatoria de GOF}
 l_md.cheio <- vector("list",5)
 names(l_md.cheio) <- c("k.z 1|Site","k.z MN|Site","k.z k.z*MN|Site","k.f 1|Site","k.f MN|Site")
 l_md.cheio[[1]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k.0.z * MN + (1|Site), family = "binomial",data=df_resultados,
@@ -211,8 +211,5 @@ O único modelo plaúsivel é aquele que inclui a interação de terceiro grau. 
 ```{r res quant l_md.selecao}
 plot(simulateResiduals(l_md.selecao[["p*k*MN"]],1000))
 ```
-Figura 2.
-
-
-
+Figura 2. Resíduos quantílicos do modelo mais plaúsivel [aquele que inclui p:k:MN], para detalhes ver documentação da função 'simulateResiduals'.
 
