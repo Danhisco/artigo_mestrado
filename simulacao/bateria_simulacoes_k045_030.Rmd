@@ -1,5 +1,5 @@
 ---
-title: "Bateria de simulacoes k045-030"
+title: "Estimativas e Predições"
 author: "Mori, Danilo Pereira"
 date: "5 de agosto de 2019"
 output: html_document
@@ -11,10 +11,12 @@ knitr::opts_chunk$set(echo = FALSE, tidy = TRUE, include = TRUE, warning = FALSE
 
 
 ```{r global packages}
+setwd("/home/danilo/Documentos/Doutorado/artigo_mestrado/simulacao/")
 library(doMC)
 library(magrittr)
 library(tidyverse)
 library(plyr)
+library(gridExtra)
 ```
 
 
@@ -22,9 +24,9 @@ library(plyr)
 Sequência de trabalho:
 
 1) data frame de referência - FEITO
-2) estabelecer matrix de paisagem
-3) estabelecer programa coalescent
-4) estimar U médio e variância
+2) estabelecer matrix de paisagem - FEITO
+3) estabelecer programa coalescente - OK!!!!!
+4) estimar U médio e variância - estimativa feita; 
 5) simular 100 SADs
 6) teste KS: GOF, p-valor_medio,_var
 
@@ -38,8 +40,16 @@ k = 0.45:0.35 by = 0.05
 ```{r data frame referencia}
 df_referencia <- read_csv("/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/df_resultados.csv") %>% 
   select(SiteCode, p, J, S, DA) %>% unique %>% arrange(p)
-k <- rep(c(0.45,0.40,0.35,0.30),each=80)
+k <- rep(c(0.99,seq(0.95,0.05,-0.05)),each=80)
 df_referencia %<>% cbind(.,k)
+df_referencia$quantil_p <- "2oT"
+df_referencia[df_referencia$p<=quantile(df_referencia$p,probs = 0.33),"quantil_p"] <- "1oT"
+df_referencia[df_referencia$p>=quantile(df_referencia$p,probs = 0.66),"quantil_p"] <- "3oT"
+
+# df_teste$quantil_p <- cut(df_teste$p,breaks = quantile(df_teste$p,probs = c(0,0.33,0.66,1)))
+
+
+
 ```
 
 ```{r d estimado}
@@ -54,7 +64,7 @@ df_referencia$d <- NA
 source("/home/danilo/Documentos/Doutorado/artigo_mestrado/R_source/utility_functions.R")
 
 # funcao para paralelizar
-func_llply <- function(i,data_frame=df_referencia){
+func_llply <- function(i,data_frame=df_referencia){ #df_referencia
   # df_temp <- data_frame
   sigma <- sigkernel(kernel = data_frame[i,"kernel_type"], 
                      p = data_frame[i,"k"], 
@@ -63,18 +73,15 @@ func_llply <- function(i,data_frame=df_referencia){
                      sigma.min=1e-6, 
                      sigma.max=1e6)$root  
 }
-
-
 # funcao para paralelizar #
 # paralelizando e armazensando os dados #
-registerDoMC(2)
+registerDoMC(4)
 replica.sim <- as.list(1:dim(df_referencia)[1])
-resultados <- llply(.data = replica.sim, .fun = func_llply, .parallel = TRUE)
-df_referencia$d <- unlist(resultados)
+df_referencia$d <- laply(.data = replica.sim, .fun = func_llply, .parallel = TRUE)
+# df_referencia$d <- unlist(resultados)
 
 df_referencia %>% ggplot(aes(x=k,y=d,group=k)) +
   geom_boxplot() + geom_jitter()
-# save(df_resultados,file="df_resultados-kernel_estimado.Rdata")
 ```
 __Figura 1__ Distância média de dispersão (d) ~ proporção de propágulos até a vizinhança imediata da planta progenitora (k)
 
@@ -86,19 +93,21 @@ __Figura 1__ Distância média de dispersão (d) ~ proporção de propágulos at
 ```{r txt file matriz de paisagem}
 load("/home/danilo/Documentos/Documentos/projetos/dissertacao/cluster/df_dados-DaniloPMori.Rdata")
 df_referencia %<>% left_join(x=.,
-                            y=unique(select(df_resultados,SiteCode,txt.file)), 
-                            by="SiteCode")
+                             y=unique(select(df_resultados,SiteCode,txt.file)), 
+                             by="SiteCode")
+write.csv(df_referencia,file="df_referencia.csv")
 rm(df_rep.U,df_resultados)
 # df_referencia %>% str
 #vizualição das paisagens
-for(i in 1:80){
-  image(
-    as.matrix(read.table(file = paste("/home/danilo/Documentos/Doutorado/artigo_mestrado/simulacao/",
-                                          df_referencia[i,"txt.file"],sep="") ) ),
-    axes=FALSE)
-  title(main=df_referencia[i,"SiteCode"])
-}
+# for(i in 1:80){
+#   image(
+#     as.matrix(read.table(file = paste("/home/danilo/Documentos/Doutorado/artigo_mestrado/simulacao/",
+#                                           df_referencia[i,"txt.file"],sep="") ) ),
+#     axes=FALSE)
+#   title(main=df_referencia[i,"SiteCode"])
+# }
 ```
+
 
 3) Estabelecer o programa coalescente
 
@@ -107,46 +116,27 @@ for(i in 1:80){
 source("/home/danilo/Documentos/Doutorado/artigo_mestrado/R_source/dinamica_coalescente_beta.R") 
 #diretorio da simulacao
 setwd("/home/danilo/Documentos/Doutorado/artigo_mestrado/simulacao/")
-```
-
-## Estimativa de U ##
-
-Número de Réplicas = 10
-
-```{r preparacao e piloto}
-### Preparação
+df_referencia <- read.csv(file="df_referencia.csv",row.names = 1,as.is = TRUE)
+#preparação
 func1 <- function(x,replicas=10) {
   x$U <- NA
   x <- x[rep(1:dim(x)[1],each=replicas),]
 }
 df_referencia %<>% func1()
 
-# piloto
-df_temp <- df_referencia
-aviao <- dinamica_coalescente(U = 1.25e-06, # U mínimo para começar a simulação 
-                              S = df_temp[1,"S"], # S observada 
-                              N_simul = 1, # número de réplicas por simulação - sempre 1
-                              seed = as.numeric(Sys.time()), # semente diferente para cada simulação
-                              disp_range = df_temp[1,"d"], # distância média em metros
-                              disp_kernel = df_temp[1,"kernel_code"], # 2=laplace
-                              landscape = df_temp[1,"txt.file"]) # código da matriz de paisagem
-
 ```
 
-Não foi possível rodar a simulação.
+## Estimativa de U ##
 
-O programa coalescente não consegue carregar uma biblioteca (libgsl.so.19). Se fizer uma busca no terminal com:
-
-sudo find -name / "libgsl.so.*" 
-
-
-```{r simulacao U}
+Número de Réplicas = 10
+```{r simulacao U, echo=TRUE}
 ### for da simulação ##
 # valores de k
 k_factor <- unique(k)
 for(a in 1:length(k_factor)){
   # por k
-  df_simU <- df_referencia %>% filter(k == k_factor[1])
+  a <- 1
+  df_simU <- df_referencia %>% filter(k == k_factor[a])
   ### funcao para paralelizar o programa
   op <- options(digits.secs=6)
   funcao_imigracao <- function(i,df_temp=df_simU){
@@ -161,11 +151,77 @@ for(a in 1:length(k_factor)){
     return(aviao$U_est)
   }  
   # paralelização da simulacao
-  registerDoMC(4)
+  registerDoMC(3)
   replica.sim <- as.list(1:dim(df_simU)[1])
   sim.coal_U <- llply(.data = replica.sim, .fun = funcao_imigracao, .parallel = TRUE)
   df_simU[,"U"] <- unlist(sim.coal_U)
-  save(df_simU, 
-       file=paste(c("df_simU__k",k_factor[a],".Rdata"),collapse = ""))
+  write.csv(df_simU, 
+            file=paste(c("df_simU__k",k_factor[a],".csv"),collapse = ""))
 }
 ```
+
+
+
+```{r avaliacao da estimativa de U}
+## com o código antigo
+# l_name.Rdata <- Sys.glob("*.Rdata") %>% as.list()
+# for(i in 1:length(l_name.Rdata)){
+ # load(l_name.Rdata[[i]])
+ # l_name.Rdata[[i]] <- df_simU
+# }
+# df_simulacao <- rbind.fill(l_name.Rdata)
+# com o .csv
+## Leitura 
+df_simulacao <- map_df(Sys.glob("./U/*.csv"),read.csv)
+df_simulacao %<>% ddply(.variables = names(df_simulacao[,-13]),summarise,U_med=mean(U),U_var=var(U))
+## Gráfico 
+l_p <- vector("list",2)
+l_p[[1]] <- ggplot(df_simulacao,aes(x=S,y=U_med)) +
+  geom_point() + facet_wrap(~k,ncol=4)
+l_p[[2]] <- ggplot(df_simulacao,aes(x=S,y=U_var)) +
+  geom_point() + facet_wrap(~k,ncol=4)
+do.call("grid.arrange",c(l_p,nrow=2))
+```
+
+Figura 1. A média (1a linha) e a variância (2a linha) do U estimado (eixo y) para gerar a riqueza observada (eixo x).
+
+O perfil dos pontos é similar entre os cenários de limitação de dispersão em seu valor médio; com o aumento da limitação de dispersão maior a variação na estimativa de U.
+
+Não vejo nenhum problema com o padrão dos dados, vou utilizar o U_med para parametrizar os modelos
+
+## Estimativa da SAD MNEE ##
+
+
+```{r SAD MNEE}
+### for da simulação ##
+source("/home/danilo/Documentos/Doutorado/artigo_mestrado/R_source/dinamica_coalescente_beta.R") 
+op <- options(digits.secs=6)
+k_level <- df_simulacao$k %>% unique
+for(a in 1:length(k_level)){
+  # a <- 1
+  # i <- 1
+  df_sim <- df_simulacao %>% filter(k == k_level[a])
+  ### funcao para paralelizar o programa
+  funcao_simulacao <- function(i,df_temp=df_sim){
+    aviao <- list()
+    aviao <- dinamica_coalescente(U = df_temp[i,"U_med"], 
+                                  S = 0, 
+                                  N_simul = 100, 
+                                  seed = as.numeric(Sys.time()), 
+                                  disp_range = df_temp[i,"d"], 
+                                  disp_kernel = df_temp[i,"kernel_code"], 
+                                  landscape = df_temp[i,"txt.file"])
+    write.csv(aviao,
+              file = paste0("./SADs/",
+                            gsub(".txt","",df_temp[i,"txt.file"]),"_k",df_temp[i,"k"])
+              )
+  }  
+  # paralelização da simulacao
+  registerDoMC(3)
+  replica.sim <- as.list(1:dim(df_sim)[1])
+  l_ply(.data = replica.sim, .fun = funcao_simulacao, .parallel = TRUE)
+}
+
+```
+
+
