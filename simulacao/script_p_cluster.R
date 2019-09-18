@@ -10,8 +10,9 @@ setwd("/home/danilo/Documentos/Doutorado/artigo_mestrado/simulacao/")
 source("dinamica_coalescente_beta.R") 
 # dados
 df_referencia <- read.csv(file="df_referencia.csv",row.names = 1,as.is = TRUE)
-# df_referencia %<>% #ddply("quantil_p",summarise,S_max=max(S),S_min=min(S))
-                # filter(S %in% c(195,230,226,26,45,52))
+# df_referencia %<>% filter(S %in% c(195,230,226,26,45,52))
+  #ddply("quantil_p",summarise,S_max=max(S),S_min=min(S))
+
 # df_referencia %>% str
 
 ######################################################
@@ -79,10 +80,13 @@ for(a in 19:length(k_factor)){
                                   disp_range = df_temp[i,"d"], 
                                   disp_kernel = df_temp[i,"kernel_code"], 
                                   landscape = df_temp[i,"txt.file"])
-    write.csv(aviao,
-              file = paste0("./SADs_preditas/",
-                            gsub(".txt","",df_temp[i,"txt.file"]),"_k",df_temp[i,"k"],".EE.csv")
-    )
+    l_SADs <- alply(aviao,.margins = 1,.fun = function(X) sort(as.vector(table(X)),decreasing = TRUE) )  
+    file_name <- paste0("./SADs_preditas/",gsub(".txt","",df_temp[,"txt.file"]),"__k",df_temp[,"k"],".EE.", "rep_",1:length(l_SADs),".csv")
+    for(b in 1:length(l_SADs)){
+      write.csv(l_SADs[[b]],
+                file=file_name[b],
+                row.names = FALSE,col.names = FALSE)
+    }
  }  
   # paralelização da simulacao
   registerDoMC(3)
@@ -115,16 +119,41 @@ f_d_ply <- function(X){
   # l_SADs <-  df_simulacao[1,]$SADs[[1]]
   df_name <- X$data %>% as.data.frame
   l_SADs <- X$SADs[[1]]
-  file_name <- paste0("./SADs_preditas/",gsub(".txt","",df_name[,"txt.file"]),"_k",df_name[,"k"],".EI.", "rep_",1:length(l_SADs),".csv")
+  file_name <- paste0("./SADs_preditas/",gsub(".txt","",df_name[,"txt.file"]),"__k",df_name[,"k"],".EI.", "rep_",1:length(l_SADs),".csv")
   for(i in 1:length(l_SADs)){
     write.csv(l_SADs[[i]],
-              file=file_name[i])
+              file=file_name[i],
+              row.names = FALSE,col.names = FALSE)
   }
 }
-d_ply(df_simulacao,c("SiteCode","k_prop"),f_d_ply)
+d_ply(df_simulacao,c("SiteCode","k_prop"),f_d_ply,.parallel = TRUE)
 
 
 ######################################################
 ############## Sintese dos dados #####################
 ######################################################
 
+## df_geral ##
+df_resultados <- map_df(Sys.glob("./U/*.csv"),read.csv)
+df_resultados %<>% ddply(names(.)[-13],summarise,U_med=mean(U),U_var=var(U))
+df_resultados$txt.file %<>% as.character()
+df_resultados %<>% mutate(file.tag=gsub(".txt","",txt.file)) 
+
+## df_SAD.obs
+df_SAD.obs <- read.csv(file = "/home/danilo/Documentos/Doutorado/artigo_mestrado/simulacao/SADs_observadas/df_SAD_obs.csv") 
+df_SAD.obs %<>% filter(N!=0 & sp != "Mortas") %>% group_by(SiteCode) %>% nest
+names(df_SAD.obs)[2] <- "SAD.obs"
+
+## df_SAD.predita ##
+df_SAD.predita <- data.frame(SAD_MN.name=Sys.glob("./SADs_preditas/*.csv"))
+find.string <- paste(c("./SADs_preditas/",".csv"),collapse = "|")
+df_SAD.predita %<>% mutate(SAD_obs.name=gsub("__k","__SAD.txt",str_match(SAD_MN.name,"ref(.*?)__k")[,1]),
+                  MN=str_match(SAD_MN.name,"EE|EI")[,1],
+                  k=str_match(SAD_MN.name,"__k(.*?).E")[,2],
+                  file.tag=gsub("__k","",str_match(SAD_MN.name,"ref(.*?)__k")[,1]),
+                  rep=str_match(SAD_MN.name,"rep_(.*?).csv")[,2])
+df_SAD.predita %>% str
+df_resultados %>% str
+df_SAD.predita %<>% left_join(x=.,y=unique(df_resultados[,c("file.tag","SiteCode")]),by="file.tag")
+
+df_SAD.predita[,"file.tag"] %>% unique
