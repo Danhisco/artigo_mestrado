@@ -1,6 +1,7 @@
 ## Rodar as Simulações ##
 ### configuracao
 library(doMC)
+library(GUILDS)
 library(magrittr)
 library(tidyverse)
 library(plyr)
@@ -79,7 +80,7 @@ for(a in 19:length(k_factor)){
                                   disp_kernel = df_temp[i,"kernel_code"], 
                                   landscape = df_temp[i,"txt.file"])
     write.csv(aviao,
-              file = paste0("./SADs/",
+              file = paste0("./SADs_preditas/",
                             gsub(".txt","",df_temp[i,"txt.file"]),"_k",df_temp[i,"k"],".EE.csv")
     )
  }  
@@ -94,4 +95,36 @@ for(a in 19:length(k_factor)){
 #################### MNEI ############################
 ######################################################
 
+# Leitura e preparação para simulação da SAD 
+df_simulacao <- map_df(Sys.glob("./U/*.csv"),read.csv)
+df_simulacao %<>% ddply(names(.)[-13],summarise,U_med=mean(U),U_var=var(U))
+df_simulacao$txt.file %<>% as.character()
+## Conversão dos Parâmetros de MNEE para MNEI ##
+df_simulacao %<>% mutate(L_plot = 100/sqrt(J/DA),
+                         m = d * ( 1 - exp(-L_plot/d) ) / L_plot, 
+                         m_ = m * p / (1 - (1-p) * m),
+                         I = m_ * (J-1)/(1-m_),
+                         J_M=p*DA*2500,
+                         theta=(U_med*(J_M-1))/(1-U_med))
+df_simulacao %<>% mutate(k_prop=k) %>%  group_by(SiteCode,k_prop) %>% nest
+## Predição da SAD
+registerDoMC(3)
+df_simulacao$SADs <- llply(df_simulacao[["data"]],function(X) replicate(100,generate.ESF(theta = X$theta, I = X$I, J = X$J)),.parallel = TRUE)
+f_d_ply <- function(X){
+  # df_name <- df_simulacao[1,]$data %>% as.data.frame
+  # l_SADs <-  df_simulacao[1,]$SADs[[1]]
+  df_name <- X$data %>% as.data.frame
+  l_SADs <- X$SADs[[1]]
+  file_name <- paste0("./SADs_preditas/",gsub(".txt","",df_name[,"txt.file"]),"_k",df_name[,"k"],".EI.", "rep_",1:length(l_SADs),".csv")
+  for(i in 1:length(l_SADs)){
+    write.csv(l_SADs[[i]],
+              file=file_name[i])
+  }
+}
+d_ply(df_simulacao,c("SiteCode","k_prop"),f_d_ply)
+
+
+######################################################
+############## Sintese dos dados #####################
+######################################################
 
