@@ -6,12 +6,16 @@ library(tidyverse)
 library(plyr)
 setwd("/home/danilo/Documentos/Doutorado/artigo_mestrado/simulacao/")
 #funcao coalescente
-source("/home/danilo/Documentos/Doutorado/artigo_mestrado/R_source/dinamica_coalescente_beta.R") 
+source("dinamica_coalescente_beta.R") 
 # dados
 df_referencia <- read.csv(file="df_referencia.csv",row.names = 1,as.is = TRUE)
 # df_referencia %<>% #ddply("quantil_p",summarise,S_max=max(S),S_min=min(S))
                 # filter(S %in% c(195,230,226,26,45,52))
 # df_referencia %>% str
+
+######################################################
+#################### MNEE ############################
+######################################################
 
 ### 1 estimar U ###
 #preparação
@@ -54,16 +58,18 @@ for(a in 19:length(k_factor)){
 # Leitura e preparação para simulação da SAD 
 df_simulacao <- map_df(Sys.glob("./U/*.csv"),read.csv)
 df_simulacao %<>% ddply(names(.)[-13],summarise,U_med=mean(U),U_var=var(U))
+df_simulacao$txt.file %<>% as.character()
+
 
 # Simulação da SAD
 op <- options(digits.secs=6)
 for(a in 19:length(k_factor)){
   # a <- 20
   # i <- 1
-  df_sim <- df_simulacao %>% filter(k == k_factor[20])
+  df_sim <- df_simulacao %>% filter(k == k_factor[a])
   # df_temp=df_sim
   ### funcao para paralelizar o programa
-  # funcao_simulacao <- function(i,df_temp=df_sim){
+  funcao_simulacao <- function(i,df_temp=df_sim){
     aviao <- list()
     aviao <- dinamica_coalescente(U = df_temp[i,"U_med"], 
                                   S = 0, 
@@ -72,16 +78,20 @@ for(a in 19:length(k_factor)){
                                   disp_range = df_temp[i,"d"], 
                                   disp_kernel = df_temp[i,"kernel_code"], 
                                   landscape = df_temp[i,"txt.file"])
-    write.csv(aviao$r,
+    write.csv(aviao,
               file = paste0("./SADs/",
-                            gsub(".txt","",df_temp[i,"txt.file"]),"_k",df_temp[i,"k"],".EE")
+                            gsub(".txt","",df_temp[i,"txt.file"]),"_k",df_temp[i,"k"],".EE.csv")
     )
+ }  
   # paralelização da simulacao
   registerDoMC(3)
   replica.sim <- as.list(1:dim(df_sim)[1])
   l_ply(.data = replica.sim, .fun = funcao_simulacao, .parallel = TRUE)
-}  
+}
 
 
+######################################################
+#################### MNEI ############################
+######################################################
 
 
