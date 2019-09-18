@@ -34,6 +34,8 @@ dinamica_coalescente <- function(U, S=0, N_simul, seed, disp_range, disp_kernel,
     }
     outfile <- tempfile()
     repeat {
+      print(paste('./dinamica_coalescente', land_dims[1], land_dims[2], U, S, N_simul,
+                  seed, disp_range, disp_kernel, infile, outfile))
         system(paste('./dinamica_coalescente', land_dims[1], land_dims[2], U, S, N_simul,
                  seed, disp_range, disp_kernel, infile, outfile))
         if (file.exists(outfile) || S == 0)
