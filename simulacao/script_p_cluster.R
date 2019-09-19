@@ -2,6 +2,8 @@
 ### configuracao
 library(doMC)
 library(GUILDS)
+library(lme4)
+library(merTools)
 library(magrittr)
 library(tidyverse)
 library(plyr)
@@ -14,6 +16,9 @@ df_referencia %<>% filter(S %in% c(195,230,226,26,45,52))
 # ddply("quantil_p",summarise,S_max=max(S),S_min=min(S))
 
 # df_referencia %>% str
+
+##### número de núcleos do computador #####
+n_cores <- 3
 
 ######################################################
 #################### MNEE ############################
@@ -49,7 +54,7 @@ for(a in 19:length(k_factor)){
     return(aviao$U_est)
   }  
   # paralelização da simulacao
-  registerDoMC(3)
+  registerDoMC(n_cores)
   replica.sim <- as.list(1:dim(df_simU)[1])
   sim.coal_U <- llply(.data = replica.sim, .fun = funcao_imigracao, .parallel = TRUE)
   df_simU[,"U"] <- unlist(sim.coal_U)
@@ -73,7 +78,7 @@ f_simulacao <- function(i,df_=df_simulacao){
                                   disp_kernel = X[,"kernel_code"], 
                                   landscape = X[,"txt.file"])
 }
-registerDoMC(3)
+registerDoMC(n_cores)
 simulacao <- as.list(1:dim(df_simulacao)[1])
 df_simulacao$SADs.EE  <- llply(simulacao,f_simulacao,.parallel = TRUE) 
 #funcao para escrita das SADs em .csv
@@ -108,7 +113,7 @@ df_simulacao %<>% mutate(L_plot = 100/sqrt(J/DA),
                          theta=(U_med*(J_M-1))/(1-U_med))
 df_simulacao %<>% mutate(k_prop=k) %>%  group_by(SiteCode,k_prop) %>% nest
 ## Predição da SAD
-registerDoMC(3)
+registerDoMC(n_cores)
 df_simulacao$SADs <- llply(df_simulacao[["data"]],function(X) replicate(100,generate.ESF(theta = X$theta, I = X$I, J = X$J)),.parallel = TRUE)
 f_d_ply <- function(X){
   # df_name <- df_simulacao[1,]$data %>% as.data.frame
@@ -123,7 +128,6 @@ f_d_ply <- function(X){
   }
 }
 d_ply(df_simulacao,c("SiteCode","k_prop"),f_d_ply,.parallel = TRUE)
-
 
 ######################################################
 ############## Sintese dos dados #####################
@@ -179,17 +183,56 @@ f_resultados <- function(X){
   return(df_resultados)
 }
 # registro
-registerDoMC(3)
+registerDoMC(n_cores)
 df_SAD.predita %<>% ddply(.,"SiteCode",f_resultados,.parallel = TRUE)
 write.csv(df_SAD.predita,file="./resultados/df_replicas.csv",row.names = F)
-df_SAD.predita %<>% ddply(.,c("SiteCode","MN","k"),
-                          summarise,
-                          GOF=length(KS.p>=0.05),p.value_mean=mean(KS.p),p.value_var=var(KS.p),S_mean=mean(S_SAD.predita),S_var=var(S_SAD.predita),S.obs_mean=mean(S_SAD.obs))
+df_SAD.predita %<>% ddply(.,c("SiteCode","MN","k"),summarise,
+                          GOF=length(KS.p>=0.05),
+                          p.value_mean=mean(KS.p),p.value_var=var(KS.p),
+                          S_mean=mean(S_SAD.predita),S_var=var(S_SAD.predita),S.obs_mean=mean(S_SAD.obs))
 df_resultados$k %<>% as.character()
 df_SAD.predita %<>% left_join(x=.,y=df_resultados[,c(1:6,11,13:14)],by=c("SiteCode","k"))
 write.csv(df_SAD.predita,file="./resultados/df_resultados.csv",row.names = F)
 
 ######################################################
-############## Análise dos Dados #####################
+############## Analise dos Dados #####################
 ######################################################
+# leitura
+df_resultados <- read.csv(file="./resultados/df_resultados.csv")
+# z score
+f_z <- function(x){
+  m <- base::mean(x,na.rm=TRUE)
+  sd <- sd(x,na.rm=TRUE)
+  output <- (x-m)/sd
+  return(output)
+}
+df_resultados %<>% mutate(p.z = f_z(p),S.z = f_z(S))
+names(df_resultados)[1] <- "Site"
 
+###################### GOF ######################
+
+# estimativa do modelo mais plausível (até o momento) 
+md_GOF <- glmer(cbind(GOF,100-GOF) ~ p.z * k * MN + (MN|Site), family = "binomial",data=df_resultados,
+                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+## bootmer ##
+df_new.data <- expand.grid(Site = df_resultados$Site[1],
+                           p.z = seq(min(df_resultados$p.z)*1.1,max(df_resultados$p.z)*1.1, length=length(unique(df_resultados$p))),
+                           k = unique(df_resultados$k),
+                           MN = unique(df_resultados$MN))
+# previsto considerando a estrutura fixa e aleatória #
+f1 <- function(.) predict(.,newdata=df_new.data)
+# previsto considerando a estrutura fixa #
+f2 <- function(.) predict(.,newdata=df_new.data, re.form=~0)
+## Os dois bootstraps. Ajuste o argumento ncpus para o numero de cores de seu computador
+b1 <- bootMer(md_GOF, FUN = f1, nsim=1000, parallel="multicore", ncpus=n_cores)
+b2 <- bootMer(md_GOF, FUN = f2, nsim=1000, parallel="multicore", ncpus=n_cores)
+# preparacao dos dados
+df_new.data$p <- df_new.data$p.z*sd(df_resultados$p) + mean(df_resultados$p) 
+df_new.data$mean <- apply(b1$t,2,mean)
+df_new.data$IC.low <- apply(b1$t,2,quantile, 0.025)
+df_new.data$IC.upp <- apply(b1$t,2,quantile, 0.975)
+df_new.data$mean.fixed <- apply(b2$t,2,mean)
+df_new.data$IC.low.fixed <- apply(b2$t,2,quantile, 0.025)
+df_new.data$IC.upp.fixed <- apply(b2$t,2,quantile, 0.975)
+# escrita
+write.csv(df_new.data,file="./resultados/df_GOF__bootmer.csv")
