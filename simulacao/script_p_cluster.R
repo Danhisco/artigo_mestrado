@@ -17,21 +17,13 @@ df_referencia %<>% filter(k %in% c(0.99,0.5,0.05))
 # ddply("quantil_p",summarise,S_max=max(S),S_min=min(S))
 
 # df_referencia %>% str
+# df_referencia %>% ggplot(aes(x=k,y=d,group=k)) + geom_boxplot() + geom_jitter() +
+  # labs(y="dist. média (metros)")
+
 
 ##### padronização do sistema #####
 n_cores <- 2 # número de cores do computador 
 n_rep <- 10 # nũmero de SADs replicas
-
-
-
-
-
-
-
-
-
-
-
 ######################################################
 #################### MNEE ############################
 ######################################################
@@ -206,7 +198,8 @@ write.csv(df_SAD.predita,file="./resultados/df_replicas.csv",row.names = F)
 df_SAD.predita %>% head
 df_SAD.predita %>% ggplot(aes(x=KS.D,y=KS.p)) + 
   geom_point() +
-  facet_wrap(MN~k,ncol=3,scales = "free")
+  facet_wrap(MN~k,ncol=3,scales = "free") +
+  labs(x="estatística D, teste KS",y="p-valor")
 df_SAD.predita %>% ggplot(aes(x=S_SAD.obs,y=KS.p)) + 
   geom_point() +
   facet_wrap(MN~k,ncol=3,scales = "free")
@@ -252,9 +245,6 @@ df_resultados %>%
   ggplot(aes(x=p.value_mean,y=GOF)) + 
   geom_point() +
   facet_wrap(MN~k,ncol = 3)
-
-
-
 
 
 ###################### GOF ######################
