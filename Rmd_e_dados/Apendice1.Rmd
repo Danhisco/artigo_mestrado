@@ -18,6 +18,7 @@ knitr::opts_chunk$set(echo = FALSE, tidy = TRUE, include = TRUE, warning = FALSE
 ```
 
 ```{r pacotes,warning=FALSE,message=FALSE,echo=FALSE}
+library(doMC)
 library(gridExtra)
 library(tidyverse)
 library(magrittr)
@@ -33,19 +34,9 @@ library(bbmle)
 ```{r preparacao dos dados,warning=FALSE,message=FALSE}
 ### leitura ###
 df_resultados <- readr::read_csv("/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/df_resultados.csv")
-# df_resultados %>% str
-
-### padronização ###
 names(df_resultados)[1] <- "Site"
-# para o resultada das simulações de k[0.45;0.30]
-df_resultados.k045_030 <- filter(df_resultados,k=="0.99") %>% dplyr::select(-k) %>% unique
-df_resultados.k045_030[,"GOF"] <- NA
-df_bateria <- data_frame(Site=gl(80,4*2,labels=unique(df_resultados.k045_030$Site)), 
-                         k=gl(4,80*2,labels = seq(0.45,0.30,-0.05)), 
-                         MN=gl(2,4*80,labels = c("EE","EI")) )
-df_resultados.k045_030 %<>% left_join(x=df_bateria,y=.,by = c("Site","MN"))
-# dim(df_resultados) == dim(df_resultados.k045_030) 
-df_resultados %<>% rbind(.,df_resultados.k045_030)
+# df_resultados %>% str
+### padronização ###
 ## fatores
 df_resultados$Site <- factor(df_resultados$Site)
 df_resultados$k <- factor(df_resultados$k,levels=unique(df_resultados$k))
@@ -121,11 +112,11 @@ Figura 1. Apêndice 1- Análise Estatística completa. Na primeira linha há as 
 
 ### Congruência entre SAD observada e predita
 
-  Consideramos que um modelo neutro não foi refutado quando o p-valor for maior ou igual à 5%. Contabilizamos o número de predições não refutadas (Goodness-of-fit) e modelamos a probabilidade de uma predição não ser refutada usando um modelo logito. Agrupamos os dados pelo Sítio de observação (Site). É possível agrupar os dados considerando um intercepto por sítio (1|Site); 1 intercepto por modelo neutro (MN|Site); ou com 1 intercepto e 1 inclinação para k por modelo neutro (k*MN|Site). Na última opção k precisa ser interpretado como variável contínua. Um protocolo de seleção de modelos hierarquicos pode ser encontrado em Zuur et al. 2009 onde se recomenda comparar formas alternativas de agrupar os dados a partir do modelo cheio da relação entre as preditoras. O modelo cheio proposto foi com a interação de terceiro grau entre as preditoras p, k e MN. Comparamos todas as combinações possíveis por verossimilhança [DÚVIDA] se entendo corretamente, os parametros da estrutura aleatória são estimados pelo R2 e os estrutura fixa por algo similar à verossimilhança; ai precisa utilizar o parâmetro REML=TRUE [DÚVIDA]
+  Consideramos que um modelo neutro não foi refutado quando o p-valor for maior ou igual à 5%. Contabilizamos o número de predições não refutadas (Goodness-of-fit) e modelamos a probabilidade de uma predição não ser refutada usando um modelo logito. Agrupamos os dados pelo Sítio de observação (Site). É possível agrupar os dados considerando um intercepto por sítio (1|Site); 1 intercepto por modelo neutro (MN|Site); ou com 1 intercepto e 1 inclinação para k por modelo neutro (k*MN|Site). Na última opção k precisa ser interpretado como variável contínua. Um protocolo de seleção de modelos hierarquicos pode ser encontrado em Zuur et al. 2009 onde se recomenda comparar formas alternativas de agrupar os dados a partir do modelo cheio da relação entre as preditoras. O modelo cheio proposto foi com a interação de terceiro grau entre as preditoras p, k e MN. Comparamos todas as combinações possíveis por verossimilhança [DÚVIDA] se entendo corretamente, os parametros da estrutura aleatória são estimados pelo R2 e os estrutura fixa por algo similar à verossimilhança; então precisa utilizar o parâmetro REML=TRUE [DÚVIDA]
 
 __Tabela 1__ Qual o melhor modelo cheio?
   
-```{r tabela 1 comparacao da estrutura aleatoria de GOF}
+```{r tabela 1 comparacao da estrutura aleatoria de GOF, include=FALSE}
 l_md.cheio <- vector("list",5)
 names(l_md.cheio) <- c("k.z 1|Site","k.z MN|Site","k.z k.z*MN|Site","k.f 1|Site","k.f MN|Site")
 l_md.cheio[[1]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k.0.z * MN + (1|Site), family = "binomial",data=df_resultados,
@@ -145,7 +136,7 @@ O modelo estatístico com k como fator e agrupamento dos dados como MN|Site foi 
 
 __Tabela 2__ Qual a relação entre as variáveis é mais plausível?
 
-```{r GOF selecao de modelos}
+```{r GOF selecao de modelos, include=FALSE}
 l_md.selecao <- vector("list",19)
 names(l_md.selecao) <- c("p*k*MN",# modelo cheio
                          "p*k*MN-p:k:MN", #MC - 3a ordem
@@ -208,8 +199,49 @@ AICctab(l_md.selecao,weights=T)
 
 O único modelo plaúsivel é aquele que inclui a interação de terceiro grau. Vamos avaliar os resíduos quantílicos utilizando o pacote DHARMa (REF). Se o modelo estatístico está fazendo um ajuste adequado então a distribuição dos resíduos quantílicos deve ser próximo a de uma distribuição normal (REF). 
 
-```{r res quant l_md.selecao}
+```{r res quant l_md.selecao, include=FALSE}
 plot(simulateResiduals(l_md.selecao[["p*k*MN"]],1000))
 ```
-Figura 2. Resíduos quantílicos do modelo mais plaúsivel [aquele que inclui p:k:MN], para detalhes ver documentação da função 'simulateResiduals'.
+
+Figura 2. Resíduos quantílicos do modelo mais plaúsivel [aquele que inclui p:k:MN], para detalhes ver documentação da função simulateResiduals.
+
+A distribuição dos resíduos quantílicos do modelo mais plausível não apresenta boa aderência à uniformidade.
+
+
+## Anexo:
+
+### Imagens das matrizes de paisagem
+
+
+```{r matrizees de paisagem}
+path_paisagens <- Sys.glob("/home/danilo/Documentos/Doutorado/artigo_mestrado/simulacao/*.txt")
+df_simulacao <- map_df(Sys.glob("~/Documentos/Doutorado/artigo_mestrado/simulacao/U/*.csv"),read.csv) 
+df_simulacao %<>% dplyr::select(SiteCode,p,J,S,DA,txt.file) %>% unique %>% 
+  left_join(x=.,
+            y=data.frame(txt.file=gsub("/home/danilo/Documentos/Doutorado/artigo_mestrado/simulacao/","",path_paisagens),path_paisagens),
+            by = "txt.file")
+df_simulacao$path_paisagens %<>% as.character()
+
+## matriz de paisagem
+
+# f_plot <- function(X){
+#   mat_paisagem <- read.table(X$path_paisagens,header = FALSE) %>% as.matrix()
+#   rotate <- function(a) t(apply(a, 2, rev))
+#   image(rotate(mat_paisagem),main=X$txt.file)
+# }
+# par(mfrow=c(20,4))
+# registerDoMC(2)
+# a_ply(df_simulacao,1,f_plot,.parallel = TRUE)
+
+
+for(i in 1:nrow(df_simulacao)){
+  X <- df_simulacao[i,]
+  mat_paisagem <- read.table(X$path_paisagens,header = FALSE) %>% as.matrix()
+  rotate <- function(a) t(apply(a, 2, rev))
+  image(rotate(mat_paisagem),main=X$SiteCode)
+}
+
+```
+
+
 
