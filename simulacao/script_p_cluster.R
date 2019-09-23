@@ -13,27 +13,38 @@ source("dinamica_coalescente_beta.R")
 # dados
 df_referencia <- read.csv(file="df_referencia.csv",row.names = 1,as.is = TRUE)
 # df_referencia %<>% filter(S %in% c(195,230,226,26,45,52)) # sítios com S extremos em cada terço do gradiente de p
-# df_referencia %<>% filter(k %in% c(0.99,0.5,0.05))
+df_referencia %<>% filter(k %in% c(0.99,0.5,0.05))
 # ddply("quantil_p",summarise,S_max=max(S),S_min=min(S))
 
 # df_referencia %>% str
 
 ##### padronização do sistema #####
 n_cores <- 2 # número de cores do computador 
-n_rep <- 100 # nũmero de  
+n_rep <- 10 # nũmero de SADs replicas
+
+
+
+
+
+
+
+
+
+
+
 ######################################################
 #################### MNEE ############################
 ######################################################
 
 ### estimar U ###
-#preparação
+# número de réplicas
 func1 <- function(x,replicas=10) {
   x$U <- NA
   x <- x[rep(1:dim(x)[1],each=replicas),]
 }
 df_referencia %<>% func1()
 
-### for da simulação ##
+### simulação ##
 # valores de k
 k_factor <- unique(df_referencia$k)
 for(a in 1:length(k_factor)){
@@ -184,16 +195,30 @@ f_resultados <- function(X){
   df_resultados <- adply(df_referencia,1,function(X) f_KSeS(df_predicao = X))
   return(df_resultados)
 }
-# registro
 registerDoMC(n_cores)
 df_SAD.predita %<>% ddply(.,"SiteCode",f_resultados,.parallel = TRUE)
+# registro
 write.csv(df_SAD.predita,file="./resultados/df_replicas.csv",row.names = F)
-df_SAD.predita <- read.csv("./resultados/df_replicas.csv")
+# df_SAD.predita <- read.csv("./resultados/df_replicas.csv")
+################################################
+############ auditoria f_resultados ############
+################################################
+df_SAD.predita %>% head
+df_SAD.predita %>% ggplot(aes(x=KS.D,y=KS.p)) + 
+  geom_point() +
+  facet_wrap(MN~k,ncol=3,scales = "free")
+df_SAD.predita %>% ggplot(aes(x=S_SAD.obs,y=KS.p)) + 
+  geom_point() +
+  facet_wrap(MN~k,ncol=3,scales = "free")
+df_SAD.predita %>% ggplot(aes(x=S_SAD.predita,y=KS.p)) + 
+  geom_point() +
+  facet_wrap(MN~k,ncol=3,scales = "free")
+
+
 df_SAD.predita %<>% ddply(.,c("SiteCode","MN","k","S_SAD.obs"),summarise,
                           GOF=sum(KS.p>=0.05),
                           p.value_mean=mean(KS.p),p.value_var=var(KS.p),
-                          S_mean=mean(S_SAD.predita),S_var=var(S_SAD.predita),
-                          S.obs_SAD=mean(S_SAD.obs))
+                          S_mean=mean(S_SAD.predita),S_var=var(S_SAD.predita))
 df_SAD.predita %<>% left_join(x=.,y=df_resultados[,c(1:6,11,13:14)],by=c("SiteCode","k"))
 write.csv(df_SAD.predita,file="./resultados/df_resultados.csv",row.names = F)
 
@@ -213,15 +238,21 @@ df_resultados %<>% mutate(p.z = f_z(p),S.z = f_z(S))
 names(df_resultados)[1] <- "Site"
 
 ########## Auditoria dos Dados ############
-df_resultados %>% mutate(S.obs = S.obs_mean) %>%  
-  ggplot(aes(x=S,y=S.obs)) + 
+# df_resultados%>% head
+## figura S X S
+df_resultados %>% 
+  ggplot(aes(x=S,y=S_SAD.obs)) + 
   geom_point() + 
   geom_abline(intercept = 0,slope=1,color="red") +
   labs(x="S planilha references on line",
        y="S vetor utilizado em KS")
-df_resultados%>% head
 # df_auditoria <- df_resultados %>% mutate(sitecode_difS=S.obs_mean-S) %>% filter(sitecode_difS>0) %>% select(Site,S,S.obs_mean) %>% unique
 # write.csv(df_auditoria,file="./resultados/df_auditoria.csv",row.names = FALSE)
+df_resultados %>% 
+  ggplot(aes(x=p.value_mean,y=GOF)) + 
+  geom_point() +
+  facet_wrap(MN~k,ncol = 3)
+
 
 
 
