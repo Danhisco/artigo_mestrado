@@ -1,6 +1,6 @@
 ---
 title: 'Apêndice 1'
-author: "Mori, Danilo"
+author: "MORI, Danilo P; LIMA, Renato AF; COUTINHO, Renato M; PRADO, Paulo I"
 date: "14 de setembro de 2019"
 output: 
   html_document:
@@ -28,18 +28,49 @@ library(lme4) # pacote de criação dos modelos estatísticos
 library(bbmle)
 ```
 
+## Relação entre Parâmetros
+
+  Os modelos precisam de um parâmetro que controla a diversidade na metacomunidade e um que controla a dispersão. A relação entre os parâmetros de diversidade pode ser obtida a partir da igualdade proposta por por Vallade & Houchmandzadeh (2003) $\theta = \frac{U  (J_M - 1)}{1-U}$. Para isso aproximamos o número de indivíduos na metacomunidade como $J_M = A_{landscape} * DA_{obs}*p$.
+  
+  
+  O parâmetro m é a probabilidade de um evento de colonização na comunidade local ser por um propágulo da metacomunidade (Hubbel 2001). Podemos definir m como a média das probabilidades de cada sítio na comunidade local ser colonizada por um imigrante (eq 1; Chisholm & Lichstein 2009).
+
+$$ eq 1: m = \frac{1}{A} \int \int_A m_{x,y} dxdy $$  
+
+ Aproximamos as comunidades locais como áreas quadradas com lado L, que pode ser obtido por $L = 100\sqrt{J/DA}$. Assim podemos reescrever a equação 1 como:
+
+$$ eq 2.a :   m = \left(\frac{1}{L} \int\limits_{-L/2}^{L/2} m_{x}(x)\mathrm{d}x \right)^2 $$
+
+$$ eq 2.b :m_{x} = 1 - \int\limits_{-L/2}^{L/2} K(x-y) \mathrm{d}y $$ 
+
+  Onde K é a função de dispersão. Na simulação coalescente a dispersão resulta do sorteio indepentende de duas distribuições de Laplace em eixos ortogonais centradas no sítio vago (figura X). Se consideramos a distribuição de Laplace como $K(x) = \frac{\alpha}{2} e^{-|\alpha x|}$ (idem para o eixo y), então:
+
+$$eq3:m = (\frac{1-e^{-\alpha L}}{\alpha L})^2$$ 
+
+Onde $\alpha = 1/b$, b é o parâmetro escalar da distribuição de Laplace que pode ser escrito em função do desvio-padrão da distribuição de Laplace (d) $b = d/ \sqrt{2}$. o desvio padrão corresponden à distância média de dispersão (Clark et al. 1999). Podemos reescrever a equação de m em funçao de d:
+
+$$ eq4: m = d \frac{1 - e^{-\frac{\sqrt{2} L}{d}} }{\sqrt{2} L} $$ 
+
+Com a equação 4 podemos calcular m a partir do desvio padrão da função de dispersão. Essa equação é válida para o processo de dispersão em paisagens homogêneas. Na simulação coalescente, uma vez que sorteamos um progenitor e este estaria presente em uma unidade de não habitat, o sorteio é refeito até que o progenitor esteja em uma unidade de habitat. Uma aproximação do efeito da fragmentação no calculo de m pode ser obtido por:
+
+$$eq.5: m' = \frac{mp}{1 - (1-p)m} $$
+
+Onde _p_ é a porcentagem de cobertura vegetal na paisagem. Caso seja necessário calcular d a partir de m, utilizamos o ramo principal da função W de Lambert ($W_{0}$):
+
+$$ eq6: d = \frac{\sqrt{2} L}{m W_{0}(- \frac{e^{-1/m}}{m} ) + 1} $$ 
+
 
 ## Análise Estatística Completa
 
 ```{r preparacao dos dados,warning=FALSE,message=FALSE}
 ### leitura ###
-df_resultados <- readr::read_csv("/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/df_resultados.csv")
-names(df_resultados)[1] <- "Site"
+df_resultados <- readr::read_csv("/home/danilo/Documentos/Doutorado/artigo_mestrado/simulacao/resultados/df_resultados.csv")
+# names(df_resultados)[1] <- "Site"
 # df_resultados %>% str
 ### padronização ###
 ## fatores
-df_resultados$Site <- factor(df_resultados$Site)
-df_resultados$k <- factor(df_resultados$k,levels=unique(df_resultados$k))
+# df_resultados$Site <- factor(df_resultados$Site)
+# df_resultados$k <- factor(df_resultados$k,levels=unique(df_resultados$k))
 df_resultados$k.0 = as.numeric(as.character(df_resultados$k))
 df_resultados$MN <- factor(df_resultados$MN,levels = c("EE","EI"))
 # df_resultados$k %>% contrasts()
@@ -53,17 +84,15 @@ f_z <- function(x){
   return(output)
 } 
 # names(df_resultados)
-df_resultados.z <- as.data.frame(apply(df_resultados[c(6:12,19)],2,f_z))
-names(df_resultados.z) <- sapply(names(df_resultados[c(6:12,19)]), function(x) paste(x,".z",sep=""))
+df_resultados.z <- as.data.frame(apply(df_resultados[c("p","J","S","k.0")],2,f_z))
+names(df_resultados.z) <- sapply(names(df_resultados.z), function(x) paste(gsub(".0","",x),".z",sep=""))
 df_resultados %<>% cbind(.,df_resultados.z)
 ### Summary ###
-# summary(df_resultados)
-# str(df_resultados)
-# head(df_resultados)
+# df_resultados %>% head
 
-## rm
-# ls()
-rm(list=c("df_bateria","f_z","df_resultados.k045_030","df_resultados.z"))
+### para auditoria ### remover depois 
+df_resultados.rep <- read.csv("/home/danilo/Documentos/Doutorado/artigo_mestrado/simulacao/resultados/df_replicas.csv")
+df_resultados.rep %<>% left_join(x=.,y=df_resultados[,c("SiteCode","J","S")],by="SiteCode")
 ```
 
 ### Descrição dos Levantamentos Selecionados
@@ -106,11 +135,30 @@ grid.arrange(l_p[[1]],l_p[[2]],l_p[[3]],l_p[[4]],l_p[[5]],l_p[[6]],
 
 ```
 
-Figura 1. Apêndice 1- Análise Estatística completa. Na primeira linha há as variáveis na escala padrão; na segunda linha as variáveis após transformação Z (centra a média em zero e desloca a variação para o centro da distribuição REVISÃO). As linhas em vermelho equivalem ao quantil de 0.25%, 0.50% e 0.75% da amostra. S = riqueza observada; p = proporção de cobertura vegetal na paisagem
+Figura 1. Na primeira linha há as variáveis na escala padrão; na segunda linha as variáveis após transformação Z (centra a média em zero e desloca a variação para o centro da distribuição REVISÃO). As linhas em vermelho equivalem ao quantil de 0.25%, 0.50% e 0.75% da amostra. S = riqueza observada; p = proporção de cobertura vegetal na paisagem
 
   A proporção de cobertura vegetal variou de 0.0074 até 1, o quantil de 25% é de 0.2916, a média é 0.6727 e o quantil de 75% é de 0.9216 (figura 1). A riqueza observada variou de 26 até 230, o quantil de 25% é de 73.75, a média é 105.85, e o quantil de 75% é 134 (figura 1). Há um vies na amostra que apresenta mais trabalhos em paisagens com alta cobertura vegetal do que em baixas, por exemplo, o primeiro 1/4 da amostra está entre 0.00 e 0.30, enquanto o último 1/4 está comprimido entre 0.92 e 1 (figura 1). A riqueza observada apresenta um outro padrão com uma tendência central e uma assimetria para a esquerda [REVISAR]: 50% da amostra está entre 73 e 134 com média e mediana próximos de 100; o primeiro 1/4 da amostra está entre 26 e 73 enquanto o último 1/4 varia entre 134 e 230, o range do 1o quarto equivale à metade do range do último quarto da amostra. Há certa covariação entre p e S: o último quarto de p varia acima do quantil de 25%; enquanto o primeiro quarto de p varia até a mediana de S. Porém os 50% centrais de cada variável estão representadas em todo o gradiente de variação da outra, e.g., entre o quantil de 25% e 75% de p observamos S que varia desde de valores inferiores à 50 até superiores à 200; e um padrão se observa para S. Para realizar a análise estatística aplicamos a transformaçaõ Z em p e S. A transformação Z centraliza no zero a média da distribuição e converte da escala da variável para a de desvio-padrões; dessa forma torna-se mais direta a interpretação de modelos lineares generalizados hierarquicos (REF 2006). Essa transformação move a variação para a região central da distribuição mantendo a relação geral entre as observações (figura 1). Não há motivos a priori para pensar que a predição dos modelos pode ser influênciada pela covariação entre p e S. [DÚVIDA] Paulo, lembro que discutimos sobre a relação entre teste frequentista e o efeito de S * p; me recordo de algo como que ao utilizar o p-valor estariamos de alguma forma ponderando isso [DÚVIDA].
 
 ### Congruência entre SAD observada e predita
+
+#### Auditoria das Replicas
+
+  Espera-se que quanto maior a estatística D do teste de Kolmogorov-Smirnov menor o p-valor observado. Não esperamos observar relação entre p-valor, J e S. Segue avaliação destas espectativas
+
+```{r auditoria teste KS,fig.height=4,fig.width=10}
+l_p <- vector("list",3)
+l_p[[1]] <- ggplot(df_resultados.rep,aes(x=KS.D,y=KS.p)) + geom_point()
+l_p[[2]] <- ggplot(df_resultados.rep,aes(x=J,y=KS.p)) + geom_point() + labs(y="") + theme(axis.text.y = element_blank(), axis.ticks.x = element_blank())
+l_p[[3]] <- ggplot(df_resultados.rep,aes(x=S,y=KS.p)) + geom_point() + labs(y="") + theme(axis.text.y = element_blank(), axis.ticks.x = element_blank())
+do.call("grid.arrange",c(l_p,ncol=3))
+```
+
+Figura 2. o p-valor obtido do teste KS (eixo y) e a maior distância entre os vetores de abundância (KS), tamanho da amostra (J) e riqueza observada (S).
+
+O método parece estar adequado: i) KS.p e KS.D apresentam uma relação inversa; ii) não há covariação entre KS.p com J e S.
+
+
+#### Modelo Estatístico 
 
   Consideramos que um modelo neutro não foi refutado quando o p-valor for maior ou igual à 5%. Contabilizamos o número de predições não refutadas (Goodness-of-fit) e modelamos a probabilidade de uma predição não ser refutada usando um modelo logito. Agrupamos os dados pelo Sítio de observação (Site). É possível agrupar os dados considerando um intercepto por sítio (1|Site); 1 intercepto por modelo neutro (MN|Site); ou com 1 intercepto e 1 inclinação para k por modelo neutro (k*MN|Site). Na última opção k precisa ser interpretado como variável contínua. Um protocolo de seleção de modelos hierarquicos pode ser encontrado em Zuur et al. 2009 onde se recomenda comparar formas alternativas de agrupar os dados a partir do modelo cheio da relação entre as preditoras. O modelo cheio proposto foi com a interação de terceiro grau entre as preditoras p, k e MN. Comparamos todas as combinações possíveis por verossimilhança [DÚVIDA] se entendo corretamente, os parametros da estrutura aleatória são estimados pelo R2 e os estrutura fixa por algo similar à verossimilhança; então precisa utilizar o parâmetro REML=TRUE [DÚVIDA]
 
@@ -238,7 +286,7 @@ for(i in 1:nrow(df_simulacao)){
   X <- df_simulacao[i,]
   mat_paisagem <- read.table(X$path_paisagens,header = FALSE) %>% as.matrix()
   rotate <- function(a) t(apply(a, 2, rev))
-  image(rotate(mat_paisagem),main=X$SiteCode)
+  image(rotate(mat_paisagem),main=paste0(X$SiteCode, " p=",X$p," J=",X$J," S=",X$S))
 }
 
 ```
