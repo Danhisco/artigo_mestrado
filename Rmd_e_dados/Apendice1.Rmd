@@ -1,5 +1,5 @@
 ---
-title: 'Apêndice 1'
+title: 'Apêndice 1: detalhamento dos Métodos'
 author: "MORI, Danilo P; LIMA, Renato AF; COUTINHO, Renato M; PRADO, Paulo I"
 date: "14 de setembro de 2019"
 output: 
@@ -40,8 +40,9 @@ iii) para as demais regiões ->  ano dos dados>= 1995
 iv)  Exceções a esse esquema ocorreram quando trabalhos foram feitos antes do ano de 2000, mas foram realizados em grandes áreas de regiões protegidas (>1000ha) ou em antigos campi universitários, no qual foram incluídos na base de dados.
 
 ```{r dados e Primeiro filtro - DBH e amostra em bloco unico e disponibilidade da SAD}
-df_references <- read.csv(file="/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/references - TreeCo.csv",as.is = TRUE,header =T, na.strings = c("","NA")) %>%
-   select(refID,status,method,arrangement,samples,effort_ha,dbh_cutoff,SiteCode,lat,long,lat_municipio,long_municipio,lat_correct,long_correct,confiabilidade, Unidade_de_conservacao,Unidade_de_conservacao1,UC_area_ha,year_data,year,state,status_diagnostico)
+df_references <- read.csv(file="/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/dados_brutos/references - TreeCo.csv",
+                          as.is = TRUE,header =T, na.strings = c("","NA")) %>%
+   select(refID,status,method,arrangement,samples,effort_ha,dbh_cutoff,SiteCode,lat,long,lat_municipio,long_municipio,lat_correct,long_correct,confiabilidade, Unidade_de_conservacao,Unidade_de_conservacao1,UC_area_ha,year_data,year,state,status_diagnostico,S, N,ordem)
 # df_references %>% names
 # df_references$status_diagnostico %>% unique
 # filtro mais simples
@@ -74,6 +75,41 @@ write.csv(df_simulacao,file="/home/danilo/Documentos/Doutorado/artigo_mestrado/1
 São 115 trabalhos pré-selecionados.
 
 ### Avaliação da abundances e dos .tif dos sites selecionados
+
+- auditoria dos .tif
+
+```{r}
+#package
+# install.packages("raster")
+# install.packages("rgdal")
+library(rgdal)
+library(raster)
+
+
+# data frame de referencia
+df_ref <- read.csv(file="/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/df_referencia.csv",header = TRUE)
+# data frame com as informações dos .tif
+df_tif <- Sys.glob("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/dados_brutos/*.tif") %>% # carregando
+  gsub("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/dados_brutos/","",.) %>% #removendo estrutura de pastas
+  adply(.,1,function(x) unname( unlist( strsplit(x, "_", fixed = TRUE) ) )) %>% #dividindo a informação
+  mutate(refID = gsub("ref","",V1),ordem=gsub(".tif","",V3)) %>% select(refID,ordem) 
+df_tif$tif.name <- Sys.glob("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/dados_brutos/*.tif") %>% #caminho dos .tif
+  gsub("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/dados_brutos/","",.)
+#merge
+class(df_tif$refID) <- class(df_ref$refID)
+class(df_tif$ordem) <- class(df_ref$ordem)
+df_ref %<>% inner_join(x=.,y=df_tif,by=c("refID","ordem")) 
+# auditoria das imagens .tif selecionadas
+
+for(i in 1:nrow(df_ref)){
+  raster <- raster(df_ref$tif.name[1])
+  mat_raster <- matrix(data = getValues(raster)/100, ncol=200)
+  rotate <- function(a) t(apply(a, 2, rev))
+  image(rotate(mat_raster),main=df_ref$SiteCode[i])
+}
+
+```
+
 
 ```{r}
 
