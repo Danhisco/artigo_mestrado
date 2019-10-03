@@ -39,13 +39,45 @@ ii) state %in% Bahia, Goiás, Mato Grosso do Sul -> ano dos dados >= 2000
 iii) para as demais regiões ->  ano dos dados>= 1995
 iv)  Exceções a esse esquema ocorreram quando trabalhos foram feitos antes do ano de 2000, mas foram realizados em grandes áreas de regiões protegidas (>1000ha) ou em antigos campi universitários, no qual foram incluídos na base de dados.
 
-```{r}
+```{r dados e Primeiro filtro - DBH e amostra em bloco unico e disponibilidade da SAD}
 df_references <- read.csv(file="/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/references - TreeCo.csv",as.is = TRUE,header =T, na.strings = c("","NA")) %>%
-   select(refID,status,method,arrangement,samples,effort_ha,dbh_cutoff,SiteCode,lat,long,lat_municipio,long_municipio,lat_correct,long_correct,confiabilidade, Unidade_de_conservacao,Unidade_de_conservacao1,UC_area_ha,year_data,year,state)
+   select(refID,status,method,arrangement,samples,effort_ha,dbh_cutoff,SiteCode,lat,long,lat_municipio,long_municipio,lat_correct,long_correct,confiabilidade, Unidade_de_conservacao,Unidade_de_conservacao1,UC_area_ha,year_data,year,state,status_diagnostico)
 # df_references %>% names
-df_references %>% filter(method=="parcelas" & arrangement == "contiguous" & effort_ha>=1 & status == "yes")
+# df_references$status_diagnostico %>% unique
+# filtro mais simples
+df_references %<>% filter(method=="parcelas" & arrangement == "contiguous" & effort_ha>=1 & status == "yes" & grepl("ok*",status_diagnostico))
+# df_references 
 ```
 
+- 123 trabalhos ao todo no primeiro filtro
+
+```{r Segundo filtro - fragmentos com area >= 1000ha}
+# UC_class<- df_references$Unidade_de_conservacao %>% unique %>% .[c(1,3)]
+UC_class<- df_references$Unidade_de_conservacao %>% unique %>% .[1]
+df_simulacao <- df_references %>% filter(UC_area_ha >= 1000 & Unidade_de_conservacao %in% UC_class)
+# df_simulacao
+```
+
+- 48 trabalhos feitos em universidade e UC de proteção integral e UC_area_ha >= 1000ha
+- 42 trabalhos feitos em universidade e UC_area_ha >= 1000ha
+
+```{r Filtros por estado e ano}
+###    i) state %in% Rio de Janeira, Rio Grande do Sul -> ano dos dados >= 1990
+# df_references$state %>% unique
+# filter(df_references,state %in% c("RJ","RS") & year >= 1990)
+df_simulacao %<>% rbind(.,filter(df_references,state %in% c("RJ","RS") & year >= 1990)) %>% unique # 17 ocorrências do filtro, 14 novas
+df_simulacao %<>% rbind(.,filter(df_references,state %in% c("BA","GO","MS") & year >= 2000)) %>% unique # 22 ocorrências do filtro, 6 novas
+df_simulacao %<>% rbind(.,filter(df_references,!(state %in% c("BA","GO","MS","RJ","RS")) & year >= 1995)) %>% unique # 87 ocorrências, 53 novas 
+write.csv(df_simulacao,file="/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/df_referencia.csv",row.names = FALSE)
+```
+
+São 115 trabalhos pré-selecionados.
+
+### Avaliação da abundances e dos .tif dos sites selecionados
+
+```{r}
+
+```
 
 
 
