@@ -28,16 +28,37 @@ library(lme4) # pacote de criação dos modelos estatísticos
 library(bbmle)
 ```
 
+## Seleção dos levantamentos fitossociológicos
+
+Filtros gerais:
+i) effort >= 1ha; ii) DBH>=5cm; iii) ano dos dados >= 2000;
+
+Filtros condicionais:
+i) state %in% Rio de Janeira, Rio Grande do Sul -> ano dos dados >= 1990
+ii) state %in% Bahia, Goiás, Mato Grosso do Sul -> ano dos dados >= 2000
+iii) para as demais regiões ->  ano dos dados>= 1995
+iv)  Exceções a esse esquema ocorreram quando trabalhos foram feitos antes do ano de 2000, mas foram realizados em grandes áreas de regiões protegidas (>1000ha) ou em antigos campi universitários, no qual foram incluídos na base de dados.
+
+```{r}
+df_references <- read.csv(file="/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/references - TreeCo.csv",as.is = TRUE,header =T, na.strings = c("","NA")) %>%
+   select(refID,status,method,arrangement,samples,effort_ha,dbh_cutoff,SiteCode,lat,long,lat_municipio,long_municipio,lat_correct,long_correct,confiabilidade, Unidade_de_conservacao,Unidade_de_conservacao1,UC_area_ha,year_data,year,state)
+# df_references %>% names
+df_references %>% filter(method=="parcelas" & arrangement == "contiguous" & effort_ha>=1 & status == "yes")
+```
+
+
+
+
 ## Relação entre Parâmetros
 
-  Os modelos precisam de um parâmetro que controla a diversidade na metacomunidade e um que controla a dispersão. A relação entre os parâmetros de diversidade pode ser obtida a partir da igualdade proposta por por Vallade & Houchmandzadeh (2003) $\theta = \frac{U  (J_M - 1)}{1-U}$. Para isso aproximamos o número de indivíduos na metacomunidade como $J_M = A_{landscape} * DA_{obs}*p$.
+  Os modelos precisam de um parâmetro que controla a diversidade na metacomunidade e um que controla a dispersão. A relação entre os parâmetros de diversidade pode ser obtida a partir da igualdade proposta por por Vallade & Houchmandzadeh (2003) $\theta = \frac{U  (J_M - 1)}{1-U}$. Para isso aproximamos o número de indivíduos na metacomunidade como $J_M = A_{landscape} * DA_{obs}*p$.  
   
   
-  O parâmetro m é a probabilidade de um evento de colonização na comunidade local ser por um propágulo da metacomunidade (Hubbel 2001). Podemos definir m como a média das probabilidades de cada sítio na comunidade local ser colonizada por um imigrante (eq 1; Chisholm & Lichstein 2009).
+  O parâmetro m é a probabilidade de um evento de colonização na comunidade local ser por um propágulo da metacomunidade (Hubbel 2001). Uma vez que toda unidade de habitat apresenta igual probabilidade de colonização, podemos definir m como a média das probabilidades de cada sítio na comunidade local ser colonizada por um imigrante (eq 1; Chisholm & Lichstein 2009).
 
 $$ eq 1: m = \frac{1}{A} \int \int_A m_{x,y} dxdy $$  
 
- Aproximamos as comunidades locais como áreas quadradas com lado L, que pode ser obtido por $L = 100\sqrt{J/DA}$. Assim podemos reescrever a equação 1 como:
+ Aproximamos as comunidades locais como áreas quadradas com lado L, que pode ser obtido por $L = \sqrt{10000\frac{J}{DA}}$. Assim podemos reescrever a equação 1 como:
 
 $$ eq 2.a :   m = \left(\frac{1}{L} \int\limits_{-L/2}^{L/2} m_{x}(x)\mathrm{d}x \right)^2 $$
 
@@ -47,22 +68,132 @@ $$ eq 2.b :m_{x} = 1 - \int\limits_{-L/2}^{L/2} K(x-y) \mathrm{d}y $$
 
 $$eq3:m = (\frac{1-e^{-\alpha L}}{\alpha L})^2$$ 
 
-Onde $\alpha = 1/b$, b é o parâmetro escalar da distribuição de Laplace que pode ser escrito em função do desvio-padrão da distribuição de Laplace (d) $b = d/ \sqrt{2}$. o desvio padrão corresponden à distância média de dispersão (Clark et al. 1999). Podemos reescrever a equação de m em funçao de d:
+Onde $\alpha = 1/b$, b é o parâmetro escalar da distribuição de Laplace que pode ser escrito em função do desvio-padrão da distribuição de Laplace (d) $b = d/ \sqrt{2}$. O desvio padrão corresponden à distância média de dispersão (Clark et al. 1999). Podemos reescrever a equação de m em funçao de d:
 
 $$ eq4: m = d \frac{1 - e^{-\frac{\sqrt{2} L}{d}} }{\sqrt{2} L} $$ 
 
-Com a equação 4 podemos calcular m a partir do desvio padrão da função de dispersão. Essa equação é válida para o processo de dispersão em paisagens homogêneas. Na simulação coalescente, uma vez que sorteamos um progenitor e este estaria presente em uma unidade de não habitat, o sorteio é refeito até que o progenitor esteja em uma unidade de habitat. Uma aproximação do efeito da fragmentação no calculo de m pode ser obtido por:
+Com a equação 4 podemos calcular m a partir do desvio padrão da função de dispersão. Essa equação é válida para o processo de dispersão em paisagens homogêneas. Na simulação coalescente, uma vez que sorteamos um progenitor e este estaria presente em uma unidade de não habitat, o sorteio é refeito até que o progenitor esteja em uma unidade de habitat. Uma aproximação do efeito da fragmentação na simulação no m calculado a partir da equação 4 pode ser obtido por:
 
 $$eq.5: m' = \frac{mp}{1 - (1-p)m} $$
 
 Onde _p_ é a porcentagem de cobertura vegetal na paisagem. Caso seja necessário calcular d a partir de m, utilizamos o ramo principal da função W de Lambert ($W_{0}$):
 
-$$ eq6: d = \frac{\sqrt{2} L}{m W_{0}(- \frac{e^{-1/m}}{m} ) + 1} $$ 
+$$ eq6 ANTIGA: d = \frac{\sqrt{2} L}{m W_{0}(- \frac{e^{-1/m}}{m} ) + 1} $$ 
+
+$$ eq6 : d = \frac{\sqrt{2} L m}{m W_{0}(- \frac{e^{-1/m}}{m} ) + 1} $$ 
+
+```{r figura X dispersao dos individuos segundo a funcao de dispersao utilizada, include=FALSE}
+# calcular d a partir do m de BCI
+# library(lamW)
+# m <- 0.1
+# J <- 213724
+# A <- 50
+# DA <- J/A
+# L=sqrt((J/DA)*10000)
+# l_cel <- 100/sqrt(DA)
+# d <- sqrt(2)*L*m / (m * lambertW0(-exp(-1/m)/m) +1)
+# 
+# 
+# 
+# # simulação da chuva de propágulos assumindo dist Laplace para os dados de BCI
+# library(rmutil)
+# density <- 20852/50
+# npoints <- 1e5
+# d_ind_MA  <- 100/sqrt(density)
+# b_laplace <- sigma / sqrt(2)
+# X_laplace.CM <- d_ind_MA * round(rlaplace(npoints, s=b_laplace) / d_ind_MA) 
+# Y_laplace.CM <- d_ind_MA * round(rlaplace(npoints, s=b_laplace) / d_ind_MA)
+# X_laplace <- rlaplace(npoints, s=b_laplace)
+# Y_laplace <- rlaplace(npoints, s=b_laplace)
+# 
+# 
+# dist_laplace <- sqrt(X_laplace^2+Y_laplace^2)
+# plot(x=X_laplace,y=Y_laplace)
+# plot(density(dist_laplace))
+
+
+```
+
+Figura X. Chuva de propágulos pressuposta pela simulação coalescente. No primeiro quadro
+
+
+## Parametrização da Dispersão
+  
+  Os sítios variam na densidade observada e portanto a distância entre os indivíudos na paisagem varia. Então optamos por parametrizar a dispersão pela proporção de propágulos que permanece até a vizinhança imediata da planta progenitora (k), padronizamos pela distância entre o centro de unidades de habitat adjacentes (l=100/sqrt(DA_obs)). Estimamos a distância média de dispersão necessária para obter determinado k.
+
+```{r figura X dispersao dos individuos segundo a funcao de dispersao utilizada , include=FALSE}
+# calcular d a partir do m de BCI
+# 
+# 
+# 
+# 
+# 
+# library(rmutil)
+# density <- 20852/50
+# npoints <- 1e5
+# d_ind_MA  <- 100/sqrt(density)
+# b_laplace <- sigma / sqrt(2)
+# X_laplace.CM <- d_ind_MA * round(rlaplace(npoints, s=b_laplace) / d_ind_MA) 
+# Y_laplace.CM <- d_ind_MA * round(rlaplace(npoints, s=b_laplace) / d_ind_MA)
+# X_laplace <- rlaplace(npoints, s=b_laplace)
+# Y_laplace <- rlaplace(npoints, s=b_laplace)
+# 
+# 
+# dist_laplace <- sqrt(X_laplace^2+Y_laplace^2)
+# plot(x=X_laplace,y=Y_laplace)
+# plot(density(dist_laplace))
+# 
+```
+
+
+  
+```{r}
+qkernel<- function(sigma, kernel, p, density=20852/50, npoints = 1e5){
+    kernel <- match.arg(kernel, choices=c("normal","gaussian","laplace","uniform"))
+    d_ind_MA  <- 100/sqrt(density)
+    if(kernel=="laplace"){
+        b_laplace <- sigma / sqrt(2)
+        X_laplace <- d_ind_MA * round(rlaplace(npoints, s=b_laplace) / d_ind_MA) 
+        Y_laplace <- d_ind_MA * round(rlaplace(npoints, s=b_laplace) / d_ind_MA)
+        dist_laplace <- sqrt(X_laplace^2+Y_laplace^2)
+        result <- quantile(dist_laplace, p)
+    }
+    if(kernel=="normal"|kernel=="gaussian"){
+        b_norm <- sigma 
+        X_norm <- d_ind_MA * round(rnorm(npoints, sd=b_norm) / d_ind_MA)
+        Y_norm <- d_ind_MA * round(rnorm(npoints, sd=b_norm) / d_ind_MA)
+        dist_norm <- sqrt(X_norm^2+Y_norm^2)
+        result <- quantile(dist_norm, p)
+    }
+    if(kernel=="uniform"){
+        b_unif <- sigma/2
+        X_unif <- d_ind_MA * round(runif(npoints, min = -b_unif, max = b_unif) / d_ind_MA)
+        Y_unif <- d_ind_MA * round(runif(npoints, min = -b_unif, max = b_unif) / d_ind_MA)
+        dist_unif <- sqrt(X_unif^2+Y_unif^2)
+        result <- quantile(dist_unif, p)
+    }
+    return(unname(result))
+}
+
+sigkernel <- function(kernel, p, distance, density=20852/50,
+                      npoints =1e5, sigma.min = 1, sigma.max= 100){
+    f1 <- function(x) distance - qkernel(x, kernel, p, density, npoints)
+    uniroot( f1 , lower = sigma.min, upper = sigma.max)
+}
+```
+  
+
+
+
+
+A chuva de propágulos pode ser entendida como o produto da fecundidade e função de dispersão (Clark et al. 1999). Por conta do pressuposto da equivalência funcional todos os indivíduos produzem o mesmo número de propágulos por unidade de tempo (Hubbell 2001), assim, podemos simular cenários de limitação à dispersão em função da porcentagem de propágulos que permace até determinada distância da planta progenitora. Dessa maneira, não precisamos definir a dispersão em termos de distância per se mas em termos de porcentagem de indivíduos que permanecem na área imediata da planta progenitora. Para isso é necessário estabelecer uma distância padrão da planta progenitora e estimar ou definir a porcentagem de indivíduos que se mantêm até esta distância padrão. Como distância padronizamos $l_{cel}$, assim, cada paisagem possui uma distância padrão que depende da densidade observada de indivíduos naquela paisagem [REESCREVER]. Podemos estimar qual a porcentagem de propágulos até a distância padrão que um determinado sd gera, partindo de um m (eqn 2); ou podemos informar a priori quais as porcentagens de interesse e estimar o sd necessário para gerar tais porcentagens. Na simulação coalescente, utilizamos 12 valores de porcentagem para simular os cenários de limitação à dispersão: 99%, seq(95,50,by=-5)% e 25%. Apesar da simulação coalescente ser bem eficiente e permitir simular paisagens infinitas, funções de dispersão que apresentam dispersão muito elevadas são computacionalmente muito onerosas (Rosindell et al. 2008) e apresentariam pouco realismo biológico (REFERÊNCIA), logo, não utilizamos porcentagens muito baixas (e.g.<1%).
+
+Para estimar o sd necessário para gerar uma determinada porcentagem de propágulos até a distância padronizada, desenvolvemos uma função no ambiente de programação R (R language team). A seguir o código utilizado nessa função, note que a função permite utilizar 3 distribuições de probabilidade (uniforme, normal e Laplace), contudo utilizamos apenas a distribuição Laplace.
 
 
 ## Análise Estatística Completa
 
-```{r preparacao dos dados,warning=FALSE,message=FALSE}
+```{r preparacao dos dados,warning=FALSE,message=FALSE, include=FALSE}
 ### leitura ###
 df_resultados <- readr::read_csv("/home/danilo/Documentos/Doutorado/artigo_mestrado/simulacao/resultados/df_resultados.csv")
 # names(df_resultados)[1] <- "Site"
@@ -97,7 +228,7 @@ df_resultados.rep %<>% left_join(x=.,y=df_resultados[,c("SiteCode","J","S")],by=
 
 ### Descrição dos Levantamentos Selecionados
 
-```{r figura 1, fig.width=8, fig.height=5, fig.align="center"}
+```{r figura 1, fig.width=8, fig.height=5, fig.align="center", include=FALSE}
 df_plot <- df_resultados %>% dplyr::filter(k=="0.99" & MN=="EE") %>% dplyr::select(Site, p, S,p.z,S.z) %>% unique
 
 # avaliando as curvas pelo quantiles
@@ -261,7 +392,7 @@ A distribuição dos resíduos quantílicos do modelo mais plausível não apres
 ### Imagens das matrizes de paisagem
 
 
-```{r matrizees de paisagem}
+```{r matrizees de paisagem, include=FALSE}
 path_paisagens <- Sys.glob("/home/danilo/Documentos/Doutorado/artigo_mestrado/simulacao/*.txt")
 df_simulacao <- map_df(Sys.glob("~/Documentos/Doutorado/artigo_mestrado/simulacao/U/*.csv"),read.csv) 
 df_simulacao %<>% dplyr::select(SiteCode,p,J,S,DA,txt.file) %>% unique %>% 
