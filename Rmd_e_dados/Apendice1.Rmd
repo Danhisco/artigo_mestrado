@@ -19,6 +19,10 @@ knitr::opts_chunk$set(echo = FALSE, tidy = TRUE, include = TRUE, warning = FALSE
 ```
 
 ```{r pacotes,warning=FALSE,message=FALSE,echo=FALSE}
+library(raster)
+library(rgdal)
+library(sp)
+library(magick)
 library(doMC)
 library(gridExtra)
 library(tidyverse)
@@ -208,11 +212,7 @@ Figura 1. Comparacao entre os parametros observados na planilha references (eixo
 #### Auditoria dos Rasters
 
 ```{r auditoria rasters}
-#package
-# install.packages(c("sp","rgdal","raster"))
-library(raster)
-library(rgdal)
-library(sp)
+#arrumando formato
 df_dados.disponiveis$SiteCode %<>% as.character()
 df_dados.disponiveis$tif.name %<>% as.character()
 
@@ -223,7 +223,7 @@ for(i in 1:nrow(df_dados.disponiveis)){
  raster <- raster(df_dados.disponiveis$tif.name[i])
  mat_raster <- matrix(data = getValues(raster)/100, ncol=200)
  rotate <- function(a) t(apply(a, 2, rev))
-  image(rotate(mat_raster),main=df_dados.disponiveis$SiteCode[i],col=terrain.colors(12,rev = TRUE),xaxt='n',yaxt='n')
+ image(rotate(mat_raster),main=df_dados.disponiveis$SiteCode[i],col=terrain.colors(12,rev = TRUE),xaxt='n',yaxt='n')
 }
 ```
 
@@ -235,47 +235,78 @@ SiteCodes com problemas no raster:
 
 ### Criação das Matrizes de Paisagem
 
-```{r tif para png ajustado}
-# funcao tif -> png ajustado #
+```{r png to tif}
 func_tif.png <- function(file){
   raster <- raster(file) #leitura do raster
   mat_raster <- matrix(data = getValues(raster)/100, ncol=200) #convertendo para matrix
-  savemat(x = mat_raster, filename = gsub(".tif",".png", file)) #salvando como png
+  squash::savemat(x = mat_raster, filename = gsub(".tif",".png", file)) #salvando como png
 }
-registerDoMC(2)
-sapply(df_dados.disponiveis$tif.name,func_tif.png,.parallel = TRUE) #gera 113 .png, oriundos dos .tif
+sapply(df_dados.disponiveis$tif.name,func_tif.png) #gera 113 .png, oriundos dos .tif
+```
 
-# repetindo o procedimento para *.png #
-png.file <- Sys.glob("*.png") #os arquivos png
-png.file %<>% sapply(., function(x) unname( unlist( strsplit(x, "_", fixed = TRUE) ) ) ) #separando o vetor em 3: refID, estado e ordem segundo a planilha do treeco
-png.file <- data.frame(row.names = NULL,
-                       refID = unname(sapply(unname(png.file[1,]), function(x) gsub("ref","",x))), #extraindo o padrão numerico do refID
-                       ordem = unname(sapply(unname(png.file[3,]), function(x) gsub(".png","",x))), #extraindo o padrão numerico da ordem
-                       png.file = colnames(png.file)) #nome do arquivo
-png.file %<>% arrange(ordem)
-#png.file %>% str 
-png.file$png.file %<>% as.character()
-df_simulacao %<>% inner_join(x = png.file, y =. , by = c("ordem", "refID")) %>% select(refID, ordem, SiteCode, S, N, DA, tif.file,png.file)
-#df_simulacao %>% str
-df_simulacao$SiteCode %<>% factor
-# funcao png -> png ajustado #
-func_png.ajust <- function(file, densidade, A_landscape=500){ #utilizo o image magick
+```{r ajuste resolucao }
+## repetindo o procedimento para *.png
+df_dados.disponiveis %<>% left_join(x=.,
+                                    y=data.frame(png.name = Sys.glob("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/dados_brutos/*.png"),
+                                                 tif.name = gsub(".png",".tif",Sys.glob("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/dados_brutos/*.png")),
+                                    by="tif.name"))
+## funcao png -> png ajustado 
+func_png.ajust <- function(file, densidade, A_landscape=500){ # atualizar para o pacote 'magick'
   system(paste(
     "convert ",file, " -resize ", densidade*A_landscape,"@ ", file,  
     sep = ""
   ))
 }
-df_simulacao %>% select(SiteCode) %>% table %>% as.data.frame()
-d_ply(df_simulacao, "SiteCode",function(x) func_png.ajust(file = x$png.file, densidade = x$DA) ) # produzindo .png com resolução ajustada e mantendo o nome
-
-# auditoria visual - direto na pasta#
-# apenas ref601_RJ_942.png teve problemas na conversão, acredito que seja algum problema na leitura desse arquivo. Vou seguir desconsiderando essa paisagem
-#df_simulacao %<>% filter(png.file != "ref601_RJ_942.png")
-#df_simulacao$SiteCode %<>% factor #drop level
-#df_simulacao %>% str
-rm(func_tif.png,func_png.ajust)
-
+df_dados.disponiveis %<>% mutate(DA=Ntotal/effort_ha) 
+a_ply(df_dados.disponiveis,1,function(x) func_png.ajust(file = x$png.name, densidade = x$DA) ) # ajuste da resolucao em funcao da densidade
+## Auditoria da mudança de resolucao 1: número total de pixels - OK
+# df_dados.disponiveis$png.name %<>% as.character()
+# df_plot <- adply(df_dados.disponiveis,1,function(X) image_info(image_read(X$png.name)))
+# df_plot %>% mutate(n_pixel = width * height, n_pixel.esperado = DA * 500) %>%
+#   ggplot(aes(x=n_pixel.esperado,y=n_pixel)) + geom_abline(intercept = 0,slope = 1,color="red") + geom_point()
+## Auditoria 2: avaliação visual
+# auditoria das imagens .tif selecionadas
+# for(i in 1:nrow(df_dados.disponiveis)){
+#  par(mar=c(0,0,2,0))
+#  # i <- 1
+#  raster <- raster(df_dados.disponiveis$png.name[i])
+#  rotate <- function(a) t(apply(a, 2, rev))
+#  image(raster,main=df_dados.disponiveis$SiteCode[i],col=terrain.colors(12,rev = TRUE),xaxt='n',yaxt='n')
+# }
 ```
+
+Ajuste de Resolução: OK
+
+```{r teste de funcao do pacote magick}
+# png para matriz binaria
+f_values.raster <- function(landscape.name){
+  raster_ <- raster(landscape.name)
+  values_raster <- getValues(raster_)
+  values_raster <- values_raster/max(values_raster)
+  f_habitat <- function(Y){
+    ifelse(Y>=0.70,1,0)
+  }
+  raster_binario <- matrix(sapply(values_raster,f_habitat),nrow=nrow(raster_))
+  return(raster_binario)
+}
+df_dados.disponiveis$png.name %<>% as.character()
+registerDoMC(2)
+df_dados.disponiveis$mat_paisagem <- alply(df_dados.disponiveis,1,function(Y) f_values.raster(landscape.name=Y$png.name),.parallel = TRUE)
+f_tree.cover <- function(mat_paisagem){
+  # df_tree.cover <- df_dados.disponiveis[2,"mat_paisagem"][[1]] %>% as.vector() %>% table %>% as.data.frame() 
+  df_tree.cover <- mat_paisagem %>% as.vector() %>% table %>% as.data.frame()
+  names(df_tree.cover) <- c("cel_class","contagem")
+  df_tree.cover %<>% spread(.,cel_class,contagem)
+  names(df_tree.cover) <- c("nao_habitat","habitat")
+  df_tree.cover %<>% mutate(p = nao_habitat/(nao_habitat+habitat))
+  return(df_tree.cover)
+}
+
+df_dados.disponiveis[2,"mat_paisagem"][[1]] %>% as.vector %>% table() %>% as.data.frame() %>% spread()
+```
+
+
+
 
 
 ## Parametrização da Dispersão
