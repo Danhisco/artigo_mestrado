@@ -277,16 +277,33 @@ a_ply(df_dados.disponiveis,1,function(x) func_png.ajust(file = x$png.name, densi
 
 Ajuste de Resolução: OK
 
+- A simulação requer que tenhamos apenas duas classes de células: a) unidade de não habitat (0); b) unidade de habitat (1)
+
 ```{r teste de funcao do pacote magick}
 # png para matriz binaria
 f_values.raster <- function(landscape.name){
+  # atribuição de variáveis
+  raster_ <- raster(df_dados.disponiveis$png.name)
   raster_ <- raster(landscape.name)
   values_raster <- getValues(raster_)
   values_raster <- values_raster/max(values_raster)
+  # tree.cover cut off
   f_habitat <- function(Y){
     ifelse(Y>=0.70,1,0)
   }
-  raster_binario <- matrix(sapply(values_raster,f_habitat),nrow=nrow(raster_))
+  # unidade de habitat e de não habitat
+  raster_f.focal <- raster(nrow=2+nrow(raster_),ncol=2+ncol(raster_))
+  values(raster_f.focal) <- 0
+    as.vector(
+                                  matrix(
+                                    c(sapply(values_raster,f_habitat)),
+                                    nrow=nrow(raster_),ncol=ncol(raster_))
+                                  )
+  # funcao para tapar buraco de grandes fragmentos e eliminar unidades de habitat solitarias (qual o efeito disso? já vi artigos) 
+  f_focal <- function(x) ifelse(sum(x[x==1],na.rm = TRUE) >= 2,1,0)
+  
+  
+  
   return(raster_binario)
 }
 df_dados.disponiveis$png.name %<>% as.character()
