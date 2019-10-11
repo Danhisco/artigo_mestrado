@@ -3,10 +3,12 @@ title: 'Apêndice 1: detalhamento dos Métodos'
 author: "MORI, Danilo P; LIMA, Renato AF; COUTINHO, Renato M; PRADO, Paulo I"
 date: "14 de setembro de 2019"
 output: 
+  
   html_notebook:
     toc: true
     toc_depth: 5
-  
+editor_options: 
+  chunk_output_type: inline
 ---
 
 <style>
@@ -238,6 +240,7 @@ SiteCodes com problemas no raster:
 ```{r png to tif}
 func_tif.png <- function(file){
   raster <- raster(file) #leitura do raster
+  raster <- raster(df_dados.disponiveis$png.name) #leitura do raster
   mat_raster <- matrix(data = getValues(raster)/100, ncol=200) #convertendo para matrix
   squash::savemat(x = mat_raster, filename = gsub(".tif",".png", file)) #salvando como png
 }
@@ -273,42 +276,155 @@ a_ply(df_dados.disponiveis,1,function(x) func_png.ajust(file = x$png.name, densi
 #  rotate <- function(a) t(apply(a, 2, rev))
 #  image(raster,main=df_dados.disponiveis$SiteCode[i],col=terrain.colors(12,rev = TRUE),xaxt='n',yaxt='n')
 # }
+df_dados.disponiveis$png.name %<>% as.character()
+df_dados.disponiveis
 ```
 
 Ajuste de Resolução: OK
 
 - A simulação requer que tenhamos apenas duas classes de células: a) unidade de não habitat (0); b) unidade de habitat (1)
 
+```{r png para matriz trinaria}
+f_area.simulada <- function(matriz, N){
+#@ matriz :: objeto matriz que representa a posição da unidade de habitat (1) e de não habitat (2).
+#@ N:: tamanho da amostra de indivíduos
+  library(BioPhysConnectoR)
+  # Janela de observação
+  d <- ceiling(sqrt(N)*(3/4)) # metade do lado do janela de observação
+  l <- ceiling(dim(matriz)[1]/2) # linha central da paisagem
+  c <- ceiling(dim(matriz)[2]/2) # coluna central da paisagem
+  # define uma janela central na paisagem onde o for sera aplicado
+  m_temp <- matriz[(l-d):(l+d),(c-d):(c+d)]
+  if(length(m_temp[m_temp==1]) < N) { 
+    stop("habitat insuficiente na janela de observação")
+  # tambem deve estar errado, pois janela de observacao ~ 2.25A_sitio
+  } else if (length(m_temp[m_temp==1]) == N) { 
+    stop("area amostral igual janela de observacao")
+  # paisagens que devem estar adequadas para os métodos
+  } else { 
+    # posição de cada elemento da janela de observação, por coluna em ordem crescente
+    col_cresc <- which(m_temp==m_temp, arr.ind = T)
+    # idem na ordem contrária
+    col_decre <- col_cresc[dim(col_cresc)[1]:1,]
+    # posicao de cada elemento, por linha em ordem crescente
+    row_cresc <- mat.sort(which(m_temp==m_temp, arr.ind = T),1,decreasing = F) 
+    # idem ao controario
+    row_decre <- row_cresc[dim(col_cresc)[1]:1,] 
+    # (nrow - 1)/2; exclui a posição dos elementos da coluna central da janela de observação
+    ciclo <- (dim(m_temp)[1]-1)/2 # 
+    l_mat_index <- list() #lista que vou usar dentro do for
+    dim_temp <- dim(m_temp)[1]
+    for(i in 1:ciclo){
+      a1 <- col_cresc[col_cresc[,"col"]==i,] #considerando o primeiro ciclo: 1a coluna em ordem crescente
+      b1 <- row_cresc[row_cresc[,"row"]==dim_temp+1-i,] #última linha em ordem crescente 
+      c1 <- col_decre[col_decre[,"col"]==dim_temp+1-i,] #última coluna em ordem reversa
+      d1 <- row_decre[row_decre[,"row"]==i,] #primeira linha em ordem reversa; os demais ciclos são com a segunda coluna, penúltima linha, penúltima coluna e segunda linha, etc  
+      l_mat_index[[i]] <- do.call(rbind,list(a1,b1,c1,d1)) #ao final de cada ciclo eu concateno tudo em uma única matriz
+    }
+    l_mat_index[[(dim_temp+1)/2]] <- col_cresc[col_cresc[,"col"]==(dim_temp+1)/2,] #a coluna central deve ser a última
+    mat_ref <- unique(do.call(rbind, l_mat_index)) #remocao de repeticao. Obtenho uma sequência de elementos que descreve uma espiral quadrada convergente
+    length_ref <- length(m_temp[mat_ref][m_temp[mat_ref]==1]) #variável para indexação:
+    m_temp[mat_ref][m_temp[mat_ref]==1][(1+length_ref-N):length_ref] <- 2 #os N últimos elementos que são iguais a 1 e troco por 2
+    matriz[(l-d):(l+d),(c-d):(c+d)] <- m_temp #substituo a matriz de volta
+    return(matriz)
+  }
+}
+
+f_mat.tri <- function(png, abund){ #png.file, número de indivíduos presente 
+  janela <- matrix(1,3,3) 
+  raster <- raster(png)
+  mat <- matrix(getValues(raster)/255, ncol = ncol(raster), nrow = nrow(raster))
+  raster_binario <- raster( matrix(nrow = nrow(mat), ncol = ncol(mat), sapply(mat, function(x) ifelse(x >= 0.7, 1, 0)) ) ) 
+  func_focal <- function(x) ifelse(sum(x[x==1]) >= 5, 1, x[5])
+  binario.focal <- as.matrix( focal(raster_binario, janela, func_focal, pad=TRUE, padvalues = 0))
+  mat_tri <- try(area_simulada(matriz = binario.focal, N = abund))
+  if(class(mat_tri) == "matrix"){ 
+    try(write.table(x = mat_tri, 
+                    file = gsub(".png",".txt", png),
+                    sep = " ", row.names = FALSE, col.names = FALSE))
+  }
+}  
+```
+
+
+
 ```{r teste de funcao do pacote magick}
 # png para matriz binaria
-f_values.raster <- function(landscape.name){
-  # atribuição de variáveis
-  raster_ <- raster(df_dados.disponiveis$png.name)
-  raster_ <- raster(landscape.name)
+    ## figuras ##
+    # par(mar=c(0.5,0.5,2,0.5))
+    # image(raster_return,
+    #       main=paste(df_dados.disponiveis$SiteCode[1],"focal(sum(X[X==1]>=2,1,0)")
+    #       ,xaxt='n',yaxt='n',xlab="",ylab="")
+    # image(raster_focal,
+    #       main=paste(df_dados.disponiveis$SiteCode[1],"tree cover>=0.70,1,0")
+    #       ,xaxt='n',yaxt='n',xlab="",ylab="")
+    # image(raster(df_dados.disponiveis$png.name[1]),
+    #       main=paste(df_dados.disponiveis$SiteCode[1],"png")
+    #       ,xaxt='n',yaxt='n',xlab="",ylab="")
+
+f_mat_binaria <- function(landscape.path,file.name){
+  #@ landscape.path::caminho de arquivo de imagem (tiff ou png)
+  #@ file.name:: nome que a matriz binaria sera gravada
+  #####################
+  ### funcao tree cover
+  ## raster de interesse
+  # raster_ <- raster(df_dados.disponiveis$png.name[1])
+  raster_ <- raster(landscape.path)
   values_raster <- getValues(raster_)
   values_raster <- values_raster/max(values_raster)
-  # tree.cover cut off
-  f_habitat <- function(Y){
-    ifelse(Y>=0.70,1,0)
-  }
-  # unidade de habitat e de não habitat
-  raster_f.focal <- raster(nrow=2+nrow(raster_),ncol=2+ncol(raster_))
-  values(raster_f.focal) <- 0
-    as.vector(
-                                  matrix(
-                                    c(sapply(values_raster,f_habitat)),
-                                    nrow=nrow(raster_),ncol=ncol(raster_))
-                                  )
-  # funcao para tapar buraco de grandes fragmentos e eliminar unidades de habitat solitarias (qual o efeito disso? já vi artigos) 
-  f_focal <- function(x) ifelse(sum(x[x==1],na.rm = TRUE) >= 2,1,0)
-  
-  
-  
-  return(raster_binario)
+  ## raster para a função focal
+  raster_focal <- raster(ncol=2+ncol(raster_),nrow=2+nrow(raster_))
+  values(raster_focal) <- 0
+  mat_focal <- as.matrix(raster_focal)
+  .linhas <- 2:(nrow(mat_focal)-1)
+  .colunas <- 2:(ncol(mat_focal)-1)
+  #####################
+  ### funcoes
+  ## função tree cover cut off: [0,1] -> c(0,1)
+  f_tree.cover <- function(Y) ifelse(Y>=0.70,1,0)
+  values(raster_) <- sapply(values_raster,f_tree.cover) 
+  # atribuicao
+  mat_focal[.linhas,.colunas] <- matrix(getValues(raster_),
+                                        nrow = dim(raster_)[1],
+                                        ncol = dim(raster_)[2])
+  values(raster_focal) <- as.vector(mat_focal)
+  ## função focal 
+  fun_focal <- function(X) ifelse(sum(X[X==1],na.rm = TRUE) >= 2,1,0)
+  # atribuicao
+  raster_return <- focal(raster_focal,
+                         w=matrix(1,nrow = 3, ncol = 3),
+                         fun = fun_focal,
+                         pad = FALSE)
+  #####################
+  ### gravar
+  # file.name <- gsub(".png",".txt",df_dados.disponiveis$png.name[1])
+  write.table(as.matrix(raster_return)[.linhas,.colunas],file = file.name, row.names = FALSE)
 }
-df_dados.disponiveis$png.name %<>% as.character()
+df_dados.disponiveis$png.name %<>% as.character
 registerDoMC(2)
-df_dados.disponiveis$mat_paisagem <- alply(df_dados.disponiveis,1,function(Y) f_values.raster(landscape.name=Y$png.name),.parallel = TRUE)
+a_ply(df_dados.disponiveis,1,function(X) f_mat_binaria(landscape.path = X$png.name,file.name = gsub(".png",".txt",X$png.name)),.parallel = TRUE) 
+```
+
+```{r area simulada}
+mat_tri <- try(area_simulada(matriz = binario.focal, N = individuos)) #aplicando area_simulada
+  if(class(mat_tri) == "matrix"){ 
+    try(write.table(x = mat_tri, 
+                    file = gsub(".png",".txt", png), #mantenho o nome, mudo a extensão
+                    sep = " ", row.names = FALSE, col.names = FALSE)) #o padrão da função coalescente
+  }
+```
+
+auditoria imagens
+
+```{r auditoria imagens}
+
+```
+
+
+
+
+
+```{r}
 f_tree.cover <- function(mat_paisagem){
   # df_tree.cover <- df_dados.disponiveis[2,"mat_paisagem"][[1]] %>% as.vector() %>% table %>% as.data.frame() 
   df_tree.cover <- mat_paisagem %>% as.vector() %>% table %>% as.data.frame()
@@ -319,9 +435,7 @@ f_tree.cover <- function(mat_paisagem){
   return(df_tree.cover)
 }
 
-df_dados.disponiveis[2,"mat_paisagem"][[1]] %>% as.vector %>% table() %>% as.data.frame() %>% spread()
 ```
-
 
 
 
