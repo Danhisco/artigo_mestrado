@@ -219,8 +219,8 @@ df_dados.disponiveis$SiteCode %<>% as.character()
 df_dados.disponiveis$tif.name %<>% as.character()
 
 # auditoria das imagens .tif selecionadas
-par(mar=c(0,0,2,0))
 for(i in 1:nrow(df_dados.disponiveis)){
+  par(mar=c(0,0,2,0))
   # i <- 1
  raster <- raster(df_dados.disponiveis$tif.name[i])
  mat_raster <- matrix(data = getValues(raster)/100, ncol=200)
@@ -231,9 +231,9 @@ for(i in 1:nrow(df_dados.disponiveis)){
 
 SiteCodes com problemas no raster:
 --RJpnrj - remover: raster com problema
+--GOcaldas - remover: parece não estar centrado 
 --MSlada5
---GOcaldas - parece não estar centrado 
---
+-- 
 
 ### Criação das Matrizes de Paisagem
 
@@ -277,7 +277,7 @@ a_ply(df_dados.disponiveis,1,function(x) func_png.ajust(file = x$png.name, densi
 #  image(raster,main=df_dados.disponiveis$SiteCode[i],col=terrain.colors(12,rev = TRUE),xaxt='n',yaxt='n')
 # }
 df_dados.disponiveis$png.name %<>% as.character()
-df_dados.disponiveis
+df_dados.disponiveis %<>% filter(!(SiteCode %in% c("RJpnrj","GOcaldas")))
 ```
 
 Ajuste de Resolução: OK
@@ -288,7 +288,6 @@ Ajuste de Resolução: OK
 f_area.simulada <- function(matriz, N){
 #@ matriz :: objeto matriz que representa a posição da unidade de habitat (1) e de não habitat (2).
 #@ N:: tamanho da amostra de indivíduos
-  library(BioPhysConnectoR)
   # Janela de observação
   d <- ceiling(sqrt(N)*(3/4)) # metade do lado do janela de observação
   l <- ceiling(dim(matriz)[1]/2) # linha central da paisagem
@@ -307,7 +306,7 @@ f_area.simulada <- function(matriz, N){
     # idem na ordem contrária
     col_decre <- col_cresc[dim(col_cresc)[1]:1,]
     # posicao de cada elemento, por linha em ordem crescente
-    row_cresc <- mat.sort(which(m_temp==m_temp, arr.ind = T),1,decreasing = F) 
+    row_cresc <- col_cresc[order(col_cresc[,1],decreasing = FALSE),] 
     # idem ao controario
     row_decre <- row_cresc[dim(col_cresc)[1]:1,] 
     # (nrow - 1)/2; exclui a posição dos elementos da coluna central da janela de observação
@@ -337,13 +336,59 @@ f_mat.tri <- function(png, abund){ #png.file, número de indivíduos presente
   raster_binario <- raster( matrix(nrow = nrow(mat), ncol = ncol(mat), sapply(mat, function(x) ifelse(x >= 0.7, 1, 0)) ) ) 
   func_focal <- function(x) ifelse(sum(x[x==1]) >= 5, 1, x[5])
   binario.focal <- as.matrix( focal(raster_binario, janela, func_focal, pad=TRUE, padvalues = 0))
-  mat_tri <- try(area_simulada(matriz = binario.focal, N = abund))
+  mat_tri <- try(f_area.simulada(matriz = binario.focal, N = abund))
   if(class(mat_tri) == "matrix"){ 
     try(write.table(x = mat_tri, 
                     file = gsub(".png",".txt", png),
                     sep = " ", row.names = FALSE, col.names = FALSE))
   }
-}  
+}
+df_dados.disponiveis$png.name %<>% as.character
+registerDoMC(4)
+a_ply(df_dados.disponiveis,1,function(X) f_mat.tri(png = X$png.name,abund = X$Ntotal),.parallel = TRUE) 
+### Auditoria
+## leitura 
+df_dados.disponiveis %<>% left_join(x=.,
+                                    y=data.frame(txt.name = Sys.glob("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/dados_brutos/*.txt"),
+                                                 tif.name = gsub(".txt",".tif",Sys.glob("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/dados_brutos/*.txt")),
+                                    by="tif.name"))
+df_dados.disponiveis$txt.name %<>% as.character()
+df_dados.disponiveis$SiteCode %<>% as.character()
+## grafico
+rotate <- function(a) t(apply(a, 2, rev))
+for(i in 1:nrow(df_dados.disponiveis)){
+  par(mar=c(0,0,2,0))
+  # i <- 2
+ txt_file <- read.table(df_dados.disponiveis$txt.name[i],header = TRUE,sep = " ",as.is = FALSE) %>% as.matrix
+ image(rotate(txt_file),main=df_dados.disponiveis$SiteCode[i],col=terrain.colors(12,rev = TRUE),xaxt='n',yaxt='n')
+}
+```
+
+- txt.file para avaliação:
+"MGlavr4","MSlada5", "MSlada3", "BAuruc", "ESsoor", "MGlavr6","SCcric1","SPpesmK","SPpesmN"
+
+```{r auditoria de valores}
+df_auditoria <- df_dados.disponiveis %>% filter(SiteCode %in% c("MGlavr4","MSlada5", "MSlada3", "BAuruc", "MGlavr6","SCcric1"))
+f_auditoria <- function(X){
+  # X <- df_auditoria[1,]
+  mat_ <- read.table(X,header = TRUE,sep = " ",as.is = FALSE)
+  v_values_mat_ <- mat_ %>% as.matrix %>%  as.vector %>% unique
+  return(v_values_mat_)
+}
+df_auditoria$txt.name %<>% as.character()
+df_auditoria$valores_txt.file <- alply(df_auditoria,1,function(Y) f_auditoria(X=Y$txt.name))
+# df_auditoria$valores_txt.file[[9]]
+df_auditoria$txt.name %<>% as.character()
+df_auditoria$SiteCode %<>% as.character()
+## grafico
+rotate <- function(a) t(apply(a, 2, rev))
+for(i in 1:nrow(df_auditoria)){
+  par(mar=c(0,0,2,0))
+  # i <- 2
+ txt_file <- read.table(df_auditoria$txt.name[i],header = TRUE,sep = " ",as.is = FALSE) %>% as.matrix
+ image(rotate(txt_file),main=df_auditoria$SiteCode[i],col=terrain.colors(12,rev = TRUE),xaxt='n',yaxt='n')
+}
+
 ```
 
 
