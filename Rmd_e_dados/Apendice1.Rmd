@@ -73,7 +73,7 @@ Qual a implicação de utilizar PBH >= 10.0cm? Qual a faixa de dbh_cutoff razoá
 
 - 7262 trabalhos na references
 - 142 trabalhos ao todo no primeiro filtro
-
+s
 ```{r Segundo filtro fragmentos com area pelo menos 1000ha}
 # se UC protecao integral
 df_simulacao_s_UCprotecao.integral <- df_1ofiltro %>% 
@@ -199,12 +199,12 @@ df_dados.disponiveis %<>% left_join(x=.,
                                             Ntotal=sum(N), Stotal=length(species.correct)),
                                     by="SiteCode")
 # comparacao references e abundances
-l_p <- vector("list",2)
-l_p[[1]] <- ggplot(df_dados.disponiveis,aes(x=N,y=Ntotal)) + geom_point() + geom_abline(intercept = 0,slope = 1,color="red") +
-  labs(x="N references",y="N SAD obs")
-l_p[[2]] <- ggplot(df_dados.disponiveis,aes(x=S,y=Stotal)) + geom_point() + geom_abline(intercept = 0,slope = 1,color="red") +
-  labs(x="S references",y="S SAD obs")
-do.call("grid.arrange",c(l_p,ncol=2))
+# l_p <- vector("list",2)
+# l_p[[1]] <- ggplot(df_dados.disponiveis,aes(x=N,y=Ntotal)) + geom_point() + geom_abline(intercept = 0,slope = 1,color="red") +
+#   labs(x="N references",y="N SAD obs")
+# l_p[[2]] <- ggplot(df_dados.disponiveis,aes(x=S,y=Stotal)) + geom_point() + geom_abline(intercept = 0,slope = 1,color="red") +
+#   labs(x="S references",y="S SAD obs")
+# do.call("grid.arrange",c(l_p,ncol=2))
 ```
 
 Figura 1. Comparacao entre os parametros observados na planilha references (eixo x) e na planilha abundances (eixo y)
@@ -282,7 +282,7 @@ df_dados.disponiveis %<>% filter(!(SiteCode %in% c("RJpnrj","GOcaldas")))
 
 Ajuste de Resolução: OK
 
-- A simulação requer que tenhamos apenas duas classes de células: a) unidade de não habitat (0); b) unidade de habitat (1)
+- matriz binária -> função focal -> matriz trinária
 
 ```{r png para matriz trinaria}
 f_area.simulada <- function(matriz, N){
@@ -381,106 +381,63 @@ df_auditoria$valores_txt.file <- alply(df_auditoria,1,function(Y) f_auditoria(X=
 df_auditoria$txt.name %<>% as.character()
 df_auditoria$SiteCode %<>% as.character()
 ## grafico
-rotate <- function(a) t(apply(a, 2, rev))
-for(i in 1:nrow(df_auditoria)){
+# rotate <- function(a) t(apply(a, 2, rev))
+# for(i in 1:nrow(df_auditoria)){
+#   par(mar=c(0,0,2,0))
+#   # i <- 2
+#  txt_file <- read.table(df_auditoria$txt.name[i],header = TRUE,sep = " ",as.is = FALSE) %>% as.matrix
+#  image(rotate(txt_file),main=df_auditoria$SiteCode[i],col=terrain.colors(12,rev = TRUE),xaxt='n',yaxt='n')
+# }
+df_write <- df_dados.disponiveis %>% 
+  filter(!(SiteCode %in% c("MGlavr4","MSlada5", "MSlada3", "BAuruc", "MGlavr6","SCcric1")))
+write.csv(df_write, 
+          file="/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/df_dados_auditados.csv", 
+          row.names=FALSE)
+```
+
+## Parametrização dos dados
+
+### Proporção de cobertura vegetal 
+
+```{r tree cover}
+df_simulacao <- read.csv("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/df_dados_auditados.csv",header = TRUE,as.is = TRUE)
+f_tree.cover <- function(file_path){
+  mat_paisagem <- read.table(file=file_path,sep=" ",header=TRUE)
+  tree.cover <- as.vector(mat_paisagem)
+  tree.cover <- tree.cover[!is.na(tree.cover)]
+  p <- 1 - length(tree.cover[tree.cover==0])/length(tree.cover)
+  image(as.matrix(mat_paisagem))
+  return(p)
+}
+registerDoMC(4)
+df_simulacao$p <- aaply(df_simulacao$txt.name,1,f_tree.cover,.parallel = TRUE)
+# df_simulacao$p %>% summary
+df_simulacao %>% ggplot(aes(x=p,y=Stotal)) + geom_point()
+```
+
+figura X. p X Stotal
+
+Auditoria final: p X image(txt.file)
+
+```{r auditoria}
+for(i in 1:nrow(df_simulacao)){
   par(mar=c(0,0,2,0))
   # i <- 2
- txt_file <- read.table(df_auditoria$txt.name[i],header = TRUE,sep = " ",as.is = FALSE) %>% as.matrix
- image(rotate(txt_file),main=df_auditoria$SiteCode[i],col=terrain.colors(12,rev = TRUE),xaxt='n',yaxt='n')
+ txt_file <- read.table(df_simulacao$txt.name[i],
+                        header = TRUE,sep = " ",as.is = FALSE) %>% as.matrix
+ image(txt_file,
+       main=paste0(df_simulacao$SiteCode[i]," p=",df_simulacao$p[i]),
+       col=terrain.colors(12,rev = TRUE),xaxt='n',yaxt='n')
 }
-
+df_simulacao %<>% filter(!(SiteCode %in% c("RJpnrj","GOcaldas")))
+write.csv(df_simulacao, 
+          file="/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/df_dados_auditados.csv", 
+          row.names=FALSE)
 ```
 
 
+### Distância média para cada k
 
-```{r teste de funcao do pacote magick}
-# png para matriz binaria
-    ## figuras ##
-    # par(mar=c(0.5,0.5,2,0.5))
-    # image(raster_return,
-    #       main=paste(df_dados.disponiveis$SiteCode[1],"focal(sum(X[X==1]>=2,1,0)")
-    #       ,xaxt='n',yaxt='n',xlab="",ylab="")
-    # image(raster_focal,
-    #       main=paste(df_dados.disponiveis$SiteCode[1],"tree cover>=0.70,1,0")
-    #       ,xaxt='n',yaxt='n',xlab="",ylab="")
-    # image(raster(df_dados.disponiveis$png.name[1]),
-    #       main=paste(df_dados.disponiveis$SiteCode[1],"png")
-    #       ,xaxt='n',yaxt='n',xlab="",ylab="")
-
-f_mat_binaria <- function(landscape.path,file.name){
-  #@ landscape.path::caminho de arquivo de imagem (tiff ou png)
-  #@ file.name:: nome que a matriz binaria sera gravada
-  #####################
-  ### funcao tree cover
-  ## raster de interesse
-  # raster_ <- raster(df_dados.disponiveis$png.name[1])
-  raster_ <- raster(landscape.path)
-  values_raster <- getValues(raster_)
-  values_raster <- values_raster/max(values_raster)
-  ## raster para a função focal
-  raster_focal <- raster(ncol=2+ncol(raster_),nrow=2+nrow(raster_))
-  values(raster_focal) <- 0
-  mat_focal <- as.matrix(raster_focal)
-  .linhas <- 2:(nrow(mat_focal)-1)
-  .colunas <- 2:(ncol(mat_focal)-1)
-  #####################
-  ### funcoes
-  ## função tree cover cut off: [0,1] -> c(0,1)
-  f_tree.cover <- function(Y) ifelse(Y>=0.70,1,0)
-  values(raster_) <- sapply(values_raster,f_tree.cover) 
-  # atribuicao
-  mat_focal[.linhas,.colunas] <- matrix(getValues(raster_),
-                                        nrow = dim(raster_)[1],
-                                        ncol = dim(raster_)[2])
-  values(raster_focal) <- as.vector(mat_focal)
-  ## função focal 
-  fun_focal <- function(X) ifelse(sum(X[X==1],na.rm = TRUE) >= 2,1,0)
-  # atribuicao
-  raster_return <- focal(raster_focal,
-                         w=matrix(1,nrow = 3, ncol = 3),
-                         fun = fun_focal,
-                         pad = FALSE)
-  #####################
-  ### gravar
-  # file.name <- gsub(".png",".txt",df_dados.disponiveis$png.name[1])
-  write.table(as.matrix(raster_return)[.linhas,.colunas],file = file.name, row.names = FALSE)
-}
-df_dados.disponiveis$png.name %<>% as.character
-registerDoMC(2)
-a_ply(df_dados.disponiveis,1,function(X) f_mat_binaria(landscape.path = X$png.name,file.name = gsub(".png",".txt",X$png.name)),.parallel = TRUE) 
-```
-
-```{r area simulada}
-mat_tri <- try(area_simulada(matriz = binario.focal, N = individuos)) #aplicando area_simulada
-  if(class(mat_tri) == "matrix"){ 
-    try(write.table(x = mat_tri, 
-                    file = gsub(".png",".txt", png), #mantenho o nome, mudo a extensão
-                    sep = " ", row.names = FALSE, col.names = FALSE)) #o padrão da função coalescente
-  }
-```
-
-auditoria imagens
-
-```{r auditoria imagens}
-
-```
-
-
-
-
-
-```{r}
-f_tree.cover <- function(mat_paisagem){
-  # df_tree.cover <- df_dados.disponiveis[2,"mat_paisagem"][[1]] %>% as.vector() %>% table %>% as.data.frame() 
-  df_tree.cover <- mat_paisagem %>% as.vector() %>% table %>% as.data.frame()
-  names(df_tree.cover) <- c("cel_class","contagem")
-  df_tree.cover %<>% spread(.,cel_class,contagem)
-  names(df_tree.cover) <- c("nao_habitat","habitat")
-  df_tree.cover %<>% mutate(p = nao_habitat/(nao_habitat+habitat))
-  return(df_tree.cover)
-}
-
-```
 
 
 
