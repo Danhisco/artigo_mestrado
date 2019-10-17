@@ -1,5 +1,5 @@
 ---
-title: 'Apêndice 1: detalhamento dos Métodos'
+title: 'Apêndice 1: criação dos dados'
 author: "MORI, Danilo P; LIMA, Renato AF; COUTINHO, Renato M; PRADO, Paulo I"
 date: "14 de setembro de 2019"
 output: 
@@ -50,16 +50,18 @@ iv)  Exceções a esse esquema ocorreram quando trabalhos foram feitos antes do 
 ```{r dados e Primeiro filtro - DBH e amostra em bloco unico e disponibilidade da SAD}
 df_references <- read.csv(file="/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/dados_brutos/references - TreeCo.csv",
                           as.is = TRUE,header =T, na.strings = c("","NA")) %>%
-   dplyr::select(refID,status,method,arrangement,samples,effort_ha,dbh_cutoff,SiteCode,lat,long,lat_municipio,long_municipio,lat_correct,long_correct,confiabilidade, Unidade_de_conservacao,Unidade_de_conservacao1,UC_area_ha,year_data,year,state,status_diagnostico,S, N,ordem)
+   dplyr::select(refID,status,method,arrangement,samples,effort_ha,dbh_cutoff,SiteCode,lat,long,lat_municipio,long_municipio,lat_correct,long_correct,confiabilidade, Unidade_de_conservacao,Unidade_de_conservacao1,UC_area_ha,year_data,year,state,status_diagnostico,S, N,ordem,frag_area,forest_size,frag_check,domain,forest_type,forest_subtype,forest_succession)
 df_references %>% dim # dim(df_references)
 # df_references %>% names
 # df_references$status_diagnostico %>% unique
 # filtro mais simples
-df_1ofiltro <- df_references %>% filter(method=="parcelas" &  #### "PBH>=10.0cm"
+# df_references$domain %>% unique
+df_1ofiltro <- df_references %>% filter(method=="parcelas" &
                                          grepl("*contiguous*",arrangement) & 
                                         effort_ha>=1 &
                                          grepl("*yes*",status) & 
                                          grepl("ok*",status_diagnostico) &
+                                         grepl("Atlantic_Forest*",domain) &
                                         dbh_cutoff %in% c("PBH>=15.0cm","PBH>=15.7cm","DBH>=5.0cm",
                                                           "DGH>=5.0cm","DBH>5.0cm","DBH>=5.0cm&H>300cm",
                                                           "DBH>=5.0cm&H>500cm", "DBH>=4.8cm", "DGH30>=5.0cm") )
@@ -108,7 +110,7 @@ df_simulacao_filtro.estate %<>% rbind(.,filter(df_1ofiltro,!(state %in% c("BA","
 df_simulacao_filtro.estate %>% dim
 ```
 
-- 132 trabalhos dentro do filtro condicional aos estados
+- 108 trabalhos dentro do filtro condicional aos estados
 
 ```{r merge dos df}
 # merge
@@ -122,8 +124,8 @@ df_ref.S_UCprotecaoIntegral %>% dim
 df_ref.C_UCprotecaoIntegral %>% filter(!(ordem %in% df_ref.S_UCprotecaoIntegral$ordem))
 # gravar
 ## s UC protecao integral
-# write.csv(df_ref.S_UCprotecaoIntegral,file="/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/df_referencia.csv",row.names = FALSE)
-df_ref.S_UCprotecaoIntegral <- read.csv("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/df_referencia.csv",header = TRUE)
+write.csv(df_ref.S_UCprotecaoIntegral,file="/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/df_referencia.csv",row.names = FALSE)
+# df_ref.S_UCprotecaoIntegral <- read.csv("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/df_referencia.csv",header = TRUE)
 ```
 
 - 2 áreas de UC proteao integral ficaram fora do conjunto, porem como UC_area_HA é muito elevado talvez não seja necessário pois devem corresponder à paisagens com alta cobertura vegetal.
@@ -132,36 +134,39 @@ df_ref.S_UCprotecaoIntegral <- read.csv("/home/danilo/Documentos/Doutorado/artig
 
 ```{r SADs obs disponivel}
 # a abundances atualizada 
-df_SAD.obs <- read.csv(file="/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/dados_brutos/abundances.csv",header = TRUE,as.is = TRUE)
-df_SAD.obs$SiteCode %<>% as.factor()
-df_SAD.obs %<>% group_by(SiteCode) %>% nest()
+# df_SAD.obs <- read.csv(file="/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/dados_brutos/abundances.csv",header = TRUE,as.is = TRUE)
+# df_SAD.obs$SiteCode %<>% as.factor()
+# df_SAD.obs %<>% group_by(SiteCode) %>% nest()
 #
-df_dados.disponiveis <- left_join(x=df_ref.S_UCprotecaoIntegral,y=df_SAD.obs,by="SiteCode")
-names(df_dados.disponiveis)[26] <- "SAD.obs"
+# df_dados.disponiveis <- left_join(x=df_ref.S_UCprotecaoIntegral,y=df_SAD.obs,by="SiteCode")
+# names(df_dados.disponiveis)[26] <- "SAD.obs"
 # df_ref.S_UCprotecaoIntegral %>% head
 ```
 
-- 134 trabalhos com SAD observada disponível
+- 110 trabalhos com SAD observada disponível
 
 #### Rasters disponíveis
 
+Pasta atualizada graças ao RAFLima
+
 ```{r rasters disponiveis}
-df_tif <- Sys.glob("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/dados_brutos/*.tif") %>% # carregando
-  gsub("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/dados_brutos/","",.) %>% #removendo estrutura de pastas
-  adply(.,1,function(x) unname( unlist( strsplit(x, "_", fixed = TRUE) ) )) %>% #dividindo a informação
-  mutate(refID = gsub("ref","",V1),ordem=gsub(".tif","",V3)) %>% dplyr::select(refID,ordem) 
-df_tif$tif.name <- Sys.glob("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/dados_brutos/*.tif") #%>% #caminho dos .tif
+df_tif <- Sys.glob("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/paisagens_atualizadas/*.tif") %>% # carregando
+  gsub("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/paisagens_atualizadas/","",.) %>% #removendo estrutura de pastas
+  adply(.,1,function(x) unname( unlist( strsplit(x, "_NA_", fixed = TRUE) ) )) %>% #dividindo a informação
+  mutate(refID = gsub("ref","",V1),ordem=gsub(".tif","",V2)) %>% dplyr::select(refID,ordem) 
+df_tif$tif.name <- Sys.glob("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/paisagens_atualizadas/*.tif") #%>% #caminho dos .tif
   # gsub("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/dados_brutos/","",.)
 #merge
-class(df_tif$refID) <- class(df_dados.disponiveis$refID)
-class(df_tif$ordem) <- class(df_dados.disponiveis$ordem)
-df_dados.disponiveis %<>% inner_join(x=.,y=df_tif,by=c("refID","ordem")) 
-df_dados.disponiveis %>% dim
+class(df_tif$refID) <- class(df_ref.S_UCprotecaoIntegral$refID)
+class(df_tif$ordem) <- class(df_ref.S_UCprotecaoIntegral$ordem)
+df_dados.disponiveis <- left_join(x=select(df_ref.S_UCprotecaoIntegral,-tif.name),y=df_tif,by=c("refID","ordem")) 
+df_dados.disponiveis %>% filter(is.na(tif.name)) %>% dplyr::select(refID,ordem) %>% mutate(refID_num = as.integer(refID)) %>% arrange(refID_num)
 # gravar
-write.csv(dplyr::select(df_dados.disponiveis,-SAD.obs),file="/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/df_referencia.csv",row.names = FALSE)
+# write.csv(df_dados.disponiveis,file="/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/df_referencia.csv",row.names = FALSE)
+# df_dados.disponiveis %>% filter(is.na(tif.name)) %>% select(refID,ordem)
 ```
 
-- 106 trabalhos com raster disponível daqueles com a SAD disponível.
+- 110 trabalhos com raster disponível daqueles com a SAD disponível.
 
 ```{r auditoria df dados atual e anterior}
 #
@@ -198,6 +203,11 @@ df_dados.disponiveis %<>% left_join(x=.,
                                     y=ddply(df_SAD.obs,"SiteCode",summarise,
                                             Ntotal=sum(N), Stotal=length(species.correct)),
                                     by="SiteCode")
+
+df_disp  <-  inner_join(x=df_dados.disponiveis,
+                                    y=ddply(df_SAD.obs,"SiteCode",summarise,
+                                            Ntotal=sum(N), Stotal=length(species.correct)),
+                                    by="SiteCode")
 # comparacao references e abundances
 # l_p <- vector("list",2)
 # l_p[[1]] <- ggplot(df_dados.disponiveis,aes(x=N,y=Ntotal)) + geom_point() + geom_abline(intercept = 0,slope = 1,color="red") +
@@ -211,48 +221,76 @@ Figura 1. Comparacao entre os parametros observados na planilha references (eixo
 
 - Utilizar a coluna Stotal para parametrizar as simulações
 
-#### Auditoria dos Rasters
+
+#### Audioria do recorte de paisagem
+
 
 ```{r auditoria rasters}
+df_dados.disponiveis <- read.csv("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/df_referencia.csv",header = TRUE,as.is = TRUE)
 #arrumando formato
 df_dados.disponiveis$SiteCode %<>% as.character()
 df_dados.disponiveis$tif.name %<>% as.character()
 
 # auditoria das imagens .tif selecionadas
 for(i in 1:nrow(df_dados.disponiveis)){
-  par(mar=c(0,0,2,0))
+ par(mar=c(0,0,2,0))
   # i <- 1
  raster <- raster(df_dados.disponiveis$tif.name[i])
- mat_raster <- matrix(data = getValues(raster)/100, ncol=200)
- rotate <- function(a) t(apply(a, 2, rev))
- image(rotate(mat_raster),main=df_dados.disponiveis$SiteCode[i],col=terrain.colors(12,rev = TRUE),xaxt='n',yaxt='n')
+ mat_raster <- matrix(data = getValues(raster)/100)
+ dim(mat_raster) <- dim(raster)[1:2]
+ # rotate <- function(a) t(apply(a, 1, rev))
+ image(mat_raster,main=df_dados.disponiveis$SiteCode[i],col=terrain.colors(12,rev = TRUE),xaxt='n',yaxt='n')
 }
 ```
 
 SiteCodes com problemas no raster:
---RJpnrj - remover: raster com problema
---GOcaldas - remover: parece não estar centrado 
---MSlada5
--- 
-
+ nenhum
+ 
 ### Criação das Matrizes de Paisagem
 
 ```{r png to tif}
 func_tif.png <- function(file){
   raster <- raster(file) #leitura do raster
-  raster <- raster(df_dados.disponiveis$png.name) #leitura do raster
-  mat_raster <- matrix(data = getValues(raster)/100, ncol=200) #convertendo para matrix
+  # raster <- raster(df_dados.disponiveis$tif.name[df_dados.disponiveis$SiteCode=="MGuberl3"])
+  mat_raster <- matrix(data = getValues(raster)/100) #convertendo para matrix
+  dim(mat_raster) <- dim(raster)[1:2]
+  #recorte de 6x6km: os 200x200 pixeis centrais
+  mat_raster <- mat_raster[301:500,301:500]
   squash::savemat(x = mat_raster, filename = gsub(".tif",".png", file)) #salvando como png
 }
-sapply(df_dados.disponiveis$tif.name,func_tif.png) #gera 113 .png, oriundos dos .tif
+registerDoMC(3)
+# df_dados.disponiveis %>% filter(is.na(tif.name))
+a_ply(df_dados.disponiveis$tif.name,1,func_tif.png,.parallel = TRUE) #gera 113 .png, oriundos dos .tif
 ```
 
-```{r ajuste resolucao }
-## repetindo o procedimento para *.png
+```{r auditoria do recorte e conversao tif para png}
+# leitura
 df_dados.disponiveis %<>% left_join(x=.,
-                                    y=data.frame(png.name = Sys.glob("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/dados_brutos/*.png"),
-                                                 tif.name = gsub(".png",".tif",Sys.glob("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/dados_brutos/*.png")),
+                                    y=data.frame(png.name = Sys.glob("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/paisagens_atualizadas/*.png"),
+                                                 tif.name = gsub(".png",".tif",
+                                                                 Sys.glob("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/paisagens_atualizadas/*.png")),
                                     by="tif.name"))
+df_dados.disponiveis$png.name %<>% as.character()
+# auditoria
+for(i in 1:nrow(df_dados.disponiveis)){
+ par(mar=c(0,0,2,0))
+ # i <- 1
+ raster <- raster(df_dados.disponiveis$png.name[i])
+ rotate <- function(a) t(apply(a, 2, rev))
+ image(raster,main=df_dados.disponiveis$SiteCode[i],col=terrain.colors(12,rev = TRUE),xaxt='n',yaxt='n')
+}
+```
+
+```{r include=FALSE}
+aud <- df_dados.disponiveis %>% filter(SiteCode == "MGuberl3") %>% .$png.name %>% raster()
+mat_aud <- matrix(getValues(aud)/255)
+dim(mat_aud) <- dim(aud)[1:2]
+mat_aud[95:104,95:104]
+```
+
+
+
+```{r ajuste resolucao }
 ## funcao png -> png ajustado 
 func_png.ajust <- function(file, densidade, A_landscape=500){ # atualizar para o pacote 'magick'
   system(paste(
@@ -267,6 +305,7 @@ a_ply(df_dados.disponiveis,1,function(x) func_png.ajust(file = x$png.name, densi
 # df_plot <- adply(df_dados.disponiveis,1,function(X) image_info(image_read(X$png.name)))
 # df_plot %>% mutate(n_pixel = width * height, n_pixel.esperado = DA * 500) %>%
 #   ggplot(aes(x=n_pixel.esperado,y=n_pixel)) + geom_abline(intercept = 0,slope = 1,color="red") + geom_point()
+# df_plot
 ## Auditoria 2: avaliação visual
 # auditoria das imagens .tif selecionadas
 # for(i in 1:nrow(df_dados.disponiveis)){
@@ -276,8 +315,10 @@ a_ply(df_dados.disponiveis,1,function(x) func_png.ajust(file = x$png.name, densi
 #  rotate <- function(a) t(apply(a, 2, rev))
 #  image(raster,main=df_dados.disponiveis$SiteCode[i],col=terrain.colors(12,rev = TRUE),xaxt='n',yaxt='n')
 # }
-df_dados.disponiveis$png.name %<>% as.character()
-df_dados.disponiveis %<>% filter(!(SiteCode %in% c("RJpnrj","GOcaldas")))
+# df_dados.disponiveis$png.name %<>% as.character()
+# df_dados.disponiveis %<>% filter(!(SiteCode %in% c("RJpnrj","GOcaldas")))
+
+df_dados.disponiveis %<>% filter(!is.na(DA))
 ```
 
 Ajuste de Resolução: OK
@@ -344,30 +385,39 @@ f_mat.tri <- function(png, abund){ #png.file, número de indivíduos presente
   }
 }
 df_dados.disponiveis$png.name %<>% as.character
-registerDoMC(4)
+registerDoMC(3)
 a_ply(df_dados.disponiveis,1,function(X) f_mat.tri(png = X$png.name,abund = X$Ntotal),.parallel = TRUE) 
 ### Auditoria
 ## leitura 
+df_dados.disponiveis <- read.csv("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/df_referencia.csv",header = TRUE,as.is = TRUE)
 df_dados.disponiveis %<>% left_join(x=.,
-                                    y=data.frame(txt.name = Sys.glob("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/dados_brutos/*.txt"),
-                                                 tif.name = gsub(".txt",".tif",Sys.glob("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/dados_brutos/*.txt")),
+                                    y=data.frame(txt.name = Sys.glob("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/paisagens_atualizadas/*.txt"),
+                                                 tif.name = aaply(Sys.glob("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/paisagens_atualizadas/*.txt"),1,
+                                                                   function(X) gsub(".txt",".tif",X)),
                                     by="tif.name"))
 df_dados.disponiveis$txt.name %<>% as.character()
 df_dados.disponiveis$SiteCode %<>% as.character()
+df_dados.disponiveis %<>% filter(!is.na(txt.name))
 ## grafico
 rotate <- function(a) t(apply(a, 2, rev))
 for(i in 1:nrow(df_dados.disponiveis)){
   par(mar=c(0,0,2,0))
-  # i <- 2
+  # i <- 3
  txt_file <- read.table(df_dados.disponiveis$txt.name[i],header = TRUE,sep = " ",as.is = FALSE) %>% as.matrix
  image(rotate(txt_file),main=df_dados.disponiveis$SiteCode[i],col=terrain.colors(12,rev = TRUE),xaxt='n',yaxt='n')
 }
 ```
 
-- txt.file para avaliação:
-"MGlavr4","MSlada5", "MSlada3", "BAuruc", "ESsoor", "MGlavr6","SCcric1","SPpesmK","SPpesmN"
+Em alguns casos a comunidade local foi dividida em mais de um fragmento:
+"BAlenc4","MGuberl7",SCserra4","RScach1","RScach2","SCarar","MScoru2","SPeea1"
 
-```{r auditoria de valores}
+```{r }
+df_dados.disponiveis %<>% filter(!(SiteCode %in% c("BAlenc4","MGuberl7","SCserra4","RScach1","RScach2","SCarar","MScoru2","SPeea1")))
+write.csv(df_dados.disponiveis,file="/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/df_dados_auditados.csv",row.names = FALSE)
+```
+
+
+```{r REMOVER, include=FALSE}
 df_auditoria <- df_dados.disponiveis %>% filter(SiteCode %in% c("MGlavr4","MSlada5", "MSlada3", "BAuruc", "MGlavr6","SCcric1"))
 f_auditoria <- function(X){
   # X <- df_auditoria[1,]
@@ -395,22 +445,45 @@ write.csv(df_write,
           row.names=FALSE)
 ```
 
+__Substituição de eventuais NAs por 0__
+
+```{r remocao de NAs dos txt file}
+f_NA_zero <- function(path_){
+  mat_paisagem <- read.table(file=path_,header = FALSE)
+  mat_paisagem[is.na(mat_paisagem)] <- 0
+  write.table(x = mat_paisagem,file = path_,sep = " ", row.names = FALSE, col.names = FALSE)
+}
+df_dados.disponiveis$txt.name %<>% as.character()
+# df_dados.disponiveis$txt.name[1]
+rregisterDoMC(3)
+a_ply(df_dados.disponiveis$txt.name,1,f_NA_zero)
+```
+
+
 ## Parametrização dos dados
 
 ### Proporção de cobertura vegetal 
 
 ```{r tree cover}
-df_simulacao <- read.csv("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/df_dados_auditados.csv",header = TRUE,as.is = TRUE)
+df_simulacao <- read.csv("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/df_dados_auditados.csv",header = TRUE,as.is = TRUE)
 f_tree.cover <- function(file_path){
   mat_paisagem <- read.table(file=file_path,sep=" ",header=TRUE)
   tree.cover <- as.vector(mat_paisagem)
   tree.cover <- tree.cover[!is.na(tree.cover)]
   p <- 1 - length(tree.cover[tree.cover==0])/length(tree.cover)
-  image(as.matrix(mat_paisagem))
   return(p)
 }
-registerDoMC(4)
+registerDoMC(3)
 df_simulacao$p <- aaply(df_simulacao$txt.name,1,f_tree.cover,.parallel = TRUE)
+#
+# summary SAD.obs
+df_SAD.obs <- read.csv(file="/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/dados_brutos/abundances.csv",header = TRUE,as.is = TRUE)
+df_SAD.obs$SiteCode %<>% as.factor()
+# merge e summarise
+df_simulacao %<>% inner_join(x=.,
+                             y=ddply(df_SAD.obs,"SiteCode",summarise,
+                                     Ntotal=sum(N), Stotal=length(species.correct)),
+                             by="SiteCode")
 # df_simulacao$p %>% summary
 df_simulacao %>% ggplot(aes(x=p,y=Stotal)) + geom_point()
 ```
@@ -420,94 +493,35 @@ figura X. p X Stotal
 Auditoria final: p X image(txt.file)
 
 ```{r auditoria}
-for(i in 1:nrow(df_simulacao)){
+df_plot <- df_simulacao %>% select(SiteCode,p,txt.name) %>% distinct()
+for(i in 1:nrow(df_plot)){
   par(mar=c(0,0,2,0))
   # i <- 2
- txt_file <- read.table(df_simulacao$txt.name[i],
+  txt_file <- read.table(df_plot$txt.name[i],
                         header = TRUE,sep = " ",as.is = FALSE) %>% as.matrix
- image(txt_file,
-       main=paste0(df_simulacao$SiteCode[i]," p=",df_simulacao$p[i]),
-       col=terrain.colors(12,rev = TRUE),xaxt='n',yaxt='n')
+  image(txt_file,
+        main=paste0(df_plot$SiteCode[i]," p=",df_plot$p[i]),
+        col=terrain.colors(12,rev = TRUE),xaxt='n',yaxt='n')
 }
-df_simulacao %<>% filter(!(SiteCode %in% c("RJpnrj","GOcaldas")))
+
+df_simulacao$txt.name %>% table
+
+
+# df_simulacao %<>% filter(!(SiteCode %in% c("RJpnrj","GOcaldas")))
 write.csv(df_simulacao, 
           file="/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/df_dados_auditados.csv", 
           row.names=FALSE)
 ```
 
+"BAlenc4","MGuberl7",SCserra4","RScach1","RScach2","SCarar","MScoru2","SPeea1"
 
 ### Distância média para cada k
 
+__Funções Construidas__
 
-
-
-
-## Parametrização da Dispersão
-
-```{r figura X dispersao dos individuos segundo a funcao de dispersao utilizada, include=FALSE}
-# calcular d a partir do m de BCI
-# library(lamW)
-# m <- 0.1
-# J <- 213724
-# A <- 50
-# DA <- J/A
-# L=sqrt((J/DA)*10000)
-# l_cel <- 100/sqrt(DA)
-# d <- sqrt(2)*L*m / (m * lambertW0(-exp(-1/m)/m) +1)
-# 
-# 
-# 
-# # simulação da chuva de propágulos assumindo dist Laplace para os dados de BCI
-# library(rmutil)
-# density <- 20852/50
-# npoints <- 1e5
-# d_ind_MA  <- 100/sqrt(density)
-# b_laplace <- sigma / sqrt(2)
-# X_laplace.CM <- d_ind_MA * round(rlaplace(npoints, s=b_laplace) / d_ind_MA) 
-# Y_laplace.CM <- d_ind_MA * round(rlaplace(npoints, s=b_laplace) / d_ind_MA)
-# X_laplace <- rlaplace(npoints, s=b_laplace)
-# Y_laplace <- rlaplace(npoints, s=b_laplace)
-# 
-# 
-# dist_laplace <- sqrt(X_laplace^2+Y_laplace^2)
-# plot(x=X_laplace,y=Y_laplace)
-# plot(density(dist_laplace))
-
-
-```
-
-Figura X. Chuva de propágulos pressuposta pela simulação coalescente. No primeiro quadro
-
-  
-  Os sítios variam na densidade observada e portanto a distância entre os indivíudos na paisagem varia. Então optamos por parametrizar a dispersão pela proporção de propágulos que permanece até a vizinhança imediata da planta progenitora (k), padronizamos pela distância entre o centro de unidades de habitat adjacentes (l=100/sqrt(DA_obs)). Estimamos a distância média de dispersão necessária para obter determinado k.
-
-```{r figura X dispersao dos individuos segundo a funcao de dispersao utilizada , include=FALSE}
-# calcular d a partir do m de BCI
-# 
-# 
-# 
-# 
-# 
-# library(rmutil)
-# density <- 20852/50
-# npoints <- 1e5
-# d_ind_MA  <- 100/sqrt(density)
-# b_laplace <- sigma / sqrt(2)
-# X_laplace.CM <- d_ind_MA * round(rlaplace(npoints, s=b_laplace) / d_ind_MA) 
-# Y_laplace.CM <- d_ind_MA * round(rlaplace(npoints, s=b_laplace) / d_ind_MA)
-# X_laplace <- rlaplace(npoints, s=b_laplace)
-# Y_laplace <- rlaplace(npoints, s=b_laplace)
-# 
-# 
-# dist_laplace <- sqrt(X_laplace^2+Y_laplace^2)
-# plot(x=X_laplace,y=Y_laplace)
-# plot(density(dist_laplace))
-# 
-```
-
-
-  
-```{r, include=FALSE}
+```{r funcoes para parametrizar}
+library(rmutil)
+library(lamW)
 qkernel<- function(sigma, kernel, p, density=20852/50, npoints = 1e5){
     kernel <- match.arg(kernel, choices=c("normal","gaussian","laplace","uniform"))
     d_ind_MA  <- 100/sqrt(density)
@@ -541,15 +555,66 @@ sigkernel <- function(kernel, p, distance, density=20852/50,
     uniroot( f1 , lower = sigma.min, upper = sigma.max)
 }
 ```
-  
 
+__Estimativa__
 
+percentis utilizados: c(0.99, 0.95:0.05) 
 
+```{r estimando sigmas para os fragmentos do TreeCo, include=FALSE}
+#
+df_simulacao <- read.csv("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/df_dados_auditados.csv",header = TRUE)
+#preparando os dados#
+percentil <- c(0.99,seq(0.95,0.05,-0.05))
+df_simulacao %<>% left_join(x=.,
+                            y=expand.grid(SiteCode = df_simulacao$SiteCode, k = percentil),
+                            by="SiteCode")
 
-A chuva de propágulos pode ser entendida como o produto da fecundidade e função de dispersão (Clark et al. 1999). Por conta do pressuposto da equivalência funcional todos os indivíduos produzem o mesmo número de propágulos por unidade de tempo (Hubbell 2001), assim, podemos simular cenários de limitação à dispersão em função da porcentagem de propágulos que permace até determinada distância da planta progenitora. Dessa maneira, não precisamos definir a dispersão em termos de distância per se mas em termos de porcentagem de indivíduos que permanecem na área imediata da planta progenitora. Para isso é necessário estabelecer uma distância padrão da planta progenitora e estimar ou definir a porcentagem de indivíduos que se mantêm até esta distância padrão. Como distância padronizamos $l_{cel}$, assim, cada paisagem possui uma distância padrão que depende da densidade observada de indivíduos naquela paisagem [REESCREVER]. Podemos estimar qual a porcentagem de propágulos até a distância padrão que um determinado sd gera, partindo de um m (eqn 2); ou podemos informar a priori quais as porcentagens de interesse e estimar o sd necessário para gerar tais porcentagens. Na simulação coalescente, utilizamos 12 valores de porcentagem para simular os cenários de limitação à dispersão: 99%, seq(95,50,by=-5)% e 25%. Apesar da simulação coalescente ser bem eficiente e permitir simular paisagens infinitas, funções de dispersão que apresentam dispersão muito elevadas são computacionalmente muito onerosas (Rosindell et al. 2008) e apresentariam pouco realismo biológico (REFERÊNCIA), logo, não utilizamos porcentagens muito baixas (e.g.<1%).
+#guardando os níveis de kernel 
+df_simulacao$kernel_type <- "laplace"
+df_simulacao$kernel_code <- "2"
+df_simulacao %>% str
+df_simulacao %<>% mutate(DA=Ntotal/effort_ha,dist_0 = 100/sqrt(DA)) 
+df_simulacao$d <- NA
+df_simulacao$kernel_type <- as.character(df_simulacao$kernel_type)
 
-Para estimar o sd necessário para gerar uma determinada porcentagem de propágulos até a distância padronizada, desenvolvemos uma função no ambiente de programação R (R language team). A seguir o código utilizado nessa função, note que a função permite utilizar 3 distribuições de probabilidade (uniforme, normal e Laplace), contudo utilizamos apenas a distribuição Laplace.
+## estimando os sigmas ##
+# source("/home/danilo/Documents/dissertacao/R_source/utility_functions.R")
 
+# funcao para paralelizar
+func_llply <- function(i,data_frame=df_simulacao){
+  df_temp <- data_frame
+  sigma <- sigkernel(kernel = df_temp[i,"kernel_type"], 
+                     p = df_temp[i,"k"], 
+                     distance = df_temp[i,"dist_0"], 
+                     density = df_temp[i,"DA"],
+                     sigma.min=1e-6, 
+                     sigma.max=1e6)$root  
+}
+
+# funcao para paralelizar #
+# paralelizando e armazensando os dados #
+registerDoMC(4)
+replica.sim <- as.list(1:dim(df_simulacao)[1])
+resultados <- llply(.data = replica.sim, .fun = func_llply, .parallel = TRUE)
+df_simulacao$d <- unlist(resultados)
+#
+df_simulacao$d %>% summary
+#
+# df_simulacao <- read.csv("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/df_dados_auditados.csv",header = TRUE)
+df_simulacao %<>% mutate(k_perc = factor(k))
+levels(df_simulacao$k_perc)[2] <- "0.10"
+df_simulacao %>% ggplot(aes(x=k_perc,y=d)) +
+  geom_jitter() +
+  geom_boxplot() +
+  labs(x="% de propágulos na vizinhança imediata",y="Distância média de dispersão (metros)")
+  theme(legend.position = "none")
+#
+write.csv(df_simulacao, 
+          file="/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/df_dados_auditados.csv", 
+          row.names=FALSE)
+```
+
+Figura . Distância média de dispersão por classe de k
 
 ## Análise Estatística Completa
 
@@ -747,6 +812,57 @@ Figura 2. Resíduos quantílicos do modelo mais plaúsivel [aquele que inclui p:
 A distribuição dos resíduos quantílicos do modelo mais plausível não apresenta boa aderência à uniformidade.
 
 
+
+
+
+## Figuras Extras
+
+
+```{r figura X dispersao dos individuos segundo a funcao de dispersao utilizada, include=FALSE}
+# calcular d a partir do m de BCI
+# library(lamW)
+# m <- 0.1
+# J <- 213724
+# A <- 50
+# DA <- J/A
+# L=sqrt((J/DA)*10000)
+# l_cel <- 100/sqrt(DA)
+# d <- sqrt(2)*L*m / (m * lambertW0(-exp(-1/m)/m) +1)
+# 
+# 
+# 
+# # simulação da chuva de propágulos assumindo dist Laplace para os dados de BCI
+# library(rmutil)
+# density <- 20852/50
+# npoints <- 1e5
+# d_ind_MA  <- 100/sqrt(density)
+# b_laplace <- sigma / sqrt(2)
+# X_laplace.CM <- d_ind_MA * round(rlaplace(npoints, s=b_laplace) / d_ind_MA) 
+# Y_laplace.CM <- d_ind_MA * round(rlaplace(npoints, s=b_laplace) / d_ind_MA)
+# X_laplace <- rlaplace(npoints, s=b_laplace)
+# Y_laplace <- rlaplace(npoints, s=b_laplace)
+# 
+# 
+# dist_laplace <- sqrt(X_laplace^2+Y_laplace^2)
+# plot(x=X_laplace,y=Y_laplace)
+# plot(density(dist_laplace))
+
+
+```
+
+Figura X. Chuva de propágulos pressuposta pela simulação coalescente. No primeiro quadro
+
+  
+  Os sítios variam na densidade observada e portanto a distância entre os indivíudos na paisagem varia. Então optamos por parametrizar a dispersão pela proporção de propágulos que permanece até a vizinhança imediata da planta progenitora (k), padronizamos pela distância entre o centro de unidades de habitat adjacentes (l=100/sqrt(DA_obs)). Estimamos a distância média de dispersão necessária para obter determinado k.
+
+
+
+
+A chuva de propágulos pode ser entendida como o produto da fecundidade e função de dispersão (Clark et al. 1999). Por conta do pressuposto da equivalência funcional todos os indivíduos produzem o mesmo número de propágulos por unidade de tempo (Hubbell 2001), assim, podemos simular cenários de limitação à dispersão em função da porcentagem de propágulos que permace até determinada distância da planta progenitora. Dessa maneira, não precisamos definir a dispersão em termos de distância per se mas em termos de porcentagem de indivíduos que permanecem na área imediata da planta progenitora. Para isso é necessário estabelecer uma distância padrão da planta progenitora e estimar ou definir a porcentagem de indivíduos que se mantêm até esta distância padrão. Como distância padronizamos $l_{cel}$, assim, cada paisagem possui uma distância padrão que depende da densidade observada de indivíduos naquela paisagem [REESCREVER]. Podemos estimar qual a porcentagem de propágulos até a distância padrão que um determinado sd gera, partindo de um m (eqn 2); ou podemos informar a priori quais as porcentagens de interesse e estimar o sd necessário para gerar tais porcentagens. Na simulação coalescente, utilizamos 12 valores de porcentagem para simular os cenários de limitação à dispersão: 99%, seq(95,50,by=-5)% e 25%. Apesar da simulação coalescente ser bem eficiente e permitir simular paisagens infinitas, funções de dispersão que apresentam dispersão muito elevadas são computacionalmente muito onerosas (Rosindell et al. 2008) e apresentariam pouco realismo biológico (REFERÊNCIA), logo, não utilizamos porcentagens muito baixas (e.g.<1%).
+
+Para estimar o sd necessário para gerar uma determinada porcentagem de propágulos até a distância padronizada, desenvolvemos uma função no ambiente de programação R (R language team). A seguir o código utilizado nessa função, note que a função permite utilizar 3 distribuições de probabilidade (uniforme, normal e Laplace), contudo utilizamos apenas a distribuição Laplace.
+
+
 ## Anexo:
 
 ### Imagens das matrizes de paisagem
@@ -776,6 +892,9 @@ df_simulacao$path_paisagens %<>% as.character()
 for(i in 1:nrow(df_simulacao)){
   X <- df_simulacao[i,]
   mat_paisagem <- read.table(X$path_paisagens,header = FALSE) %>% as.matrix()
+  dim_ <- 
+  is.na(mat_paisagem) <- 0
+  
   rotate <- function(a) t(apply(a, 2, rev))
   image(rotate(mat_paisagem),main=paste0(X$SiteCode, " p=",X$p," J=",X$J," S=",X$S))
 }
