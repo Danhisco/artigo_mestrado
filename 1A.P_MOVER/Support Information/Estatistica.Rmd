@@ -1,5 +1,5 @@
 ---
-title: "Estatistica"
+title: "Auditoria da Simualação"
 author: "Mori, Danilo"
 date: "19/10/2019"
 output: html_document
@@ -39,56 +39,114 @@ library(dplyr)
 #### U
 
 ```{r auditoria U }
-df_auditoria <- read.csv("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/df_auditoria",header = TRUE, as.is = TRUE)
+# com dados para simular (MN * k * site)
+df_simulacao <- read.csv("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/df_simulacao_EEeEI.csv",header = TRUE, as.is = TRUE)
+names(df_simulacao)
+# organizar as colunas
+df_simulacao %<>% select(SiteCode,refID,ordem,k,p,U_med,U_var,Ntotal,Stotal,DA,d,m,m_,I,J_M,theta)
+# com os dados primeiros (site)
+# df_referencia <- read.csv("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/df_p_simulacao.csv",as.is = TRUE) %>% 
+#   select(SiteCode,refID,ordem) %>% distinct()
+# df_auditoria <- inner_join(x=df_simulacao,y=df_referencia,by="SiteCode")
+
 ggplot(df_auditoria,aes(x=p,y=U_med)) + 
   geom_point() + 
   geom_smooth(method="lm") + 
-  facet_wrap(~k_prop,ncol=4,scales = "free")
+  facet_wrap(~k,ncol=4,scales = "free")
 ```
 
 São 2080 linhas: 104 sítios de amostragem e 20 cenários de limitação à dispersão.
 
 #### SADs preditas
+->> para contar número de arquivos
+ls -l . | egrep -c '^-'
+->> para remover todos os *.csv
+for a in *.csv; do rm $a; done
 
 ```{r avaliacao da simulacao 1}
 # setwd("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/SADs_preditas/")
-## numero de arquivos na pasta SADs_preditas: 392000
+## numero de arquivos na pasta SADs_preditas: 
 system("ls -l ./SADs_preditas/ | egrep -c '^-'")
 ## eu esperava: 416000
-20 * 104 * 100 * 2 - 392000
+# 20 * 104 * 100 * 2 - 392000
 ```
 
 Quais são os sítios que estão faltando? Todas as baterias de simulações apresentam o mesmo número de réplicas? 
 
+Agora temos 416000 SADs e todos as linhas da bateria de simulação foram igualmente replicadas. Em termos de volume de produtos o lote da simulação esta adequado.
+
 ```{r avaliacao da simulacao 1}
 # data frame
 df_SAD.predita <- data.frame(SAD_MN.name=as.character(Sys.glob("./SADs_preditas/*.csv")))
-df_SAD.predita %<>% mutate(MN=str_match(SAD_MN.name,"EE|EI")[,1],
+df_SAD.predita$SAD_MN.name %<>% as.character()
+df_SAD.predita %<>% mutate(MN=as.character(str_match(SAD_MN.name,"EE|EI")),
                            k=str_match(SAD_MN.name,"__k(.*?).E")[,2],
-                           file.tag=gsub("__k","",str_match(SAD_MN.name,"ref(.*?)__k")[,1]),
-                           rep=str_match(SAD_MN.name,"rep_(.*?).csv")[,2])
-df_SAD.predita <- cbind(df_SAD.predita,do.call(rbind,strsplit(df_SAD.predita$file.tag,"_*_"))[,c(1,3)])
-names(df_SAD.predita)[6:7] <- c("refID","ordem")
-df_SAD.predita$refID <- gsub("ref","",df_SAD.predita$refID) 
-# 
-df_SAD.auditoria <- ddply(df_SAD.predita,c("MN","k","refID","ordem"),summarise,n_SAD.predita = length(SAD_MN.name))
-df_SAD.auditoria %<>% select(refID,ordem,n_SAD.predita) %>% distinct()
-#
-df_SAD.auditoria$refID <- as.integer(df_SAD.auditoria$refID)
-df_SAD.auditoria$ordem <- as.integer(as.character(df_SAD.auditoria$ordem))
-df_auditoria %<>% left_join(x=.,
-                            y=df_SAD.auditoria,
-                            by=c("refID","ordem"))
-
-df_auditoria %>% filter(is.na(n_SAD.predita)) %>% select(SiteCode) %>% distinct()
-df_auditoria %<>% select(-k_prop)
-write.csv(filter(df_auditoria,is.na(n_SAD.predita)),
-          file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/df_sitios_nao_simulados.csv",
-          row.names = FALSE)
+                           rep=str_match(SAD_MN.name,"rep_(.*?).csv")[,2],
+                           ordem=str_match(SAD_MN.name,"NA_(.*?)__k")[,2],
+                           refID=str_match(SAD_MN.name,"ref(.*?)_NA")[,2])
+# avaliacao do numero de replicas por linha da bateria de simulacao
+# registerDoMC(3)
+# df_SAD.auditoria <- ddply(df_SAD.predita,c("MN","k","refID","ordem"),summarise,n_SAD.predita = length(SAD_MN.name),.parallel = TRUE)
+#########
+# df_SAD.auditoria %<>% left_join(x=.,y=df_referencia,by=c("refID","ordem"))
+# df_ <- df_SAD.auditoria %>% filter(n_SAD.predita == 200) %>% select(refID,ordem) %>% distinct()
 ```
 
-Apenas 98 sítio foram simulados
+### Avaliação dos sítios que foram simulados
 
+```{r avaliacao da simulacao 4}
+## dados
+# SAD obs de todos os sitios selecionados:
+# df_SAD.obs <- read.csv(file = "/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/dados_brutos/abundances.csv") 
+# path.file_ <- "/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/dados_brutos/"
+# df_SAD.obs %>% filter(SiteCode %in% unique(df_auditoria$SiteCode)) %>% d_ply(.,"SiteCode",
+#       function(X) write.csv(filter(X,species.original!="Mortas"),
+#                             file=paste0(path.file_,"SAD.obs__ref",head(X$RefID,1),"_NA_",head(X$ordem,1),".csv"),
+#                             col.names = FALSE) )
+# colocando em um data frame
+df_SAD.obs <- data.frame(SAD_obs.name = Sys.glob("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/dados_brutos/SAD.obs__ref*.csv"))
+df_SAD.obs$SAD_obs.name %<>% as.character()
+df_SAD.obs %<>% mutate(ordem=str_match(SAD_obs.name,"NA_(.*?).csv")[,2],
+                       refID=str_match(SAD_obs.name,"ref(.*?)_NA")[,2])
+#
+df_SAD.obs %>% str
+# df_SAD.predita %>% str
+# df_resultados %>% str
+### Merges ####
+# preparação
+# merge
+df_auditoria <-  left_join(x=df_SAD.predita,
+                           y=df_SAD.obs,
+                           by=c("refID","ordem"))
+df_auditoria %<>% group_by(SAD_obs.name,MN,k) %>% nest
+## função para os resultados ##
+f_resultados <- function(X){
+  # df_referencia <- df_SAD.predita[1,]$data[[1]] %>% as.data.frame()
+  # v_SAD.obs <- df_SAD.predita[1,]$SAD.obs[[1]] %>% as.data.frame() %>% .$N
+  df_referencia <- X$data[[1]] %>% as.data.frame()
+  v_SAD.obs <- X$SAD.obs[[1]] %>% as.data.frame() %>% .$N
+  f_KSeS <- function(OBS = v_SAD.obs,df_predicao){
+      # df_predicao <- df_referencia[1,]
+      v_SAD.predita <- read.csv(file = df_predicao[,"SAD_MN.name"]) %>% .$SAD_predita %>% as.vector
+      # teste de Kolmogoro-Smirnov #
+        a <- suppressWarnings(ks.test(x = OBS,
+                                      y = v_SAD.predita))
+        a <- data.frame(KS.D = a$statistic, KS.p = a$p.value)
+      a$S_SAD.predita <- length(v_SAD.predita)
+      a$S_SAD.obs <- length(v_SAD.obs) 
+      return(a)
+      }  
+  # teste de KS e armazenamento #
+  resultados <- adply(df_referencia,1,function(Y) f_KSeS(df_predicao = Y))
+  return(resultados)
+}
+registerDoMC(n_cores)
+df_SAD.predita %<>% ddply(.,"SiteCode",f_resultados,.parallel = TRUE)
+# registro
+write.csv(df_SAD.predita,file="./resultados/df_replicas.csv",row.names = F)
+
+
+```
 
 
 
