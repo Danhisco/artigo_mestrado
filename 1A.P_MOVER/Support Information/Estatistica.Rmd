@@ -19,7 +19,7 @@ knitr::opts_knit$set(root.dir = "~/Documentos/Doutorado/artigo_mestrado/1A.P_MOV
 setwd("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/")
 ```
 
-```{r}
+```{r pacotes}
 library(doMC)
 library(GUILDS)
 library(lme4)
@@ -84,6 +84,9 @@ df_SAD.predita %<>% mutate(MN=as.character(str_match(SAD_MN.name,"EE|EI")),
                            rep=str_match(SAD_MN.name,"rep_(.*?).csv")[,2],
                            ordem=str_match(SAD_MN.name,"NA_(.*?)__k")[,2],
                            refID=str_match(SAD_MN.name,"ref(.*?)_NA")[,2])
+write.csv(df_SAD.predita,
+          "~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/df_SAD.predita.csv",
+          row.names = FALSE)
 # avaliacao do numero de replicas por linha da bateria de simulacao
 # registerDoMC(3)
 # df_SAD.auditoria <- ddply(df_SAD.predita,c("MN","k","refID","ordem"),summarise,n_SAD.predita = length(SAD_MN.name),.parallel = TRUE)
@@ -95,56 +98,67 @@ df_SAD.predita %<>% mutate(MN=as.character(str_match(SAD_MN.name,"EE|EI")),
 ### Avaliação dos sítios que foram simulados
 
 ```{r avaliacao da simulacao 4}
+################################
 ## dados
-# SAD obs de todos os sitios selecionados:
-# df_SAD.obs <- read.csv(file = "/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/dados_brutos/abundances.csv") 
-# path.file_ <- "/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/dados_brutos/"
-# df_SAD.obs %>% filter(SiteCode %in% unique(df_auditoria$SiteCode)) %>% d_ply(.,"SiteCode",
-#       function(X) write.csv(filter(X,species.original!="Mortas"),
-#                             file=paste0(path.file_,"SAD.obs__ref",head(X$RefID,1),"_NA_",head(X$ordem,1),".csv"),
-#                             col.names = FALSE) )
-# colocando em um data frame
+################################
+### SAD preditas
+df_SAD.predita <- read.csv("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/df_SAD.predita.csv",header = TRUE,as.is = TRUE)
+### SAD obs
 df_SAD.obs <- data.frame(SAD_obs.name = Sys.glob("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/dados_brutos/SAD.obs__ref*.csv"))
 df_SAD.obs$SAD_obs.name %<>% as.character()
 df_SAD.obs %<>% mutate(ordem=str_match(SAD_obs.name,"NA_(.*?).csv")[,2],
                        refID=str_match(SAD_obs.name,"ref(.*?)_NA")[,2])
-#
-df_SAD.obs %>% str
-# df_SAD.predita %>% str
-# df_resultados %>% str
-### Merges ####
-# preparação
+df_SAD.obs$ordem %<>% as.integer()
+df_SAD.obs$refID %<>% as.integer()
 # merge
 df_auditoria <-  left_join(x=df_SAD.predita,
                            y=df_SAD.obs,
                            by=c("refID","ordem"))
-df_auditoria %<>% group_by(SAD_obs.name,MN,k) %>% nest
+df_auditoria %<>% group_by(SAD_obs.name) %>% nest %>% filter(!is.na(SAD_obs.name))
+################################
 ## função para os resultados ##
-f_resultados <- function(X){
-  # df_referencia <- df_SAD.predita[1,]$data[[1]] %>% as.data.frame()
-  # v_SAD.obs <- df_SAD.predita[1,]$SAD.obs[[1]] %>% as.data.frame() %>% .$N
-  df_referencia <- X$data[[1]] %>% as.data.frame()
-  v_SAD.obs <- X$SAD.obs[[1]] %>% as.data.frame() %>% .$N
-  f_KSeS <- function(OBS = v_SAD.obs,df_predicao){
-      # df_predicao <- df_referencia[1,]
-      v_SAD.predita <- read.csv(file = df_predicao[,"SAD_MN.name"]) %>% .$SAD_predita %>% as.vector
-      # teste de Kolmogoro-Smirnov #
-        a <- suppressWarnings(ks.test(x = OBS,
-                                      y = v_SAD.predita))
-        a <- data.frame(KS.D = a$statistic, KS.p = a$p.value)
-      a$S_SAD.predita <- length(v_SAD.predita)
-      a$S_SAD.obs <- length(v_SAD.obs) 
-      return(a)
-      }  
-  # teste de KS e armazenamento #
-  resultados <- adply(df_referencia,1,function(Y) f_KSeS(df_predicao = Y))
-  return(resultados)
+################################
+### rotina da função
+df_auditoria$resultados <- vector("list",length = nrow(df_auditoria))
+for(i in 1:nrow(df_auditoria)){
+  # i <- 1
+  df_ <- df_auditoria[i,]
+  v_SAD.obs <- sort(read.csv(df_$SAD_obs.name,header = TRUE,as.is = TRUE)$N)
+  df_predicao <- as.data.frame(df_$data[[1]])
+  f_KSeS <- function(v_OBS = v_SAD.obs, path_SAD.MN){
+    # path_SAD.MN <- df_predicao[1,"SAD_MN.name"]
+    v_SAD.predita <- as.integer(read.csv(path_SAD.MN,header = TRUE,as.is = TRUE)$SAD_predita)
+    a <- suppressWarnings(ks.test(x = v_OBS,
+                                  y = v_SAD.predita))
+    a <- data.frame(KS.D = a$statistic, KS.p = a$p.value)
+    a$S_SAD.predita <- length(v_SAD.predita)
+    a$S_SAD.obs <- length(v_SAD.obs) 
+    return(a)
+  }
+  # f_KSeS(path_SAD.MN = df_predicao$SAD_MN.name[10])
+  registerDoMC(4)
+  df_auditoria$resultados[[i]] <- adply(df_predicao,1, function(X) f_KSeS(path_SAD.MN = X$SAD_MN.name),.parallel = TRUE)
 }
-registerDoMC(n_cores)
-df_SAD.predita %<>% ddply(.,"SiteCode",f_resultados,.parallel = TRUE)
-# registro
-write.csv(df_SAD.predita,file="./resultados/df_replicas.csv",row.names = F)
+## Caso alguma SAD obs não estava presente:
+df_auditoria.SAD_obsNA <- left_join(x=df_SAD.predita,
+                                    y=df_SAD.obs,
+                                    by=c("refID","ordem"))
+df_auditoria.SAD_obsNA %<>% filter(is.na(SAD_obs.name)) %>% select(refID,ordem) %>% distinct()
+## completando a ocorr873873ência:
+df_abundances <- read.csv("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/dados_brutos/abundances.csv",
+                          header = TRUE,as.is = TRUE)
+df_abundances %<>% filter(RefID == "873" & ordem == "1328") # não esta disponível.
 
+# registro
+df_p.write <- df_auditoria %>% select(-data) %>% unnest(cols = c(resultados)) %>% as.data.frame()
+write.csv(df_p.write,file="./resultados/df_replicas.csv",row.names = F)
+```
+
+
+Para apagar todos os arquivos com um determinado padrão ("EI"):
+find . -type f -name '*EI*' -delete
+
+```{r}
 
 ```
 
