@@ -158,8 +158,37 @@ write.csv(df_p.write,file="./resultados/df_replicas.csv",row.names = F)
 Para apagar todos os arquivos com um determinado padrão ("EI"):
 find . -type f -name '*EI*' -delete
 
-```{r}
+```{r auditoria das replicas}
+# dados por réplicas
+df_replicas <- read.csv("./resultados/df_replicas.csv",header = TRUE,as.is = TRUE)
+# referencia dos sitios
+df_referencia <- read.csv("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/df_referencia.csv",header = TRUE, as.is = TRUE)
+# merge para replicas
+df_replicas %<>% left_join(x=.,y=df_referencia[,1:5],by=c("ordem","refID"))
+####################
+df_replicas %>% head
+```
 
+
+```{r}
+# sumarise
+registerDoMC(3)
+df_resultados <- ddply(df_replicas,c("MN","k","SiteCode"),summarise,
+                       D_mean = mean(KS.D), D_var = var(KS.D),
+                       p.value_mean = mean(KS.p),p.value_var = var(KS.p),
+                       S.MN_mean = mean(S_SAD.predita), S.MN_var = var(S_SAD.predita),
+                       S.obs_mean=mean(S_SAD.obs),S.obs_var=var(S_SAD.obs),
+                       n_N.ref = sum(KS.p>=0.05), n_ref = sum(KS.p<0.05),
+                       .parallel = TRUE)
+# merge
+df_simulacao <- read.csv("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/df_simulacao_EEeEI.csv",header = TRUE, as.is = TRUE)
+df_resultados %<>% left_join(x=.,
+                             y=select(df_simulacao,SiteCode,k,p,Ntotal,Stotal,U_med,U_var,DA,d,m_,theta),
+                             by=c("SiteCode","k")) 
+df_resultados %>% names
+df_resultados %<>% select(SiteCode,MN,k,p,n_N.ref,n_ref,S.MN_mean,U_med,Ntotal,Stotal,DA,d,m_,theta,U_var,S.MN_var,D_mean,D_var,p.value_mean,p.value_var,S.obs_mean,S.obs_var)
+# gravar
+write.csv(df_resultados,file="./resultados/df_resultados.csv",col.names = FALSE)
 ```
 
 
