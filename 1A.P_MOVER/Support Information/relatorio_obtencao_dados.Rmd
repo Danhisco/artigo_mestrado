@@ -708,3 +708,18 @@ grid.arrange(l_p[[1]],l_p[[2]],l_p[[3]],l_p[[4]],
 
 __Figura 6__ Padrões gerais para o número de SADs refutadas (n_SAD.ref).
 
+
+```{r S predita e obs, eval=TRUE,echo=FALSE}
+# dados
+df_resultados <- read.table(file="./resultados/df_resultados.csv",header = TRUE,sep = ";",dec = ".",as.is=FALSE)
+level_k <- unique(as.character(df_resultados$k))
+df_resultados$k <- factor(as.character(df_resultados$k),levels = level_k)
+levels(df_resultados$k)[19] <- "0.1"
+# graficos
+ggplot(df_resultados,aes(x=S.obs_mean,y=S.MN_mean,color=MN)) +
+  geom_abline(intercept = 0,slope = 1,color="red") +
+  geom_point() +
+  facet_wrap(~k,ncol=4,scales="free")
+```
+
+__Figura 7__ S_predita ~ S_obs
