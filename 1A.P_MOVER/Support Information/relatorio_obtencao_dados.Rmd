@@ -1,0 +1,319 @@
+---
+title: "Relatorio de obtenção dos resultados"
+author: "Mori, Danilo"
+date: "29/10/2019"
+output: 
+  html_document:
+    toc: true
+    toc_depth: 5
+---
+
+<style>
+body {
+text-align: justify}
+</style>
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, tidy = FALSE, include = TRUE, warning = FALSE,cache = TRUE,message=FALSE,eval=FALSE)
+knitr::opts_knit$set(root.dir = "~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/")
+setwd("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/")
+```
+
+```{r pacotes}
+library(doMC)
+library(GUILDS)
+library(lme4)
+library(merTools)
+library(magrittr)
+library(gridExtra)
+library(ggplot2)
+library(stringr)
+library(tidyr)
+library(plyr)
+library(purrr)
+library(dplyr)
+```
+
+
+# Seleção e Preparo dos Sítios de Amostragem
+
+## Dados Disponíveis
+
+### Seleção dos trabalhos fitossociológicos
+
+__Filtros gerais:__  
+i) effort >= 1ha; ii) DBH>=5cm; iii) ano dos dados >= 2000;
+
+__Filtros condicionais:__  
+i) state %in% Rio de Janeira, Rio Grande do Sul -> ano dos dados >= 1990  
+ii) state %in% Bahia, Goiás, Mato Grosso do Sul -> ano dos dados >= 2000  
+iii) para as demais regiões ->  ano dos dados>= 1995  
+iv) Exceções a esse esquema ocorreram quando trabalhos foram feitos antes do ano de 2000 em grandes áreas de regiões protegidas (>1000ha) ou em antigos campi universitários.  
+
+```{r filtros references}
+### dados
+df_references <- read.csv(file="/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/dados_brutos/references - TreeCo.csv",
+                          as.is = TRUE,header =T, na.strings = c("","NA"))
+### filtro geral
+df_1ofiltro <- df_references %>% filter(method=="parcelas" &
+                                         grepl("*contiguous*",arrangement) & 
+                                        effort_ha>=1 &
+                                         grepl("*yes*",status) & 
+                                         grepl("ok*",status_diagnostico) &
+                                         grepl("Atlantic_Forest*",domain) &
+                                        dbh_cutoff %in% c("PBH>=15.0cm","PBH>=15.7cm",
+                                                          "DBH>=5.0cm","DGH>=5.0cm",
+                                                          "DBH>=4.8cm",
+                                                          "DBH>=5.0cm&H>300cm","DBH>=5.0cm&H>500cm", 
+                                                          "DGH30>=5.0cm") )
+### filtro universidades e campi
+df_simulacao_s_UCprotecao.integral <- df_1ofiltro %>% 
+  filter(UC_area_ha >= 1000 & 
+         Unidade_de_conservacao == "universities and research centers")
+### filtro estados
+df_simulacao_filtro.estate <- filter(df_1ofiltro,state %in% c("RJ","RS") & year >= 1990)
+df_simulacao_filtro.estate %<>% rbind(.,filter(df_1ofiltro,state %in% c("BA","GO","MS") & year >= 2000)) %>% 
+  unique
+df_simulacao_filtro.estate %<>% rbind(.,filter(df_1ofiltro,!(state %in% c("BA","GO","MS","RJ","RS")) & year >= 1995)) %>% 
+  unique
+### unindo e salvando
+df_ref.S_UCprotecaoIntegral <- rbind(df_simulacao_s_UCprotecao.integral,df_simulacao_filtro.estate) %>% 
+  distinct()
+```
+
+
+### SADs obs Raster de Paisagem
+
+- A SAD obs conta com a abundância dos indivíduos mortos em pé, que foram desconsiderados para a parametrização das simulações.  
+
+```{r tratamento}
+# SAD obs
+df_SAD.obs <- read.csv(file="/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/dados_brutos/abundances.csv",header = TRUE,as.is = TRUE)
+df_SAD.obs$SiteCode %<>% as.factor()
+df_SAD.obs %<>% filter(species.correct != "Mortas") %>% select(SiteCode,RefID,ordem,species.correct,N) #%>% group_by(SiteCode,RefID,ordem) %>% nest
+names(df_SAD.obs)[2] <- "refID"
+# merge
+df_dados.disponiveis %<>% inner_join(x=.,
+                                     y=ddply(df_SAD.obs,"SiteCode",summarise,
+                                            Ntotal=sum(N), Stotal=length(species.correct)),
+                                     by="SiteCode")
+
+```
+
+
+### Raster de Paisagem
+
+- Os rasters de paisagem atualizados são para áreas > 5km2.  
+- A resolução dos arquivos é de 30x30m e o lado da paisagem é de 800 pixels.  
+- Selecionei os 200 pixels centrais, assim obtive paisagens de 6x6km.  
+
+```{r png to tif}
+func_tif.png <- function(file){
+  raster <- raster(file) #leitura do raster
+  # raster <- raster(df_dados.disponiveis$tif.name[df_dados.disponiveis$SiteCode=="MGuberl3"])
+  mat_raster <- matrix(data = getValues(raster)/100) #convertendo para matrix
+  dim(mat_raster) <- dim(raster)[1:2]
+  #recorte de 6x6km: os 200x200 pixeis centrais
+  mat_raster <- mat_raster[301:500,301:500]
+  squash::savemat(x = mat_raster, filename = gsub(".tif",".png", file)) #salvando como png
+}
+registerDoMC(3)
+# df_dados.disponiveis %>% filter(is.na(tif.name))
+a_ply(df_dados.disponiveis$tif.name,1,func_tif.png,.parallel = TRUE) #gera 113 .png, oriundos dos .tif
+```
+
+- Ajustei a resolução das imagens de tal modo que o total de pixels na paisagem = DA_{obs} * Area_{paisagem}
+
+```{r}
+func_png.ajust <- function(file, densidade, A_landscape=600){ # atualizar para o pacote 'magick'
+  system(paste(
+    "convert ",file, " -resize ", densidade*A_landscape,"@ ", file,  
+    sep = ""
+  ))
+}
+df_dados.disponiveis %<>% mutate(DA=Ntotal/effort_ha) # portanto exclui os indivíduos mortos
+registerDoMC(3)
+a_ply(df_dados.disponiveis,1,function(x) func_png.ajust(file = x$png.name, densidade = x$DA), .parallel = TRUE) # ajuste da resolucao em funcao da densidade
+
+```
+
+- então aplico o seguinte tratamento nas imagens:
+
+i) pixels com cobertura vegetal >= 70% em unidades de habitat e abaixo unidades de não-habitat  
+ii) função focal para tapar buracos e apagar fragmentos com apenas 1 unidade de habitat   
+iii) função 'area simulada', que marca unidades de habitat que serão seguidas na simulação coalescente:  
+  a) define-se uma janela de observação; A_{janela de observação} ~ 2.25 A_{sitio de amostragem} ;  
+  b) esta janela é posicionada na região central da paisagem ;  
+  c) a função marca as unidades de habitat pressupondo uma espiral quadrada divergente que se inicia no pixel central da paisagem ;  
+  d) unidades de não-habitat não são marcadas.  
+
+```{r}
+f_area.simulada <- function(matriz, N){
+#@ matriz :: objeto matriz que representa a posição da unidade de habitat (1) e de não habitat (2).
+#@ N:: tamanho da amostra de indivíduos
+  # Janela de observação
+  d <- ceiling(sqrt(N)*(3/4)) # metade do lado do janela de observação
+  l <- ceiling(dim(matriz)[1]/2) # linha central da paisagem
+  c <- ceiling(dim(matriz)[2]/2) # coluna central da paisagem
+  # define uma janela central na paisagem onde o for sera aplicado
+  m_temp <- matriz[(l-d):(l+d),(c-d):(c+d)]
+  if(length(m_temp[m_temp==1]) < N) { 
+    stop("habitat insuficiente na janela de observação")
+  # tambem deve estar errado, pois janela de observacao ~ 2.25A_sitio
+  } else if (length(m_temp[m_temp==1]) == N) { 
+    stop("area amostral igual janela de observacao")
+  # paisagens que devem estar adequadas para os métodos:
+  } else { 
+    # posição de cada elemento da janela de observação, por coluna em ordem crescente
+    col_cresc <- which(m_temp==m_temp, arr.ind = T)
+    # idem na ordem contrária
+    col_decre <- col_cresc[dim(col_cresc)[1]:1,]
+    # posicao de cada elemento, por linha em ordem crescente
+    row_cresc <- col_cresc[order(col_cresc[,1],decreasing = FALSE),] 
+    # idem ao controario
+    row_decre <- row_cresc[dim(col_cresc)[1]:1,] 
+    # (nrow - 1)/2; exclui a posição dos elementos da coluna central da janela de observação
+    ciclo <- (dim(m_temp)[1]-1)/2 # 
+    l_mat_index <- list() #lista que vou usar dentro do for
+    dim_temp <- dim(m_temp)[1]
+    for(i in 1:ciclo){
+      a1 <- col_cresc[col_cresc[,"col"]==i,] #considerando o primeiro ciclo: 1a coluna em ordem crescente
+      b1 <- row_cresc[row_cresc[,"row"]==dim_temp+1-i,] #última linha em ordem crescente 
+      c1 <- col_decre[col_decre[,"col"]==dim_temp+1-i,] #última coluna em ordem reversa
+      d1 <- row_decre[row_decre[,"row"]==i,] #primeira linha em ordem reversa; os demais ciclos são com a segunda coluna, penúltima linha, penúltima coluna e segunda linha, etc  
+      l_mat_index[[i]] <- do.call(rbind,list(a1,b1,c1,d1)) #ao final de cada ciclo eu concateno tudo em uma única matriz
+    }
+    l_mat_index[[(dim_temp+1)/2]] <- col_cresc[col_cresc[,"col"]==(dim_temp+1)/2,] #a coluna central deve ser a última
+    mat_ref <- unique(do.call(rbind, l_mat_index)) #remocao de repeticao. Obtenho uma sequência de elementos que descreve uma espiral quadrada convergente
+    length_ref <- length(m_temp[mat_ref][m_temp[mat_ref]==1]) #variável para indexação:
+    m_temp[mat_ref][m_temp[mat_ref]==1][(1+length_ref-N):length_ref] <- 2 #os N últimos elementos que são iguais a 1 e troco por 2
+    matriz[(l-d):(l+d),(c-d):(c+d)] <- m_temp #substituo a matriz de volta
+    return(matriz)
+  }
+}
+
+f_mat.tri <- function(png, abund){ #png.file, número de indivíduos presente 
+  janela <- matrix(1,3,3) 
+  raster <- raster(png)
+  mat <- matrix(getValues(raster)/255, ncol = ncol(raster), nrow = nrow(raster))
+  raster_binario <- raster( matrix(nrow = nrow(mat), ncol = ncol(mat), sapply(mat, function(x) ifelse(x >= 0.7, 1, 0)) ) ) 
+  func_focal <- function(x) ifelse(sum(x[x==1]) >= 5, 1, x[5])
+  binario.focal <- as.matrix( focal(raster_binario, janela, func_focal, pad=TRUE, padvalues = 0))
+  mat_tri <- try(f_area.simulada(matriz = binario.focal, N = abund))
+  if(class(mat_tri) == "matrix"){ 
+    try(write.table(x = mat_tri, 
+                    file = gsub(".png",".txt", png),
+                    sep = " ", row.names = FALSE, col.names = FALSE))
+  }
+}
+df_dados.disponiveis$png.name %<>% as.character
+registerDoMC(3)
+a_ply(df_dados.disponiveis,1,function(X) f_mat.tri(png = X$png.name,abund = X$Ntotal),.parallel = TRUE)
+```
+
+
+- Essa rotina gera paisagens onde a comunidade local é representada exatamente por um quadrado (figura 1).  
+- Em outros casos a particular configuração espacial não permite construir a comunidade local como uma região quadrada (figura 1).
+
+```{r}
+knitr::include_graphics(path = )
+```
+
+
+- Consideramos que os métodos são uma boa aproximação quando todo o habitat da comunidade local esta conectado.
+- Para as paisagens onde o habitat da comunidade local esta fragmentado em fragmentos florestais vizinhos, eu removi o habitat isolado e marquei quantidade equivalante de habitat adjacente à comunidade local:
+
+```{r rotina de conserto das paisagens}
+par(mar=c(0.2,0.2,1.2,0.2))
+i <- 1 #nrow = 9
+N <- df_conserto.land$N[i]
+paisagem <- as.matrix(read.table(df_conserto.land$txt.name[i],header = TRUE,sep = " ",as.is = FALSE))
+# janela de observação:
+d <- ceiling(sqrt(N)*(3/4))  # metade do lado do janela de observação
+l <- ceiling(dim(paisagem)[1]/2) # linha central da paisagem
+c <- ceiling(dim(paisagem)[2]/2) # coluna central da paisagem
+# janela de observação:
+janela_observao <- paisagem[(l-d):(l+d),(c-d):(c+d)]
+###############################
+########### região para remover
+###############################
+## objetos
+#visualização
+image(janela_observao,main=df_conserto.land$SiteCode[i],col=terrain.colors(12,rev = TRUE))
+coordenada_ <- locator(1) %>% unlist()
+l_ <- round(coordenada_[1]*nrow(janela_observao))
+c_ <- round(coordenada_[2]*ncol(janela_observao))
+n_ <- 5
+## auditoria visual
+image(janela_observao[(l_-n_):(l_+n_),(c_-n_):(c_+n_)],
+      main=df_conserto.land$SiteCode[i],col=terrain.colors(12,rev = TRUE))
+## para aqueles sem o habitat central como 1:
+# janela_observao[(l_-n_):(l_+n_),(c_-n_):(c_+n_)] <- 2
+## janela de conversao de 2->1
+#1
+p_arrumar <- janela_observao[(l_-n_):(l_+n_),(c_-n_):(c_+n_)]
+rm_ <- p_arrumar[p_arrumar==2] %>% length()
+p_arrumar[p_arrumar==2] <- 1
+janela_observao[(l_-n_):(l_+n_),(c_-n_):(c_+n_)] <- p_arrumar
+#2
+# p_arrumar <- janela_observao[(l_-n_):(l_+n_+2),(c_-n_):(c_+n_)]
+# rm_ <- length(p_arrumar[p_arrumar==2]) + rm_
+# p_arrumar[p_arrumar==2] <- 1
+# janela_observao[(l_-n_):(l_+n_+2),(c_-n_):(c_+n_)] <- p_arrumar
+######################################
+########### região para incluir 1 -> 2
+######################################
+# length(rm_)
+## 
+image(janela_observao)
+coordenada_ <- locator(1) %>% unlist()
+l_ <- round(coordenada_[1]*nrow(janela_observao))
+c_ <- round(coordenada_[2]*ncol(janela_observao))
+n_ <- 2
+janela_observao[(l_-n_):(l_+n_),(c_-n_):(c_+n_)] # %>% image
+# para aqules com ponto central = 1
+# janela_observao[l_+1,c_+1] <- 1
+# exemplo: o ponto de inicío é [4,3] e o ponto l_,c_ é [3,3] portanto em termos de l_,c_: 
+p_inicio <- c(l_+1,c_+1)
+# correr pela ___ até o ponto:
+image(janela_observao)
+coordenada_ <- locator(1) %>% unlist()
+l_ <- round(coordenada_[1]*nrow(janela_observao))
+c_ <- round(coordenada_[2]*ncol(janela_observao))
+n_ <- 2
+janela_observao[(l_-n_):(l_+n_),(c_-n_):(c_+n_)] # %>% image
+p_final <- c(l_+1,c_)
+# trocando 1 -> 2
+p_rm_ <- janela_observao[p_inicio[1]:p_final[1],p_inicio[2]:p_final[2]] %>% length()
+# if
+p_rm_ < rm_
+ janela_observao[p_inicio[1]:p_final[1],p_inicio[2]:p_final[2]] <- 2
+ rm_ <- rm_ - p_rm_
+# else 
+ janela_observao[p_inicio[1]:p_final[1],p_inicio[2]:p_final[2]][1:rm_] <- 2
+
+## outro
+# pontos_p_marcar <- janela_observao[p_inicio[1]:p_final[1],p_inicio[2]:p_final[2]]
+# pontos_p_marcar[pontos_p_marcar==1][1:length(rm_)] <- 2
+# janela_observao[p_inicio[1]:p_final[1],p_inicio[2]:p_final[2]] <- pontos_p_marcar 
+# image(janela_observao)
+# auditoria e gravar
+image(paisagem[(l-d):(l+d),(c-d):(c+d)],
+      main=paste(df_conserto.land$SiteCode[i], "antes"),
+      col=terrain.colors(12,rev = TRUE))
+image(janela_observao,
+      main=paste(df_conserto.land$SiteCode[i], "consertada"),
+      col=terrain.colors(12,rev = TRUE))
+paisagem[(l-d):(l+d),(c-d):(c+d)] <- janela_observao
+image(paisagem,main=df_conserto.land$SiteCode[i],col=terrain.colors(12,rev = TRUE))
+write.table(paisagem,
+            file=df_conserto.land$txt.name[i],
+            row.names = FALSE,col.names = FALSE)
+
+```
+
+
+
+###
+
+

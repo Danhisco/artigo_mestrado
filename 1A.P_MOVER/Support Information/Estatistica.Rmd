@@ -25,6 +25,7 @@ library(GUILDS)
 library(lme4)
 library(merTools)
 library(magrittr)
+library(gridExtra)
 library(ggplot2)
 library(stringr)
 library(tidyr)
@@ -49,7 +50,7 @@ df_simulacao %<>% select(SiteCode,refID,ordem,k,p,U_med,U_var,Ntotal,Stotal,DA,d
 #   select(SiteCode,refID,ordem) %>% distinct()
 # df_auditoria <- inner_join(x=df_simulacao,y=df_referencia,by="SiteCode")
 
-ggplot(df_auditoria,aes(x=p,y=U_med)) + 
+ggplot(df_simulacao,aes(x=p,y=U_med)) + 
   geom_point() + 
   geom_smooth(method="lm") + 
   facet_wrap(~k,ncol=4,scales = "free")
@@ -85,7 +86,7 @@ df_SAD.predita %<>% mutate(MN=as.character(str_match(SAD_MN.name,"EE|EI")),
                            ordem=str_match(SAD_MN.name,"NA_(.*?)__k")[,2],
                            refID=str_match(SAD_MN.name,"ref(.*?)_NA")[,2])
 write.csv(df_SAD.predita,
-          "~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/df_SAD.predita.csv",
+          "~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/resultados/df_SAD.predita.csv",
           row.names = FALSE)
 # avaliacao do numero de replicas por linha da bateria de simulacao
 # registerDoMC(3)
@@ -95,35 +96,53 @@ write.csv(df_SAD.predita,
 # df_ <- df_SAD.auditoria %>% filter(n_SAD.predita == 200) %>% select(refID,ordem) %>% distinct()
 ```
 
+
 ### Avaliação dos sítios que foram simulados
+
+```{r}
+
+```
+
+
 
 ```{r avaliacao da simulacao 4}
 ################################
 ## dados
 ################################
+### referencia
+df_references <- read.csv(file="/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/dados_brutos/references - TreeCo.csv",
+                          as.is = TRUE,header =T, na.strings = c("","NA"))
+df_references %<>% select(SiteCode,refID,ordem)
 ### SAD preditas
-df_SAD.predita <- read.csv("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/df_SAD.predita.csv",header = TRUE,as.is = TRUE)
-### SAD obs
+df_SAD.predita <- read.csv("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/resultados/df_SAD.predita.csv",header = TRUE,as.is = TRUE)
+### SAD obsh
 df_SAD.obs <- data.frame(SAD_obs.name = Sys.glob("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/dados_brutos/SAD.obs__ref*.csv"))
 df_SAD.obs$SAD_obs.name %<>% as.character()
 df_SAD.obs %<>% mutate(ordem=str_match(SAD_obs.name,"NA_(.*?).csv")[,2],
                        refID=str_match(SAD_obs.name,"ref(.*?)_NA")[,2])
 df_SAD.obs$ordem %<>% as.integer()
 df_SAD.obs$refID %<>% as.integer()
-# merge
-df_auditoria <-  left_join(x=df_SAD.predita,
-                           y=df_SAD.obs,
-                           by=c("refID","ordem"))
-df_auditoria %<>% group_by(SAD_obs.name) %>% nest %>% filter(!is.na(SAD_obs.name))
+# merge1
+df_auditoria <-  inner_join(x=df_SAD.predita,
+                            y=df_SAD.obs,
+                            by=c("refID","ordem"))
+df_auditoria %<>% filter(!is.na(SAD_obs.name))
+# merge2
+df_references$refID %<>% as.integer()
+df_references$ordem %<>% as.integer()
+df_auditoria %<>% left_join(x=.,y=df_references,by=c("refID","ordem")) 
+
 ################################
 ## função para os resultados ##
 ################################
 ### rotina da função
 df_auditoria$resultados <- vector("list",length = nrow(df_auditoria))
+registerDoMC(4)
 for(i in 1:nrow(df_auditoria)){
   # i <- 1
   df_ <- df_auditoria[i,]
-  v_SAD.obs <- sort(read.csv(df_$SAD_obs.name,header = TRUE,as.is = TRUE)$N)
+  v_SAD.obs <- read.csv(df_$SAD_obs.name,header = TRUE,as.is = TRUE) %>% filter(species.correct != "Mortas") %>% 
+    .$N %>% sort()
   df_predicao <- as.data.frame(df_$data[[1]])
   f_KSeS <- function(v_OBS = v_SAD.obs, path_SAD.MN){
     # path_SAD.MN <- df_predicao[1,"SAD_MN.name"]
@@ -136,7 +155,6 @@ for(i in 1:nrow(df_auditoria)){
     return(a)
   }
   # f_KSeS(path_SAD.MN = df_predicao$SAD_MN.name[10])
-  registerDoMC(4)
   df_auditoria$resultados[[i]] <- adply(df_predicao,1, function(X) f_KSeS(path_SAD.MN = X$SAD_MN.name),.parallel = TRUE)
 }
 ## Caso alguma SAD obs não estava presente:
@@ -164,49 +182,89 @@ df_replicas <- read.csv("./resultados/df_replicas.csv",header = TRUE,as.is = TRU
 # referencia dos sitios
 df_referencia <- read.csv("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/df_referencia.csv",header = TRUE, as.is = TRUE)
 # merge para replicas
-df_replicas %<>% left_join(x=.,y=df_referencia[,1:5],by=c("ordem","refID"))
+df_replicas %<>% left_join(x=.,y=df_references,by=c("ordem","refID"))
 ####################
 df_replicas %>% head
 ```
 
+### avaliação de df_replicas
 
-```{r}
+```{r df_replicas auditoria}
+df_replicas %>% ddply(.,c("MN","k","SiteCode"), summarise, ocorrencias = length(rep)) %>% summary
+df_replicas %>% filter(MN == "EE",k==0.99,SiteCode=="MGuberl7") %>% .$rep %>% table
+df_replicas %>% filter(SiteCode=="MGuberl7") %>% .$rep %>% table
+```
+
+
+```{r df_replicas sumario e registro}
 # sumarise
-registerDoMC(3)
+registerDoMC(4)
+alpha <- 0.05
 df_resultados <- ddply(df_replicas,c("MN","k","SiteCode"),summarise,
                        D_mean = mean(KS.D), D_var = var(KS.D),
                        p.value_mean = mean(KS.p),p.value_var = var(KS.p),
                        S.MN_mean = mean(S_SAD.predita), S.MN_var = var(S_SAD.predita),
                        S.obs_mean=mean(S_SAD.obs),S.obs_var=var(S_SAD.obs),
-                       n_N.ref = sum(KS.p>=0.05), n_ref = sum(KS.p<0.05),
+                       n_SAD.N.ref = sum(KS.p>=alpha), n_SAD.ref = sum(KS.p<alpha),
                        .parallel = TRUE)
 # merge
-df_simulacao <- read.csv("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/df_simulacao_EEeEI.csv",header = TRUE, as.is = TRUE)
-df_resultados %<>% left_join(x=.,
-                             y=select(df_simulacao,SiteCode,k,p,Ntotal,Stotal,U_med,U_var,DA,d,m_,theta),
+df_simulacao <- read.csv("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/df_simulacao_EEeEI.csv",header = TRUE, as.is = TRUE)
+df_resultados %<>% left_join(x=.,                            y=select(df_simulacao,SiteCode,k,p,Ntotal,Stotal,U_med,U_var,DA,d,m_,theta),
                              by=c("SiteCode","k")) 
 df_resultados %>% names
-df_resultados %<>% select(SiteCode,MN,k,p,n_N.ref,n_ref,S.MN_mean,U_med,Ntotal,Stotal,DA,d,m_,theta,U_var,S.MN_var,D_mean,D_var,p.value_mean,p.value_var,S.obs_mean,S.obs_var)
+df_resultados %<>% select(SiteCode,MN,k,p,
+                          n_SAD.N.ref, n_SAD.ref,S.MN_mean,U_med,
+                          Ntotal,Stotal,DA,d,m_,theta,
+                          U_var,S.MN_var,
+                          p.value_mean,p.value_var,
+                          D_mean,D_var,
+                          S.obs_mean,S.obs_var)
 # gravar
-write.csv(df_resultados,file="./resultados/df_resultados.csv",col.names = FALSE)
+# names(df_resultados)[1] <- "Site"
+df_resultados$k.0<- as.numeric(as.character(df_resultados$k))
+df_resultados$MN <- factor(df_resultados$MN)
+df_resultados <- df_resultados[with(df_resultados,order(p,-k.0)),]
+write.table(df_resultados,file="./resultados/df_resultados.csv",row.names = FALSE,sep = ";",dec = ".")
 ```
 
 
+```{r df resultados}
+# leitura
+df_resultados <- read.table(file="./resultados/df_resultados.csv",header = TRUE,sep = ";",dec = ".",as.is=FALSE)
+level_k <- unique(as.character(df_resultados$k))
+df_resultados$k <- factor(as.character(df_resultados$k),levels = level_k)
+levels(df_resultados$k)[19] <- "0.1"
+# contrasts(df_resultados$k)
+# graficos
+l_p <- vector("list",4)
+l_p[[1]] <- ggplot(df_resultados,aes(x=p.value_mean,y=n_SAD.ref)) + geom_point() + geom_smooth(stat="smooth") + labs(y="número de SADs refutadas",x="p-valor médio")
+l_p[[2]] <- ggplot(df_resultados,aes(x=D_mean,y=p.value_mean)) + geom_point() + geom_smooth(stat="smooth") + labs(x="estatística D média",y="p-valor médio")
+l_p[[3]] <- ggplot(df_resultados,aes(x=p.value_mean,y=p.value_var)) + geom_point() + geom_smooth(stat="smooth") + labs(y="variância p-valor",x="p-valor médio")
+l_p[[4]] <- ggplot(df_resultados,aes(x=D_mean,y=D_var)) + geom_point() + geom_smooth(stat="smooth") +
+   labs(x="estatística D média",y="variância estatística D")
+# l_p[[5]] <- ggplot(df_resultados,aes(x=Stotal,y=S.obs_mean)) + geom_point() + geom_abline(intercept = 0,slope = 1,color="red")
+# df_resultados %<>% mutate(diff_S.obs = Stotal-S.obs_mean)
+# l_p[[6]] <- ggplot(df_resultados, aes(x=df_resultados$diff_S.obs)) + 
+#   geom_histogram(breaks=seq(0, max(df_resultados$diff_S.obs), length.out = 40)) + 
+#   labs(title="", x="S_{parametro U} - S_{do vetor KS}", y="Count")
+grid.arrange(l_p[[1]], l_p[[2]], l_p[[3]], l_p[[4]], # l_p[[5]],# l_p[[6]],
+             layout_matrix = rbind(c(rep(1,3),rep(2,3)),
+                                   c(rep(3,3),rep(4,3))) #,
+                                   # c(rep(5,3),rep(NA,3)))
+             )
+```
+
+Vou refazer a simulação para os sítios em que S.obs usada na parametrização de U não foi a mesma utilizada no teste de KS. Então refiz tudo com os valores corretos.
+
+### Padrões gerais
 
 ```{r preparacao dos dados,warning=FALSE,message=FALSE, include=FALSE}
-### leitura ###
-df_resultados <- readr::read_csv("/home/danilo/Documentos/Doutorado/artigo_mestrado/simulacao/resultados/df_resultados.csv")
-# names(df_resultados)[1] <- "Site"
-# df_resultados %>% str
+### leitura e padronização ###
 ### padronização ###
-## fatores
-# df_resultados$Site <- factor(df_resultados$Site)
-# df_resultados$k <- factor(df_resultados$k,levels=unique(df_resultados$k))
-df_resultados$k.0 = as.numeric(as.character(df_resultados$k))
-df_resultados$MN <- factor(df_resultados$MN,levels = c("EE","EI"))
-# df_resultados$k %>% contrasts()
-# df_resultados$MN %>% contrasts()
-
+df_resultados <- read.table(file="./resultados/df_resultados.csv",header = TRUE,sep = ";",dec = ".",as.is=FALSE)
+level_k <- unique(as.character(df_resultados$k))
+df_resultados$k <- factor(as.character(df_resultados$k),levels = level_k)
+levels(df_resultados$k)[19] <- "0.1"
 ### z score ### 
 f_z <- function(x){
   m <- base::mean(x,na.rm=TRUE)
@@ -215,21 +273,25 @@ f_z <- function(x){
   return(output)
 } 
 # names(df_resultados)
-df_resultados.z <- as.data.frame(apply(df_resultados[c("p","J","S","k.0")],2,f_z))
+df_resultados.z <- as.data.frame(apply(df_resultados[c("p","Ntotal","Stotal","k.0")],2,f_z))
 names(df_resultados.z) <- sapply(names(df_resultados.z), function(x) paste(gsub(".0","",x),".z",sep=""))
 df_resultados %<>% cbind(.,df_resultados.z)
+# gravar
+write.table(df_resultados,file="./resultados/df_resultados.csv",row.names = FALSE,sep = ";",dec = ".")
 ### Summary ###
 # df_resultados %>% head
 
 ### para auditoria ### remover depois 
-df_resultados.rep <- read.csv("/home/danilo/Documentos/Doutorado/artigo_mestrado/simulacao/resultados/df_replicas.csv")
-df_resultados.rep %<>% left_join(x=.,y=df_resultados[,c("SiteCode","J","S")],by="SiteCode")
+df_replicas <- read.csv("./resultados/df_replicas.csv",header = TRUE,as.is = TRUE)
+df_replicas %<>% left_join(x=.,
+                           y=df_resultados,
+                           by=c("SiteCode" = "Site"))
 ```
 
 ### Descrição dos Levantamentos Selecionados
 
 ```{r figura 1, fig.width=8, fig.height=5, fig.align="center", include=FALSE}
-df_plot <- df_resultados %>% dplyr::filter(k=="0.99" & MN=="EE") %>% dplyr::select(Site, p, S,p.z,S.z) %>% unique
+df_plot <- df_resultados %>% dplyr::filter(k=="0.99" & MN=="EE") %>% dplyr::select(Site, p, Stotal,p.z,Stotal.z) %>% unique
 
 # avaliando as curvas pelo quantiles
 # df_plot %<>% mutate(terceiro_quantil = ifelse(p>quantile(df_plot$p,probs=0.75),">_3oQ","<_3oQ")) 
@@ -242,19 +304,19 @@ l_p[[2]] <- ggplot(df_plot, aes(x=p.z)) +
   geom_histogram(bins=30) +
   geom_vline(xintercept = c(quantile(df_plot$p.z,probs = c(0.25,0.50,0.75))),color="red")
   # geom_density()
-l_p[[3]] <- ggplot(df_plot, aes(x=S)) +
+l_p[[3]] <- ggplot(df_plot, aes(x=Stotal)) +
   geom_histogram(bins=30) +
-  geom_vline(xintercept = quantile(df_plot$S,probs = c(0.25,0.50,0.75)),color="red")
-l_p[[4]] <- ggplot(df_plot, aes(x=S.z)) +
+  geom_vline(xintercept = quantile(df_plot$Stotal,probs = c(0.25,0.50,0.75)),color="red")
+l_p[[4]] <- ggplot(df_plot, aes(x=Stotal.z)) +
   geom_histogram(bins=30) +
-  geom_vline(xintercept = c(quantile(df_plot$S.z,probs = c(0.25,0.50,0.75))),color="red")
-l_p[[5]] <- ggplot(df_plot, aes(x=p,y=S)) +
-  geom_hline(yintercept = quantile(df_plot$S,probs = c(0.25,0.50,0.75)),color="red") +
+  geom_vline(xintercept = c(quantile(df_plot$Stotal.z,probs = c(0.25,0.50,0.75))),color="red")
+l_p[[5]] <- ggplot(df_plot, aes(x=p,y=Stotal)) +
+  geom_hline(yintercept = quantile(df_plot$Stotal,probs = c(0.25,0.50,0.75)),color="red") +
   geom_vline(xintercept = quantile(df_plot$p,probs = c(0.25,0.50,0.75)),color="red") +
   geom_point() + 
   geom_smooth(method="lm")
-l_p[[6]] <- ggplot(df_plot, aes(x=p.z,y=S.z)) +
-  geom_hline(yintercept = quantile(df_plot$S.z,probs = c(0.25,0.50,0.75)),color="red") +
+l_p[[6]] <- ggplot(df_plot, aes(x=p.z,y=Stotal.z)) +
+  geom_hline(yintercept = quantile(df_plot$Stotal.z,probs = c(0.25,0.50,0.75)),color="red") +
   geom_vline(xintercept = quantile(df_plot$p.z,probs = c(0.25,0.50,0.75)),color="red") +
   geom_point() + 
   geom_smooth(method="lm")
@@ -272,21 +334,33 @@ Figura 1. Na primeira linha há as variáveis na escala padrão; na segunda linh
 
 ### Congruência entre SAD observada e predita
 
-#### Auditoria das Replicas
-
   Espera-se que quanto maior a estatística D do teste de Kolmogorov-Smirnov menor o p-valor observado. Não esperamos observar relação entre p-valor, J e S. Segue avaliação destas espectativas
 
 ```{r auditoria teste KS,fig.height=4,fig.width=10}
-l_p <- vector("list",3)
-l_p[[1]] <- ggplot(df_resultados.rep,aes(x=KS.D,y=KS.p)) + geom_point()
-l_p[[2]] <- ggplot(df_resultados.rep,aes(x=J,y=KS.p)) + geom_point() + labs(y="") + theme(axis.text.y = element_blank(), axis.ticks.x = element_blank())
-l_p[[3]] <- ggplot(df_resultados.rep,aes(x=S,y=KS.p)) + geom_point() + labs(y="") + theme(axis.text.y = element_blank(), axis.ticks.x = element_blank())
-do.call("grid.arrange",c(l_p,ncol=3))
+l_p <- vector("list",2)
+l_p[[1]] <- ggplot(df_resultados,aes(x=log(Ntotal),y=n_SAD.ref)) + geom_point() + 
+  labs(y="") + theme(axis.text.y = element_blank()) 
+l_p[[2]] <- ggplot(df_resultados,aes(x=log(Stotal),y=n_SAD.ref)) + geom_point() + labs(y="") + theme(axis.text.y = element_blank())
+do.call("grid.arrange",c(l_p,ncol=2))
+grid.arrange(l_p[[1]],l_p[[2]],top="Número de SADs refutadas",ncol=2)
 ```
 
-Figura 2. o p-valor obtido do teste KS (eixo y) e a maior distância entre os vetores de abundância (KS), tamanho da amostra (J) e riqueza observada (S).
+figura . Número de SADs refutadas ~ log(N) e log(S)
 
-O método parece estar adequado: i) KS.p e KS.D apresentam uma relação inversa; ii) não há covariação entre KS.p com J e S.
+#### padrões gerais
+
+```{r n_SAD.N.ref grafico exp}
+l_p <- vector("list",2)
+l_p[[1]] <- ggplot(filter(df_resultados,k %in% levels(df_resultados$k)[1:10]),
+                   aes(x=p,y=n_SAD.ref)) +
+  geom_point() + geom_smooth() + facet_grid(k~MN)
+l_p[[2]] <- ggplot(filter(df_resultados,k %in% levels(df_resultados$k)[11:20]),
+                   aes(x=p,y=n_SAD.ref)) +
+  geom_point() + geom_smooth() + facet_grid(k~MN)
+do.call("grid.arrange",c(l_p,ncol=2))
+```
+
+
 
 
 #### Modelo Estatístico 
