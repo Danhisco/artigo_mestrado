@@ -202,7 +202,7 @@ par(mar=c(0,0,0,0))
 
 ## Relação entre Parâmetros
 
-  Os modelos precisam de um parâmetro que controla a diversidade na metacomunidade e um que controla a dispersão. A relação entre os parâmetros de diversidade pode ser obtida a partir da igualdade proposta por por Vallade & Houchmandzadeh (2003) $\theta = \frac{U  (J_M - 1)}{1-U}$. Para isso aproximamos o número de indivíduos na metacomunidade como $J_M = A_{landscape} * DA_{obs}*p$.  
+  Os modelos precisam de um parâmetro que controla a diversidade na metacomunidade e um que controla a dispersão. A relação entre os parâmetros de diversidade pode ser obtida a partir da igualdade proposta por por Vallade & Houchmandzadeh (2003) $\theta = \frac{U  (J_M - 1)}{1-U}$. Para isso aproximamos o número de indivíduos na metacomunidade como $J_M = A_{landscape}  DA_{obs} p$.  
   
   
   O parâmetro m é a probabilidade de um evento de colonização na comunidade local ser por um propágulo da metacomunidade (Hubbel 2001). Uma vez que toda unidade de habitat apresenta igual probabilidade de colonização, podemos definir m como a média das probabilidades de cada sítio na comunidade local ser colonizada por um imigrante (eq 1; Chisholm & Lichstein 2009).

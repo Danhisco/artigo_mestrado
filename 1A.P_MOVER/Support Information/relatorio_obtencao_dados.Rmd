@@ -82,7 +82,7 @@ df_ref.S_UCprotecaoIntegral <- rbind(df_simulacao_s_UCprotecao.integral,df_simul
 ```
 
 
-### SADs obs Raster de Paisagem
+### SADs obs
 
 - A SAD obs conta com a abundância dos indivíduos mortos em pé, que foram desconsiderados para a parametrização das simulações.  
 
@@ -124,7 +124,7 @@ a_ply(df_dados.disponiveis$tif.name,1,func_tif.png,.parallel = TRUE) #gera 113 .
 
 - Ajustei a resolução das imagens de tal modo que o total de pixels na paisagem = DA_{obs} * Area_{paisagem}
 
-```{r}
+```{r ajuste resolucao}
 func_png.ajust <- function(file, densidade, A_landscape=600){ # atualizar para o pacote 'magick'
   system(paste(
     "convert ",file, " -resize ", densidade*A_landscape,"@ ", file,  
@@ -147,9 +147,9 @@ iii) função 'area simulada', que marca unidades de habitat que serão seguidas
   c) a função marca as unidades de habitat pressupondo uma espiral quadrada divergente que se inicia no pixel central da paisagem ;  
   d) unidades de não-habitat não são marcadas.  
 
-```{r}
+```{r f_mat_tri}
 f_area.simulada <- function(matriz, N){
-#@ matriz :: objeto matriz que representa a posição da unidade de habitat (1) e de não habitat (2).
+#@ matriz :: objeto matriz que representa
 #@ N:: tamanho da amostra de indivíduos
   # Janela de observação
   d <- ceiling(sqrt(N)*(3/4)) # metade do lado do janela de observação
@@ -215,10 +215,10 @@ a_ply(df_dados.disponiveis,1,function(X) f_mat.tri(png = X$png.name,abund = X$Nt
 - Essa rotina gera paisagens onde a comunidade local é representada exatamente por um quadrado (figura 1).  
 - Em outros casos a particular configuração espacial não permite construir a comunidade local como uma região quadrada (figura 1).
 
-```{r}
-knitr::include_graphics(path = )
-```
+![fig1 A](/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/figuras/conserto_paisagens/comunidade_local_quadrada.png){ width=37.5% }
+![fig1 B](/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/figuras/conserto_paisagens/comunidade_loca_aproximada_ok.png){ width=37.5% }
 
+__Figura 1__ Na esquerda consideramos a comunidade local como quadrada; na direita consideramos a comunidade local aproximadamente como um quadrado 
 
 - Consideramos que os métodos são uma boa aproximação quando todo o habitat da comunidade local esta conectado.
 - Para as paisagens onde o habitat da comunidade local esta fragmentado em fragmentos florestais vizinhos, eu removi o habitat isolado e marquei quantidade equivalante de habitat adjacente à comunidade local:
@@ -312,8 +312,399 @@ write.table(paisagem,
 
 ```
 
+Um exemplo de paisagem modificada esta na figura 2.
+
+![](/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/figuras/conserto_paisagens/MGuberl7_antes.png){ width=37.5% }
+![](/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/figuras/conserto_paisagens/MGuberl7_consertada.png){ width=37.5% }
+
+__Figura 2__ Exemplo de modificação realizada para poder aproximar a paisagem pelos métodos utilizados.
+
+Por conta da função focal a paisagem esta cercada por NAs (linhas e colunas marginais), então removo-as utilizando:
+
+```{r remocao de NAs}
+f_NA_zero <- function(path_){
+  mat_paisagem <- read.table(file=path_,header = FALSE)
+  mat_paisagem[is.na(mat_paisagem)] <- 0
+  write.table(x = mat_paisagem,file = path_,sep = " ", row.names = FALSE, col.names = FALSE)
+}
+```
 
 
-###
+## Parametrização 
 
+A relação entre os parâmetros de diversidade pode ser obtida a partir da igualdade proposta por por Vallade & Houchmandzadeh (2003) $\theta = \frac{U  (J_M - 1)}{1-U}$. Para isso aproximamos o número de indivíduos na metacomunidade como $J_M = A_{landscape}  DA_{obs} p$.  
+  
+  
+  O parâmetro m é a probabilidade de um evento de colonização na comunidade local ser por um propágulo da metacomunidade (Hubbel 2001). Uma vez que toda unidade de habitat apresenta igual probabilidade de colonização, podemos definir m como a média das probabilidades de cada sítio na comunidade local ser colonizada por um imigrante (eq 1; Chisholm & Lichstein 2009).
+
+$$ eq 1: m = \frac{1}{A} \int \int_A m_{x,y} dxdy $$  
+
+ Aproximamos as comunidades locais como áreas quadradas com lado L, que pode ser obtido por $L = \sqrt{10000\frac{J}{DA}}$. Assim podemos reescrever a equação 1 como:
+
+$$ eq 2.a :   m = \left(\frac{1}{L} \int\limits_{-L/2}^{L/2} m_{x}(x)\mathrm{d}x \right)^2 $$
+
+$$ eq 2.b :m_{x} = 1 - \int\limits_{-L/2}^{L/2} K(x-y) \mathrm{d}y $$ 
+
+  Onde K é a função de dispersão. Na simulação coalescente a dispersão resulta do sorteio indepentende de duas distribuições de Laplace em eixos ortogonais centradas no sítio vago (figura X). Se consideramos a distribuição de Laplace como $K(x) = \frac{\alpha}{2} e^{-|\alpha x|}$ (idem para o eixo y), então:
+
+$$eq3:m = (\frac{1-e^{-\alpha L}}{\alpha L})^2$$ 
+
+Onde $\alpha = 1/b$, b é o parâmetro escalar da distribuição de Laplace que pode ser escrito em função do desvio-padrão da distribuição de Laplace (d) $b = d/ \sqrt{2}$. O desvio padrão corresponden à distância média de dispersão (Clark et al. 1999). Podemos reescrever a equação de m em funçao de d:
+
+$$ eq4: m = d \frac{1 - e^{-\frac{\sqrt{2} L}{d}} }{\sqrt{2} L} $$ 
+
+Com a equação 4 podemos calcular m a partir do desvio padrão da função de dispersão. Essa equação é válida para o processo de dispersão em paisagens homogêneas. Na simulação coalescente, uma vez que sorteamos um progenitor e este estaria presente em uma unidade de não habitat, o sorteio é refeito até que o progenitor esteja em uma unidade de habitat. Uma aproximação do efeito da fragmentação na simulação no m calculado a partir da equação 4 pode ser obtido por:
+
+$$eq.5: m' = \frac{mp}{1 - (1-p)m} $$
+
+Onde _p_ é a porcentagem de cobertura vegetal na paisagem. Caso seja necessário calcular d a partir de m, utilizamos o ramo principal da função W de Lambert ($W_{0}$):
+
+$$ eq6 : d = \frac{\sqrt{2} L m}{m W_{0}(- \frac{e^{-1/m}}{m} ) + 1} $$ 
+
+
+### Proporção de cobertura vegetal 
+
+Para calcular a proporção de cobertura vegetal utilizei a função:
+
+```{r tree cover}
+f_tree.cover <- function(file_path){
+  mat_paisagem <- read.table(file=file_path,sep=" ",header=TRUE)
+  tree.cover <- as.vector(mat_paisagem)
+  tree.cover <- tree.cover[!is.na(tree.cover)]
+  p <- 1 - length(tree.cover[tree.cover==0])/length(tree.cover)
+  return(p)
+}
+registerDoMC(4)
+df_simulacao$p <- aaply(df_simulacao$txt.name,1,f_tree.cover,.parallel = TRUE)
+# 
+```
+
+
+A relação entre proporção de habitat (p) e riqueza observada (S) esta na figura 3.
+
+```{r relacao p e S,eval=TRUE,echo=FALSE,fig.width=8,fig.height=3}
+### dados
+df_resultados <- read.table(file="./resultados/df_resultados.csv",header = TRUE,sep = ";",dec = ".",as.is=FALSE)
+level_k <- unique(as.character(df_resultados$k))
+df_resultados$k <- factor(as.character(df_resultados$k),levels = level_k)
+levels(df_resultados$k)[19] <- "0.1"
+### graficos
+df_plot <- df_resultados %>% dplyr::filter(k=="0.99" & MN=="EE") %>% dplyr::select(SiteCode, p, Stotal) %>% unique
+l_p <- vector("list",3)
+l_p[[1]] <- ggplot(df_plot, aes(x=p)) +
+  geom_histogram(bins=30) +
+  geom_vline(xintercept = c(quantile(df_plot$p,probs = c(0.25,0.50,0.75))),color="red")
+l_p[[2]] <- ggplot(df_plot, aes(x=Stotal)) +
+  geom_histogram(bins=30) +
+  geom_vline(xintercept = quantile(df_plot$Stotal,probs = c(0.25,0.50,0.75)),color="red")
+l_p[[3]] <- ggplot(df_plot, aes(x=p,y=Stotal)) +
+  # geom_hline(yintercept = quantile(df_plot$Stotal,probs = c(0.25,0.50,0.75)),color="red") +
+  # geom_vline(xintercept = quantile(df_plot$p,probs = c(0.25,0.50,0.75)),color="red") +
+  geom_point() # + 
+  # geom_smooth(method="lm")
+do.call("grid.arrange",c(l_p,ncol=3))
+```
+
+__Figura 3__ Distribuição de p, s e relação entre as duas variáveis. As linhas verticais em vermelho marcam respectivamente o quantil de 25, 50 e 75% da distribuição.
+
+### Parâmetro de dispersão
+
+Parametrizamos por k, a proporção de propágulos que permanecem até a vizinhança imediata da planta progenitora. A estimativa da distância média de dispersão para o respectivo k para cada paisagem foi obtida pelas funções:
+
+```{r funcoes para estimar d necessario para respectivo k}
+library(rmutil)
+library(lamW)
+qkernel<- function(sigma, kernel, p, density=20852/50, npoints = 1e5){
+    kernel <- match.arg(kernel, choices=c("normal","gaussian","laplace","uniform"))
+    d_ind_MA  <- 100/sqrt(density)
+    if(kernel=="laplace"){
+        b_laplace <- sigma / sqrt(2)
+        X_laplace <- d_ind_MA * round(rlaplace(npoints, s=b_laplace) / d_ind_MA) 
+        Y_laplace <- d_ind_MA * round(rlaplace(npoints, s=b_laplace) / d_ind_MA)
+        dist_laplace <- sqrt(X_laplace^2+Y_laplace^2)
+        result <- quantile(dist_laplace, p)
+    }
+    if(kernel=="normal"|kernel=="gaussian"){
+        b_norm <- sigma 
+        X_norm <- d_ind_MA * round(rnorm(npoints, sd=b_norm) / d_ind_MA)
+        Y_norm <- d_ind_MA * round(rnorm(npoints, sd=b_norm) / d_ind_MA)
+        dist_norm <- sqrt(X_norm^2+Y_norm^2)
+        result <- quantile(dist_norm, p)
+    }
+    if(kernel=="uniform"){
+        b_unif <- sigma/2
+        X_unif <- d_ind_MA * round(runif(npoints, min = -b_unif, max = b_unif) / d_ind_MA)
+        Y_unif <- d_ind_MA * round(runif(npoints, min = -b_unif, max = b_unif) / d_ind_MA)
+        dist_unif <- sqrt(X_unif^2+Y_unif^2)
+        result <- quantile(dist_unif, p)
+    }
+    return(unname(result))
+}
+
+sigkernel <- function(kernel, p, distance, density=20852/50,
+                      npoints =1e5, sigma.min = 1, sigma.max= 100){
+    f1 <- function(x) distance - qkernel(x, kernel, p, density, npoints)
+    uniroot( f1 , lower = sigma.min, upper = sigma.max)
+}
+```
+
+Utilizamos os percentis: c(0.99,seq(0.95,0.05,-0.05)) (figura 4)
+
+```{r figura 4 relacao k e d, fig.width=5,fig.height=4,eval=TRUE,echo=FALSE}
+df_resultados %>% ggplot(aes(x=k,y=d)) +
+  geom_jitter() +
+  geom_boxplot() +
+  labs(x="% de propágulos na vizinhança imediata",y="Distância média de dispersão (metros)")
+```
+
+__Figura 4__ Distância média de dispersão em metros (d) ~ porcentagem de propagulos até a vizinhança imediata (k)
+
+
+# Simulação
+
+A simulação coalescente foi construida em C++ e uma função em R foi utilizada para alimentar a simulação:
+
+```{r dinamica coalescente beta}
+dinamica_coalescente <- function(U, S=0, N_simul, seed, disp_range, disp_kernel, landscape){
+  # Runs coalescent simulations for a given heterogeneous landscape
+  #
+  # Parameters:
+  # U: speciation rate
+  # S: observed richness (integer) - used to fit the value of U, or set to
+  #       0 (default) if that is not desired
+  # N_simul: number of simulations
+  # seed: seed of the RNG (an integer)
+  # disp_range: width of the dispersal kernel
+  # disp_kernel: an integer corresponding to the type of dispersal kernel. One of
+  #               0: uniform
+  #               1: normal
+  #               2: Laplacian
+  # landscape: either a filename containing the landscape data, or a
+  #   bidimensional R array or matrix.
+  #   TODO: describe the format of the input - trinary matrix)
+  #
+  # Returns:
+  # r: an array of dimension N_simul x landscape dimensions, that is, each
+  #   r[i.,] is a bidimensional array of the same shape as the landscape.
+  #   Each site is labeled according to the identity of the species occupying
+  #   that site.
+  # U_est: estimated speciation rate. This is returned only if input parameter S > 0
+  if (is.character(landscape)){
+    l <- as.matrix(read.table(landscape))
+    infile <- landscape
+    land_dims <- dim(l)
+  } else {
+    land_dims <- dim(landscape)
+    infile <- tempfile()
+    # input file *must* be clean: no comments, headers or anything
+    write.table(landscape, infile, col.names=F, row.names=F)
+  }
+  outfile <- tempfile()
+  repeat {
+    system(paste('./dinamica_coalescente', land_dims[1], land_dims[2], U, S, N_simul,
+                 seed, disp_range, disp_kernel, infile, outfile))
+    if (file.exists(outfile) || S == 0)
+      break
+    U <- U/10.
+    print(paste("Decreasing value of U to", U))
+    # set some lowest boundary here so simulations don't take forever
+    if (U < 1e-20){
+      print("Richness value too low, giving up...")
+      return(NULL)
+    }
+  }
+  r <- as.matrix(read.table(outfile))
+  # transpose each grid, as output is written along lines but R reads it along columns
+  # TODO: I thought I got it right, but it was wrong... please DO re-check
+  #r <- aperm(r, c(1,3,2))
+  
+  # recover estimated speciation rate
+  if (S > 0){
+    out_con <- file(outfile)
+    U_line <- strsplit(readLines(out_con, 2)[2], ' ')[[1]]
+    close(out_con)
+    U_est <- as.double(U_line[length(U_line)])
+    return(list(r = r, U_est = U_est))
+  }
+  return(r)
+}
+
+```
+
+
+
+## Estimativa de U
+
+Foram utilizadas 10 réplicas para estimar U:
+
+```{r estimativa de U}
+# replicas
+n_rep.U <- 10
+func1 <- function(x,replicas=n_rep.U) {
+  x$U <- NA
+  x <- x[rep(1:dim(x)[1],each=replicas),]
+}
+df_referencia %<>% func1()
+# simulacao
+# valores de k
+k_factor <- unique(df_referencia$k)
+registerDoMC(n_cores)
+for(a in 1:length(k_factor)){
+  df_simU <- df_referencia %>% dplyr::filter(k == k_factor[a])
+  op <- options(digits.secs=6)
+  funcao_imigracao <- function(i,df_temp=df_simU){
+    aviao <- list()
+    aviao <- dinamica_coalescente(U = 1.25e-06, 
+                                  S = df_temp[i,"Stotal"], 
+                                  N_simul = 1, 
+                                  seed = as.numeric(Sys.time()), 
+                                  disp_range = df_temp[i,"d"], 
+                                  disp_kernel = df_temp[i,"kernel_code"], 
+                                  landscape = df_temp[i,"txt.name"])
+    return(aviao$U_est)
+  }
+  replica.sim <- as.list(1:dim(df_simU)[1])
+  sim.coal_U <- llply(.data = replica.sim, .fun = funcao_imigracao, .parallel = TRUE)
+  df_simU[,"U"] <- unlist(sim.coal_U)
+  write.csv(df_simU, 
+            file=paste0("./U/","df_simU__k",k_factor[a],".csv"),row.names = FALSE)
+}
+```
+
+Então calculou-se a média e variância por SiteCode e k (a maior variância foi na casa dos e-06). O U médio foi utilizado para parametrizar as predições de MNEE e MNEI (figura 6).
+
+```{r U padroes gerais, eval=TRUE,echo=FALSE,fig.height=10}
+# dados
+df_resultados <- read.table(file="./resultados/df_resultados.csv",header = TRUE,sep = ";",dec = ".",as.is=FALSE)
+level_k <- unique(as.character(df_resultados$k))
+df_resultados$k <- factor(as.character(df_resultados$k),levels = level_k)
+levels(df_resultados$k)[19] <- "0.1"
+# graficos
+l_p <- vector("list",3)
+l_p[[1]] <- ggplot(df_resultados,aes(x=log(Stotal),y=U_med)) + 
+  geom_point() +
+  geom_smooth() +
+  theme(axis.title.y = element_blank(),
+        axis.ticks.y = element_blank())
+l_p[[2]] <- ggplot(df_resultados,aes(x=k,y=U_med,group=k)) + 
+  geom_jitter() + 
+  geom_boxplot()
+l_p[[3]] <- ggplot(df_resultados,aes(x=p,y=U_med)) + 
+  geom_point() + 
+  geom_smooth() +
+  facet_wrap(~k,ncol=4,scales="free")
+grid.arrange(l_p[[1]],l_p[[2]],l_p[[3]],
+             layout_matrix = rbind(c(2,2,2,1),
+                                   c(3,3,3,3),
+                                   c(3,3,3,3))
+             )
+
+```
+
+__Figura 5__ Padrões gerais de U.  
+
+
+## SAD predita
+
+### MNEE  
+
+Para obter as SADs preditas por MNEE utilizei o seguinte código
+
+```{r SADs MNEE}
+f_simulacao <- function(i,df_=df_simulacao){
+  X <- df_[i,]
+  mat_sim <- dinamica_coalescente(U = X[,"U_med"], 
+                                  S = 0, 
+                                  N_simul = n_rep.SAD, 
+                                  seed = as.numeric(Sys.time()), 
+                                  disp_range = X[,"d"], 
+                                  disp_kernel = X[,"kernel_code"], 
+                                  landscape = X[,"txt.name"])
+  l_SADs.preditas <- alply(mat_sim,1,function(Y) sort(as.integer(table(Y))) )
+  file_name <- gsub("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/","",
+                    X[,"txt.name"])
+  file_name <- gsub(".txt","",file_name)
+  path.file <- paste0(getwd(),"/SADs_preditas/",file_name,"__k",X[,"k"],".EE.", "rep_",1:length(l_SADs.preditas),".csv")
+  for(j in 1:length(l_SADs.preditas)){
+    write.csv(data.frame(SAD_predita = l_SADs.preditas[[j]]),
+              file=path.file[j],
+              row.names = FALSE)
+  }
+}
+registerDoMC(4)
+simulacao <- as.list(1:dim(df_simulacao)[1])
+l_ply(simulacao,f_simulacao,.parallel = TRUE)
+```
+
+### MNEI  
+
+Para MNEI:
+
+```{r SADs MNEI}
+# preparação dos dados
+df_simulacao %<>% mutate(L_plot = 100/sqrt(Ntotal/DA),
+                         m = d * ( 1 - exp(-L_plot*sqrt(2)/d) ) / (L_plot*sqrt(2)), 
+                         m_ = m * p / (1 - (1-p) * m),
+                         I = m_ * (Ntotal-1)/(1-m_),
+                         J_M=p*DA*2500,
+                         theta=(U_med*(J_M-1))/(1-U_med))
+# simulação
+f_simulacaoEI <- function(i,df_=df_simulacao){
+  # i <- 1
+  # n_rep.SAD <- 100
+  df_name <- df_[i,]
+  l_SADs <- replicate(n_rep.SAD,generate.ESF(theta = df_name$theta, I = df_name$I, J = df_name$Ntotal))
+  file_name <- gsub("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/","",
+                    df_name[,"txt.name"])
+  file_name <- gsub(".txt","",file_name)
+  path.file <- paste0(getwd(),"/SADs_preditas/",file_name,"__k",df_name[,"k"],".EI.", "rep_",1:length(l_SADs),".csv")
+  for(j in 1:length(l_SADs)){
+    write.csv(data.frame(SAD_predita = l_SADs[[j]]),
+              file=path.file[j],
+              row.names = FALSE)
+  }
+}
+registerDoMC(4)
+simulacao <- as.list(1:dim(df_simulacao)[1])
+l_ply(simulacao,f_simulacaoEI,.parallel = TRUE)
+```
+
+### Padrões Gerais
+
+```{r SAD preditas padroes gerais, eval=TRUE,echo=FALSE,fig.height=10}
+# dados
+df_resultados <- read.table(file="./resultados/df_resultados.csv",header = TRUE,sep = ";",dec = ".",as.is=FALSE)
+level_k <- unique(as.character(df_resultados$k))
+df_resultados$k <- factor(as.character(df_resultados$k),levels = level_k)
+levels(df_resultados$k)[19] <- "0.1"
+# graficos
+l_p <- vector("list",4)
+l_p[[1]] <- ggplot(df_resultados,aes(x=MN,y=n_SAD.ref)) +
+  geom_jitter() +
+  geom_boxplot()
+l_p[[2]] <- ggplot(df_resultados,aes(x=k,y=n_SAD.ref,group=k)) +
+  geom_jitter() +
+  geom_boxplot()
+l_p[[3]] <- ggplot(filter(df_resultados,
+                          k %in% levels(df_resultados$k)[1:10]),
+                   aes(x=p,y=n_SAD.ref)) +
+  geom_point() + 
+  geom_smooth() + 
+  facet_grid(k~MN)
+l_p[[4]] <- ggplot(filter(df_resultados,
+                          k %in% levels(df_resultados$k)[11:20]),
+                   aes(x=p,y=n_SAD.ref)) +
+  geom_point() + 
+  geom_smooth() + 
+  facet_grid(k~MN)
+grid.arrange(l_p[[1]],l_p[[2]],l_p[[3]],l_p[[4]],
+             layout_matrix = rbind(c(1,2,2,2),
+                                   c(3,3,4,4),
+                                   c(3,3,4,4),
+                                   c(3,3,4,4))
+             )
+
+```
+
+__Figura 6__ Padrões gerais para o número de SADs refutadas (n_SAD.ref).
 
