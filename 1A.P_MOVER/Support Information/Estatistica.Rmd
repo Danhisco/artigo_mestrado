@@ -1,17 +1,17 @@
 ---
-title: "Auditoria da Simualação"
+title: "Estatistica"
 author: "Mori, Danilo"
-date: "19/10/2019"
-output: html_document
-editor_options: 
-  chunk_output_type: console
+date: "31/10/2019"
+output: 
+  html_document:
+    toc: true
+    toc_depth: 5
 ---
 
 <style>
 body {
 text-align: justify}
 </style>
-
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE, tidy = TRUE, include = TRUE, warning = FALSE,cache = TRUE,message=FALSE)
@@ -20,9 +20,16 @@ setwd("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/")
 ```
 
 ```{r pacotes}
+# install.packages("remotes")
+remotes::install_github("lme4/lme4")
+library(optimx)
+library(parallel)
+library(minqa)
 library(doMC)
 library(GUILDS)
-library(lme4)
+# library(lme4)
+library(dfoptim)
+library(sads)
 library(merTools)
 library(magrittr)
 library(gridExtra)
@@ -34,234 +41,10 @@ library(purrr)
 library(dplyr)
 ```
 
-
-## Auditoria da simulação:
-
-#### U
-
-```{r auditoria U }
-# com dados para simular (MN * k * site)
-df_simulacao <- read.csv("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/df_simulacao_EEeEI.csv",header = TRUE, as.is = TRUE)
-names(df_simulacao)
-# organizar as colunas
-df_simulacao %<>% select(SiteCode,refID,ordem,k,p,U_med,U_var,Ntotal,Stotal,DA,d,m,m_,I,J_M,theta)
-# com os dados primeiros (site)
-# df_referencia <- read.csv("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/df_p_simulacao.csv",as.is = TRUE) %>% 
-#   select(SiteCode,refID,ordem) %>% distinct()
-# df_auditoria <- inner_join(x=df_simulacao,y=df_referencia,by="SiteCode")
-
-ggplot(df_simulacao,aes(x=p,y=U_med)) + 
-  geom_point() + 
-  geom_smooth(method="lm") + 
-  facet_wrap(~k,ncol=4,scales = "free")
-```
-
-São 2080 linhas: 104 sítios de amostragem e 20 cenários de limitação à dispersão.
-
-#### SADs preditas
-->> para contar número de arquivos
-ls -l . | egrep -c '^-'
-->> para remover todos os *.csv
-for a in *.csv; do rm $a; done
-
-```{r avaliacao da simulacao 1}
-# setwd("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/SADs_preditas/")
-## numero de arquivos na pasta SADs_preditas: 
-system("ls -l ./SADs_preditas/ | egrep -c '^-'")
-## eu esperava: 416000
-# 20 * 104 * 100 * 2 - 392000
-```
-
-Quais são os sítios que estão faltando? Todas as baterias de simulações apresentam o mesmo número de réplicas? 
-
-Agora temos 416000 SADs e todos as linhas da bateria de simulação foram igualmente replicadas. Em termos de volume de produtos o lote da simulação esta adequado.
-
-```{r avaliacao da simulacao 1}
-# data frame
-df_SAD.predita <- data.frame(SAD_MN.name=as.character(Sys.glob("./SADs_preditas/*.csv")))
-df_SAD.predita$SAD_MN.name %<>% as.character()
-df_SAD.predita %<>% mutate(MN=as.character(str_match(SAD_MN.name,"EE|EI")),
-                           k=str_match(SAD_MN.name,"__k(.*?).E")[,2],
-                           rep=str_match(SAD_MN.name,"rep_(.*?).csv")[,2],
-                           ordem=str_match(SAD_MN.name,"NA_(.*?)__k")[,2],
-                           refID=str_match(SAD_MN.name,"ref(.*?)_NA")[,2])
-write.csv(df_SAD.predita,
-          "~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/resultados/df_SAD.predita.csv",
-          row.names = FALSE)
-# avaliacao do numero de replicas por linha da bateria de simulacao
-# registerDoMC(3)
-# df_SAD.auditoria <- ddply(df_SAD.predita,c("MN","k","refID","ordem"),summarise,n_SAD.predita = length(SAD_MN.name),.parallel = TRUE)
-#########
-# df_SAD.auditoria %<>% left_join(x=.,y=df_referencia,by=c("refID","ordem"))
-# df_ <- df_SAD.auditoria %>% filter(n_SAD.predita == 200) %>% select(refID,ordem) %>% distinct()
-```
-
-
-### Avaliação dos sítios que foram simulados
-
-```{r}
-
-```
-
-
-
-```{r avaliacao da simulacao 4}
-################################
-## dados
-################################
-### referencia
-df_references <- read.csv(file="/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/dados_brutos/references - TreeCo.csv",
-                          as.is = TRUE,header =T, na.strings = c("","NA"))
-df_references %<>% select(SiteCode,refID,ordem)
-### SAD preditas
-df_SAD.predita <- read.csv("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/resultados/df_SAD.predita.csv",header = TRUE,as.is = TRUE)
-### SAD obsh
-df_SAD.obs <- data.frame(SAD_obs.name = Sys.glob("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/dados_brutos/SAD.obs__ref*.csv"))
-df_SAD.obs$SAD_obs.name %<>% as.character()
-df_SAD.obs %<>% mutate(ordem=str_match(SAD_obs.name,"NA_(.*?).csv")[,2],
-                       refID=str_match(SAD_obs.name,"ref(.*?)_NA")[,2])
-df_SAD.obs$ordem %<>% as.integer()
-df_SAD.obs$refID %<>% as.integer()
-# merge1
-df_auditoria <-  inner_join(x=df_SAD.predita,
-                            y=df_SAD.obs,
-                            by=c("refID","ordem"))
-df_auditoria %<>% filter(!is.na(SAD_obs.name))
-# merge2
-df_references$refID %<>% as.integer()
-df_references$ordem %<>% as.integer()
-df_auditoria %<>% left_join(x=.,y=df_references,by=c("refID","ordem")) 
-
-################################
-## função para os resultados ##
-################################
-### rotina da função
-df_auditoria$resultados <- vector("list",length = nrow(df_auditoria))
-registerDoMC(4)
-for(i in 1:nrow(df_auditoria)){
-  # i <- 1
-  df_ <- df_auditoria[i,]
-  v_SAD.obs <- read.csv(df_$SAD_obs.name,header = TRUE,as.is = TRUE) %>% filter(species.correct != "Mortas") %>% 
-    .$N %>% sort()
-  df_predicao <- as.data.frame(df_$data[[1]])
-  f_KSeS <- function(v_OBS = v_SAD.obs, path_SAD.MN){
-    # path_SAD.MN <- df_predicao[1,"SAD_MN.name"]
-    v_SAD.predita <- as.integer(read.csv(path_SAD.MN,header = TRUE,as.is = TRUE)$SAD_predita)
-    a <- suppressWarnings(ks.test(x = v_OBS,
-                                  y = v_SAD.predita))
-    a <- data.frame(KS.D = a$statistic, KS.p = a$p.value)
-    a$S_SAD.predita <- length(v_SAD.predita)
-    a$S_SAD.obs <- length(v_SAD.obs) 
-    return(a)
-  }
-  # f_KSeS(path_SAD.MN = df_predicao$SAD_MN.name[10])
-  df_auditoria$resultados[[i]] <- adply(df_predicao,1, function(X) f_KSeS(path_SAD.MN = X$SAD_MN.name),.parallel = TRUE)
-}
-## Caso alguma SAD obs não estava presente:
-df_auditoria.SAD_obsNA <- left_join(x=df_SAD.predita,
-                                    y=df_SAD.obs,
-                                    by=c("refID","ordem"))
-df_auditoria.SAD_obsNA %<>% filter(is.na(SAD_obs.name)) %>% select(refID,ordem) %>% distinct()
-## completando a ocorr873873ência:
-df_abundances <- read.csv("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/dados_brutos/abundances.csv",
-                          header = TRUE,as.is = TRUE)
-df_abundances %<>% filter(RefID == "873" & ordem == "1328") # não esta disponível.
-
-# registro
-df_p.write <- df_auditoria %>% select(-data) %>% unnest(cols = c(resultados)) %>% as.data.frame()
-write.csv(df_p.write,file="./resultados/df_replicas.csv",row.names = F)
-```
-
-
-Para apagar todos os arquivos com um determinado padrão ("EI"):
-find . -type f -name '*EI*' -delete
-
-```{r auditoria das replicas}
-# dados por réplicas
-df_replicas <- read.csv("./resultados/df_replicas.csv",header = TRUE,as.is = TRUE)
-# referencia dos sitios
-df_referencia <- read.csv("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/df_referencia.csv",header = TRUE, as.is = TRUE)
-# merge para replicas
-df_replicas %<>% left_join(x=.,y=df_references,by=c("ordem","refID"))
-####################
-df_replicas %>% head
-```
-
-### avaliação de df_replicas
-
-```{r df_replicas auditoria}
-df_replicas %>% ddply(.,c("MN","k","SiteCode"), summarise, ocorrencias = length(rep)) %>% summary
-df_replicas %>% filter(MN == "EE",k==0.99,SiteCode=="MGuberl7") %>% .$rep %>% table
-df_replicas %>% filter(SiteCode=="MGuberl7") %>% .$rep %>% table
-```
-
-
-```{r df_replicas sumario e registro}
-# sumarise
-registerDoMC(4)
-alpha <- 0.05
-df_resultados <- ddply(df_replicas,c("MN","k","SiteCode"),summarise,
-                       D_mean = mean(KS.D), D_var = var(KS.D),
-                       p.value_mean = mean(KS.p),p.value_var = var(KS.p),
-                       S.MN_mean = mean(S_SAD.predita), S.MN_var = var(S_SAD.predita),
-                       S.obs_mean=mean(S_SAD.obs),S.obs_var=var(S_SAD.obs),
-                       n_SAD.N.ref = sum(KS.p>=alpha), n_SAD.ref = sum(KS.p<alpha),
-                       .parallel = TRUE)
-# merge
-df_simulacao <- read.csv("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/df_simulacao_EEeEI.csv",header = TRUE, as.is = TRUE)
-df_resultados %<>% left_join(x=.,                            y=select(df_simulacao,SiteCode,k,p,Ntotal,Stotal,U_med,U_var,DA,d,m_,theta),
-                             by=c("SiteCode","k")) 
-df_resultados %>% names
-df_resultados %<>% select(SiteCode,MN,k,p,
-                          n_SAD.N.ref, n_SAD.ref,S.MN_mean,U_med,
-                          Ntotal,Stotal,DA,d,m_,theta,
-                          U_var,S.MN_var,
-                          p.value_mean,p.value_var,
-                          D_mean,D_var,
-                          S.obs_mean,S.obs_var)
-# gravar
-# names(df_resultados)[1] <- "Site"
-df_resultados$k.0<- as.numeric(as.character(df_resultados$k))
-df_resultados$MN <- factor(df_resultados$MN)
-df_resultados <- df_resultados[with(df_resultados,order(p,-k.0)),]
-write.table(df_resultados,file="./resultados/df_resultados.csv",row.names = FALSE,sep = ";",dec = ".")
-```
-
-
-```{r df resultados}
-# leitura
+```{r dados}
+### leitura ###
 df_resultados <- read.table(file="./resultados/df_resultados.csv",header = TRUE,sep = ";",dec = ".",as.is=FALSE)
-level_k <- unique(as.character(df_resultados$k))
-df_resultados$k <- factor(as.character(df_resultados$k),levels = level_k)
-levels(df_resultados$k)[19] <- "0.1"
-# contrasts(df_resultados$k)
-# graficos
-l_p <- vector("list",4)
-l_p[[1]] <- ggplot(df_resultados,aes(x=p.value_mean,y=n_SAD.ref)) + geom_point() + geom_smooth(stat="smooth") + labs(y="número de SADs refutadas",x="p-valor médio")
-l_p[[2]] <- ggplot(df_resultados,aes(x=D_mean,y=p.value_mean)) + geom_point() + geom_smooth(stat="smooth") + labs(x="estatística D média",y="p-valor médio")
-l_p[[3]] <- ggplot(df_resultados,aes(x=p.value_mean,y=p.value_var)) + geom_point() + geom_smooth(stat="smooth") + labs(y="variância p-valor",x="p-valor médio")
-l_p[[4]] <- ggplot(df_resultados,aes(x=D_mean,y=D_var)) + geom_point() + geom_smooth(stat="smooth") +
-   labs(x="estatística D média",y="variância estatística D")
-# l_p[[5]] <- ggplot(df_resultados,aes(x=Stotal,y=S.obs_mean)) + geom_point() + geom_abline(intercept = 0,slope = 1,color="red")
-# df_resultados %<>% mutate(diff_S.obs = Stotal-S.obs_mean)
-# l_p[[6]] <- ggplot(df_resultados, aes(x=df_resultados$diff_S.obs)) + 
-#   geom_histogram(breaks=seq(0, max(df_resultados$diff_S.obs), length.out = 40)) + 
-#   labs(title="", x="S_{parametro U} - S_{do vetor KS}", y="Count")
-grid.arrange(l_p[[1]], l_p[[2]], l_p[[3]], l_p[[4]], # l_p[[5]],# l_p[[6]],
-             layout_matrix = rbind(c(rep(1,3),rep(2,3)),
-                                   c(rep(3,3),rep(4,3))) #,
-                                   # c(rep(5,3),rep(NA,3)))
-             )
-```
-
-Vou refazer a simulação para os sítios em que S.obs usada na parametrização de U não foi a mesma utilizada no teste de KS. Então refiz tudo com os valores corretos.
-
-### Padrões gerais
-
-```{r preparacao dos dados,warning=FALSE,message=FALSE, include=FALSE}
-### leitura e padronização ###
 ### padronização ###
-df_resultados <- read.table(file="./resultados/df_resultados.csv",header = TRUE,sep = ";",dec = ".",as.is=FALSE)
 level_k <- unique(as.character(df_resultados$k))
 df_resultados$k <- factor(as.character(df_resultados$k),levels = level_k)
 levels(df_resultados$k)[19] <- "0.1"
@@ -276,279 +59,140 @@ f_z <- function(x){
 df_resultados.z <- as.data.frame(apply(df_resultados[c("p","Ntotal","Stotal","k.0")],2,f_z))
 names(df_resultados.z) <- sapply(names(df_resultados.z), function(x) paste(gsub(".0","",x),".z",sep=""))
 df_resultados %<>% cbind(.,df_resultados.z)
-# gravar
-write.table(df_resultados,file="./resultados/df_resultados.csv",row.names = FALSE,sep = ";",dec = ".")
-### Summary ###
-# df_resultados %>% head
-
-### para auditoria ### remover depois 
-df_replicas <- read.csv("./resultados/df_replicas.csv",header = TRUE,as.is = TRUE)
-df_replicas %<>% left_join(x=.,
-                           y=df_resultados,
-                           by=c("SiteCode" = "Site"))
+names(df_resultados)[c(1,6)] <- c("Site","n_ref")
 ```
 
-### Descrição dos Levantamentos Selecionados
 
-```{r figura 1, fig.width=8, fig.height=5, fig.align="center", include=FALSE}
-df_plot <- df_resultados %>% dplyr::filter(k=="0.99" & MN=="EE") %>% dplyr::select(Site, p, Stotal,p.z,Stotal.z) %>% unique
+## Número de SADs refutadas
 
-# avaliando as curvas pelo quantiles
-# df_plot %<>% mutate(terceiro_quantil = ifelse(p>quantile(df_plot$p,probs=0.75),">_3oQ","<_3oQ")) 
-l_p <- vector("list",6)
-l_p[[1]] <- ggplot(df_plot, aes(x=p)) +
-  geom_histogram(bins=30) +
-  geom_vline(xintercept = c(quantile(df_plot$p,probs = c(0.25,0.50,0.75))),color="red")
-  # geom_density()
-l_p[[2]] <- ggplot(df_plot, aes(x=p.z)) +
-  geom_histogram(bins=30) +
-  geom_vline(xintercept = c(quantile(df_plot$p.z,probs = c(0.25,0.50,0.75))),color="red")
-  # geom_density()
-l_p[[3]] <- ggplot(df_plot, aes(x=Stotal)) +
-  geom_histogram(bins=30) +
-  geom_vline(xintercept = quantile(df_plot$Stotal,probs = c(0.25,0.50,0.75)),color="red")
-l_p[[4]] <- ggplot(df_plot, aes(x=Stotal.z)) +
-  geom_histogram(bins=30) +
-  geom_vline(xintercept = c(quantile(df_plot$Stotal.z,probs = c(0.25,0.50,0.75))),color="red")
-l_p[[5]] <- ggplot(df_plot, aes(x=p,y=Stotal)) +
-  geom_hline(yintercept = quantile(df_plot$Stotal,probs = c(0.25,0.50,0.75)),color="red") +
-  geom_vline(xintercept = quantile(df_plot$p,probs = c(0.25,0.50,0.75)),color="red") +
+### Visualização
+
+```{r n_ref preditoras categoricas}
+# graficos
+l_p <- vector("list",4)
+l_p[[1]] <- ggplot(df_resultados,aes(x=MN,y=n_SAD.ref)) +
+  geom_jitter() +
+  geom_boxplot()
+l_p[[2]] <- ggplot(df_resultados,aes(x=k,y=n_SAD.ref,group=k)) +
+  geom_jitter() +
+  geom_boxplot()
+l_p[[3]] <- ggplot(filter(df_resultados,
+                          k %in% levels(df_resultados$k)[1:10]),
+                   aes(x=p,y=n_SAD.ref)) +
   geom_point() + 
-  geom_smooth(method="lm")
-l_p[[6]] <- ggplot(df_plot, aes(x=p.z,y=Stotal.z)) +
-  geom_hline(yintercept = quantile(df_plot$Stotal.z,probs = c(0.25,0.50,0.75)),color="red") +
-  geom_vline(xintercept = quantile(df_plot$p.z,probs = c(0.25,0.50,0.75)),color="red") +
+  geom_smooth() + 
+  facet_grid(k~MN)
+l_p[[4]] <- ggplot(filter(df_resultados,
+                          k %in% levels(df_resultados$k)[11:20]),
+                   aes(x=p,y=n_SAD.ref)) +
   geom_point() + 
-  geom_smooth(method="lm")
-# do.call("grid.arrange",c(l_p,ncol=3))
-grid.arrange(l_p[[1]],l_p[[2]],l_p[[3]],l_p[[4]],l_p[[5]],l_p[[6]],
-             layout_matrix = rbind(c(1,1,3,3,5,5),
-                                   c(2,2,4,4,6,6) )
+  geom_smooth() + 
+  facet_grid(k~MN)
+grid.arrange(l_p[[1]],l_p[[2]],l_p[[3]],l_p[[4]],
+             layout_matrix = rbind(c(1,2,2,2),
+                                   c(3,3,4,4),
+                                   c(3,3,4,4),
+                                   c(3,3,4,4))
              )
 
 ```
 
-Figura 1. Na primeira linha há as variáveis na escala padrão; na segunda linha as variáveis após transformação Z (centra a média em zero e desloca a variação para o centro da distribuição REVISÃO). As linhas em vermelho equivalem ao quantil de 0.25%, 0.50% e 0.75% da amostra. S = riqueza observada; p = proporção de cobertura vegetal na paisagem
+__Figura 1__ Número de SADs refutadas (n_SAD.ref) ~ MN, k, p
 
-  A proporção de cobertura vegetal variou de 0.0074 até 1, o quantil de 25% é de 0.2916, a média é 0.6727 e o quantil de 75% é de 0.9216 (figura 1). A riqueza observada variou de 26 até 230, o quantil de 25% é de 73.75, a média é 105.85, e o quantil de 75% é 134 (figura 1). Há um vies na amostra que apresenta mais trabalhos em paisagens com alta cobertura vegetal do que em baixas, por exemplo, o primeiro 1/4 da amostra está entre 0.00 e 0.30, enquanto o último 1/4 está comprimido entre 0.92 e 1 (figura 1). A riqueza observada apresenta um outro padrão com uma tendência central e uma assimetria para a esquerda [REVISAR]: 50% da amostra está entre 73 e 134 com média e mediana próximos de 100; o primeiro 1/4 da amostra está entre 26 e 73 enquanto o último 1/4 varia entre 134 e 230, o range do 1o quarto equivale à metade do range do último quarto da amostra. Há certa covariação entre p e S: o último quarto de p varia acima do quantil de 25%; enquanto o primeiro quarto de p varia até a mediana de S. Porém os 50% centrais de cada variável estão representadas em todo o gradiente de variação da outra, e.g., entre o quantil de 25% e 75% de p observamos S que varia desde de valores inferiores à 50 até superiores à 200; e um padrão se observa para S. Para realizar a análise estatística aplicamos a transformaçaõ Z em p e S. A transformação Z centraliza no zero a média da distribuição e converte da escala da variável para a de desvio-padrões; dessa forma torna-se mais direta a interpretação de modelos lineares generalizados hierarquicos (REF 2006). Essa transformação move a variação para a região central da distribuição mantendo a relação geral entre as observações (figura 1). Não há motivos a priori para pensar que a predição dos modelos pode ser influênciada pela covariação entre p e S. [DÚVIDA] Paulo, lembro que discutimos sobre a relação entre teste frequentista e o efeito de S * p; me recordo de algo como que ao utilizar o p-valor estariamos de alguma forma ponderando isso [DÚVIDA].
+Vamos aproximar a variável por um processo binomial. Utilizamos o seguinte protocolo de ajuste dos dados  
+1) comparar diferentes agrupamentos dos dados por sítios de amostragem, para um mesmo modelo cheio;  
+2) os modelo cheio vão conter as variáveis p e MN e duas versões de k (continua e categorica);
+3) e as 3 funções de ligação canônicas  
+4) o modelo cheio mais plausível sera utilizado na seleção de variáveis
+5) a seleção de variáveis contará com todas as combinações das preditoras do modelo cheio
+6) avaliamos os resíduos quantílicos do modelo mais plausível
 
-### Congruência entre SAD observada e predita
 
-  Espera-se que quanto maior a estatística D do teste de Kolmogorov-Smirnov menor o p-valor observado. Não esperamos observar relação entre p-valor, J e S. Segue avaliação destas espectativas
-
-```{r auditoria teste KS,fig.height=4,fig.width=10}
-l_p <- vector("list",2)
-l_p[[1]] <- ggplot(df_resultados,aes(x=log(Ntotal),y=n_SAD.ref)) + geom_point() + 
-  labs(y="") + theme(axis.text.y = element_blank()) 
-l_p[[2]] <- ggplot(df_resultados,aes(x=log(Stotal),y=n_SAD.ref)) + geom_point() + labs(y="") + theme(axis.text.y = element_blank())
-do.call("grid.arrange",c(l_p,ncol=2))
-grid.arrange(l_p[[1]],l_p[[2]],top="Número de SADs refutadas",ncol=2)
+```{r n_ref comparacao modelos cheios}
+l_md <- vector("list",15)
+names(l_md) <- c("l k0 1|Site","l k0 MN|Site","l k0 k0*MN|Site",
+                 "l kf 1|Site","l kf MN|Site",
+                 "p k0 1|Site","p k0 MN|Site","p k0 k0*MN|Site",
+                 "p kf 1|Site","p kf MN|Site",
+                 "c k0 1|Site","c k0 MN|Site","c k0 k0*MN|Site",
+                 "c kf 1|Site","c kf MN|Site")
+## logito ##
+l_md[[1]] <- glmer(cbind(n_ref,100-n_ref) ~ p.z * k.z * MN + (1|Site), 
+                   family = "binomial",data=df_resultados,
+                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[2]] <- glmer(cbind(n_ref,100-n_ref) ~ p.z * k.z * MN + (MN|Site), 
+                   family = "binomial",data=df_resultados,
+                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[3]] <- glmer(cbind(n_ref,100-n_ref) ~ p.z * k.z * MN + (MN*k.z|Site),
+                   family = "binomial",data=df_resultados,
+                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[4]] <- glmer(cbind(n_ref,100-n_ref) ~ p.z * k * MN + (1|Site),
+                   family = "binomial",data=df_resultados,
+                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[5]] <- glmer(cbind(n_ref,100-n_ref) ~ p.z * k * MN + (MN|Site),
+                   family = "binomial",data=df_resultados,
+                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+## probit ##
+l_md[[6]] <- glmer(cbind(n_ref,100-n_ref) ~ p.z * k.z * MN + (1|Site), 
+                   family = "binomial"(link = probit),data=df_resultados,
+                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[7]] <- glmer(cbind(n_ref,100-n_ref) ~ p.z * k.z * MN + (MN|Site), 
+                   family = "binomial"(link = probit),data=df_resultados,
+                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[8]] <- glmer(cbind(n_ref,100-n_ref) ~ p.z * k.z * MN + (MN*k.z|Site),
+                   family = "binomial"(link = probit),data=df_resultados,
+                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[9]] <- glmer(cbind(n_ref,100-n_ref) ~ p.z * k * MN + (1|Site),
+                   family = "binomial"(link = probit),data=df_resultados,
+                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[10]] <- glmer(cbind(n_ref,100-n_ref) ~ p.z * k * MN + (MN|Site),
+                   family = "binomial"(link = probit),data=df_resultados,
+                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+## cloglog
+l_md[[11]] <- glmer(cbind(n_ref,100-n_ref) ~ p.z * k.z * MN + (1|Site), 
+                   family = "binomial"(link = cloglog),data=df_resultados,
+                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[12]] <- glmer(cbind(n_ref,100-n_ref) ~ p.z * k.z * MN + (MN|Site), 
+                   family = "binomial"(link = cloglog),data=df_resultados,
+                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[13]] <- glmer(cbind(n_ref,100-n_ref) ~ p.z * k.z * MN + (MN*k.z|Site),
+                   family = "binomial"(link = cloglog),data=df_resultados,
+                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e7)))
+par_md <- getME(l_md[[13]],c("theta","fixef"))
+l_md[[13]] <- glmer(cbind(n_ref,100-n_ref) ~ p.z * k.z * MN + (MN*k.z|Site),
+                   family = "binomial"(link = cloglog),data=df_resultados,
+                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e7)),
+                   start = par_md)
+l_md[[14]] <- glmer(cbind(n_ref,100-n_ref) ~ p.z * k * MN + (1|Site),
+                   family = "binomial"(link = cloglog),data=df_resultados,
+                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[15]] <- glmer(cbind(n_ref,100-n_ref) ~ p.z * k * MN + (MN|Site),
+                   family = "binomial"(link = cloglog),data=df_resultados,
+                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+AICctab(l_md,weights=T)
 ```
 
-figura . Número de SADs refutadas ~ log(N) e log(S)
+Pergunta: existe algum problema em comparar modelos que utilizaram diferentes otimizadores?
+Resposta: os otimizadores diferem no algoritmo que vare o campo de parâmetros; uma vez escolhidos os parâmetros os modelos são comparados da mesma forma
 
-#### padrões gerais
+Falhas de convergência:
 
-```{r n_SAD.N.ref grafico exp}
-l_p <- vector("list",2)
-l_p[[1]] <- ggplot(filter(df_resultados,k %in% levels(df_resultados$k)[1:10]),
-                   aes(x=p,y=n_SAD.ref)) +
-  geom_point() + geom_smooth() + facet_grid(k~MN)
-l_p[[2]] <- ggplot(filter(df_resultados,k %in% levels(df_resultados$k)[11:20]),
-                   aes(x=p,y=n_SAD.ref)) +
-  geom_point() + geom_smooth() + facet_grid(k~MN)
-do.call("grid.arrange",c(l_p,ncol=2))
-```
-
-
-
-
-#### Modelo Estatístico 
-
-  Consideramos que um modelo neutro não foi refutado quando o p-valor for maior ou igual à 5%. Contabilizamos o número de predições não refutadas (Goodness-of-fit) e modelamos a probabilidade de uma predição não ser refutada usando um modelo logito. Agrupamos os dados pelo Sítio de observação (Site). É possível agrupar os dados considerando um intercepto por sítio (1|Site); 1 intercepto por modelo neutro (MN|Site); ou com 1 intercepto e 1 inclinação para k por modelo neutro (k*MN|Site). Na última opção k precisa ser interpretado como variável contínua. Um protocolo de seleção de modelos hierarquicos pode ser encontrado em Zuur et al. 2009 onde se recomenda comparar formas alternativas de agrupar os dados a partir do modelo cheio da relação entre as preditoras. O modelo cheio proposto foi com a interação de terceiro grau entre as preditoras p, k e MN. Comparamos todas as combinações possíveis por verossimilhança [DÚVIDA] se entendo corretamente, os parametros da estrutura aleatória são estimados pelo R2 e os estrutura fixa por algo similar à verossimilhança; então precisa utilizar o parâmetro REML=TRUE [DÚVIDA]
-
-__Tabela 1__ Qual o melhor modelo cheio?
-  
-```{r tabela 1 comparacao da estrutura aleatoria de GOF, include=FALSE}
-l_md.cheio <- vector("list",5)
-names(l_md.cheio) <- c("k.z 1|Site","k.z MN|Site","k.z k.z*MN|Site","k.f 1|Site","k.f MN|Site")
-l_md.cheio[[1]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k.0.z * MN + (1|Site), family = "binomial",data=df_resultados,
-              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md.cheio[[2]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k.0.z * MN + (MN|Site), family = "binomial",data=df_resultados,
-              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md.cheio[[3]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k.0.z * MN + (k.0.z*MN|Site), family = "binomial",data=df_resultados,
-              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md.cheio[[4]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k * MN + (1|Site), family = "binomial",data=df_resultados,
-              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md.cheio[[5]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k * MN + (MN|Site), family = "binomial",data=df_resultados,
-              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-AICctab(l_md.cheio,weights=T)
-```
-
-O modelo estatístico com k como fator e agrupamento dos dados como MN|Site foi o único plausível.
-
-__Tabela 2__ Qual a relação entre as variáveis é mais plausível?
-
-```{r GOF selecao de modelos, include=FALSE}
-l_md.selecao <- vector("list",19)
-names(l_md.selecao) <- c("p*k*MN",# modelo cheio
-                         "p*k*MN-p:k:MN", #MC - 3a ordem
-                         "p*(k+MN)","k*(p+MN)","MN*(p+k)", #2 interações
-                         "p*k+MN","p*MN+k","k*MN+p", #1 interação + preditor
-                         "p*k","p*MN","k*MN", #1 interação
-                         "p+k+MN",#aditivo 3
-                         "p+k","p+MN","k+MN", #aditivo 2 
-                         "p","k","MN", #preditor isolado
-                         "1") #nulo
-#modelo cheio
-l_md.selecao[[1]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k * MN + (MN|Site), family = "binomial",data=df_resultados,
-              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-#modelo cheio - interação 3a ordem
-l_md.selecao[[2]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k * MN - p.z:k:MN + (MN|Site), family = "binomial",data=df_resultados,
-              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-#2 interações
-l_md.selecao[[3]] <- glmer(cbind(GOF,100-GOF) ~ p.z * (k + MN) + (MN|Site), family = "binomial",data=df_resultados,
-              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md.selecao[[4]] <- glmer(cbind(GOF,100-GOF) ~ k * (p.z + MN) + (MN|Site), family = "binomial",data=df_resultados,
-              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md.selecao[[5]] <- glmer(cbind(GOF,100-GOF) ~ MN * (p.z + k) + (MN|Site), family = "binomial",data=df_resultados,
-              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-#1 interação + preditor
-l_md.selecao[[6]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k + MN + (MN|Site), family = "binomial",data=df_resultados,
-              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md.selecao[[7]] <- glmer(cbind(GOF,100-GOF) ~ p.z * MN + k + (MN|Site), family = "binomial",data=df_resultados,
-              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md.selecao[[8]] <- glmer(cbind(GOF,100-GOF) ~ k * MN + p.z + (MN|Site), family = "binomial",data=df_resultados,
-              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-#1 interação
-l_md.selecao[[9]] <- glmer(cbind(GOF,100-GOF) ~ p.z * k + (1|Site), family = "binomial",data=df_resultados,
-              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md.selecao[[10]] <- glmer(cbind(GOF,100-GOF) ~ p.z * MN + (MN|Site), family = "binomial",data=df_resultados,
-              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md.selecao[[11]] <- glmer(cbind(GOF,100-GOF) ~ k * MN + (MN|Site), family = "binomial",data=df_resultados,
-              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-#aditivo 3
-l_md.selecao[[12]] <- glmer(cbind(GOF,100-GOF) ~ p.z + k + MN + (MN|Site), family = "binomial",data=df_resultados,
-              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-#aditivo 2
-l_md.selecao[[13]] <- glmer(cbind(GOF,100-GOF) ~ p.z + k + (1|Site), family = "binomial",data=df_resultados,
-              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md.selecao[[14]] <- glmer(cbind(GOF,100-GOF) ~ p.z + MN + (MN|Site), family = "binomial",data=df_resultados,
-              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md.selecao[[15]] <- glmer(cbind(GOF,100-GOF) ~ k + MN + (MN|Site), family = "binomial",data=df_resultados,
-              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-#aditivo 1
-l_md.selecao[[16]] <- glmer(cbind(GOF,100-GOF) ~ p.z + (1|Site), family = "binomial",data=df_resultados,
-              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md.selecao[[17]] <- glmer(cbind(GOF,100-GOF) ~ k + (1|Site), family = "binomial",data=df_resultados,
-              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md.selecao[[18]] <- glmer(cbind(GOF,100-GOF) ~ MN + (MN|Site), family = "binomial",data=df_resultados,
-              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-# nulo
-l_md.selecao[[19]] <- glmer(cbind(GOF,100-GOF) ~ 1 + (1|Site), family = "binomial",data=df_resultados,
-              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-AICctab(l_md.selecao,weights=T)
-```
-
-O único modelo plaúsivel é aquele que inclui a interação de terceiro grau. Vamos avaliar os resíduos quantílicos utilizando o pacote DHARMa (REF). Se o modelo estatístico está fazendo um ajuste adequado então a distribuição dos resíduos quantílicos deve ser próximo a de uma distribuição normal (REF). 
-
-```{r res quant l_md.selecao, include=FALSE}
-plot(simulateResiduals(l_md.selecao[["p*k*MN"]],1000))
-```
-
-Figura 2. Resíduos quantílicos do modelo mais plaúsivel [aquele que inclui p:k:MN], para detalhes ver documentação da função simulateResiduals.
-
-A distribuição dos resíduos quantílicos do modelo mais plausível não apresenta boa aderência à uniformidade.
-
-
-
-
-
-## Figuras Extras
-
-
-```{r figura X dispersao dos individuos segundo a funcao de dispersao utilizada, include=FALSE}
-# calcular d a partir do m de BCI
-# library(lamW)
-# m <- 0.1
-# J <- 213724
-# A <- 50
-# DA <- J/A
-# L=sqrt((J/DA)*10000)
-# l_cel <- 100/sqrt(DA)
-# d <- sqrt(2)*L*m / (m * lambertW0(-exp(-1/m)/m) +1)
+```{r n_ref modelo cheio com convergencia}
+# rotina de avaliação
 # 
-# 
-# 
-# # simulação da chuva de propágulos assumindo dist Laplace para os dados de BCI
-# library(rmutil)
-# density <- 20852/50
-# npoints <- 1e5
-# d_ind_MA  <- 100/sqrt(density)
-# b_laplace <- sigma / sqrt(2)
-# X_laplace.CM <- d_ind_MA * round(rlaplace(npoints, s=b_laplace) / d_ind_MA) 
-# Y_laplace.CM <- d_ind_MA * round(rlaplace(npoints, s=b_laplace) / d_ind_MA)
-# X_laplace <- rlaplace(npoints, s=b_laplace)
-# Y_laplace <- rlaplace(npoints, s=b_laplace)
-# 
-# 
-# dist_laplace <- sqrt(X_laplace^2+Y_laplace^2)
-# plot(x=X_laplace,y=Y_laplace)
-# plot(density(dist_laplace))
-
-
+par_md <- getME(l_md[[13]],c("theta","fixef"))
+l_md[[13]] <- glmer(cbind(n_ref,100-n_ref) ~ p.z * k.z * MN + (MN*k.z|Site),
+                   family = "binomial"(link = cloglog),data=df_resultados,
+                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e7)),
+                   start = par_md)
+AICctab(l_md,weights=T)
 ```
 
-Figura X. Chuva de propágulos pressuposta pela simulação coalescente. No primeiro quadro
+Resolvido
 
-  
-  Os sítios variam na densidade observada e portanto a distância entre os indivíudos na paisagem varia. Então optamos por parametrizar a dispersão pela proporção de propágulos que permanece até a vizinhança imediata da planta progenitora (k), padronizamos pela distância entre o centro de unidades de habitat adjacentes (l=100/sqrt(DA_obs)). Estimamos a distância média de dispersão necessária para obter determinado k.
+__Seleção de Variáveis__
 
-
-
-
-A chuva de propágulos pode ser entendida como o produto da fecundidade e função de dispersão (Clark et al. 1999). Por conta do pressuposto da equivalência funcional todos os indivíduos produzem o mesmo número de propágulos por unidade de tempo (Hubbell 2001), assim, podemos simular cenários de limitação à dispersão em função da porcentagem de propágulos que permace até determinada distância da planta progenitora. Dessa maneira, não precisamos definir a dispersão em termos de distância per se mas em termos de porcentagem de indivíduos que permanecem na área imediata da planta progenitora. Para isso é necessário estabelecer uma distância padrão da planta progenitora e estimar ou definir a porcentagem de indivíduos que se mantêm até esta distância padrão. Como distância padronizamos $l_{cel}$, assim, cada paisagem possui uma distância padrão que depende da densidade observada de indivíduos naquela paisagem [REESCREVER]. Podemos estimar qual a porcentagem de propágulos até a distância padrão que um determinado sd gera, partindo de um m (eqn 2); ou podemos informar a priori quais as porcentagens de interesse e estimar o sd necessário para gerar tais porcentagens. Na simulação coalescente, utilizamos 12 valores de porcentagem para simular os cenários de limitação à dispersão: 99%, seq(95,50,by=-5)% e 25%. Apesar da simulação coalescente ser bem eficiente e permitir simular paisagens infinitas, funções de dispersão que apresentam dispersão muito elevadas são computacionalmente muito onerosas (Rosindell et al. 2008) e apresentariam pouco realismo biológico (REFERÊNCIA), logo, não utilizamos porcentagens muito baixas (e.g.<1%).
-
-Para estimar o sd necessário para gerar uma determinada porcentagem de propágulos até a distância padronizada, desenvolvemos uma função no ambiente de programação R (R language team). A seguir o código utilizado nessa função, note que a função permite utilizar 3 distribuições de probabilidade (uniforme, normal e Laplace), contudo utilizamos apenas a distribuição Laplace.
-
-
-## Anexo:
-
-### Imagens das matrizes de paisagem
-
-
-```{r matrizees de paisagem, include=FALSE}
-path_paisagens <- Sys.glob("/home/danilo/Documentos/Doutorado/artigo_mestrado/simulacao/*.txt")
-df_simulacao <- map_df(Sys.glob("~/Documentos/Doutorado/artigo_mestrado/simulacao/U/*.csv"),read.csv) 
-df_simulacao %<>% dplyr::select(SiteCode,p,J,S,DA,txt.file) %>% unique %>% 
-  left_join(x=.,
-            y=data.frame(txt.file=gsub("/home/danilo/Documentos/Doutorado/artigo_mestrado/simulacao/","",path_paisagens),path_paisagens),
-            by = "txt.file")
-df_simulacao$path_paisagens %<>% as.character()
-
-## matriz de paisagem
-
-# f_plot <- function(X){
-#   mat_paisagem <- read.table(X$path_paisagens,header = FALSE) %>% as.matrix()
-#   rotate <- function(a) t(apply(a, 2, rev))
-#   image(rotate(mat_paisagem),main=X$txt.file)
-# }
-# par(mfrow=c(20,4))
-# registerDoMC(2)
-# a_ply(df_simulacao,1,f_plot,.parallel = TRUE)
-
-
-for(i in 1:nrow(df_simulacao)){
-  X <- df_simulacao[i,]
-  mat_paisagem <- read.table(X$path_paisagens,header = FALSE) %>% as.matrix()
-  dim_ <- 
-  is.na(mat_paisagem) <- 0
-  
-  rotate <- function(a) t(apply(a, 2, rev))
-  image(rotate(mat_paisagem),main=paste0(X$SiteCode, " p=",X$p," J=",X$J," S=",X$S))
-}
+```{r n_ref selecao de variaveis}
 
 ```
-
-
 
