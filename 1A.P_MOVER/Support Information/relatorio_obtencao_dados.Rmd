@@ -671,19 +671,6 @@ l_ply(simulacao,f_simulacaoEI,.parallel = TRUE)
 
 # Prévia Resultados
 
-## U estimado
-
-```{r U estimado, eval=TRUE,echo=FALSE}
-# dados
-df_resultados <- read.table(file="./resultados/df_resultados.csv",header = TRUE,sep = ";",dec = ".",as.is=FALSE)
-level_k <- unique(as.character(df_resultados$k))
-df_resultados$k <- factor(as.character(df_resultados$k),levels = level_k)
-levels(df_resultados$k)[19] <- "0.1"
-#
-
-```
-
-
 ## Auditoria 1: auto coerrência dos dados
 
 ```{r avaliacao da auto coerrencia,, eval=TRUE,echo=FALSE}
@@ -771,7 +758,7 @@ __Figura 8__ S_predita ~ S_obs. Linha vermelha: slope=1,intercept=0
 
 ## Auditoria 2: Comparação com o conjunto de dados antigos
 
-```{r resultados antigos, eval=TRUE,echo=FALSE}
+```{r diff resultados antigos, eval=TRUE,echo=FALSE}
 # dados antigos
 df_resultados.antigos <- read.csv("/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/df_resultados.csv",header = TRUE,as.is = TRUE)
 # dados novos
@@ -797,10 +784,39 @@ df_auditoria %<>% mutate(diff_GOF = n_SAD.N.ref - GOF,
                          diff_d = d.y - d.x,
                          diff_m_ = m_.y - m_.x,
                          J_M.x = DA.x * p.x * 600,
-                         theta.x = (U),
+                         theta.x = (U*(J_M.x-1))/(1-U),
                          diff_theta = theta - theta.x) 
 ## Graficos
+df_plot <- df_auditoria %>% select(SiteCode, MN, k,
+                                   diff_GOF, diff_S.mean,
+                                   diff_d, diff_m_, diff_U, diff_theta,
+                                   diff_p, diff_Ntotal, diff_Stotal)
+l_p <- vector("list",9)
+## parâmetros comuns
+l_p[[1]] <- ggplot(df_plot, aes(x=diff_p)) + geom_histogram(bins=40) + labs(y="contagem")
+l_p[[2]] <- ggplot(df_plot, aes(x=diff_Ntotal)) + geom_histogram(bins=40) + theme(axis.title.y = element_blank())
+l_p[[3]] <- ggplot(df_plot, aes(x=diff_Ntotal)) + geom_histogram(bins=40) + theme(axis.title.y = element_blank())
+# do.call("grid.arrange",c(l_p,ncol=3,top="diff_ = novo - antigo"))
+## parametros de cada MN 
+l_p[[4]] <- ggplot(df_plot, aes(x=diff_d)) + geom_histogram(bins=40) + labs(y="contagem")
+l_p[[5]] <- ggplot(df_plot, aes(x=diff_m_)) + geom_histogram(bins=40) + theme(axis.title.y = element_blank())
+l_p[[6]] <- ggplot(df_plot, aes(x=diff_U)) + geom_histogram(bins=40) + theme(axis.title.y = element_blank())
+l_p[[7]] <- ggplot(df_plot, aes(x=diff_theta)) + geom_histogram(bins=40) + theme(axis.title.y = element_blank())
+## variávis resposta da congruência com o observado
+l_p[[8]] <- ggplot(df_plot,aes(x=MN,y=diff_GOF,group=MN)) + geom_jitter() + geom_boxplot()
+l_p[[9]] <- ggplot(df_plot,aes(x=MN,y=diff_S.mean,group=MN)) + geom_jitter() + geom_boxplot()
+# arranjo dos plots
+mat_lay <- rbind(c(1,2,3,NA),
+                 c(4,5,6,7),
+                 c(8,8,9,9))
+grid.arrange(l_p[[1]],l_p[[2]],l_p[[3]],l_p[[4]],l_p[[5]],l_p[[6]],l_p[[7]],l_p[[8]],l_p[[9]],
+             layout_matrix=mat_lay,top="diff_ = novo - antigo")
+do.call("grid.arrange",c(l_p,layout_matrix=mat_lay,top="diff_ = novo - antigo"))
+```
 
+__Figura 8__ Diferença entre os parâmetros do novo conjunto de dados e do antigo.
+
+```{r}
 
 ```
 
