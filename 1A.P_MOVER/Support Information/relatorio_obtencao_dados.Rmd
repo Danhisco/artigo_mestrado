@@ -959,7 +959,6 @@ MGUberl1, BAlenc4, BAjuss e todos com diff_p -> 0
 - pela minha avaliação visual a estimativa de p está correta, como havia avaliado anteriormente
 
 __SAD obs__
-,eval=TRUE,echo=FALSE
 
 ```{r continuacao para SAD obs,eval=TRUE,echo=FALSE,message=FALSE}
 #### função
@@ -1010,4 +1009,71 @@ do.call("grid.arrange",c(l_p,ncol=2,top="proporção de abundância e riqueza de
 
 __Figura 11__ Trabalhos que diferem em Ntotal e Stotal e proporção da abundância e riqueza das espécies indeterminadas (grep(" sp\\.",species.correct)). Na primeira linha há os 75 pontos em comum (novo - antigo); na segunda linha há os 103 pontos do conjunto de dados novo. Novo: 2019; Antigo: 2017/2018
 
+
+## Sítios que apresentam alteração em GOF e S_mean
+
+```{r Sitios diff GOF e S_mean, eval=TRUE,echo=FALSE,fig.height=10,fig.width=6}
+# dados antigos
+df_resultados.antigos <- read.csv("/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/df_resultados.csv",header = TRUE,as.is = TRUE)
+# dados novos
+df_resultados <- read.table(file="./resultados/df_resultados.csv",header = TRUE,sep = ";",dec = ".",as.is=TRUE)
+# merge
+# df_resultados %>% str
+# df_resultados.antigos %>% str
+df_auditoria <- inner_join(x=df_resultados.antigos,y=df_resultados,
+                           by=c("SiteCode","MN","k"))
+# df_auditoria %>% names
+# padronizacao
+level_k <- unique(as.character(df_auditoria$k))
+df_auditoria$k <- factor(as.character(df_auditoria$k),levels = level_k)
+# df_auditoria %>% str
+# variáveis de auditoria
+## diff = novo - antigo
+df_auditoria %<>% mutate(diff_GOF = n_SAD.N.ref - GOF,
+                         diff_S.mean = S.MN_mean - S_m,
+                         diff_U = U_med - U,
+                         diff_p = p.y-p.x,
+                         diff_Ntotal = Ntotal - J,
+                         diff_Stotal = Stotal - S,
+                         diff_d = d.y - d.x,
+                         diff_m_ = m_.y - m_.x,
+                         J_M.x = DA.x * p.x * 2500, # ta errado, se fiz certo no passado então é 2500 (5x5km2 = 2500ha)
+                         theta.x = (U*(J_M.x-1))/(1-U),
+                         diff_theta = theta - theta.x) 
+## Graficos
+df_auditoria %<>% select(SiteCode, MN, k,
+                         diff_GOF, diff_S.mean,
+                         diff_d, diff_m_, diff_U, diff_theta,
+                         diff_p, diff_Ntotal, diff_Stotal) %>% distinct()
+# df_auditoria %>% filter(between(df_auditoria$diff_GOF,quantile(df_auditoria$diff_GOF,probs = 0.25),quantile(df_auditoria$diff_GOF,probs = 0.75))) %>% dim
+  # .$SiteCode %>% unique
+l_p <- vector("list",6)
+l_p[[1]] <- ggplot(filter(df_auditoria,MN=="EE"),aes(x=k,y=diff_GOF)) + 
+  geom_point() +
+  geom_line(aes(group=SiteCode)) +
+  geom_boxplot() +
+  ggtitle("EE")
+l_p[[2]] <- ggplot(filter(df_auditoria,MN=="EI"),aes(x=k,y=diff_GOF)) + 
+  geom_point() +
+  geom_line(aes(group=SiteCode)) +
+  geom_boxplot() +
+  ggtitle("EI")
+l_p[[3]] <- ggplot(filter(df_auditoria,MN=="EE"),aes(x=k,y=diff_S.mean)) + 
+  geom_point() +
+  geom_line(aes(group=SiteCode)) +
+  geom_boxplot()
+l_p[[4]] <- ggplot(filter(df_auditoria,MN=="EI"),aes(x=k,y=diff_S.mean)) + 
+  geom_point() +
+  geom_line(aes(group=SiteCode)) +
+  geom_boxplot()
+l_p[[5]] <- ggplot(filter(df_auditoria,MN=="EE"),aes(x=k,y=diff_d)) + 
+  geom_point() +
+  geom_line(aes(group=SiteCode)) +
+  geom_boxplot()
+l_p[[6]] <- ggplot(filter(df_auditoria,MN=="EI"),aes(x=k,y=diff_m_)) + 
+  geom_point() +
+  geom_line(aes(group=SiteCode)) +
+  geom_boxplot()
+do.call("grid.arrange",c(l_p,ncol=2))
+```
 
