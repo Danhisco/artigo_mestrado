@@ -14,22 +14,19 @@ text-align: justify}
 </style>
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE, tidy = TRUE, include = TRUE, warning = FALSE,cache = TRUE,message=FALSE)
+knitr::opts_chunk$set(echo = TRUE, tidy = FALSE, include = TRUE, warning = FALSE,cache = TRUE,message=FALSE,eval=TRUE)
 knitr::opts_knit$set(root.dir = "~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/")
 setwd("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/")
 ```
 
-```{r pacotes}
-# install.packages("remotes")
-remotes::install_github("lme4/lme4")
-library(optimx)
-library(parallel)
-library(minqa)
+```{r pacotes,eval=TRUE}
+library(gtools)
 library(doMC)
+library(mgcv)
+library(gratia)
 library(GUILDS)
-# library(lme4)
-library(dfoptim)
-library(sads)
+library(gamm4)
+library(lme4)
 library(merTools)
 library(magrittr)
 library(gridExtra)
@@ -42,13 +39,18 @@ library(dplyr)
 ```
 
 ```{r dados}
-### leitura ###
+### dados ###
+# leitura
 df_resultados <- read.table(file="./resultados/df_resultados.csv",header = TRUE,sep = ";",dec = ".",as.is=FALSE)
-### padronização ###
+# padronização
 level_k <- unique(as.character(df_resultados$k))
 df_resultados$k <- factor(as.character(df_resultados$k),levels = level_k)
 levels(df_resultados$k)[19] <- "0.1"
-### z score ### 
+df_resultados %<>% mutate(L_plot = 100*sqrt(Ntotal/DA),
+                          d_L.plot = d / L_plot,
+                          S_class = quantcut(Stotal,q=20),
+                          p_class = quantcut(p,q=20))
+# z score
 f_z <- function(x){
   m <- base::mean(x,na.rm=TRUE)
   sd <- sd(x,na.rm=TRUE)
@@ -56,143 +58,384 @@ f_z <- function(x){
   return(output)
 } 
 # names(df_resultados)
-df_resultados.z <- as.data.frame(apply(df_resultados[c("p","Ntotal","Stotal","k.0")],2,f_z))
+df_resultados.z <- as.data.frame(apply(df_resultados[c("p","Ntotal","Stotal","k.0","d_L.plot")],2,f_z))
 names(df_resultados.z) <- sapply(names(df_resultados.z), function(x) paste(gsub(".0","",x),".z",sep=""))
 df_resultados %<>% cbind(.,df_resultados.z)
-names(df_resultados)[c(1,6)] <- c("Site","n_ref")
+# summary(df_resultados)
+```
+
+# U - taxa de especiação necessária para obter a riqueza observada no equilíbrio  
+
+## Padrões Gerais  
+
+
+
+## Descrição Estatística
+
+Segundo Pedersen et al. (2019) há 5 formas de utilizar HGAM (Hierarchical Generalized Additive Models); dessas 3 descrevem o padrão geral: G, GS e GI (figura 4, Petersen et al. 2019)
+
+__Modelo G:__  
+"A single commom (global) smoother for all observations"  
+Nesse modelo há um smoother global e 1 intercepto para cada nível do efeito aleatório (random smoother); e.g.:  
+
+CO2_modG <- gam(log(uptake) ~ s(log(conc), k=5, bs="tp") +  
+                              s(Plant_uo, k=12, bs="re),  
+                              data =.; method="REML", family="gaussian")  
+  
+Modelo GS:  
+"Model GS is a close analogue to a GLMM with varying slopes: all groups have similar functional responses, but intergroup variation in responses is allowed. This approach works by allowing each grouping level to have its own functional response, but penalizing functions that are too far from the average."  
+  
+CO2_modGS <- gam(log(uptake) ∼ s(log(conc), k=5, m=2) +  
+                               s(log(conc), Plant_uo, k=5, bs="fs", m=2),  
+                               data=CO2, method="REML")  
+  
+Modelo GI:  
+" We now allow each group-specific smoother to have its own smoothing parameter and hence its own level of wiggliness (there are more smoothing parameters to estimate) and means that the only information shared between groups is through the global smoother, the common error term, and through the random effect for group-level intercepts (if used)."  
+
+CO2_modGI <- gam(log(uptake) ∼ s(log(conc), k=5, m=2, bs="tp") +   
+                               s(log(conc), by=Plant_uo, k=5, m=1, bs="tp") +   
+                               s(Plant_uo, bs="re", k=12),   
+                               data=CO2, method="REML")  
+
+
+EXEMPLO DE gamm4:: 
+
+~ 6 vezes mais rapido do que a alternativa, porem não tem a mesma flexibilidade que a função gam
+
+system.time(l_p[[1]] <- gamm4(U_med ~ s(d_L.plot), random = ~(1|SiteCode) ,
+                family="gaussian",
+                data = df_resultados))[[3]]
+  
+```{r estudo gamm(U)}
+ctrl <- list(nthreads=3) #número de cores para paralelizar; ajuda pouca.
+l_p <- vector("list",length = 3)
+# modelo G
+l_p[[1]] <- gam(U_med ~ s(d_L.plot) + s() # global smoother
+                  log(Stotal) + # log(Stotal) as a linear predictor 
+                  s(SiteCode,bs="re"), # a smooth to account for the intercept for each SiteCode (1|SiteCode)
+                family="gaussian",
+                data = df_resultados, method = "REML",control=ctrl)
+# modelo GS
+l_p[[2]] <- gam(U_med ~ s(d_L.plot) + 
+                  log(Stotal) + 
+                  s(d_L.plot,SiteCode,bs="fs"), # esse smoother alem de permitir uma função de base para cada nível de SiteCode, também estima um intercepto por SiteCode
+                family="gaussian",
+                data = df_resultados, method = "REML",control=ctrl)
+
+# modelo GI
+
+
+
+require(mgcv);set.seed(9)
+dat <- gamSim(1,n=2000,dist="poisson",scale=.1)
+k <- 12;bs <- "cr";
+
+system.time(b1<-gam(y~s(x0,bs=bs)+s(x1,bs=bs)+s(x2,bs=bs,k=k)
+            ,family=poisson,data=dat,method="REML"))[3]
+
+system.time(b2<-gam(y~s(x0,bs=bs)+s(x1,bs=bs)+s(x2,bs=bs,k=k),
+            family=poisson,data=dat,method="REML",control=ctrl))[3]
+
 ```
 
 
-## Número de SADs refutadas
-
-### Visualização
-
-```{r n_ref preditoras categoricas}
-# graficos
-l_p <- vector("list",4)
-l_p[[1]] <- ggplot(df_resultados,aes(x=MN,y=n_SAD.ref)) +
-  geom_jitter() +
-  geom_boxplot()
-l_p[[2]] <- ggplot(df_resultados,aes(x=k,y=n_SAD.ref,group=k)) +
-  geom_jitter() +
-  geom_boxplot()
-l_p[[3]] <- ggplot(filter(df_resultados,
-                          k %in% levels(df_resultados$k)[1:10]),
-                   aes(x=p,y=n_SAD.ref)) +
-  geom_point() + 
-  geom_smooth() + 
-  facet_grid(k~MN)
-l_p[[4]] <- ggplot(filter(df_resultados,
-                          k %in% levels(df_resultados$k)[11:20]),
-                   aes(x=p,y=n_SAD.ref)) +
-  geom_point() + 
-  geom_smooth() + 
-  facet_grid(k~MN)
-grid.arrange(l_p[[1]],l_p[[2]],l_p[[3]],l_p[[4]],
-             layout_matrix = rbind(c(1,2,2,2),
-                                   c(3,3,4,4),
-                                   c(3,3,4,4),
-                                   c(3,3,4,4))
-             )
-
-```
-
-__Figura 1__ Número de SADs refutadas (n_SAD.ref) ~ MN, k, p
-
-Vamos aproximar a variável por um processo binomial. Utilizamos o seguinte protocolo de ajuste dos dados  
-1) comparar diferentes agrupamentos dos dados por sítios de amostragem, para um mesmo modelo cheio;  
-2) os modelo cheio vão conter as variáveis p e MN e duas versões de k (continua e categorica);
-3) e as 3 funções de ligação canônicas  
-4) o modelo cheio mais plausível sera utilizado na seleção de variáveis
-5) a seleção de variáveis contará com todas as combinações das preditoras do modelo cheio
-6) avaliamos os resíduos quantílicos do modelo mais plausível
 
 
-```{r n_ref comparacao modelos cheios}
-l_md <- vector("list",15)
-names(l_md) <- c("l k0 1|Site","l k0 MN|Site","l k0 k0*MN|Site",
-                 "l kf 1|Site","l kf MN|Site",
-                 "p k0 1|Site","p k0 MN|Site","p k0 k0*MN|Site",
-                 "p kf 1|Site","p kf MN|Site",
-                 "c k0 1|Site","c k0 MN|Site","c k0 k0*MN|Site",
-                 "c kf 1|Site","c kf MN|Site")
-## logito ##
-l_md[[1]] <- glmer(cbind(n_ref,100-n_ref) ~ p.z * k.z * MN + (1|Site), 
-                   family = "binomial",data=df_resultados,
-                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md[[2]] <- glmer(cbind(n_ref,100-n_ref) ~ p.z * k.z * MN + (MN|Site), 
-                   family = "binomial",data=df_resultados,
-                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md[[3]] <- glmer(cbind(n_ref,100-n_ref) ~ p.z * k.z * MN + (MN*k.z|Site),
-                   family = "binomial",data=df_resultados,
-                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md[[4]] <- glmer(cbind(n_ref,100-n_ref) ~ p.z * k * MN + (1|Site),
-                   family = "binomial",data=df_resultados,
-                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md[[5]] <- glmer(cbind(n_ref,100-n_ref) ~ p.z * k * MN + (MN|Site),
-                   family = "binomial",data=df_resultados,
-                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-## probit ##
-l_md[[6]] <- glmer(cbind(n_ref,100-n_ref) ~ p.z * k.z * MN + (1|Site), 
-                   family = "binomial"(link = probit),data=df_resultados,
-                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md[[7]] <- glmer(cbind(n_ref,100-n_ref) ~ p.z * k.z * MN + (MN|Site), 
-                   family = "binomial"(link = probit),data=df_resultados,
-                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md[[8]] <- glmer(cbind(n_ref,100-n_ref) ~ p.z * k.z * MN + (MN*k.z|Site),
-                   family = "binomial"(link = probit),data=df_resultados,
-                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md[[9]] <- glmer(cbind(n_ref,100-n_ref) ~ p.z * k * MN + (1|Site),
-                   family = "binomial"(link = probit),data=df_resultados,
-                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md[[10]] <- glmer(cbind(n_ref,100-n_ref) ~ p.z * k * MN + (MN|Site),
-                   family = "binomial"(link = probit),data=df_resultados,
-                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-## cloglog
-l_md[[11]] <- glmer(cbind(n_ref,100-n_ref) ~ p.z * k.z * MN + (1|Site), 
-                   family = "binomial"(link = cloglog),data=df_resultados,
-                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md[[12]] <- glmer(cbind(n_ref,100-n_ref) ~ p.z * k.z * MN + (MN|Site), 
-                   family = "binomial"(link = cloglog),data=df_resultados,
-                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md[[13]] <- glmer(cbind(n_ref,100-n_ref) ~ p.z * k.z * MN + (MN*k.z|Site),
-                   family = "binomial"(link = cloglog),data=df_resultados,
-                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e7)))
-par_md <- getME(l_md[[13]],c("theta","fixef"))
-l_md[[13]] <- glmer(cbind(n_ref,100-n_ref) ~ p.z * k.z * MN + (MN*k.z|Site),
-                   family = "binomial"(link = cloglog),data=df_resultados,
-                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e7)),
-                   start = par_md)
-l_md[[14]] <- glmer(cbind(n_ref,100-n_ref) ~ p.z * k * MN + (1|Site),
-                   family = "binomial"(link = cloglog),data=df_resultados,
-                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md[[15]] <- glmer(cbind(n_ref,100-n_ref) ~ p.z * k * MN + (MN|Site),
-                   family = "binomial"(link = cloglog),data=df_resultados,
-                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-AICctab(l_md,weights=T)
-```
 
-Pergunta: existe algum problema em comparar modelos que utilizaram diferentes otimizadores?
-Resposta: os otimizadores diferem no algoritmo que vare o campo de parâmetros; uma vez escolhidos os parâmetros os modelos são comparados da mesma forma
 
-Falhas de convergência:
+<!-- código antigo  -->
 
-```{r n_ref modelo cheio com convergencia}
-# rotina de avaliação
-# 
-par_md <- getME(l_md[[13]],c("theta","fixef"))
-l_md[[13]] <- glmer(cbind(n_ref,100-n_ref) ~ p.z * k.z * MN + (MN*k.z|Site),
-                   family = "binomial"(link = cloglog),data=df_resultados,
-                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e7)),
-                   start = par_md)
-AICctab(l_md,weights=T)
-```
+<!-- ## Número de SADs refutadas -->
 
-Resolvido
+<!-- ### Visualização -->
 
-__Seleção de Variáveis__
+<!-- ```{r n_ref preditoras categoricas} -->
+<!-- # graficos -->
+<!-- l_p <- vector("list",4) -->
+<!-- l_p[[1]] <- ggplot(df_resultados,aes(x=MN,y=n_SAD.ref)) + -->
+<!--   geom_jitter() + -->
+<!--   geom_boxplot() -->
+<!-- l_p[[2]] <- ggplot(df_resultados,aes(x=k,y=n_SAD.ref,group=k)) + -->
+<!--   geom_jitter() + -->
+<!--   geom_boxplot() -->
+<!-- l_p[[3]] <- ggplot(filter(df_resultados, -->
+<!--                           k %in% levels(df_resultados$k)[1:10]), -->
+<!--                    aes(x=p,y=n_SAD.ref)) + -->
+<!--   geom_point() +  -->
+<!--   geom_smooth() +  -->
+<!--   facet_grid(k~MN) -->
+<!-- l_p[[4]] <- ggplot(filter(df_resultados, -->
+<!--                           k %in% levels(df_resultados$k)[11:20]), -->
+<!--                    aes(x=p,y=n_SAD.ref)) + -->
+<!--   geom_point() +  -->
+<!--   geom_smooth() +  -->
+<!--   facet_grid(k~MN) -->
+<!-- grid.arrange(l_p[[1]],l_p[[2]],l_p[[3]],l_p[[4]], -->
+<!--              layout_matrix = rbind(c(1,2,2,2), -->
+<!--                                    c(3,3,4,4), -->
+<!--                                    c(3,3,4,4), -->
+<!--                                    c(3,3,4,4)) -->
+<!--              ) -->
 
-```{r n_ref selecao de variaveis}
+<!-- ``` -->
 
-```
+<!-- __Figura 1__ Número de SADs refutadas (n_SAD.ref) ~ MN, k, p -->
+
+<!-- Vamos aproximar a variável por um processo binomial. Utilizamos o seguinte protocolo de ajuste dos dados   -->
+<!-- 1) comparar diferentes agrupamentos dos dados por sítios de amostragem, para um mesmo modelo cheio;   -->
+<!-- 2) os modelo cheio vão conter as variáveis p e MN e duas versões de k (continua e categorica); -->
+<!-- 3) e as 3 funções de ligação canônicas   -->
+<!-- 4) o modelo cheio mais plausível sera utilizado na seleção de variáveis -->
+<!-- 5) a seleção de variáveis contará com todas as combinações das preditoras do modelo cheio -->
+<!-- 6) avaliamos os resíduos quantílicos do modelo mais plausível -->
+
+
+<!-- ```{r n_ref comparacao modelos cheios} -->
+<!-- l_md <- vector("list",15) -->
+<!-- names(l_md) <- c("l k0 1|Site","l k0 MN|Site","l k0 k0*MN|Site", -->
+<!--                  "l kf 1|Site","l kf MN|Site", -->
+<!--                  "p k0 1|Site","p k0 MN|Site","p k0 k0*MN|Site", -->
+<!--                  "p kf 1|Site","p kf MN|Site", -->
+<!--                  "c k0 1|Site","c k0 MN|Site","c k0 k0*MN|Site", -->
+<!--                  "c kf 1|Site","c kf MN|Site") -->
+<!-- ## logito ## -->
+<!-- l_md[[1]] <- glmer(cbind(n_ref,100-n_ref) ~ p.z * k.z * MN + (1|Site),  -->
+<!--                    family = "binomial",data=df_resultados, -->
+<!--                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- l_md[[2]] <- glmer(cbind(n_ref,100-n_ref) ~ p.z * k.z * MN + (MN|Site),  -->
+<!--                    family = "binomial",data=df_resultados, -->
+<!--                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- l_md[[3]] <- glmer(cbind(n_ref,100-n_ref) ~ p.z * k.z * MN + (MN*k.z|Site), -->
+<!--                    family = "binomial",data=df_resultados, -->
+<!--                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- l_md[[4]] <- glmer(cbind(n_ref,100-n_ref) ~ p.z * k * MN + (1|Site), -->
+<!--                    family = "binomial",data=df_resultados, -->
+<!--                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- l_md[[5]] <- glmer(cbind(n_ref,100-n_ref) ~ p.z * k * MN + (MN|Site), -->
+<!--                    family = "binomial",data=df_resultados, -->
+<!--                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- ## probit ## -->
+<!-- l_md[[6]] <- glmer(cbind(n_ref,100-n_ref) ~ p.z * k.z * MN + (1|Site),  -->
+<!--                    family = "binomial"(link = probit),data=df_resultados, -->
+<!--                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- l_md[[7]] <- glmer(cbind(n_ref,100-n_ref) ~ p.z * k.z * MN + (MN|Site),  -->
+<!--                    family = "binomial"(link = probit),data=df_resultados, -->
+<!--                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- l_md[[8]] <- glmer(cbind(n_ref,100-n_ref) ~ p.z * k.z * MN + (MN*k.z|Site), -->
+<!--                    family = "binomial"(link = probit),data=df_resultados, -->
+<!--                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- l_md[[9]] <- glmer(cbind(n_ref,100-n_ref) ~ p.z * k * MN + (1|Site), -->
+<!--                    family = "binomial"(link = probit),data=df_resultados, -->
+<!--                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- l_md[[10]] <- glmer(cbind(n_ref,100-n_ref) ~ p.z * k * MN + (MN|Site), -->
+<!--                    family = "binomial"(link = probit),data=df_resultados, -->
+<!--                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- ## cloglog -->
+<!-- l_md[[11]] <- glmer(cbind(n_ref,100-n_ref) ~ p.z * k.z * MN + (1|Site),  -->
+<!--                    family = "binomial"(link = cloglog),data=df_resultados, -->
+<!--                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- l_md[[12]] <- glmer(cbind(n_ref,100-n_ref) ~ p.z * k.z * MN + (MN|Site),  -->
+<!--                    family = "binomial"(link = cloglog),data=df_resultados, -->
+<!--                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- l_md[[13]] <- glmer(cbind(n_ref,100-n_ref) ~ p.z * k.z * MN + (MN*k.z|Site), -->
+<!--                    family = "binomial"(link = cloglog),data=df_resultados, -->
+<!--                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e7))) -->
+<!-- par_md <- getME(l_md[[13]],c("theta","fixef")) -->
+<!-- l_md[[13]] <- glmer(cbind(n_ref,100-n_ref) ~ p.z * k.z * MN + (MN*k.z|Site), -->
+<!--                    family = "binomial"(link = cloglog),data=df_resultados, -->
+<!--                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e7)), -->
+<!--                    start = par_md) -->
+<!-- l_md[[14]] <- glmer(cbind(n_ref,100-n_ref) ~ p.z * k * MN + (1|Site), -->
+<!--                    family = "binomial"(link = cloglog),data=df_resultados, -->
+<!--                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- l_md[[15]] <- glmer(cbind(n_ref,100-n_ref) ~ p.z * k * MN + (MN|Site), -->
+<!--                    family = "binomial"(link = cloglog),data=df_resultados, -->
+<!--                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- AICctab(l_md,weights=T) -->
+<!-- ``` -->
+
+<!-- Pergunta: existe algum problema em comparar modelos que utilizaram diferentes otimizadores? -->
+<!-- Resposta: os otimizadores diferem no algoritmo que vare o campo de parâmetros; uma vez escolhidos os parâmetros os modelos são comparados da mesma forma -->
+
+<!-- Falhas de convergência: -->
+
+<!-- ```{r n_ref modelo cheio com convergencia} -->
+<!-- # rotina de avaliação -->
+<!-- #  -->
+<!-- par_md <- getME(l_md[[13]],c("theta","fixef")) -->
+<!-- l_md[[13]] <- glmer(cbind(n_ref,100-n_ref) ~ p.z * k.z * MN + (MN*k.z|Site), -->
+<!--                    family = "binomial"(link = cloglog),data=df_resultados, -->
+<!--                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e7)), -->
+<!--                    start = par_md) -->
+<!-- AICctab(l_md,weights=T) -->
+<!-- ``` -->
+
+<!-- Resolvido -->
+
+<!-- ### Para n_SAD.Nref -->
+
+<!-- ```{r gof comparacao modelos cheios} -->
+<!-- l_md <- vector("list",15) -->
+<!-- names(l_md) <- c("l k0 1|Site","l k0 MN|Site","l k0 k0*MN|Site", -->
+<!--                  "l kf 1|Site","l kf MN|Site", -->
+<!--                  "p k0 1|Site","p k0 MN|Site","p k0 k0*MN|Site", -->
+<!--                  "p kf 1|Site","p kf MN|Site", -->
+<!--                  "c k0 1|Site","c k0 MN|Site","c k0 k0*MN|Site", -->
+<!--                  "c kf 1|Site","c kf MN|Site") -->
+<!-- ## logito ## -->
+<!-- l_md[[1]] <- glmer(cbind(n_SAD.N.ref,100-n_SAD.N.ref) ~ p.z * k.z * MN + (1|Site),  -->
+<!--                    family = "binomial",data=df_resultados, -->
+<!--                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- l_md[[2]] <- glmer(cbind(n_SAD.N.ref,100-n_SAD.N.ref) ~ p.z * k.z * MN + (MN|Site),  -->
+<!--                    family = "binomial",data=df_resultados, -->
+<!--                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- l_md[[3]] <- glmer(cbind(n_SAD.N.ref,100-n_SAD.N.ref) ~ p.z * k.z * MN + (MN*k.z|Site), -->
+<!--                    family = "binomial",data=df_resultados, -->
+<!--                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- l_md[[4]] <- glmer(cbind(n_SAD.N.ref,100-n_SAD.N.ref) ~ p.z * k * MN + (1|Site), -->
+<!--                    family = "binomial",data=df_resultados, -->
+<!--                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- l_md[[5]] <- glmer(cbind(n_SAD.N.ref,100-n_SAD.N.ref) ~ p.z * k * MN + (MN|Site), -->
+<!--                    family = "binomial",data=df_resultados, -->
+<!--                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- ## probit ## -->
+<!-- l_md[[6]] <- glmer(cbind(n_SAD.N.ref,100-n_SAD.N.ref) ~ p.z * k.z * MN + (1|Site),  -->
+<!--                    family = "binomial"(link = probit),data=df_resultados, -->
+<!--                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- l_md[[7]] <- glmer(cbind(n_SAD.N.ref,100-n_SAD.N.ref) ~ p.z * k.z * MN + (MN|Site),  -->
+<!--                    family = "binomial"(link = probit),data=df_resultados, -->
+<!--                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- l_md[[8]] <- glmer(cbind(n_SAD.N.ref,100-n_SAD.N.ref) ~ p.z * k.z * MN + (MN*k.z|Site), -->
+<!--                    family = "binomial"(link = probit),data=df_resultados, -->
+<!--                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- par_md <- getME(l_md[[8]],c("theta","fixef")) -->
+<!-- l_md[[8]] <- glmer(cbind(n_SAD.N.ref,100-n_SAD.N.ref) ~ p.z * k.z * MN + (MN*k.z|Site), -->
+<!--                    family = "binomial"(link = probit),data=df_resultados, -->
+<!--                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)), -->
+<!--                    start = par_md) -->
+<!-- l_md[[9]] <- glmer(cbind(n_SAD.N.ref,100-n_SAD.N.ref) ~ p.z * k * MN + (1|Site), -->
+<!--                    family = "binomial"(link = probit),data=df_resultados, -->
+<!--                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- l_md[[10]] <- glmer(cbind(n_SAD.N.ref,100-n_SAD.N.ref) ~ p.z * k * MN + (MN|Site), -->
+<!--                    family = "binomial"(link = probit),data=df_resultados, -->
+<!--                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- ## cloglog -->
+<!-- l_md[[11]] <- glmer(cbind(n_SAD.N.ref,100-n_SAD.N.ref) ~ p.z * k.z * MN + (1|Site),  -->
+<!--                    family = "binomial"(link = cloglog),data=df_resultados, -->
+<!--                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- l_md[[12]] <- glmer(cbind(n_SAD.N.ref,100-n_SAD.N.ref) ~ p.z * k.z * MN + (MN|Site),  -->
+<!--                    family = "binomial"(link = cloglog),data=df_resultados, -->
+<!--                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- l_md[[13]] <- glmer(cbind(n_SAD.N.ref,100-n_SAD.N.ref) ~ p.z * k.z * MN + (MN*k.z|Site), -->
+<!--                    family = "binomial"(link = cloglog),data=df_resultados, -->
+<!--                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e7))) -->
+<!-- par_md <- getME(l_md[[13]],c("theta","fixef")) -->
+<!-- l_md[[13]] <- glmer(cbind(n_SAD.N.ref,100-n_SAD.N.ref) ~ p.z * k.z * MN + (MN*k.z|Site), -->
+<!--                    family = "binomial"(link = cloglog),data=df_resultados, -->
+<!--                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e7)), -->
+<!--                    start = par_md) -->
+<!-- l_md[[14]] <- glmer(cbind(n_SAD.N.ref,100-n_SAD.N.ref) ~ p.z * k * MN + (1|Site), -->
+<!--                    family = "binomial"(link = cloglog),data=df_resultados, -->
+<!--                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- l_md[[15]] <- glmer(cbind(n_SAD.N.ref,100-n_SAD.N.ref) ~ p.z * k * MN + (MN|Site), -->
+<!--                    family = "binomial"(link = cloglog),data=df_resultados, -->
+<!--                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- AICctab(l_md,weights=T) -->
+<!-- ``` -->
+
+
+<!-- O modelo cheio VR ~ p.z * k.z * MN + (MN * k.z|Site) é o modelo cheio mais plausível. -->
+
+<!-- Se VR = n_ref, então a função de ligação cloglog é a mais plausível -->
+<!-- Se VR = GOF, então a logito -->
+
+
+
+<!-- __Seleção de Variáveis__ -->
+
+<!-- ```{r GOF selecao de modelos} -->
+<!-- # f_md <- function( -->
+<!-- df_=df_resultados -->
+<!-- l_md <- vector("list",19) -->
+<!-- names(l_md) <- c("p*k*MN",# modelo cheio -->
+<!--                  "p*k*MN-p:k:MN", #MC - 3a ordem -->
+<!--                  "p*(k+MN)","k*(p+MN)","MN*(p+k)", #2 interações -->
+<!--                  "p*k+MN","p*MN+k","k*MN+p", #1 interação + preditor -->
+<!--                  "p*k","p*MN","k*MN", #1 interação -->
+<!--                  "p+k+MN",#aditivo 3 -->
+<!--                  "p+k","p+MN","k+MN", #aditivo 2  -->
+<!--                  "p","k","MN", #preditor isolado -->
+<!--                  "1") #nulo -->
+<!-- #modelo cheio -->
+<!-- l_md[[1]] <- glmer(cbind(n_SAD.N.ref,100-n_SAD.N.ref) ~ p.z * k * MN + (MN|Site),  -->
+<!--                    family = "binomial", data=df_, -->
+<!--                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- #modelo cheio - interação 3a ordem -->
+<!-- l_md[[2]] <- glmer(cbind(n_SAD.N.ref,100-n_SAD.N.ref) ~ p.z * k * MN - p.z:k:MN + (MN|Site),  -->
+<!--                    family = "binomial", data=df_, -->
+<!--                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- #2 interações -->
+<!-- l_md[[3]] <- glmer(cbind(n_SAD.N.ref,100-n_SAD.N.ref) ~ p.z * (k + MN) + (MN|Site),  -->
+<!--                    family = "binomial", data=df_, -->
+<!--                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- l_md[[4]] <- glmer(cbind(n_SAD.N.ref,100-n_SAD.N.ref) ~ k * (p.z + MN) + (MN|Site),  -->
+<!--                    family = "binomial", data=df_, -->
+<!--                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- l_md[[5]] <- glmer(cbind(n_SAD.N.ref,100-n_SAD.N.ref) ~ MN * (p.z + k) + (MN|Site),  -->
+<!--                    family = "binomial",data=df_, -->
+<!--                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- #1 interação + preditor -->
+<!-- l_md[[6]] <- glmer(cbind(n_SAD.N.ref,100-n_SAD.N.ref) ~ p.z * k + MN + (MN|Site),  -->
+<!--                    family = "binomial", data=df_, -->
+<!--                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- l_md[[7]] <- glmer(cbind(n_SAD.N.ref,100-n_SAD.N.ref) ~ p.z * MN + k + (MN|Site),  -->
+<!--                    family = "binomial", data=df_, -->
+<!--                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- l_md[[8]] <- glmer(cbind(n_SAD.N.ref,100-n_SAD.N.ref) ~ k * MN + p.z + (MN|Site),  -->
+<!--                    family = "binomial", data=df_, -->
+<!--                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- #1 interação -->
+<!-- l_md[[9]] <- glmer(cbind(n_SAD.N.ref,100-n_SAD.N.ref) ~ p.z * k + (1|Site), -->
+<!--                    family = "binomial", data=df_, -->
+<!--                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- l_md[[10]] <- glmer(cbind(n_SAD.N.ref,100-n_SAD.N.ref) ~ p.z * MN + (MN|Site), -->
+<!--                     family = "binomial", data=df_, -->
+<!--                     control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- l_md[[11]] <- glmer(cbind(n_SAD.N.ref,100-n_SAD.N.ref) ~ k * MN + (MN|Site), -->
+<!--                     family = "binomial", data=df_, -->
+<!--                     control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- #aditivo 3 -->
+<!-- l_md[[12]] <- glmer(cbind(n_SAD.N.ref,100-n_SAD.N.ref) ~ p.z + k + MN + (MN|Site), -->
+<!--                     family = "binomial", data=df_, -->
+<!--                     control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- #aditivo 2 -->
+<!-- l_md[[13]] <- glmer(cbind(n_SAD.N.ref,100-n_SAD.N.ref) ~ p.z + k + (1|Site), -->
+<!--                     family = "binomial", data=df_, -->
+<!--                     control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- l_md[[14]] <- glmer(cbind(n_SAD.N.ref,100-n_SAD.N.ref) ~ p.z + MN + (MN|Site), -->
+<!--                     family = "binomial", data=df_, -->
+<!--                     control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- l_md[[15]] <- glmer(cbind(n_SAD.N.ref,100-n_SAD.N.ref) ~ k + MN + (MN|Site), -->
+<!--                     family = "binomial", data=df_, -->
+<!--                     control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- #aditivo 1 -->
+<!-- l_md[[16]] <- glmer(cbind(n_SAD.N.ref,100-n_SAD.N.ref) ~ p.z + (1|Site), -->
+<!--                     family = "binomial", data=df_, -->
+<!--                     control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- l_md[[17]] <- glmer(cbind(n_SAD.N.ref,100-n_SAD.N.ref) ~ k + (1|Site), -->
+<!--                     family = "binomial", data=df_, -->
+<!--                     control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- l_md[[18]] <- glmer(cbind(n_SAD.N.ref,100-n_SAD.N.ref) ~ MN + (MN|Site), -->
+<!--                     family = "binomial", data=df_, -->
+<!--                     control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- # nulo -->
+<!-- l_md[[19]] <- glmer(cbind(n_SAD.N.ref,100-n_SAD.N.ref) ~ 1 + (1|Site), -->
+<!--                     family = "binomial", data=df_, -->
+<!--                     control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- # } -->
+<!-- # registerDoMC(3) -->
+<!-- # l_md.GOF <- dlply() -->
+
+<!-- AICctab(l_md,weights=T) -->
+<!-- ``` -->
 

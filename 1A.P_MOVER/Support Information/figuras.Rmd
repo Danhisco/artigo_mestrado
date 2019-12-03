@@ -1,0 +1,73 @@
+---
+title: "Graficos"
+author: "Mori, Danilo"
+date: "14/11/2019"
+output: 
+  html_document:
+    toc: true
+    toc_depth: 5
+editor_options: 
+  chunk_output_type: console
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, tidy = FALSE, include = TRUE, warning = FALSE,cache = FALSE,message=FALSE,eval=TRUE)
+knitr::opts_knit$set(root.dir = "~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/")
+setwd("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/")
+```
+
+```{r pacotes,eval=TRUE}
+library(doMC)
+library(GUILDS)
+library(lme4)
+library(merTools)
+library(magrittr)
+library(gridExtra)
+library(ggplot2)
+library(stringr)
+library(tidyr)
+library(plyr)
+library(purrr)
+library(dplyr)
+```
+
+```{r dados}
+df_resultados <- read.table(file="./resultados/df_resultados.csv",header = TRUE,sep = ";",dec = ".",as.is=FALSE) %>% distinct()
+level_k <- unique(as.character(df_resultados$k))
+df_resultados$k <- factor(as.character(df_resultados$k),levels = level_k)
+levels(df_resultados$k)[19] <- "0.1"
+```
+
+# Auditoria
+
+Figura para Renato avaliar a validade dos sítios
+
+# U
+
+## fig 1.
+
+```{r U padroes gerais}
+# graficos
+l_p <- vector("list",3)
+l_p[[1]] <- ggplot(df_resultados,aes(x=log(Stotal),y=U_med)) + 
+  geom_point() +
+  geom_smooth() +
+  theme(axis.title.y = element_blank(),
+        axis.ticks.y = element_blank())
+l_p[[2]] <- ggplot(df_resultados,aes(x=k,y=U_med,group=k)) + 
+  geom_jitter() + 
+  geom_boxplot() #+
+  # stat_summary(aes(group=1),fun.y=median,geom = "line")
+l_p[[3]] <- ggplot(df_resultados,aes(x=p,y=U_med)) + 
+  geom_point() + 
+  geom_smooth() +
+  facet_wrap(~k,ncol=4,scales="free")
+grid.arrange(l_p[[1]],l_p[[2]],l_p[[3]],
+             layout_matrix = rbind(c(2,2,2,1),
+                                   c(3,3,3,3),
+                                   c(3,3,3,3))
+             )
+
+ggplot(df_resultados,aes(x=log(Stotal),y=U_med)) + geom_point() + geom_smooth() + facet_wrap(~k,ncol=4)
+```
+
+
