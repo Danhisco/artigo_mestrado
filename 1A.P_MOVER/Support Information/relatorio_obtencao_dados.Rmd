@@ -16,12 +16,13 @@ text-align: justify}
 </style>
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, tidy = FALSE, include = TRUE, warning = FALSE,cache = FALSE,message=FALSE,eval=FALSE)
+knitr::opts_chunk$set(echo = TRUE, tidy = FALSE, include = TRUE, warning = FALSE,cache = TRUE,message=FALSE,eval=FALSE)
 knitr::opts_knit$set(root.dir = "~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/")
 setwd("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/")
 ```
 
 ```{r pacotes,eval=TRUE}
+library(gtools)
 library(doMC)
 library(GUILDS)
 library(lme4)
@@ -450,16 +451,76 @@ sigkernel <- function(kernel, p, distance, density=20852/50,
 }
 ```
 
-Utilizamos os percentis: c(0.99,seq(0.95,0.05,-0.05)) (figura 4)
+Utilizamos os percentis: c(0.99,seq(0.95,0.05,-0.05)) (figura 4). Obtenção dos percentis:
+
+```{r estimativa de d necessario para gerar k}
+# dados
+percentil <- c(0.99,seq(0.95,0.05,-0.05))
+df_simulacao %<>% left_join(x=.,
+                            y=expand.grid(SiteCode = df_simulacao$SiteCode, k = percentil),
+                            by="SiteCode")
+
+df_simulacao$kernel_type <- "laplace"
+df_simulacao$kernel_code <- "2"
+df_simulacao %<>% mutate(DA=Ntotal/effort_ha, # densidade desconsiderando as espécies mortas
+                         dist_0 = 100/sqrt(DA)) # distância entre indivíduos vizinhos
+df_simulacao$d <- NA
+df_simulacao$kernel_type <- as.character(df_simulacao$kernel_type)
+# funcao para paralelizar
+func_llply <- function(i,data_frame=df_simulacao){
+  df_temp <- data_frame
+  sigma <- sigkernel(kernel = df_temp[i,"kernel_type"], 
+                     p = df_temp[i,"k"], 
+                     distance = df_temp[i,"dist_0"], 
+                     density = df_temp[i,"DA"],
+                     sigma.min=1e-6, 
+                     sigma.max=1e6)$root  
+}
+registerDoMC(4)
+replica.sim <- as.list(1:dim(df_simulacao)[1])
+resultados <- llply(.data = replica.sim, .fun = func_llply, .parallel = TRUE)
+df_simulacao$d <- unlist(resultados)
+# padronização
+df_simulacao %<>% mutate(k_perc = factor(k))
+levels(df_simulacao$k_perc)[2] <- "0.10"
+df_simulacao %>% names
+df_simulacao %<>% select(SiteCode,p,k,DA,Ntotal,Stotal,txt.name,kernel_code,d,)
+df_simulacao$txt.name <- gsub("dados_brutos","simulacao",df_simulacao$txt.name)
+```
+
 
 ```{r figura 4 relacao k e d, fig.width=5,fig.height=4,eval=TRUE,echo=FALSE}
-df_resultados %>% ggplot(aes(x=k,y=d)) +
+### pacotes
+library(gtools)
+### dados
+df_resultados <- read.table(file="./resultados/df_resultados.csv",header = TRUE,sep = ";",dec = ".",as.is=FALSE)
+level_k <- unique(as.character(df_resultados$k))
+df_resultados$k <- factor(as.character(df_resultados$k),levels = level_k)
+levels(df_resultados$k)[19] <- "0.1"
+### graficos
+l_p <- vector("list",2)
+l_p[[1]] <- ggplot(df_resultados,aes(x=k,y=d)) +
   geom_jitter() +
   geom_boxplot() +
   labs(x="% de propágulos na vizinhança imediata",y="Distância média de dispersão (metros)")
+df_resultados %<>% mutate(L_plot = 100*sqrt(Ntotal/DA),d_L.plot = d / L_plot,S_class = quantcut(Stotal,q=20),p_class = quantcut(p,q=20))
+l_p[[2]] <- ggplot(df_resultados,aes(x=k,y=d_L.plot)) +
+  geom_jitter() +
+  geom_boxplot() +
+  labs(x="% de propágulos na vizinhança imediata",y="d / Lado_plot")
+# l_p[[3]] <- ggplot(df_resultados,aes(x=d_L.plot,y=U_med)) +
+#   geom_point() + geom_line(aes(group=SiteCode)) + facet_wrap(~S_class, ncol=4,scales="free")
+# grid.arrange(l_p[[1]],l_p[[2]],l_p[[3]],
+#              layout_matrix = rbind(c(1,NA),
+#                                    c(2,3))
+#              )
+do.call("grid.arrange",c(l_p,ncol=2))
 ```
 
 __Figura 4__ Distância média de dispersão em metros (d) ~ porcentagem de propagulos até a vizinhança imediata (k)
+
+
+
 
 
 # Simulação
@@ -575,35 +636,78 @@ for(a in 1:length(k_factor)){
 
 Então calculou-se a média e variância por SiteCode e k (a maior variância foi na casa dos e-06). O U médio foi utilizado para parametrizar as predições de MNEE e MNEI (figura 6).
 
-```{r U padroes gerais, eval=TRUE,echo=FALSE,fig.height=10}
+```{r U padroes gerais, eval=TRUE,echo=FALSE,fig.height=40,fig.width=9}
 # dados
 df_resultados <- read.table(file="./resultados/df_resultados.csv",header = TRUE,sep = ";",dec = ".",as.is=FALSE)
 level_k <- unique(as.character(df_resultados$k))
 df_resultados$k <- factor(as.character(df_resultados$k),levels = level_k)
 levels(df_resultados$k)[19] <- "0.1"
+df_resultados %<>% mutate(L_plot = 100*sqrt(Ntotal/DA),
+                          d_L.plot = d / L_plot,
+                          S_class = quantcut(Stotal,q=20),
+                          p_class = quantcut(p,q=20),
+                          logito_U_med=log( U_med/(1-U_med) ) )
 # graficos
-l_p <- vector("list",3)
-l_p[[1]] <- ggplot(df_resultados,aes(x=log(Stotal),y=U_med)) + 
+l_p <- vector("list",4)
+# l_p[[1]] <- ggplot(df_resultados,aes(x=log(Stotal),y=U_med)) + 
+#   geom_point() +
+#   geom_smooth() +
+#   theme(axis.title.y = element_blank(),
+#         axis.ticks.y = element_blank())
+# 
+# l_p[[1]] <- ggplot(df_resultados,aes(x=log(Stotal),y=U_med)) + 
+#   geom_point() +
+#   geom_smooth() +
+#   theme(axis.title.y = element_blank(),
+#         axis.ticks.y = element_blank()) +
+#   facet_wrap(~k,ncol=4)
+
+l_p[[1]] <- ggplot(df_resultados,aes(x=k,y=U_med)) + 
   geom_point() +
-  geom_smooth() +
-  theme(axis.title.y = element_blank(),
-        axis.ticks.y = element_blank())
-l_p[[2]] <- ggplot(df_resultados,aes(x=k,y=U_med,group=k)) + 
-  geom_jitter() + 
-  geom_boxplot()
-l_p[[3]] <- ggplot(df_resultados,aes(x=p,y=U_med)) + 
+  geom_line(aes(group=SiteCode)) + 
+  facet_wrap(~p_class, ncol=4,scales="free") + # 
+  ggtitle(label="eixo x = k (% de prop até vizinhança imediata")
+l_p[[2]] <- ggplot(df_resultados,aes(x=d_L.plot,y=U_med)) +
   geom_point() + 
-  geom_smooth() +
-  facet_wrap(~k,ncol=4,scales="free")
-grid.arrange(l_p[[1]],l_p[[2]],l_p[[3]],
-             layout_matrix = rbind(c(2,2,2,1),
-                                   c(3,3,3,3),
-                                   c(3,3,3,3))
-             )
+  geom_line(aes(group=SiteCode)) + 
+  facet_wrap(~p_class, ncol=4,scales="free") + #,scales="free"
+  labs(x="d / L_plot") + 
+  ggtitle(label="eixo x = d / L_pĺot")
+l_p[[3]] <- ggplot(df_resultados,aes(x=k,y=logito_U_med)) + 
+  geom_point() +
+  geom_line(aes(group=SiteCode)) + 
+  facet_wrap(~p_class, ncol=4,scales="free") + #,scales="free" 
+  ggtitle(label="eixo x = k (% de prop até vizinhança imediata")
+l_p[[4]] <- ggplot(df_resultados,aes(x=d_L.plot,y=logito_U_med)) +
+  geom_point() + 
+  geom_line(aes(group=SiteCode)) + 
+  facet_wrap(~p_class, ncol=4,scales="free") + #,scales="free"
+  labs(x="d / L_plot") + 
+  ggtitle(label="eixo x = d / L_pĺot")
+# grid.arrange(l_p[[1]],l_p[[2]],
+             # layout_matrix = rbind(c(NA,rep(1,2),NA),
+                                   # rep(2,4),
+                                   # rep(2,4),
+                                   # rep(2,4))
+             # )
+do.call("grid.arrange",c(l_p,ncol=1))
+```
+
+__Figura 5__ U_med estimado por k (% de prop até a vizinhança imediada) e d / L_plot (distância média de dispersão / largura da área amostral aproximada como um quadrado).
+
+
+### Estudo do padrão de U
+
+#### Diferença entre pontos consecutivos
+
+```{r dif entre pontos consecutivos, eval=FALSE}
+teste_acf <- df_resultados %>% filter(SiteCode==df_resultados$SiteCode[1] & MN == "EE") %>% .$U_med
+hist()
 
 ```
 
-__Figura 5__ Padrões gerais de U.  
+
+
 
 
 ## SAD predita
@@ -728,11 +832,11 @@ levels(df_resultados$k)[19] <- "0.1"
 # graficos
 l_p <- vector("list",4)
 l_p[[1]] <- ggplot(df_resultados,aes(x=p.value_mean,y=n_SAD.N.ref)) + geom_point() + 
-  geom_smooth(method ="loess") + labs(y="número de SADs não refutadas",x="p-valor médio")
+  geom_smooth() + labs(y="número de SADs não refutadas",x="p-valor médio")
 l_p[[2]] <- ggplot(df_resultados,aes(x=D_mean,y=p.value_mean)) + geom_point() + 
-  geom_smooth(method ="loess") + labs(x="estatística D média",y="p-valor médio")
-l_p[[3]] <- ggplot(df_resultados,aes(x=p.value_mean,y=p.value_var)) + geom_point() + geom_smooth(method="loess") + labs(y="variância p-valor",x="p-valor médio")
-l_p[[4]] <- ggplot(df_resultados,aes(x=D_mean,y=D_var)) + geom_point() + geom_smooth(method="loess") +
+  geom_smooth() + labs(x="estatística D média",y="p-valor médio")
+l_p[[3]] <- ggplot(df_resultados,aes(x=p.value_mean,y=p.value_var)) + geom_point() + geom_smooth() + labs(y="variância p-valor",x="p-valor médio")
+l_p[[4]] <- ggplot(df_resultados,aes(x=D_mean,y=D_var)) + geom_point() + geom_smooth() +
    labs(x="estatística D média",y="variância estatística D")
 # l_p[[5]] <- ggplot(df_resultados,aes(x=Stotal,y=S.obs_mean)) + geom_point() + geom_abline(intercept = 0,slope = 1,color="red")
 # df_resultados %<>% mutate(diff_S.obs = Stotal-S.obs_mean)
@@ -806,11 +910,12 @@ __Figura 8__ S_predita ~ S_obs. Linha vermelha: slope=1,intercept=0
 
 ## Auditoria 2: Comparação com o conjunto de dados antigos
 
-```{r diff resultados antigos, eval=TRUE,echo=FALSE}
+```{r diff resultados antigo1s, eval=TRUE,echo=FALSE}
 # dados antigos
 df_resultados.antigos <- read.csv("/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/df_resultados.csv",header = TRUE,as.is = TRUE)
 # dados novos
 df_resultados <- read.table(file="./resultados/df_resultados.csv",header = TRUE,sep = ";",dec = ".",as.is=TRUE)
+file.info("./resultados/df_resultados.csv")
 # merge
 # df_resultados %>% str
 # df_resultados.antigos %>% str
@@ -984,13 +1089,15 @@ df_auditoria %<>% adply(.,1,function(X)f_sp.indet(SAD_path=X$SAD_obs.name),.para
 df_resultados.antigos <- read.csv("/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/df_resultados.csv",header = TRUE,as.is = TRUE)
 df_resultados <- read.table(file="./resultados/df_resultados.csv",header = TRUE,sep = ";",dec = ".",as.is=TRUE)
 df_merge <- inner_join(x=df_resultados.antigos,y=df_resultados,
-                       by=c("SiteCode","MN","k"))
+                       by=c("SiteCode","MN","k")) %>% distinct()
 level_k <- unique(as.character(df_merge$k))
 df_merge$k <- factor(as.character(df_merge$k),levels = level_k)
 df_merge %<>% mutate(diff_p = p.y-p.x,
+                     diff_GOF = n_SAD.N.ref - GOF,
+                     diff_S.mean = S.MN_mean - S_m,
                      diff_Ntotal = Ntotal - J,
                      diff_Stotal = Stotal - S) %>%
-  select(SiteCode,p.y,diff_p,Ntotal,Stotal,diff_Ntotal,diff_Stotal) %>% distinct()
+  select(SiteCode,k,MN,p.y,diff_p,Ntotal,Stotal,diff_Ntotal,diff_Stotal,diff_GOF,diff_S.mean)
 ## merge
 df_plot2 <- df_auditoria %>% inner_join(x=.,y=df_merge,by="SiteCode")
 ############# Gráficos
@@ -1074,6 +1181,64 @@ l_p[[6]] <- ggplot(filter(df_auditoria,MN=="EI"),aes(x=k,y=diff_m_)) +
   geom_point() +
   geom_line(aes(group=SiteCode)) +
   geom_boxplot()
+# x11()
 do.call("grid.arrange",c(l_p,ncol=2))
 ```
+
+__Figura 12__ Comparação entre MN para as variáveis resposta (linhas 1 e 2) e para os parâmetros de dispersão (linha 3) por cenário de limitação de dispersão.  
+
+__**Congruência com o observado:GOF**__  
+- para alguns sítios independe o cenário de limitação à dispersão; porém para alguns há grande variação na resposta  
+- a maior parte dos sítios está próximo de zero para ambos os modelos, porém a variação de EI é superior.  
+__**Congruência com o observado:S.mean**__  
+- a riqueza média apresentou grande variação, inclusive em alguns sítios houve diminuição de 1000 spp do antigo para o novo
+- a diferença na riqueza média muda em função de k, o que não deveria ser observado em MNEE uma vez que independente de k ele estima corretamente a riqueza observada. Esse resultado é comum entre os dois conjuntos de dados (é intrinseco ao método). Assim essa mudança corrobora a hipótese de que pode existir uma troca de rótulos entre sítios.
+__**Parâmetros de Dispersão**__
+- a diferença em d pode ser explicada pelas mudanças aplicadas no conjunto de dados
+
+
+__Quais os sítios que devem ser avaliados__  
+
+- Priorizar a avaliação da congruência para MNEE que deveria ser mais robusto
+- Existe relação entre a diferença da congruência entre os conjuntos de dados e a proporção de espécies indeterminadas? Algum rótulo foi trocado?
+
+```{r sitios que diferem,eval=TRUE,echo=FALSE }
+l_p <- vector("list",4)
+l_p[[1]] <- ggplot(df_plot2,aes(x=diff_Ntotal,y=diff_GOF,group=SiteCode)) +
+  geom_point() + geom_line()
+l_p[[2]] <- ggplot(df_plot,aes(x=diff_Stotal,y=diff_GOF,group=SiteCode)) +
+  geom_point() + geom_line()
+
+```
+
+
+## Sítios para Avaliação Renato Lima
+
+```{r diff resultados antigos, eval=TRUE,echo=FALSE}
+# dados antigos
+df_resultados.antigos <- read.csv("/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/df_resultados.csv",header = TRUE,as.is = TRUE)
+# dados novos
+# file.info("./resultados/df_resultados.csv")
+df_resultados <- read.table(file="./resultados/df_resultados.csv",header = TRUE,sep = ";",dec = ".",as.is=TRUE)
+# merge
+# df_resultados %>% str
+# df_resultados.antigos %>% str
+df_auditoria <- inner_join(x=df_resultados.antigos,y=df_resultados,
+                           by=c("SiteCode","MN","k"))
+# df_auditoria %>% names
+# padronizacao
+level_k <- unique(as.character(df_auditoria$k))
+df_auditoria$k <- factor(as.character(df_auditoria$k),levels = level_k)
+# df_auditoria %>% str
+# variáveis de auditoria
+## diff = novo - antigo
+df_auditoria %<>% mutate(diff_p = p.y-p.x,
+                         diff_Ntotal = Ntotal - J,
+                         diff_Stotal = Stotal - S) 
+## seleção de sítios
+# df_auditoria %>% select(diff_p,diff_Ntotal,diff_Stotal) %>% summary
+# df_auditoria %>% filter(diff_Ntotal > 30) %>% .$
+```
+
+
 
