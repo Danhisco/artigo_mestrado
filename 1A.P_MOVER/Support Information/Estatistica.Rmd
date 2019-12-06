@@ -14,7 +14,7 @@ text-align: justify}
 </style>
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, tidy = FALSE, include = TRUE, warning = FALSE,cache = TRUE,message=FALSE,eval=TRUE)
+knitr::opts_chunk$set(echo = FALSE, tidy = FALSE, include = TRUE, warning = FALSE,cache = TRUE,message=FALSE,eval=TRUE)
 knitr::opts_knit$set(root.dir = "~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/")
 setwd("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/")
 ```
@@ -25,6 +25,8 @@ library(doMC)
 library(mgcv)
 library(gratia)
 library(GUILDS)
+library(broom)
+library(bbmle)
 library(gamm4)
 library(lme4)
 library(merTools)
@@ -47,9 +49,7 @@ level_k <- unique(as.character(df_resultados$k))
 df_resultados$k <- factor(as.character(df_resultados$k),levels = level_k)
 levels(df_resultados$k)[19] <- "0.1"
 df_resultados %<>% mutate(L_plot = 100*sqrt(Ntotal/DA),
-                          d_L.plot = d / L_plot,
-                          S_class = quantcut(Stotal,q=20),
-                          p_class = quantcut(p,q=20))
+                          d_L.plot = d / L_plot)
 # z score
 f_z <- function(x){
   m <- base::mean(x,na.rm=TRUE)
@@ -68,77 +68,238 @@ df_resultados %<>% cbind(.,df_resultados.z)
 
 ## Padrões Gerais  
 
+```{r padroes gerais U,echo=FALSE,fig.width=12,fig.height=4}
+# graficos
+l_p <- vector("list",3)
+l_p[[1]] <- ggplot(df_resultados,aes(x=k,y=U_med)) + 
+  geom_point() +
+  geom_line(aes(group=SiteCode)) + 
+  geom_boxplot(aes(group=k))
+l_p[[2]] <- ggplot(df_resultados,aes(x=Stotal,y=U_med)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  labs(y="")
+l_p[[3]] <- ggplot(df_resultados,aes(x=p,y=Stotal)) +
+  geom_point() + 
+  geom_smooth(method="lm")
+do.call("grid.arrange",c(l_p,ncol=3))
+```
+
+__Figura 1__ Padrões gerais de U_med: ~ k (% de propágulos até a vizinhança imediata da planta progenitora); ~ Stotal (riqueza observada na área amostral). E o padrão empírico encontrado nos dados Stotal ~ p
+
+
+
+```{r padroes gerais U por SiteCode,echo=FALSE,fig.height=50,fig.width=12}
+# dados
+df_plot <- df_resultados %>% select(SiteCode,p,U_med,k,d_L.plot) %>% 
+  mutate(label_facet.wrap = paste0(SiteCode,";p=",round(p,4))) %>% 
+  distinct() %>% arrange(p)
+levels_label <- unique(df_plot$label_facet.wrap)
+df_plot$label_facet.wrap <- factor(df_plot$label_facet.wrap,levels = levels_label)
+# graficos
+l_p <- vector("list",2)
+l_p[[1]] <- ggplot(df_plot,aes(x=k,U_med)) +
+  geom_point() +
+  geom_line(aes(group=SiteCode)) +
+  facet_wrap(~label_facet.wrap,ncol=6,scales="free") +
+  ggtitle(label="eixo x = k")
+l_p[[2]] <- ggplot(df_plot,aes(x=d_L.plot,U_med)) +
+  geom_point() +
+  geom_line(aes(group=SiteCode)) +
+  facet_wrap(~label_facet.wrap,ncol=6,scales="free") +
+  ggtitle(label="eixo x = d / L_plot")  
+do.call("grid.arrange",c(l_p,ncol=1))
+```
+
+__Figura 2__ Padrões gerais de U_med por SiteCode: ~ k (% de propágulos até a vizinhança imediata da planta progenitora); ~ d / L_plot (distância média de dispersão / Lado do área amostral)
 
 
 ## Descrição Estatística
 
-Segundo Pedersen et al. (2019) há 5 formas de utilizar HGAM (Hierarchical Generalized Additive Models); dessas 3 descrevem o padrão geral: G, GS e GI (figura 4, Petersen et al. 2019)
+<!-- Segundo Pedersen et al. (2019) há 5 formas de utilizar HGAM (Hierarchical Generalized Additive Models); dessas 3 descrevem o padrão geral: G, GS e GI (figura 4, Petersen et al. 2019) -->
 
-__Modelo G:__  
-"A single commom (global) smoother for all observations"  
-Nesse modelo há um smoother global e 1 intercepto para cada nível do efeito aleatório (random smoother); e.g.:  
+<!-- __Modelo G:__   -->
+<!-- "A single commom (global) smoother for all observations"   -->
+<!-- Nesse modelo há um smoother global e 1 intercepto para cada nível do efeito aleatório (random smoother); e.g.:   -->
 
-CO2_modG <- gam(log(uptake) ~ s(log(conc), k=5, bs="tp") +  
-                              s(Plant_uo, k=12, bs="re),  
-                              data =.; method="REML", family="gaussian")  
+<!-- CO2_modG <- gam(log(uptake) ~ s(log(conc), k=5, bs="tp") +   -->
+<!--                               s(Plant_uo, k=12, bs="re),   -->
+<!--                               data =.; method="REML", family="gaussian")   -->
+
+<!-- Modelo GS:   -->
+<!-- "Model GS is a close analogue to a GLMM with varying slopes: all groups have similar functional responses, but intergroup variation in responses is allowed. This approach works by allowing each grouping level to have its own functional response, but penalizing functions that are too far from the average."   -->
+
+<!-- CO2_modGS <- gam(log(uptake) ∼ s(log(conc), k=5, m=2) +   -->
+<!--                                s(log(conc), Plant_uo, k=5, bs="fs", m=2),   -->
+<!--                                data=CO2, method="REML")   -->
+
+<!-- Modelo GI:   -->
+<!-- " We now allow each group-specific smoother to have its own smoothing parameter and hence its own level of wiggliness (there are more smoothing parameters to estimate) and means that the only information shared between groups is through the global smoother, the common error term, and through the random effect for group-level intercepts (if used)."   -->
+
+<!-- CO2_modGI <- gam(log(uptake) ∼ s(log(conc), k=5, m=2, bs="tp") +    -->
+<!--                                s(log(conc), by=Plant_uo, k=5, m=1, bs="tp") +    -->
+<!--                                s(Plant_uo, bs="re", k=12),    -->
+<!--                                data=CO2, method="REML")   -->
+
+
+<!-- EXEMPLO DE gamm4::  -->
+
+<!-- ~ 6 vezes mais rapido do que a alternativa, porem não tem a mesma flexibilidade que a função gam -->
+
+<!-- system.time(l_p[[1]] <- gamm4(U_med ~ s(d_L.plot), random = ~(1|SiteCode) , -->
+<!--                 family="gaussian", -->
+<!--                 data = df_resultados))[[3]] -->
   
-Modelo GS:  
-"Model GS is a close analogue to a GLMM with varying slopes: all groups have similar functional responses, but intergroup variation in responses is allowed. This approach works by allowing each grouping level to have its own functional response, but penalizing functions that are too far from the average."  
+Para descrever o padrão de U em função da diminuição da limitação de dispersão e proporção de habitat disponível vamos utilizar GAMM (generalized additive mixed models, Wood 2017). Há pelo menos 3 formas de descrevermos o padrão global (Pedersen et al. 2019): a) um intercepto por SiteCode (1|SiteCode); b) um smoother por SiteCode (dispersão | SiteCode), porém com penalização para aqueles smoothers muito distintos do padrão global; e c) um smoother por SiteCode (dispersão | SiteCode) com seu próprio parâmetro de 'flexibilidade' (smoothing parameter).   
   
-CO2_modGS <- gam(log(uptake) ∼ s(log(conc), k=5, m=2) +  
-                               s(log(conc), Plant_uo, k=5, bs="fs", m=2),  
-                               data=CO2, method="REML")  
-  
-Modelo GI:  
-" We now allow each group-specific smoother to have its own smoothing parameter and hence its own level of wiggliness (there are more smoothing parameters to estimate) and means that the only information shared between groups is through the global smoother, the common error term, and through the random effect for group-level intercepts (if used)."  
+GAMM oferecem grande flexibilidade ao custo de aumento do número de parâmetros estimados e do custo computacional. Então irei começar por um modelo cuja estrutura aleatória é a mais simples possível (1 intercepto por SiteCode) para poder oferecer mais flexibilidade para o tensor(variável_dispersão,p)  
 
-CO2_modGI <- gam(log(uptake) ∼ s(log(conc), k=5, m=2, bs="tp") +   
-                               s(log(conc), by=Plant_uo, k=5, m=1, bs="tp") +   
-                               s(Plant_uo, bs="re", k=12),   
-                               data=CO2, method="REML")  
+### Seleção de Modelo cheio  
 
+- 2 famílias: gaussian e gamma  
+- 3 funções de ligação: identity (apenas para gaussian), log, inverse  
+- 2 variáveis concorrentes para descrever a dispersão: k e (d/L_plot)  
+- log(Stotal) como preditora linear  
+- (1|SiteCode) como estrutura aleatória  
 
-EXEMPLO DE gamm4:: 
+__exemplo de código:__  
+gam(U_med ~ s(d_L.plot.z) + s(p.z) + ti(d_L.plot.z,p.z) +  
+                      log(Stotal) +  
+                      s(SiteCode,bs="re"),  
+                    family="gaussian",  
+                    data = df_resultados, method = "REML",control=ctrl)  
 
-~ 6 vezes mais rapido do que a alternativa, porem não tem a mesma flexibilidade que a função gam
+__Tabela de Seleção do Modelo Mais plausível:__    
 
-system.time(l_p[[1]] <- gamm4(U_med ~ s(d_L.plot), random = ~(1|SiteCode) ,
-                family="gaussian",
-                data = df_resultados))[[3]]
-  
-```{r estudo gamm(U)}
-ctrl <- list(nthreads=3) #número de cores para paralelizar; ajuda pouca.
-l_p <- vector("list",length = 3)
-# modelo G
-l_p[[1]] <- gam(U_med ~ s(d_L.plot) + s() # global smoother
-                  log(Stotal) + # log(Stotal) as a linear predictor 
-                  s(SiteCode,bs="re"), # a smooth to account for the intercept for each SiteCode (1|SiteCode)
+```{r selecao de modelo cheio GAMM(U)}
+ctrl <- list(nthreads=3) #número de cores para paralelizar
+l_md <- vector("list",length = 10)
+names(l_md) <- c("d id normal","d log normal", "d inverse normal", "d log gamma", "d inverse gamma",
+                 "k id normal","k log normal", "k inverse normal", "k log gamma", "k inverse gamma")
+l_md[[1]] <- gam(U_med ~ s(d_L.plot.z) + s(p.z) + ti(d_L.plot.z,p.z) +
+                  log(Stotal) +
+                  s(SiteCode,bs="re"),
                 family="gaussian",
                 data = df_resultados, method = "REML",control=ctrl)
-# modelo GS
-l_p[[2]] <- gam(U_med ~ s(d_L.plot) + 
-                  log(Stotal) + 
-                  s(d_L.plot,SiteCode,bs="fs"), # esse smoother alem de permitir uma função de base para cada nível de SiteCode, também estima um intercepto por SiteCode
-                family="gaussian",
+l_md[[2]] <- gam(U_med ~ s(d_L.plot.z) + s(p.z) + ti(d_L.plot.z,p.z) +
+                  log(Stotal) +
+                  s(SiteCode,bs="re"),
+                family=gaussian(link = "log"),
+                data = df_resultados, method = "REML",control=ctrl)
+l_md[[3]] <- gam(U_med ~ s(d_L.plot.z) + s(p.z) + ti(d_L.plot.z,p.z) +
+                  log(Stotal) +
+                  s(SiteCode,bs="re"),
+                family=gaussian(link = "inverse"),
+                data = df_resultados, method = "REML",control=ctrl)
+l_md[[4]] <- gam(U_med ~ s(d_L.plot.z) + s(p.z) + ti(d_L.plot.z,p.z) +
+                  log(Stotal) +
+                  s(SiteCode,bs="re"),
+                family=Gamma(link = "log"),
+                data = df_resultados, method = "REML",control=ctrl)
+l_md[[5]] <- gam(U_med ~ s(d_L.plot.z) + s(p.z) + ti(d_L.plot.z,p.z) +
+                  log(Stotal) +
+                  s(SiteCode,bs="re"),
+                family=Gamma(link = "inverse"),
                 data = df_resultados, method = "REML",control=ctrl)
 
-# modelo GI
+l_md[[6]] <- gam(U_med ~ s(k.z) + s(p.z) + ti(k.0,p.z) +
+                  log(Stotal) +
+                  s(SiteCode,bs="re"),
+                family="gaussian",
+                data = df_resultados, method = "REML",control=ctrl)
+l_md[[7]] <- gam(U_med ~ s(k.z) + s(p.z) + ti(k.0,p.z) +
+                  log(Stotal) +
+                  s(SiteCode,bs="re"),
+                family=gaussian(link = "log"),
+                data = df_resultados, method = "REML",control=ctrl)
+l_md[[8]] <- gam(U_med ~ s(k.z) + s(p.z) + ti(k.0,p.z) +
+                  log(Stotal) +
+                  s(SiteCode,bs="re"),
+                family=gaussian(link = "inverse"),
+                data = df_resultados, method = "REML",control=ctrl)
+l_md[[9]] <- gam(U_med ~ s(k.z) + s(p.z) + ti(k.0,p.z) +
+                  log(Stotal) +
+                  s(SiteCode,bs="re"),
+                family=Gamma(link = "log"),
+                data = df_resultados, method = "REML",control=ctrl)
+l_md[[10]] <- gam(U_med ~ s(k.z) + s(p.z) + ti(k.0,p.z) +
+                  log(Stotal) +
+                  s(SiteCode,bs="re"),
+                family=Gamma(link = "inverse"),
+                data = df_resultados, method = "REML",control=ctrl)
+AICctab(l_md,weights = TRUE)
+```
+
+O modelos cheio mais plausível possui família Gamma e função de ligação 'log"
+
+### Auditoria do modelo cheio mais plausível
+
+<!-- Protocolo de Wood (in Checking and Selecting GAMs): -->
+
+<!-- 1) Residual Checking:   -->
+<!-- a) fitted ~ residuals (1|SiteCode) -->
+<!-- a) fitted ~ residuals (1|SiteCode) -->
+<!-- b) residuals ~ preditoras   -->
+
+```{r auditoria md mais plausivel U 1}
+# Dados
+# md_U <- gam(U_med ~ s(d_L.plot.z) + s(p.z) + ti(d_L.plot.z,p.z) +
+#                   log(Stotal) +
+#                   s(SiteCode,bs="re"),
+#                 family=gaussian(link = "inverse"),
+#                 data = df_resultados, method = "REML",control=ctrl) # "d log gamma"
+md_U <- l_md[["d log gamma"]]
+# df_md.U <- augment(md_U)
+# Gráficos
+# l_p <- vector("list",2)
+# l_p[[1]] <- 
+# ggplot(df_md.U,aes(y=U_med,x=.fitted)) +
+#   geom_point() +
+#   geom_smooth() +
+#   # geom_abline(intercept = 0,slope = 1,color="red") +
+#   # theme(axis.text = element_blank(),
+#         # axis.ticks = element_blank()) +
+#   facet_wrap(~SiteCode,ncol=4,scales="free")
+gam.check(md_U)
+```
+
+__Figura 3__ gam.check(modelo cheio mais plausível)  
 
 
+```{r auditoria md mais plausivel U 2,warning=FALSE,message=FALSE}
+p_plot <- DHARMa::simulateResiduals(md_U,n=1000)
+plot(p_plot)
+```
 
-require(mgcv);set.seed(9)
-dat <- gamSim(1,n=2000,dist="poisson",scale=.1)
-k <- 12;bs <- "cr";
+__Figura 4__ DHARMa::simulateResiduals(modelo cheio mais plausível)
 
-system.time(b1<-gam(y~s(x0,bs=bs)+s(x1,bs=bs)+s(x2,bs=bs,k=k)
-            ,family=poisson,data=dat,method="REML"))[3]
 
-system.time(b2<-gam(y~s(x0,bs=bs)+s(x1,bs=bs)+s(x2,bs=bs,k=k),
-            family=poisson,data=dat,method="REML",control=ctrl))[3]
+O Modelo mais plausível diverge do pressuposto de que a variável resposta pode ser aproximada por uma distribuição Gamma(link=log).  
 
+```{r diag 1 modelo cheio GAMM(U),eval=FALSE,echo=FALSE,include=FALSE}
+
+gam.check(md_U)
+md_U.upgrade <- gam(U_med ~ s(d_L.plot.z,k=20) + s(p.z) + ti(d_L.plot.z,p.z,k=20) +
+                  log(Stotal) +
+                  s(SiteCode,bs="re"),
+                family=Gamma(link = "log"),
+                data = df_resultados, method = "REML",control=ctrl)
+gam.check(md_U.upgrade)
 ```
 
 
+
+
+
+
+
+
+<!-- __1) Parâmetros Lineares (parametric coefficients)__    -->
+<!-- intercepto geral e a inclinação de log(Stotal)     -->
+
+<!-- __2) Approximate significance of smooth terms__ -->
+<!-- a) edf (effective degrees of freedom): número de parâmetros a serem estimados por smoothers menos uma constante; descreve o grau de complexidade do smoother. -->
+<!-- b) Ref.df e F: columns from a ANOVA for the overall significance of the smoother (a linear parametric test) -->
 
 
 
