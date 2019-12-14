@@ -243,12 +243,15 @@ O modelos cheio mais plausível possui família Gamma e função de ligação 'l
 
 ```{r auditoria md mais plausivel U 1}
 # Dados
-# md_U <- gam(U_med ~ s(d_L.plot.z) + s(p.z) + ti(d_L.plot.z,p.z) +
-#                   log(Stotal) +
-#                   s(SiteCode,bs="re"),
-#                 family=gaussian(link = "inverse"),
-#                 data = df_resultados, method = "REML",control=ctrl) # "d log gamma"
-md_U <- l_md[["d log gamma"]]
+md_U <- gam(U_med ~ s(d_L.plot.z) + s(p.z) + ti(d_L.plot.z,p.z) +
+                  log(Stotal) +
+                  s(SiteCode,bs="re"),
+                family=Gamma(link = "log"),
+                data = df_resultados, method = "REML",control=as.list(3)) # "d log gamma"
+
+summary(md_U)
+gam.check(md_U)
+# md_U <- l_md[["d log gamma"]]
 # df_md.U <- augment(md_U)
 # Gráficos
 # l_p <- vector("list",2)
@@ -274,17 +277,85 @@ plot(p_plot)
 __Figura 4__ DHARMa::simulateResiduals(modelo cheio mais plausível)
 
 
-O Modelo mais plausível diverge do pressuposto de que a variável resposta pode ser aproximada por uma distribuição Gamma(link=log).  
+O Modelo mais plausível diverge do pressuposto de que a variável resposta pode ser aproximada por uma distribuição Gamma(link=log) para ambos diagnósticos.  
+Possibilidades de configuração: a) número de funções bases e/ou local dos knots; b) os tipos de smoothers para utilizar (cubic ou thin plate regression spline); c) determinar em qual derivada a penalização sera feita;...?  
+
+
+```{r md_U comparacao entre smoothers}
+l_md <- vector("list",5)
+names(l_md) <- paste0("model",1:5)
+l_md[[1]] <- gam(U_med ~ s(d_L.plot.z,bs="tp") + s(p.z,bs="tp") + ti(d_L.plot.z,p.z,bs="tp") +
+                  log(Stotal) +
+                  s(SiteCode,bs="re"),
+                family=Gamma(link = "log"),
+                data = df_resultados, method = "REML",control=as.list(3))
+l_md[[2]] <- gam(U_med ~ s(d_L.plot.z,bs="cr") + s(p.z,bs="cr") + ti(d_L.plot.z,p.z,bs="cr") +
+                  log(Stotal) +
+                  s(SiteCode,bs="re"),
+                family=Gamma(link = "log"),
+                data = df_resultados, method = "REML",control=as.list(3))
+l_md[[3]] <- gam(U_med ~ s(d_L.plot.z,bs="cr") + s(p.z,bs="tp") + ti(d_L.plot.z,p.z,bs="cr") +
+                  log(Stotal) +
+                  s(SiteCode,bs="re"),
+                family=Gamma(link = "log"),
+                data = df_resultados, method = "REML",control=as.list(3))
+l_md[[4]] <- gam(U_med ~ s(d_L.plot.z,bs="tp") + s(p.z,bs="cr") + ti(d_L.plot.z,p.z,bs="tp") +
+                  log(Stotal) +
+                  s(SiteCode,bs="re"),
+                family=Gamma(link = "log"),
+                data = df_resultados, method = "REML",control=as.list(3))
+l_md[[5]] <- gam(U_med ~ te(d_L.plot.z,p.z,bs=c("cr","tp")) +
+                  log(Stotal) +
+                  s(SiteCode,bs="re"),
+                family=Gamma(link = "log"),
+                data = df_resultados, method = "REML",control=as.list(3))
+l_md[[6]] <- gamm4(U_med ~ t2(d_L.plot.z,p.z,bs=c("cr","tp")) +
+                    log(Stotal),
+                    random=~(1|SiteCode),
+                  family=Gamma(link = "log"),
+                  data = df_resultados) #, method = "REML",control=as.list(3)
+l_md[[7]] <- gamm4(U_med ~ t2(d_L.plot.z,p.z,bs=c("cr","tp")) +
+                    log(Stotal),
+                    random=~(d_L.plot.z|SiteCode),
+                  family=Gamma(link = "log"),
+                  data = df_resultados) #, method = "REML",control=as.list(3)
+AICctab(l_md,weights = TRUE)
+# gam.check(l_md[[3]])
+# p_plot <- DHARMa::simulateResiduals(l_md[[6]]$mer,n = 1000)
+# plot(p_plot)
+# plot(l_md[[6]]$gam)
+```
+
+Utilizar bs="cr" para a variável d e para o tensor entre p e d parece ser o método mais plausível; enquanto para a variável p é robusta. O gam.check parece indicar que existe poucas funções de base para o smoother de d:  
+
+```{r atualizacao de l_md.U.3}
+teste_md.U <- gam(U_med ~ s(d_L.plot.z,bs="cr",k = 40) + s(p.z,bs="tp") + ti(d_L.plot.z,p.z,bs="cr") +
+                  log(Stotal) +
+                  s(SiteCode,bs="re"),
+                family=Gamma(link = "log"),
+                data = df_resultados, method = "REML",control=as.list(3))
+gam.check(teste_md.U)
+library(gamm4)
+teste_md.U <- gamm4(U_med ~ t2(d_L.plot.z,p.z,bs=c("cr","tp")) + 
+                      # t2(d_L.plot.z,SiteCode,bs=c("cr","ts")) +
+                      log(Stotal),
+                family=Gamma(link = "log"),
+                data = df_resultados, method = "REML")
+
+```
+
+O valor padrão de k=9, utilizei duas alternativas: k=20 e k=40. Para ambas o número de k parece ser insuficiente (k-edf->0 e p-valor<2e-16), isso pode indicar que seja necessário considerar um smoother por sitecode.
+
 
 ```{r diag 1 modelo cheio GAMM(U),eval=FALSE,echo=FALSE,include=FALSE}
 
 gam.check(md_U)
-md_U.upgrade <- gam(U_med ~ s(d_L.plot.z,k=20) + s(p.z) + ti(d_L.plot.z,p.z,k=20) +
+md_U.upgrade <- gam(U_med ~ s(d_L.plot.z,k=103) + s(p.z) + ti(d_L.plot.z,p.z,k=20) +
                   log(Stotal) +
                   s(SiteCode,bs="re"),
                 family=Gamma(link = "log"),
                 data = df_resultados, method = "REML",control=ctrl)
-gam.check(md_U.upgrade)
+ck(md_U.upgrade)
 ```
 
 
