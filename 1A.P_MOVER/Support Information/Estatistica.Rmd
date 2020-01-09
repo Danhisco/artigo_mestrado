@@ -64,6 +64,7 @@ f_z <- function(x){
 df_resultados.z <- as.data.frame(apply(df_resultados[c("p","Ntotal","log_Stotal","k.0","k.0_1","d_L.plot")],2,f_z))
 names(df_resultados.z) <- sapply(names(df_resultados.z), function(x) paste(gsub(".0","",x),".z",sep=""))
 df_resultados %<>% cbind(.,df_resultados.z)
+df_resultados.U <- df_resultados %<>% filter(MN=="EE") %>% distinct() 
 # summary(df_resultados)
 ```
 
@@ -82,12 +83,12 @@ l_p[[2]] <- ggplot(df_resultados,aes(x=p,y=U_med)) +
   geom_point() +
   geom_smooth(method = "auto") +
   labs(y="")
-l_p[[3]] <- ggplot(df_resultados,aes(x=Stotal,y=U_med)) +
+l_p[[3]] <- ggplot(df_resultados,aes(x=log(Stotal),y=U_med)) +
   geom_point() +
-  geom_smooth(method = "lm")
-l_p[[4]] <- ggplot(df_resultados,aes(x=p,y=Stotal)) +
+  geom_smooth(method = "auto")
+l_p[[4]] <- ggplot(df_resultados,aes(x=p,y=log(Stotal))) +
   geom_point() + 
-  geom_smooth(method="lm")
+  geom_smooth(method="auto")
 do.call("grid.arrange",c(l_p,ncol=2))
 ```
 
@@ -121,40 +122,6 @@ __Figura 2__ Padrões gerais de U_med por SiteCode: ~ k (% de propágulos até a
 
 ## Descrição Estatística:
 
-<!-- Segundo Pedersen et al. (2019) há 5 formas de utilizar HGAM (Hierarchical Generalized Additive Models); dessas 3 descrevem o padrão geral: G, GS e GI (figura 4, Petersen et al. 2019) -->
-
-<!-- __Modelo G:__   -->
-<!-- "A single commom (global) smoother for all observations"   -->
-<!-- Nesse modelo há um smoother global e 1 intercepto para cada nível do efeito aleatório (random smoother); e.g.:   -->
-
-<!-- CO2_modG <- gam(log(uptake) ~ s(log(conc), k=5, bs="tp") +   -->
-<!--                               s(Plant_uo, k=12, bs="re),   -->
-<!--                               data =.; method="REML", family="gaussian")   -->
-
-<!-- Modelo GS:   -->
-<!-- "Model GS is a close analogue to a GLMM with varying slopes: all groups have similar functional responses, but intergroup variation in responses is allowed. This approach works by allowing each grouping level to have its own functional response, but penalizing functions that are too far from the average."   -->
-
-<!-- CO2_modGS <- gam(log(uptake) ∼ s(log(conc), k=5, m=2) +   -->
-<!--                                s(log(conc), Plant_uo, k=5, bs="fs", m=2),   -->
-<!--                                data=CO2, method="REML")   -->
-
-<!-- Modelo GI:   -->
-<!-- " We now allow each group-specific smoother to have its own smoothing parameter and hence its own level of wiggliness (there are more smoothing parameters to estimate) and means that the only information shared between groups is through the global smoother, the common error term, and through the random effect for group-level intercepts (if used)."   -->
-
-<!-- CO2_modGI <- gam(log(uptake) ∼ s(log(conc), k=5, m=2, bs="tp") +    -->
-<!--                                s(log(conc), by=Plant_uo, k=5, m=1, bs="tp") +    -->
-<!--                                s(Plant_uo, bs="re", k=12),    -->
-<!--                                data=CO2, method="REML")   -->
-
-
-<!-- EXEMPLO DE gamm4::  -->
-
-<!-- ~ 6 vezes mais rapido do que a alternativa, porem não tem a mesma flexibilidade que a função gam -->
-
-<!-- system.time(l_p[[1]] <- gamm4(U_med ~ s(d_L.plot), random = ~(1|SiteCode) , -->
-<!--                 family="gaussian", -->
-<!--                 data = df_resultados))[[3]] -->
-  
 Para descrever o padrão de U em função da proporção de habitat disponível e da diminuição da limitação de dispersão vamos utilizar GAMM (generalized additive mixed models, Wood 2017). Há pelo menos 3 formas de descrevermos o padrão global (Pedersen et al. 2019): a) um intercepto por SiteCode (1|SiteCode); b) um smoother por SiteCode (dispersão | SiteCode), porém com penalização para aqueles smoothers muito distintos do padrão global; e c) um smoother por SiteCode (dispersão | SiteCode) com seu próprio parâmetro de 'flexibilidade' (smoothing parameter).   
   
 GAMM oferecem grande flexibilidade ao custo de aumento do número de parâmetros estimados e do custo computacional, além da perda de interpretabilidade. Então irei começar por um modelo cuja estrutura aleatória é a mais simples possível (1 intercepto por SiteCode) para poder oferecer mais flexibilidade para o tensor(variável_dispersão,p).   
@@ -178,60 +145,87 @@ __Tabela de Seleção do Modelo Mais plausível:__
 
 ```{r selecao de modelo cheio GAMM(U)}
 ctrl <- list(nthreads=3) #número de cores para paralelizar
-l_md <- vector("list",length = 10)
+l_md <- vector("list",length = 15)
 names(l_md) <- c("d id normal","d log normal", "d inverse normal", "d log gamma", "d inverse gamma",
-                 "k id normal","k log normal", "k inverse normal", "k log gamma", "k inverse gamma")
+                 "1-k id normal","1-k log normal", "1-k inverse normal", "1-k log gamma", "1-k inverse gamma",
+                 "k.f id normal","k.f log normal", "k.f inverse normal", "k.f log gamma", "k.f inverse gamma")
 l_md[[1]] <- gam(U_med ~ s(d_L.plot) + s(p) + ti(d_L.plot,p) +
-                  log_Stotal.z +
+                  s(log_Stotal) +
                   s(SiteCode,bs="re"),
                 family="gaussian",
-                data = df_resultados, method = "REML",control=ctrl)
-l_md[[2]] <- gam(U_med ~ s(d_L.plot ) + s(p ) + ti(d_L.plot ,p ) +
-                  log_Stotal.z +
+                data = df_resultados.U, method = "REML",control=ctrl)
+l_md[[2]] <- gam(U_med ~ s(d_L.plot) + s(p) + ti(d_L.plot,p) +
+                  s(log_Stotal) +
                   s(SiteCode,bs="re"),
                 family=gaussian(link = "log"),
-                data = df_resultados, method = "REML",control=ctrl)
-l_md[[3]] <- gam(U_med ~ s(d_L.plot ) + s(p ) + ti(d_L.plot ,p ) +
-                  log_Stotal.z +
+                data = df_resultados.U, method = "REML",control=ctrl)
+l_md[[3]] <- gam(U_med ~ s(d_L.plot) + s(p) + ti(d_L.plot,p) +
+                  s(log_Stotal) +
                   s(SiteCode,bs="re"),
                 family=gaussian(link = "inverse"),
-                data = df_resultados, method = "REML",control=ctrl)
-l_md[[4]] <- gam(U_med ~ s(d_L.plot ) + s(p ) + ti(d_L.plot ,p ) +
-                  log_Stotal.z +
+                data = df_resultados.U, method = "REML",control=ctrl)
+l_md[[4]] <- gam(U_med ~ s(d_L.plot) + s(p) + ti(d_L.plot,p) +
+                  s(log_Stotal) +
                   s(SiteCode,bs="re"),
                 family=Gamma(link = "log"),
-                data = df_resultados, method = "REML",control=ctrl)
-l_md[[5]] <- gam(U_med ~ s(d_L.plot ) + s(p ) + ti(d_L.plot ,p ) +
-                  log_Stotal.z +
+                data = df_resultados.U, method = "REML",control=ctrl)
+l_md[[5]] <- gam(U_med ~ s(d_L.plot) + s(p) + ti(d_L.plot,p) +
+                  s(log_Stotal) +
                   s(SiteCode,bs="re"),
                 family=Gamma(link = "inverse"),
-                data = df_resultados, method = "REML",control=ctrl)
+                data = df_resultados.U, method = "REML",control=ctrl)
 # k_1 
-l_md[[6]] <- gam(U_med ~ s(k.0_1 ) + s(p ) + ti(k.0_1 ,p ) +
-                  log_Stotal.z +
+l_md[[6]] <- gam(U_med ~ s(k.0_1) + s(p) + ti(k.0_1,p) +
+                  s(log_Stotal) +
                   s(SiteCode,bs="re"),
                 family="gaussian",
-                data = df_resultados, method = "REML",control=ctrl)
-l_md[[7]] <- gam(U_med ~ s(k.0_1 ) + s(p ) + ti(k.0_1 ,p ) +
-                  log_Stotal.z +
+                data = df_resultados.U, method = "REML",control=ctrl)
+l_md[[7]] <- gam(U_med ~ s(k.0_1) + s(p) + ti(k.0_1,p) +
+                  s(log_Stotal) +
                   s(SiteCode,bs="re"),
                 family=gaussian(link = "log"),
-                data = df_resultados, method = "REML",control=ctrl)
-l_md[[8]] <- gam(U_med ~ s(k.0_1 ) + s(p ) + ti(k.0_1 ,p ) +
-                  log_Stotal.z +
+                data = df_resultados.U, method = "REML",control=ctrl)
+l_md[[8]] <- gam(U_med ~ s(k.0_1) + s(p) + ti(k.0_1,p) +
+                  s(log_Stotal) +
                   s(SiteCode,bs="re"),
                 family=gaussian(link = "inverse"),
-                data = df_resultados, method = "REML",control=ctrl)
-l_md[[9]] <- gam(U_med ~ s(k.0_1 ) + s(p ) + ti(k.0_1 ,p ) +
-                  log_Stotal.z +
+                data = df_resultados.U, method = "REML",control=ctrl)
+l_md[[9]] <- gam(U_med ~ s(k.0_1) + s(p) + ti(k.0_1,p) +
+                  s(log_Stotal) +
                   s(SiteCode,bs="re"),
                 family=Gamma(link = "log"),
-                data = df_resultados, method = "REML",control=ctrl)
-l_md[[10]] <- gam(U_med ~ s(k.0_1 ) + s(p ) + ti(k.0_1 ,p ) +
-                  log_Stotal.z +
+                data = df_resultados.U, method = "REML",control=ctrl)
+l_md[[10]] <- gam(U_med ~ s(k.0_1) + s(p) + ti(k.0_1,p) +
+                  s(log_Stotal) +
                   s(SiteCode,bs="re"),
                 family=Gamma(link = "inverse"),
-                data = df_resultados, method = "REML",control=ctrl)
+                data = df_resultados.U, method = "REML",control=ctrl)
+# k.f 
+l_md[[11]] <- gam(U_med ~ s(p,k,bs="fs") + k +
+                  s(log_Stotal) +
+                  s(SiteCode,bs="re"),
+                family="gaussian",
+                data = df_resultados.U, method = "REML",control=ctrl)
+l_md[[12]] <- gam(U_med ~ s(p,k,bs="fs") + k +
+                  s(log_Stotal) +
+                  s(SiteCode,bs="re"),
+                family=gaussian(link = "log"),
+                data = df_resultados.U, method = "REML",control=ctrl)
+l_md[[13]] <- gam(U_med ~ s(p,k,bs="fs") + k +
+                  s(log_Stotal) +
+                  s(SiteCode,bs="re"),
+                family=gaussian(link = "inverse"),
+                data = df_resultados.U, method = "REML",control=ctrl)
+l_md[[14]] <- gam(U_med ~ s(p,k,bs="fs") + k +
+                  s(log_Stotal) +
+                  s(SiteCode,bs="re"),
+                family=Gamma(link = "log"),
+                data = df_resultados.U, method = "REML",control=ctrl)
+l_md[[15]] <- gam(U_med ~ s(p,k,bs="fs") + k +
+                  s(log_Stotal) +
+                  s(SiteCode,bs="re"),
+                family=Gamma(link = "inverse"),
+                data = df_resultados.U, method = "REML",control=ctrl)
 AICctab(l_md,weights = TRUE)
 ```
 
@@ -246,17 +240,18 @@ O modelos cheio mais plausível possui família Gamma e função de ligação 'l
 <!-- a) fitted ~ residuals (1|SiteCode) -->
 <!-- b) residuals ~ preditoras   -->
 
-```{r auditoria md mais plausivel U 01}
+```{r auditoria md mais plausivel U 01} 
 # Dados
-md_U <- gam(U_med ~ s(d_L.plot.z) + s(p.z) + ti(d_L.plot.z,p.z) +
-                  log_Stotal.z +
-                  s(SiteCode,bs="re"),
-                family=Gamma(link = "log"),
-                data = df_resultados, method = "REML",control=as.list(3)) # "d log gamma"
-
-summary(md_U)
+md_U <- l_md[["d log gamma"]]
+# summary(md_U)
+## gam.check
 par(mfrow=c(2,2))
 gam.check(md_U)
+## intercepto por sitecode
+df_ <- data.frame(term=names(coef(l_md[[1]])),coef=as.numeric(coef(l_md[[1]])))
+df_ %>% filter(grepl("SiteCode",term)) %>% ggplot(aes(x="",y=coef)) + 
+  geom_boxplot() + geom_jitter()
+# df_ %>% filter(grepl("SiteCode",term)) %>% summary
 ```
 
 __Figura 3__ gam.check(modelo cheio mais plausível)  
@@ -279,6 +274,8 @@ Segue avaliação dos efeitos:
 
 ```{r auditoria md_U mais plausível U 3,fig.width=12}
 gratia::draw(md_U)
+par(mfrow=c(2,2))
+plot(md_U)
 ```
 
 __Figura 4__ gratia::draw(md_U)
@@ -289,8 +286,11 @@ A função que plota o gráfico dos efeitos acusa um erro: Removed 951 rows cont
 __tabela __ Concurvidade dos smoothers
 
 ```{r concurvidade md_U}
-concurvity(md_U)
+concurvity(md_U,full = TRUE)
 ```
+
+Os três indices variam entre 0 e 1, quando igual a 1 então o smoother apresenta concurvidade com algum outro smoother. O intercepto geral ('para'), o smoother de s(p) e o smoother s(log_Stotal) apresenta concurvidade 
+
 
 
 ```{r auditoria md_U 4}
@@ -298,7 +298,7 @@ df_ <- augment(md_U) %>% mutate(.predict=exp(.fitted))
 # gráficos exploratórios
 par(mfrow=c(1,2))
 hist(df_$.predict,breaks = 60)
-hist(df_resultados$U_med,breaks = 60)
+hist(df_resultados.U$U_med,breaks = 60)
 #
 summary(df_)
 ```
@@ -322,8 +322,218 @@ __Figura 5.2__ Observado X Predito U ~ s(%d.z) + s(p.z) + ti(%d.z,p.z) + log_Sto
   
 Para alguns sítios observa-se que a nuvem dos pontos se aproxima à reta, contudo para outros sítios o smoother global não descreve o padrão não-linear  (figura 5.2). Uma possibilidade é ajustar um smoother por SiteCode: a) compartilhando um mesmo parâmetro de penalidade (menor flexibilidade); b) com uma réplica do smoother global para cada sítio (mais flexível, muito mais oneroso computacionalmente).
 
+Em resumo, o modelo mais plausível i) não pode ser aproximado por uma distribuição Gamma com função de ligação log; e o smoother s(p) apresenta concurvidade com outros smoothers. Há formas alternativas de modelar a relação dispersão * p: te(dispersão,p) e t2(dispersão,p). 
+
+```{r md_U comparacao s+ti te e t2}
+# Dados
+l_md <- vector("list",5)
+names(l_md) <- c("s+ti","s + s","s(d) + ti(d,p)","te","t2")
+l_md[[1]] <- gam(U_med ~ s(d_L.plot.z) + s(p.z) + ti(d_L.plot.z,p.z) +
+                  log_Stotal.z +
+                  s(SiteCode,bs="re"),
+                family=Gamma(link = "log"),
+                data = df_resultados.U, method = "REML",control=as.list(3))
+l_md[[2]] <- gam(U_med ~ s(d_L.plot.z) + s(p.z) +
+                  log_Stotal.z +
+                  s(SiteCode,bs="re"),
+                family=Gamma(link = "log"),
+                data = df_resultados.U, method = "REML",control=as.list(3))
+l_md[[3]] <- gam(U_med ~ s(d_L.plot.z) + ti(d_L.plot.z,p.z) +
+                  log_Stotal.z +
+                  s(SiteCode,bs="re"),
+                family=Gamma(link = "log"),
+                data = df_resultados.U, method = "REML",control=as.list(3))
+l_md[[4]] <- gam(U_med ~ te(d_L.plot.z,p.z) +
+                  log_Stotal.z +
+                  s(SiteCode,bs="re"),
+                family=Gamma(link = "log"),
+                data = df_resultados.U, method = "REML",control=as.list(3))
+l_md[[5]] <- gam(U_med ~ t2(d_L.plot.z,p.z) +
+                  log_Stotal.z +
+                  s(SiteCode,bs="re"),
+                family=Gamma(link = "log"),
+                data = df_resultados.U, method = "REML",control=as.list(3))
+AICctab(l_md,weights=T)
+```
 
 
+O único modelo plausível, somando 0.82 do peso de evidência, pressupóem o smoother individual de d/L_plot e o tensor entre d/L_plot e de p; o segundo modelo mais plausível, com 0.18 de peso de evidência, considera adicionalmente o smoother individual para p. Os modelos com tensores te e t2 apresentam menos parâmetros porém não estão dentro do intervalo de plausibilidade; o modelo menos plausível considera os smoothers indivíduais de d/L_plot e p, mas desconsidera o tensor das preditoras. Os resultados corroboram o hipótese de que o smoother individual de p é concurvo ao tensor de d e p. Segue auditoria do modelo mais plausível:
+
+
+```{r auditoria 1 s(d)+ti(d,p)}
+par(mfrow=c(2,2))
+gam.check(l_md[["s(d) + ti(d,p)"]])
+```
+
+
+```{r auditoria 2 s(d)+ti(d,p)}
+p_plot <- DHARMa::simulateResiduals(l_md[["s(d) + ti(d,p)"]],n=1000)
+plot(p_plot)
+```
+
+Ambos diagnostico apontam que o pressuposto de distribuição gamma com função de ligação log não é uma boa aproximação, e pela comparação com o modelo anterior o ajuste do modelo com relação ao segundo mais plausível piorou. Segue avaliação dos efeitos:  
+  
+
+```{r auditoria 3 s(d)+ti(d,p)}
+gratia::draw(l_md[["s(d) + ti(d,p)"]])
+# gratia::draw(l_md[["s+ti"]])
+```
+  
+O gráfico de efeitos do smoother de d/L_plot mostra que o desvio padrão da estimativa aumenta com o aumento do preditor. Idealmente deveria ser homogeneo ao longo do gradite do preditor (REF). Segue avaliaão da concurvidade entre os smoothers:  
+  
+```{r auditoria 4 s(d)+ti(d,p)}
+concurvity(l_md[["s(d) + ti(d,p)"]])
+```
+
+O diagnostico de concurvidade indica que não há problemas. Ainda há possibilidade de aumentar o número de funções bases para ajustar o padrão, pois gam.check indica que talvez seja necessário aumentar o número de funções base para o smoother de d/L_plot
+
+```{r auditoria 5 s(d) + ti(d,p)}
+l_md[[3]] <- gam(U_med ~ s(d_L.plot.z,k=10) + ti(d_L.plot.z,p.z) +
+                  log_Stotal.z +
+                  s(SiteCode,bs="re"),
+                family=Gamma(link = "log"),
+                data = df_resultados.U, method = "REML",control=as.list(3))
+gam.check(l_md[[3]]) 
+gratia::draw(l_md[[3]])
+```
+
+Para k maiores (20,40) o diagnóstico da gam.check continua indicando que k não é suficiente, porem ao aumentar k promove o aumento de sobreajuste do modelo sem melhoras no pressuposto de distribuição gamma com função de ligação log.  
+
+
+#### Exploração de outras estruturas aleatórias
+
+```{r estruturas aleatorias alternativas U_med d}
+l_md <- vector("list",2)
+names(l_md) <- c("(1|SiteCode)","d|SiteCode,lambda comum") #,"d|SiteCode,lambda por SiteCode")
+l_md[[1]] <- gam(U_med ~ s(d_L.plot.z) + ti(d_L.plot.z,p.z) +
+                  log_Stotal.z +
+                  s(SiteCode,bs="re"),
+                family=Gamma(link = "log"),
+                data = df_resultados.U, method = "REML",control=as.list(3))
+l_md[[2]] <- gam(U_med ~ s(d_L.plot.z) + ti(d_L.plot.z,p.z) +
+                  log_Stotal.z +
+                  s(d_L.plot.z,SiteCode,bs="fs",m=2),
+                family=Gamma(link = "log"),
+                data = df_resultados.U, method = "REML",control=as.list(3))
+# l_md[[3]] <- gam(U_med ~ s(d_L.plot.z) + ti(d_L.plot.z,p.z) +
+#                   log_Stotal.z +
+#                   s(d_L.plot.z,by=SiteCode,m=1) + s(SiteCode,bs="re"),
+#                 family=Gamma(link = "log"),
+#                 data = df_resultados.U, method = "REML",control=as.list(3))
+AICctab(l_md,weights=TRUE)
+```
+
+O modelo que permite um smoother de dispersão por sitecode com lambda comum é o mais plausível. Segue auditoria do modelo:
+
+```{r auditoria 1 d|SiteCode lambda comum}
+par(mfrow=c(2,2))
+gam.check(l_md[[2]])
+```
+
+
+```{r auditoria 2 d|SiteCode lambda comum}
+p_plot <- DHARMa::simulateResiduals(l_md[[2]],n=1000)
+plot(p_plot)
+```
+
+Observa-se piora na adequação ao pressuposto de distribuição gamma(link=log)
+
+```{r auditoria 3 d|SiteCode lambda comum}
+gratia::draw(l_md[[2]])
+```
+
+
+#### Alternativas de configuração de gam  
+  
+i) mudança no tipo de funções base utilizada, o método padrão é o ts (thin plate regression spline).  
+ii) modificar em qual grau da derivada a flexibilidade do smoother é penalizada.  
+
+Como ii é feito por padrão, vou explorar i. O modelo que considera os smoothers indivíduais de d e p vai ser usado na exploração dos tipos de smoother. 
+
+opções:
+
+1) tp; 2) ts; 3) ds; 4) cr; cc; cs; 5) sos; cp; 6) mrf; 7) gp; 8) so; sw; sf 
+
+```{r comparação entre tipos de smoothers}
+l_md <- vector("list",)
+names(l_md) <- c()
+
+```
+
+
+
+<!-- __t2__ -->
+
+<!-- ```{r auditoria 1 t2} -->
+<!-- par(mfrow=c(2,2)) -->
+<!-- gam.check(l_md[["t2"]]) -->
+<!-- ``` -->
+
+
+<!-- ```{r auditoria 2 t2} -->
+<!-- p_plot <- DHARMa::simulateResiduals(l_md[["t2"]],n=1000) -->
+<!-- plot(p_plot) -->
+<!-- ``` -->
+
+<!-- Ambos diagnostico apontam que o pressuposto de distribuição gamma com função de ligação log não é uma boa aproximação, e pela comparação com o modelo anterior o ajuste do modelo com relação ao segundo mais plausível piorou. Segue avaliação dos efeitos:   -->
+
+
+<!-- ```{r auditoria 3 t2} -->
+<!-- gratia::draw(l_md[["t2"]]) -->
+<!-- ``` -->
+
+<!-- O gráfico de efeitos do smoother de d/L_plot mostra que o desvio padrão da estimativa aumenta com o aumento do preditor. Idealmente deveria ser homogeneo ao longo do gradite do preditor (REF). Segue avaliaão da concurvidade entre os smoothers:   -->
+
+<!-- ```{r auditoria 4 t2} -->
+<!-- concurvity(l_md[["t2"]]) -->
+<!-- ``` -->
+
+<!-- __te__ -->
+
+<!-- ```{r auditoria 1 te} -->
+<!-- par(mfrow=c(2,2)) -->
+<!-- gam.check(l_md[["te"]]) -->
+<!-- ``` -->
+
+
+<!-- ```{r auditoria 2 te} -->
+<!-- p_plot <- DHARMa::simulateResiduals(l_md[["te"]],n=1000) -->
+<!-- plot(p_plot) -->
+<!-- ``` -->
+
+
+<!-- ```{r auditoria 3 te} -->
+<!-- gratia::draw(l_md[["te"]]) -->
+<!-- ``` -->
+
+
+<!-- ```{r auditoria 4 te} -->
+<!-- concurvity(l_md[["te"]]) -->
+<!-- ``` -->
+
+
+<!-- __s+s__ -->
+
+<!-- ```{r auditoria 1 s + s} -->
+<!-- par(mfrow=c(2,2)) -->
+<!-- gam.check(l_md[["s + s"]]) -->
+<!-- ``` -->
+
+
+<!-- ```{r auditoria 2 s+s} -->
+<!-- p_plot <- DHARMa::simulateResiduals(l_md[["s + s"]],n=1000) -->
+<!-- plot(p_plot) -->
+<!-- ``` -->
+
+
+<!-- ```{r auditoria 3 s+s} -->
+<!-- gratia::draw(l_md[["s + s"]]) -->
+<!-- ``` -->
+
+
+<!-- ```{r auditoria 4 s+s} -->
+<!-- concurvity(l_md[["s + s"]]) -->
+<!-- ``` -->
 
 
 
