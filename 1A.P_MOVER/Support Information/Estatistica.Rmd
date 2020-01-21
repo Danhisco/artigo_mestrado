@@ -452,19 +452,26 @@ gam(cbind(n_nRef,100-n_nRef) ~ s(p.z,by=MN,bs="tp") + s(d_Lplot.z,by=MN,bs="tp")
 
 
 ```{r gam binomial n_nRef}
-ctrl <- 3
+ctrl <- as.list(3)
 l_md <- vector("list",3)
-names(l_md) <- c("1|SiteCode",)
-l_md[[1]] <- gam(cbind(n_nRef,100-n_nRef) ~ s(p.z,by=MN,bs="tp") + s(d_Lplot.z,by=MN,bs="tp") + ti(p.z,d_Lplot.z,by=MN,bs="tp") +
+names(l_md) <- c("1|SiteCode","MN|SiteCode","MN * disp|SiteCode")
+l_md[[1]] <- gam(cbind(n_nRef,100-n_nRef) ~ MN + s(p.z,by=MN,bs="tp") + s(d_Lplot.z,by=MN,bs="tp") + ti(p.z,d_Lplot.z,by=MN,bs="tp") +
                    s(SiteCode,bs="re"),
                  family = "binomial",
                  data = df_resultados, method = "REML",control=ctrl)
-l_md[[1]] <- gam(cbind(n_nRef,100-n_nRef) ~ s(p.z,by=MN,bs="tp") + s(d_Lplot.z,by=MN,bs="tp") + ti(p.z,d_Lplot.z,by=MN,bs="tp") +
-                   s(SiteCode,bs="re"),
+l_md[[2]] <- gam(cbind(n_nRef,100-n_nRef) ~ s(p.z,by=MN,bs="tp") + s(d_Lplot.z,by=MN,bs="tp") + ti(p.z,d_Lplot.z,by=MN,bs="tp") +
+                   s(SiteCode,by=MN,bs="re"),
                  family = "binomial",
                  data = df_resultados, method = "REML",control=ctrl)
 ```
 
+```{r}
+gratia::draw(l_md[[2]])
+gam.check(l_md[[2]])
+summary(l_md[[2]])
+p_plot <- DHARMa::simulateResiduals(l_md[[1]],n=1000)
+plot(p_plot)
+```
 
 # U - taxa de especiação necessária para obter a riqueza observada no equilíbrio  
 
