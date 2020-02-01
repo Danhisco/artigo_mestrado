@@ -234,31 +234,31 @@ names(l_md) <- c("p*d*MN",# modelo cheio
                  "p","d","MN", #preditor isolado
                  "1") #nulo
 #modelo cheio
-l_md[[1]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * d_Lplot.z * MN + (MN*d_Lplot.z|SiteCode), family = "binomial",data=df_resultados,
+l_md[[1]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * d_Lplot.z * MN + (d_Lplot.z * MN|SiteCode), family = "binomial",data=df_resultados,
               control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
 #modelo cheio - interação 3a ordem
-l_md[[2]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * d_Lplot.z * MN - p.z:d_Lplot.z:MN + (MN*d_Lplot.z|SiteCode), family = "binomial",data=df_resultados,
+l_md[[2]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * d_Lplot.z * MN - p.z:d_Lplot.z:MN + (d_Lplot.z * MN|SiteCode), family = "binomial",data=df_resultados,
               control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
 #2 interações
 l_md[[3]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * (d_Lplot.z + MN) + (MN+d_Lplot.z|SiteCode), family = "binomial",data=df_resultados,
               control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md[[4]] <- glmer(cbind(n_nRef,100-n_nRef) ~ d_Lplot.z * (p.z + MN) + (MN*d_Lplot.z|SiteCode), family = "binomial",data=df_resultados,
+l_md[[4]] <- glmer(cbind(n_nRef,100-n_nRef) ~ d_Lplot.z * (p.z + MN) + (d_Lplot.z * MN|SiteCode), family = "binomial",data=df_resultados,
               control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md[[5]] <- glmer(cbind(n_nRef,100-n_nRef) ~ MN * (p.z + d_Lplot.z) + (MN*d_Lplot.z|SiteCode), family = "binomial",data=df_resultados,
+l_md[[5]] <- glmer(cbind(n_nRef,100-n_nRef) ~ MN * (p.z + d_Lplot.z) + (d_Lplot.z * MN|SiteCode), family = "binomial",data=df_resultados,
               control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
 #1 interação + preditor
 l_md[[6]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * d_Lplot.z + MN + (MN+d_Lplot.z|SiteCode), family = "binomial",data=df_resultados,
               control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
 l_md[[7]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * MN + d_Lplot.z + (MN+d_Lplot.z|SiteCode), family = "binomial",data=df_resultados,
               control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md[[8]] <- glmer(cbind(n_nRef,100-n_nRef) ~ d_Lplot.z * MN + p.z + (MN*d_Lplot.z|SiteCode), family = "binomial",data=df_resultados,
+l_md[[8]] <- glmer(cbind(n_nRef,100-n_nRef) ~ d_Lplot.z * MN + p.z + (d_Lplot.z * MN|SiteCode), family = "binomial",data=df_resultados,
               control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
 #1 interação
 l_md[[9]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * d_Lplot.z + (d_Lplot.z|SiteCode), family = "binomial",data=df_resultados,
               control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
 l_md[[10]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * MN + (MN|SiteCode), family = "binomial",data=df_resultados,
               control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md[[11]] <- glmer(cbind(n_nRef,100-n_nRef) ~ d_Lplot.z * MN + (MN*d_Lplot.z|SiteCode), family = "binomial",data=df_resultados,
+l_md[[11]] <- glmer(cbind(n_nRef,100-n_nRef) ~ d_Lplot.z * MN + (d_Lplot.z * MN|SiteCode), family = "binomial",data=df_resultados,
               control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
 #aditivo 3
 l_md[[12]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z + d_Lplot.z + MN + (MN+d_Lplot.z|SiteCode), family = "binomial",data=df_resultados,
@@ -290,7 +290,8 @@ Como visto anteriormente este modelo não apresenta pressupostos que se aproxima
 __Tabela 1__ Modelo mais plausível para descrever o número de SADs não refutadas  
 
 ```{r tabela do modelo plausivel}
-tab_model(l_md[["p*d*MN"]])
+# tab_model(l_md[["p*d*MN"]])
+summary(l_md[["p*d*MN"]])
 ```
 
 O R2 marginal é baixo (0.088) enquanto o R2 condicional é elevado (0.836). Segue avaliação visual da congruência com o observado comparando a probabilidade de se refutar uma predição neutra e a estimada pelo modelo.
@@ -330,12 +331,38 @@ iii) O pressuposto de linearidade pode não ser suficiente para estimar a tendê
 
 Uma avaliação direta da predição de que MNEE pode apresentar melhor congruência para paisagens com proporções intermediárias de cobertura vegetal é a de comparar a inclinação e intercepto do efeito do aumento da dispersão entre os modelos neutros por sítio e então plotar as estimativas pela proporção de cobertura vegetal. 
 
-```{r inferencia n_nRef}
-# bruto
+```{r inferencia n_nRef, warning=FALSE,message=FALSE}
+# dados brutos
+df_coef.Site <- coef(l_md[["p*d*MN"]])$SiteCode
+## arrumando os nomes
+df_coef.Site$SiteCode <- row.names(coef(l_md[["p*d*MN"]])$SiteCode) 
+row.names(df_coef.Site) <- NULL
+names(df_coef.Site) <- c("intercept","p_coef","d_Lplot_coef","MNEI","p__d_Lplot_coef","p__MNEI","d_Lplot__MNEI","p__d_Lplot__MNEI","SiteCode")
+# multiplicao pelo respectivo valor de p.z
+df_ <- df_coef.Site[,c(2,5,6,8,9)] %>% inner_join(x=.,
+                            y=distinct(select(df_resultados,SiteCode,p.z,p)),
+                            by="SiteCode") %>% 
+  adply(.,1,.fun=function(X) data.frame(coef_p = X$p.z * X$p_coef,
+                                        coef_p__d_Lplot = X$p.z * X$p__d_Lplot_coef,
+                                        coef_p__MNEI = X$p.z * X$p__MNEI,
+                                        coef_p__d_Lplot__MNEI = X$p.z * X$p__d_Lplot__MNEI
+                                        )
+        )
+# merge
+df_coef.Site %<>% inner_join(x=.,
+                            y=df_[,5:11],
+                            by="SiteCode") %>% 
+  select(SiteCode, p.z, p, intercept, coef_p, d_Lplot_coef, MNEI, coef_p__d_Lplot, coef_p__MNEI, d_Lplot__MNEI,coef_p__d_Lplot__MNEI)
+
+```
+
+
+```{r}
+
+
+
 # estimativas da estrutura aleatória
 df_coef.Site <- ranef(l_md[["p*d*MN"]])$SiteCode
-df_coef.Site$SiteCode <- row.names(ranef(l_md[["p*d*MN"]])$SiteCode) 
-row.names(df_coef.Site) <- NULL
 names(df_coef.Site)[c(1,3,4)] <- c("intercept","slope","slope0_MNEI")
 df_coef.Site %<>% 
   mutate(intercept_MNEI = intercept + MNEI, slope_MNEI = slope + slope0_MNEI) %>% 
@@ -352,7 +379,6 @@ df_coef.Site$coef[df_coef.Site$coef %in% c("(Intercept)","MNEI")] = "intercept"
 
 tidy(l_md[["p*d*MN"]])
 ```
-
 
 
 
