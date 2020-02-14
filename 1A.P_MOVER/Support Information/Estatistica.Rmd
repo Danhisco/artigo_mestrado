@@ -15,7 +15,7 @@ body {
 text-align: justify}
 </style>
 
-```{r setup, include=FALSE}
+```{r setup, include=TRUE,echo=FALSE}
 knitr::opts_chunk$set(echo = FALSE, tidy = FALSE, include = TRUE, warning = FALSE,cache = TRUE,message=FALSE,eval=TRUE)
 knitr::opts_knit$set(root.dir = "~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/")
 setwd("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/")
@@ -146,7 +146,7 @@ AICctab(l_md,weights=TRUE)
 
 O único modelo plausível considera a variável k (fator) e estrutura aleatória MN|SiteCode.
 
-```{r appraise l_md[[k|SiteCode]]}
+```{r appraise l_md[[k MN|SiteCode]] 1}
 appraise(l_md[["k MN|SiteCode"]])
 ```
 
@@ -260,7 +260,7 @@ do.call("grid.arrange",c(l_p,ncol=2))
 
 __Figura 1.4__ Observado e predito pelo modelo mais plausível. Eixo x = prop. de cobertura vegetal na paisagem; Eixo y: número de SADs não refutadas. Em branco o padrão geral estimado e em vermelho o erro padrão. 
   
-O padrão estimado parece ser muito sensível  a valores extremo: a média de EI parece estar muito abaixo da mediana; essa tendência também parece ser observada para algum grau do vale que surge para p.z ~ -1 e p->0.05.
+O padrão estimado parece ser muito sensível  a valores extremo: a média de EI parece estar muito abaixo da mediana; essa tendência também parece ser observada para algum grau do vale que surge para p.z ~ -1 e p->0.05. Vejo duas opções: a) avaliar outliers e b) parâmetros da gam (parâmetro de penalidade, número de funções base; por padrão ambos são estimados utilizando REML, começar pelo parâmetro de penalidade)
 
 
 # diff_S = (S_obs - S_MN)/S_obs
@@ -287,10 +287,8 @@ Para modelar o padrão não linear dos dados vou utilizar GAMM: normal e duas es
 
 
 ```{r avaliação do padrão sem outliers}
-l_md.diff_S <- vector("list",length=10)
+l_md.diff_S <- vector("list",length=6)
 names(l_md.diff_S) <- c("normal id MN|SiteCode","normal id 1|SiteCode",
-                        "normal log MN|SiteCode","normal log 1|SiteCode",
-                        "Gamma id MN|SiteCode","Gamma id 1|SiteCode",
                         "Gamma log MN|SiteCode","Gamma log 1|SiteCode",
                         "Gamma inverse MN|SiteCode","Gamma inverse 1|SiteCode")
 l_md.diff_S[[1]] <- gam(diff_S ~ k*MN + s(log_Stotal.z,bs="tp") + s(p.z,k,by=MN,bs="fs",xt=list(bs="tp")) +
@@ -303,52 +301,40 @@ l_md.diff_S[[2]] <- gam(diff_S ~ k*MN + s(log_Stotal.z,bs="tp") + s(p.z,k,by=MN,
                         data=df_resultados,
                         family = "gaussian",
                         method="REML")
-l_md.diff_S[[3]] <- gam(diff_S ~ k*MN + s(log_Stotal.z,bs="tp") + s(p.z,k,by=MN,bs="fs",xt=list(bs="cr")) +
+l_md.diff_S[[3]] <- gam(diff_S ~ k*MN + s(log_Stotal.z,bs="tp") + s(p.z,k,by=MN,bs="fs",xt=list(bs="tp")) +
                           s(SiteCode,by=MN,bs="re"),
                         data=df_resultados,
-                        family = gaussian(family="log"),
+                        family = "Gamma",
                         method="REML")
-l_md.diff_S[[4]] <- gam(diff_S ~ k*MN + s(log_Stotal.z,bs="tp") + s(p.z,k,by=MN,bs="fs",xt=list(bs="cr")) +
+l_md.diff_S[[4]] <- gam(diff_S ~ k*MN + s(log_Stotal.z,bs="tp") + s(p.z,k,by=MN,bs="fs",xt=list(bs="tp")) +
                           s(SiteCode,bs="re"),
                         data=df_resultados,
-                        family = gaussian(family="log"),
+                        family = "Gamma",
                         method="REML")
-l_md.diff_S[[5]] <- gam(diff_S ~ k*MN + s(log_Stotal.z,bs="tp") + s(p.z,k,by=MN,bs="fs",xt=list(bs="cr")) +
+l_md.diff_S[[5]] <- gam(diff_S ~ k*MN + s(log_Stotal.z,bs="tp") + s(p.z,k,by=MN,bs="fs",xt=list(bs="tp")) +
                           s(SiteCode,by=MN,bs="re"),
                         data=df_resultados,
-                        family = Gamma(family="identity"),
+                        family = "Gamma"(link="log"),
                         method="REML")
-l_md.diff_S[[6]] <- gam(diff_S ~ k*MN + s(log_Stotal.z,bs="tp") + s(p.z,k,by=MN,bs="fs",xt=list(bs="cr")) +
+l_md.diff_S[[6]] <- gam(diff_S ~ k*MN + s(log_Stotal.z,bs="tp") + s(p.z,k,by=MN,bs="fs",xt=list(bs="tp")) +
                           s(SiteCode,bs="re"),
                         data=df_resultados,
-                        family = Gamma(family="identity"),
-                        method="REML")
-l_md.diff_S[[7]] <- gam(diff_S ~ k*MN + s(log_Stotal.z,bs="tp") + s(p.z,k,by=MN,bs="fs",xt=list(bs="cr")) +
-                          s(SiteCode,by=MN,bs="re"),
-                        data=df_resultados,
-                        family = Gamma(family="log"),
-                        method="REML")
-l_md.diff_S[[8]] <- gam(diff_S ~ k*MN + s(log_Stotal.z,bs="tp") + s(p.z,k,by=MN,bs="fs",xt=list(bs="cr")) +
-                          s(SiteCode,bs="re"),
-                        data=df_resultados,
-                        family = Gamma(family="log"),
-                        method="REML")
-l_md.diff_S[[9]] <- gam(diff_S ~ k*MN + s(log_Stotal.z,bs="tp") + s(p.z,k,by=MN,bs="fs",xt=list(bs="cr")) +
-                          s(SiteCode,by=MN,bs="re"),
-                        data=df_resultados,
-                        family = Gamma(family="inverse"),
-                        method="REML")
-l_md.diff_S[[10]] <- gam(diff_S ~ k*MN + s(log_Stotal.z,bs="tp") + s(p.z,k,by=MN,bs="fs",xt=list(bs="cr")) +
-                          s(SiteCode,bs="re"),
-                        data=df_resultados,
-                        family = Gamma(family="inverse"),
+                        family = "Gamma"(link="log"),
                         method="REML")
 AICctab(l_md.diff_S,weights=TRUE)
-
+# l_md1 <- l_md.diff_S[1:2]
+# l_md.diff_S[1:2] <- l_md1
 ```
 
 ```{r appraise l_md[[k|SiteCode]]}
-appraise(l_md.diff_S[["MN|SiteCode"]])
+appraise(l_md.diff_S[["normal id MN|SiteCode"]])
+```
+
+__Figura 2.2__ Graficos diagnosticos do modelo mais plausível para diff_S.   
+  
+  
+```{r }
+
 ```
 
 
