@@ -21,7 +21,7 @@ knitr::opts_knit$set(root.dir = "~/Documentos/Doutorado/artigo_mestrado/1A.P_MOV
 setwd("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/")
 ```
 
-```{r pacotes,eval=TRUE}
+```{r pacotes,eval=TRUE,echo=TRUE}
 library(gtools)
 library(doMC)
 library(mgcv)
@@ -83,12 +83,12 @@ l_p <- vector("list",2)
 l_p[[1]] <- ggplot(filter(df_resultados,k %in% levels(df_resultados$k)[1:10]),
                    aes(x=p,y=n_nRef)) + 
   geom_point() + 
-  # geom_smooth(method="loess") +
+  geom_smooth(method="loess") +
   facet_grid(k~MN)
 l_p[[2]] <- ggplot(filter(df_resultados,k %in% levels(df_resultados$k)[11:20]),
                    aes(x=p,y=n_nRef)) + 
   geom_point() + 
-  # geom_smooth(method="loess") +
+  geom_smooth(method="loess") +
   facet_grid(k~MN) 
 do.call("grid.arrange",c(l_p,ncol=2))
 ```
@@ -97,305 +97,6 @@ __Figura 1.1__ número de SADs não refutadas ~ p * I(1-k) * MN. A linha azul é
 
 Para descrever estatisticamente o número de SADs preditas não refutadas iremos utilizar a distribuição binomial com função de ligação logito. Agruparemos os dados pelo sítio de amostragem. Esperamos que MNEE apresente melhor congruência com o observado para sítios em paisagens com proporção intermediária de cobertura vegetal e para cenários de extrema limitação de dispersão. Uma interpretação desta predição pode ser obtida se possibilitarmos que, para cada sítios de amostragem, a probabilidade de uma predição ser refutada seja uma função da variável de dispersão para cada modelo, ou seja, (dispersão * modelo neutro | sítio de amostragem). O modelo cheio considera a interação de terceira ordem entre as preditoras cobertura vegetal (p, contínua), dispersão (k, categorica; k_1, contínua; d_Lplot, contínua) e a classe do modelo neutro (MNEE e MNEI). Utilizamos uma abordagem baseada em seleção de modelos para determinar a relação entre as variáveis mais parcimoniosa.
 
-## GLMM binomial
-
-### Modelo Cheio
-
-
-```{r n_nRef comparacao modelos cheios}
-l_md <- vector("list",8)
-names(l_md) <- c("k0 1|Site","k0 MN|Site","k0 k0*MN|Site",
-                 "kf 1|Site","kf MN|Site",
-                 "d/L_plot 1|Site","d/L_plot MN|Site","d/L_plot d/L_plot*MN|Site")
-l_md[[1]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * k_1.z * MN + (1|SiteCode),
-                   family = "binomial",data=df_resultados,
-                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md[[2]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * k_1.z * MN + (MN|SiteCode),
-                   family = "binomial",data=df_resultados,
-                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md[[3]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * k_1.z * MN + (MN*k_1.z|SiteCode),
-                   family = "binomial",data=df_resultados,
-                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md[[4]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * k * MN + (1|SiteCode),
-                   family = "binomial",data=df_resultados,
-                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md[[5]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * k * MN + (MN|SiteCode),
-                   family = "binomial",data=df_resultados,
-                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md[[6]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * d_Lplot.z * MN + (1|SiteCode),
-                   family = "binomial",data=df_resultados,
-                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md[[7]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * d_Lplot.z * MN + (MN|SiteCode),
-                   family = "binomial",data=df_resultados,
-                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md[[8]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * d_Lplot.z * MN + (MN*d_Lplot.z|SiteCode),
-                   family = "binomial",data=df_resultados,
-                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-AICctab(l_md,weights=T)
-```
-
-O único modelo plausível é aquele com função de ligação logito, a variável d/L_plot e a estrutura aleatória MN * d/L_plot|SiteCode. Segue avaliação do pressuposto binomial(link=cloglog):
-
-```{r auditoria mais plausivel md_n.ref1}
-md_nRef <- l_md[["d/L_plot d/L_plot*MN|Site"]]
-p_plot <- DHARMa::simulateResiduals(md_nRef,n=1000)
-plot(p_plot)
-```
-
-__Figura 1.2__ Resíduos Quantílicos do modelo cheio para n_nRef ~ p*d_Lplot*MN + (d_Lplot*MN|SiteCode)
-
-Os resíduos quantílicos apontam que a distribuição dos resíduos não adere à distribuição uniforme, o que indica que a distribuição binomial(link=cloglog) não é um bom pressuposto para o conjunto dos dados. Segue resíduos pearson:
-
-```{r auditoria mais plausivel md_n.ref2}
-l_p <- vector("list",4)
-l_p[[1]] <- plot(md_nRef, sqrt(abs(resid(.)))~fitted(.),
-                 type=c("p","smooth"),ylab=expression(sqrt(abs(resid))))
-l_p[[2]] <- plot(md_nRef,resid(.,type="pearson")~p.z,
-      type=c("p","smooth"),
-      id=0.05,idLabels=~SiteCode)
-l_p[[3]] <- plot(md_nRef,resid(.,type="pearson")~d_Lplot.z,
-      type=c("p","smooth"),
-      id=0.05,idLabels=~SiteCode)
-l_p[[4]] <- plot(md_nRef,MN~resid(.,type="pearson"),
-      type=c("p","smooth"),
-      id=0.05,idLabels=~SiteCode)
-do.call("grid.arrange",c(l_p,ncol=2))
-```
-
-__Figura 1.3__ Resíduos "Pearson" do modelo cheio para n_ref ~ p * I(d/L_plot)*MN + (I(d/L_plot)|SiteCode)
-
-Os resíduos de Pearson indicam que podem existir outliers: alguns sítios apresentam erros agrupados em valores extremos. Pelo gráfico dos resíduos por MN parecem existir 5 sítios em que apresentam comportamento muito distinto dos demais.
-
-```{r selecao do modelo cheio sem os sitios outliers}
-# prepração dos dados
-df_md_n_nRef <- augment(md_nRef)
-df_md_n_nRef$.pearson_resid <- resid(md_nRef,type="pearson")
-Sites <- df_md_n_nRef %>% 
-  filter(.pearson_resid>100 | .pearson_resid< -50) %>% .$SiteCode %>% as.character()
-df_resultados.s_out <- df_resultados %>% filter(!(SiteCode %in% Sites))
-# seleção do modelo mais plausível
-l_md <- vector("list",8)
-names(l_md) <- c("k0 1|Site","k0 MN|Site","k0 k0*MN|Site",
-                 "kf 1|Site","kf MN|Site",
-                 "d/L_plot 1|Site","d/L_plot MN|Site","d/L_plot d/L_plot*MN|Site")
-l_md[[1]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * k_1.z * MN + (1|SiteCode),
-                   family = "binomial",data=df_resultados.s_out,
-                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md[[2]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * k_1.z * MN + (MN|SiteCode),
-                   family = "binomial",data=df_resultados.s_out,
-                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md[[3]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * k_1.z * MN + (MN*k_1.z|SiteCode),
-                   family = "binomial",data=df_resultados.s_out,
-                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md[[4]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * k * MN + (1|SiteCode),
-                   family = "binomial",data=df_resultados.s_out,
-                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md[[5]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * k * MN + (MN|SiteCode),
-                   family = "binomial",data=df_resultados.s_out,
-                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md[[6]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * d_Lplot.z * MN + (1|SiteCode),
-                   family = "binomial",data=df_resultados.s_out,
-                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md[[7]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * d_Lplot.z * MN + (MN|SiteCode),
-                   family = "binomial",data=df_resultados.s_out,
-                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md[[8]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * d_Lplot.z * MN + (MN*d_Lplot.z|SiteCode),
-                   family = "binomial",data=df_resultados.s_out,
-                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-AICctab(l_md,weights=T)
-```
-
-A seleção de modelos é robusta à remoção dos outliers: o único plausível é link=cloglog, d/L_plot e d/L_plot *MN | SiteCode
-
-```{r auditoria md_n.ref sem outliers 1}
-p_plot <- DHARMa::simulateResiduals(l_md[["d/L_plot d/L_plot*MN|Site"]],n=1000)
-plot(p_plot)
-```
-
-__figura 1.4__ Resíduos Quantílicos do modelo cheio sem outliers
-
-
-O pressuposto de binomial(link=cloglog) continua não sendo adequado.  
-
-### Modelo mais plausível: seleção e avaliação
-
-Sigo com a seleção das variáveis. A estrutura aleatória completa é (MN * d_Lplot.z | SiteCode) para os modelos que possuirem a interação MN*d_Lplot.z, para os demais modelos que não apresentam esse termo a estrutura aleatória segue a relação de MN e d_Lplot.z na estrutura fixa. 
-
-```{r n_nRef selecao de modelos}
-l_md <- vector("list",19)
-names(l_md) <- c("p*d*MN",# modelo cheio
-                 "p*d*MN-p:d:MN", #MC - 3a ordem
-                 "p*(d+MN)","d*(p+MN)","MN*(p+d)", #2 interações
-                 "p*d+MN","p*MN+d","d*MN+p", #1 interação + preditor
-                 "p*d","p*MN","d*MN", #1 interação
-                 "p+d+MN",#aditivo 3
-                 "p+d","p+MN","d+MN", #aditivo 2 
-                 "p","d","MN", #preditor isolado
-                 "1") #nulo
-#modelo cheio
-l_md[[1]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * d_Lplot.z * MN + (d_Lplot.z * MN|SiteCode), family = "binomial",data=df_resultados,
-              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-#modelo cheio - interação 3a ordem
-l_md[[2]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * d_Lplot.z * MN - p.z:d_Lplot.z:MN + (d_Lplot.z * MN|SiteCode), family = "binomial",data=df_resultados,
-              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-#2 interações
-l_md[[3]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * (d_Lplot.z + MN) + (MN+d_Lplot.z|SiteCode), family = "binomial",data=df_resultados,
-              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md[[4]] <- glmer(cbind(n_nRef,100-n_nRef) ~ d_Lplot.z * (p.z + MN) + (d_Lplot.z * MN|SiteCode), family = "binomial",data=df_resultados,
-              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md[[5]] <- glmer(cbind(n_nRef,100-n_nRef) ~ MN * (p.z + d_Lplot.z) + (d_Lplot.z * MN|SiteCode), family = "binomial",data=df_resultados,
-              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-#1 interação + preditor
-l_md[[6]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * d_Lplot.z + MN + (MN+d_Lplot.z|SiteCode), family = "binomial",data=df_resultados,
-              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md[[7]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * MN + d_Lplot.z + (MN+d_Lplot.z|SiteCode), family = "binomial",data=df_resultados,
-              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md[[8]] <- glmer(cbind(n_nRef,100-n_nRef) ~ d_Lplot.z * MN + p.z + (d_Lplot.z * MN|SiteCode), family = "binomial",data=df_resultados,
-              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-#1 interação
-l_md[[9]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * d_Lplot.z + (d_Lplot.z|SiteCode), family = "binomial",data=df_resultados,
-              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md[[10]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * MN + (MN|SiteCode), family = "binomial",data=df_resultados,
-              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md[[11]] <- glmer(cbind(n_nRef,100-n_nRef) ~ d_Lplot.z * MN + (d_Lplot.z * MN|SiteCode), family = "binomial",data=df_resultados,
-              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-#aditivo 3
-l_md[[12]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z + d_Lplot.z + MN + (MN+d_Lplot.z|SiteCode), family = "binomial",data=df_resultados,
-              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-#aditivo 2
-l_md[[13]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z + d_Lplot.z + (d_Lplot.z|SiteCode), family = "binomial",data=df_resultados,
-              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md[[14]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z + MN + (MN|SiteCode), family = "binomial",data=df_resultados,
-              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md[[15]] <- glmer(cbind(n_nRef,100-n_nRef) ~ d_Lplot.z + MN + (MN+d_Lplot.z|SiteCode), family = "binomial",data=df_resultados,
-              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-#aditivo 1
-l_md[[16]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z + (1|SiteCode), family = "binomial",data=df_resultados,
-              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md[[17]] <- glmer(cbind(n_nRef,100-n_nRef) ~ d_Lplot.z + (d_Lplot.z|SiteCode), family = "binomial",data=df_resultados,
-              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md[[18]] <- glmer(cbind(n_nRef,100-n_nRef) ~ MN + (MN|SiteCode), family = "binomial",data=df_resultados,
-              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-# nulo
-l_md[[19]] <- glmer(cbind(n_nRef,100-n_nRef) ~ 1 + (1|SiteCode), family = "binomial",data=df_resultados,
-              control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-AICctab(l_md,weights=T)
-```
-
-O único modelo plausível com 0.909 do peso de evidência é o modelo cheio.
-
-Como visto anteriormente este modelo não apresenta pressupostos que se aproximam do observado para os dados.   
-
-__Tabela 1__ Modelo mais plausível para descrever o número de SADs não refutadas  
-
-```{r tabela do modelo plausivel}
-tab_model(l_md[["p*d*MN"]])
-# summary(l_md[["p*d*MN"]])
-```
-  
-O R2 marginal é baixo (0.088) enquanto o R2 condicional é elevado (0.836). Segue avaliação visual da congruência com o observado comparando a probabilidade de se refutar uma predição neutra e a estimada pelo modelo.  
-  
-```{r auditoria modelo mais plausivel md_nRef,include=FALSE,echo=TRUE}
-df_plot <- df_resultados %>% select(SiteCode,p.z,d_Lplot.z,MN,n_nRef) %>% mutate(p_nRef = n_nRef/100)
-df_plot$predict <- predict(l_md[["p*d*MN"]],type="response")
-# grafico
-
-sites <- levels(df_plot$SiteCode)
-# l_p <- vector("list",length = 103)
-# par(mfrow=c(21,5))
-for(i in 1:length(sites)){
-  df_ <- filter(df_plot,SiteCode == sites[i])
-  # l_p[[i]] <- ggplot(df_,aes(x=p_nRef,y=predict,colour=MN,shape=MN)) + 
-  #   geom_point() +
-  #   geom_abline(slope=1,intercept = 0,color="red") +
-  #   scale_color_manual(values=c("#000000", "#0000FF")) +
-  #   labs(title = sites[i])
-  plot(df_$predict ~ df_$p_nRef,
-       xlim=c(0,1),ylim=c(0,1),col=df_$MN,
-       main=sites[i], xlab="Prob. Obs", ylab="Prob. Est.")
-  abline(a=0,b=1,color="red",add=TRUE)
-}
-# do.call("grid.arrange",c(l_p,ncol=10))
-```
-
-__Figura 1.5__ Probabilidade de não refutar uma SAD neutra observada ~ predita pelo modelo mais plausível. Pontos pretos = MNEE, pontos vermelhos = MNEI
-
-Observamos que para alguns sítios os valores se aproximam de uma relação linear, como esperado pelo modelo, contudo para outros valores observa-se tendência não lineares onde alguns valores são bem ajustados enquanto outros aumentam e diminuiem. Isso pode indicar que seja mais adequado considerar um modelo que possibilite maior flexibilidade para estimar a tendência global dos dados. 
-
-Em resumo:  
-i) O modelo mais plausível apresenta R2_marginal > 80%, porém pouco é explicado pela estrutura fixa do modelo (R2_condicional < 10%);        
-ii) Os modelos neutros apresentam variância distinta: enquanto MNEE varia em valores próximos de 98 SADs não refutadas para a maior parte dos sítios, MNEI varia em [0;100].  
-iii) O pressuposto de linearidade pode não ser suficiente para estimar a tendência global para todos os sítios de amostragem, uma vez que outras tendências são observadas no gráfico de estimado X observado (figura 1.5).  
-
-### Infêrência
-
-Uma avaliação direta da predição de que MNEE pode apresentar melhor congruência para paisagens com proporções intermediárias de cobertura vegetal é a de comparar a inclinação e intercepto do efeito do aumento da dispersão entre os modelos neutros por sítio e então plotar as estimativas pela proporção de cobertura vegetal. 
-
-__Esquema da Figura__
-
-i) obter os coeficientes para cada sítio pela função coef();  
-ii) multiplicar todos os coeficientes que apresentam alguma relação com a preditora "p.z" pelo correspondete valor de p.z para aquele sítio;  
-iii) MNEE é o nível padrão e MNEI é o contraste.  
-iv) Assim, por SiteCode:   
-  a) alfa_EE = intercept + p.z  
-  b) beta_EE = d_Lplot.z + p.z:d_Lplot.z  
-  c) alfa_EI = alfa_EE + MNEI + p:MNEI  
-  d) beta_EI = beta_EE + d_Lplot:MNEI + p:d_Lplot:MNEI  
-
-   
-```{r inferencia n_nRef, warning=FALSE,message=FALSE,include=FALSE}
-# dados brutos
-df_coef.Site <- coef(l_md[["p*d*MN"]])$SiteCode
-## arrumando os nomes
-df_coef.Site$SiteCode <- row.names(coef(l_md[["p*d*MN"]])$SiteCode) 
-row.names(df_coef.Site) <- NULL
-names(df_coef.Site) <- c("intercept","p_coef","d_Lplot_coef","MNEI","p__d_Lplot_coef","p__MNEI","d_Lplot__MNEI","p__d_Lplot__MNEI","SiteCode")
-# multiplicao pelo respectivo valor de p.z
-df_ <- df_coef.Site[,c(2,5,6,8,9)] %>% inner_join(x=.,
-                            y=distinct(select(df_resultados,SiteCode,p.z,p)),
-                            by="SiteCode") %>% 
-  adply(.,1,.fun=function(X) data.frame(coef_p = X$p.z * X$p_coef,
-                                        coef_p__d_Lplot = X$p.z * X$p__d_Lplot_coef,
-                                        coef_p__MNEI = X$p.z * X$p__MNEI,
-                                        coef_p__d_Lplot__MNEI = X$p.z * X$p__d_Lplot__MNEI
-                                        )
-        )
-# merge e escolha das colunas que já foram multiplicados pelos valores de p.z
-df_coef.Site %<>% inner_join(x=.,
-                            y=df_[,5:11],
-                            by="SiteCode") %>% 
-  select(SiteCode, p.z, p, intercept, coef_p, d_Lplot_coef, MNEI, coef_p__d_Lplot, coef_p__MNEI, d_Lplot__MNEI,coef_p__d_Lplot__MNEI)
-# grafico
-## dados
-df_plot <- df_coef.Site %>% 
-  mutate(alfa_EE = intercept + coef_p, 
-         beta_EE = d_Lplot_coef + coef_p__d_Lplot,
-         alfa_EI = alfa_EE + MNEI + coef_p__MNEI, 
-         beta_EI = beta_EE + d_Lplot__MNEI + coef_p__d_Lplot__MNEI) %>%
-  select(SiteCode, p.z, p, alfa_EE, alfa_EI, beta_EE, beta_EI) %>% 
-  gather(.,key="coef","logito_P.nRef",alfa_EE,alfa_EI,beta_EE,beta_EI)
-# filter(df_plot,coef %in% c("beta_EE","beta_EI")) %>% summary
-## grafico
-l_p <- vector("list",2)
-l_p[[1]] <- ggplot(filter(df_plot,coef %in% c("alfa_EE","alfa_EI")), aes(x=p,y=logito_P.nRef,colour=coef,shape=coef,group=SiteCode)) +
-  geom_line(color="#A9A9A9") +
-  geom_point() +
-  scale_color_manual(values=c("#000000", "#0000FF")) +
-  xlim(0, 1) + ylim(-23.5, 8.5) + 
-  geom_hline(yintercept = 0,color="red")
-l_p[[2]] <- ggplot(filter(df_plot,coef %in% c("beta_EE","beta_EI")), aes(x=p,y=logito_P.nRef,colour=coef,shape=coef,group=SiteCode)) +
-  geom_line(color="#A9A9A9") +
-  geom_point() +
-  scale_color_manual(values=c("#000000", "#0000FF")) +
-  xlim(0, 1) + ylim(-22.65, 5.8) + 
-  geom_hline(yintercept = 0,color="red")
-do.call("grid.arrange",c(l_p,ncol=1))
-```
-
-__Figura 1.6__ Coeficientes estimados por Sítio de Amostragem, logito(Probabilidade(não refutar uma SAD neutra) no eixo y e proporção de cobertura vegetal (p) no eixo x. Para sítios possibilitamos um intercepto e uma inclinação em d/Lplot por modelo neutro, no primeiro painel temos os interceptos e no segundo as inclinações.
-
-
-Essa figura não me auxilia na interpretação da predição. Gráficos de 3 dimensões (logito(Pr(nRef)) X p X d/L_plot) devem ser mais adequados para interpretar os resultados. Como este modelo não apresenta boa adequação ao conjunto de dados (pressuposto de binomial e padrões não lineares) vou seguir para um modelo que possibilita maior flexibilidade.  
   
 ## GAMM binomial: número de predições não refutadas  
   
@@ -404,36 +105,37 @@ A hipótese de trabalho é sobre uma relação não linear, uma escolha são gen
 
 ### Comparação de Modelos Cheios
 
-```{r gam binomial n_nRef selecao de variaveis}
+
+```{r gam binomial n_nRef selecao de variaveis, echo=TRUE}
 l_md <- vector("list",6)
 names(l_md) <- c("k 1|SiteCode", "k MN|SiteCode",
                  "k_1 1|SiteCode","k_1 MN|SiteCode",
                  "d/L 1|SiteCode","d/L MN|SiteCode")
 # muitos parametros para poucos dados "k_1 k_1 * MN|SiteCode","d_Lplot d_Lplot * MN|SiteCode")
 # k
-l_md[[1]] <- gam(cbind(n_nRef,100-n_nRef) ~ k + s(p.z,MN,by=k,bs="fs") +
+l_md[[1]] <- gam(cbind(n_nRef,100-n_nRef) ~ k * MN + s(p.z,MN,by=k,bs="fs") +
                    s(SiteCode,bs="re"),
                    family = "binomial",
                    data = df_resultados, method = "REML")
-l_md[[2]] <- gam(cbind(n_nRef,100-n_nRef) ~ k + s(p.z,MN,by=k,bs="fs") +
+l_md[[2]] <- gam(cbind(n_nRef,100-n_nRef) ~ k * MN + s(p.z,MN,by=k,bs="fs") +
                    s(SiteCode,by=MN,bs="re"),
                    family = "binomial",
                    data = df_resultados, method = "REML")
 # k_1
-l_md[[3]] <- gam(cbind(n_nRef,100-n_nRef) ~ s(p.z,MN,bs="fs") + s(k_1.z,MN,bs="fs") + ti(p.z,k_1.z,by=MN,bs=c("tp","tp")) +
+l_md[[3]] <- gam(cbind(n_nRef,100-n_nRef) ~ MN + s(p.z,MN,bs="fs") + s(k_1.z,MN,bs="fs") + ti(p.z,k_1.z,by=MN,bs=c("tp","tp")) +
                    s(SiteCode,bs="re"),
                    family = "binomial",
                    data = df_resultados, method = "REML")
-l_md[[4]] <- gam(cbind(n_nRef,100-n_nRef) ~ s(p.z,MN,bs="fs") + s(k_1.z,MN,bs="fs") + ti(p.z,k_1.z,by=MN,bs=c("tp","tp")) +
+l_md[[4]] <- gam(cbind(n_nRef,100-n_nRef) ~ MN +  s(p.z,MN,bs="fs") + s(k_1.z,MN,bs="fs") + ti(p.z,k_1.z,by=MN,bs=c("tp","tp")) +
                    s(SiteCode,by=MN,bs="re"),
                    family = "binomial",
                    data = df_resultados, method = "REML")
 # d/L
-l_md[[5]] <- gam(cbind(n_nRef,100-n_nRef) ~ s(p.z,MN,bs="fs") + s(d_Lplot.z,MN,bs="fs") + ti(p.z,d_Lplot.z,by=MN,bs=c("tp","tp")) +
+l_md[[5]] <- gam(cbind(n_nRef,100-n_nRef) ~ MN + s(p.z,MN,bs="fs") + s(d_Lplot.z,MN,bs="fs") + ti(p.z,d_Lplot.z,by=MN,bs=c("tp","tp")) +
                    s(SiteCode,bs="re"),
                    family = "binomial",
                    data = df_resultados, method = "REML")
-l_md[[6]] <- gam(cbind(n_nRef,100-n_nRef) ~ s(p.z,MN,bs="fs") + s(d_Lplot.z,MN,bs="fs") + ti(p.z,d_Lplot.z,by=MN,bs=c("tp","tp")) +
+l_md[[6]] <- gam(cbind(n_nRef,100-n_nRef) ~ MN +  s(p.z,MN,bs="fs") + s(d_Lplot.z,MN,bs="fs") + ti(p.z,d_Lplot.z,by=MN,bs=c("tp","tp")) +
                    s(SiteCode,by=MN,bs="re"),
                    family = "binomial",
                    data = df_resultados, method = "REML")
@@ -444,497 +146,902 @@ AICctab(l_md,weights=TRUE)
 
 O único modelo plausível considera a variável k (fator) e estrutura aleatória MN|SiteCode.
 
-#### Summary dos mais plausíveis
+```{r appraise l_md[[k|SiteCode]]}
+appraise(l_md[["k MN|SiteCode"]])
+```
+
+__Figura 1.2__ appraise(gam( cbind(n_nRef,100-n_nRef) ~ k*MN + s(p.z,MN,by=k), binomial(logit) )  
 
 ```{r sumario md_nRef mais plausivel}
-summary(l_md[["k_1 MN|SiteCode"]])
-# summary(l_md[["k MN|SiteCode"]])
-# plot(l_md[["k MN|SiteCode"]])
+summary(l_md[["k MN|SiteCode"]])
 ```
-  
-#### Comparação com o observado  
-  
-  
-```{r predito e observado}
-# código adaptado de Pedersen et al. 2017 Support Information
-## grafico
-ggplot(data=CO2, aes(x=conc, y=uptake, group=Plant_uo)) +
-  facet_wrap(~Plant_uo) +
-  geom_ribbon(aes(ymin=exp(fit - 2*se.fit), ymax=exp(fit + 2*se.fit), x=conc),
-              data=CO2_modG_pred, 
-              alpha=0.3, 
-              inherit.aes=FALSE) +
-  geom_line(aes(y=exp(fit)), data=CO2_modG_pred) +
-  geom_point() +
-  labs(x=expression(CO[2] ~ concentration ~ (mL ~ L^{-1})),
-       y=expression(CO[2] ~ uptake ~ (mu*mol ~ m^{-2})))
 
-# predições
+```{r estudo gamm4,include=FALSE}
+teste_gamm4 <- gamm4(cbind(n_nRef,100-n_nRef) ~ k * MN + s(p.z,MN,by=k,bs="fs"),
+                     random = ~(MN|SiteCode),
+                     family = "binomial",
+                     data = df_resultados, method = "REML")
+```
+
+
+### Comparação com o observado  
+
+```{r predicao n_nRef}
 ## modelo mais plausível
 df_pred.k <- expand.grid(SiteCode=levels(df_resultados$SiteCode)[1],
                           MN=levels(df_resultados$MN),
                           k=levels(df_resultados$k),
-                          p.z=seq(min(df_resultados$p.z),max(df_resultados$p.z),length=103))
+                          p.z=seq(min(df_resultados$p.z),max(df_resultados$p.z),length=103)) %>% 
+  mutate(p = p.z * sd(df_resultados$p) + mean(df_resultados$p))
 df_pred.k <- cbind(df_pred.k,
                    predict(l_md[["k MN|SiteCode"]],
                            df_pred.k,type="response",se.fit=TRUE))
+df_pred.k[,c("fit","se.fit")] <- df_pred.k[,c("fit","se.fit")]*100
+
+
 ## segundo modelo mais plausível (mais fácil de interpretar)
-df_pred.k_1 <- expand.grid(SiteCode=levels(df_resultados$SiteCode)[1],
-                            MN=levels(df_resultados$MN),
-                            k_1.z=unique(df_resultados$k_1.z),
-                            p.z=seq(min(df_resultados$p.z),max(df_resultados$p.z),length=103))
-df_pred.k_1 <- cbind(df_pred.k_1,
-                     predict(l_md[["k_1 MN|SiteCode"]],
-                             df_pred.k_1,type="response",se.fit=TRUE))
-names(df_pred.k_1)[5:6] <- c("fit.k_1","se.k_1")
-df_pred.k_1 %<>% inner_join(x=.,
-                            y=distinct(select(df_resultados,k,k_1.z)),
-                            by="k_1.z")
+# df_pred.k_1 <- expand.grid(SiteCode=levels(df_resultados$SiteCode)[1],
+#                             MN=levels(df_resultados$MN),
+#                             k_1.z=unique(df_resultados$k_1.z),
+#                             p.z=seq(min(df_resultados$p.z),max(df_resultados$p.z),length=103))
+# df_pred.k_1 <- cbind(df_pred.k_1,
+#                      predict(l_md[["k_1 MN|SiteCode"]],
+#                              df_pred.k_1,type="response",se.fit=TRUE))
+# df_pred.k_1[,c("fit","se.fit")] <- df_pred.k_1[,c("fit","se.fit")]*100
+# names(df_pred.k_1)[5:6] <- c("fit.k_1","se.k_1")
+# df_pred.k_1 %<>% inner_join(x=.,
+#                             y=distinct(select(df_resultados,k,k_1.z,p,p.z)),
+#                             by=c("k_1.z","p.z"))
+# Gráficos Exploratórios
+# l_p <- vector("list",2)
+# l_p[[1]] <- 
+  # ggplot(df_pred.k,aes(x=p,y=fit,color=MN)) + 
+  # geom_line() + 
+  # facet_wrap(~k,ncol=4) + 
+  # labs(title = "MN*k + s(p,k,by=MN,bs=fs)") + ylab("Pr(não refutar)") + 
+  # scale_color_manual(values=c("#FF0000", "#000000"))
+# l_p[[2]] <- ggplot(df_pred.k_1,aes(x=p.z,y=fit.k_1,color=MN)) + 
+#   geom_line() + 
+#   facet_wrap(~k,ncol=5) + 
+#   labs(title = "ti(p,k_1,by=MN)") +
+#   ylab("")
+# do.call("grid.arrange",c(l_p,ncol=2))
+```
+
+<!-- __Figura 1.3__ Probabilidade de não refutar uma SAD neutra para cada modelo estatístico (título dos paineis); na esquerda o modelo mais plausível, na esquerda o segundo modelo plausível (>1000 deltaAIC). Os valores médios de cada modelo neutro apresentam semelhante entre os dois gráficos, contudo o modelo mais plausível apresenta maior flexibilidade na descrição dos modelos.  -->
+  
+  
+```{r predito e observado n_nRef graficos}
+# código adaptado de Pedersen et al. 2017 Support Information
 # gráficos
 l_p <- vector("list",2)
-l_p[[1]] <- ggplot(filter(df_resultados,k %in% levels(df_resultados$k)[1:10]),aes(x=p.z,y=n_nRef)) + 
+l_p[[1]] <- ggplot(filter(df_resultados,k %in% levels(df_resultados$k)[1:10]),aes(x=p,y=n_nRef)) + 
   geom_point() + facet_grid(k~MN) +
   # k
-  geom_ribbon(aes(ymin=exp(fit - 2*se.fit), ymax=exp(fit + 2*se.fit), x=p.z),
-              data=filter(df_pred.k,k %in% levels(df_resultados$k)[1:10]), 
-              alpha=0.3, 
+  geom_ribbon(aes(ymin=I(fit - 2*se.fit), ymax=I(fit + 2*se.fit), x=p),
+              data=filter(df_pred.k,k %in% levels(df_resultados$k)[1:10]),
+              alpha=0.3,
               inherit.aes=FALSE,
               color="red") +
-  geom_line(aes(y=fit), data=filter(df_pred.k,k %in% levels(df_resultados$k)[1:10])) +
-  # k_1
-  geom_ribbon(aes(ymin=exp(fit.k_1 - 2*se.k_1), ymax=exp(fit.k_1 + 2*se.k_1), x=p.z),
-              data=filter(df_pred.k_1,k %in% levels(df_resultados$k)[1:10]), 
-              alpha=0.3, 
-              inherit.aes=FALSE,
-              color="blue") +
-  geom_line(aes(y=fit.k_1), data=filter(df_pred.k_1,k %in% levels(df_resultados$k)[1:10]))
-l_p[[2]] <- ggplot(filter(df_resultados,k %in% levels(df_resultados$k)[11:20]),aes(x=p.z,y=n_nRef)) + 
+  geom_line(aes(y=fit),color="white", data=filter(df_pred.k,k %in% levels(df_resultados$k)[1:10])) +
+  ylab("Pr(not ref. SAD)") + xlab("Proportion of Tree Cover") +
+  theme(panel.background = element_rect(fill = "gray"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())
+  # # k_1
+  # geom_ribbon(aes(ymin=exp(fit.k_1 - 2*se.k_1), ymax=exp(fit.k_1 + 2*se.k_1), x=p.z),
+  #             data=filter(df_pred.k_1,k %in% levels(df_resultados$k)[1:10]), 
+  #             alpha=0.3, 
+  #             inherit.aes=FALSE,
+  #             color="blue") +
+  # geom_line(aes(y=fit.k_1), data=filter(df_pred.k_1,k %in% levels(df_resultados$k)[1:10]))
+l_p[[2]] <- ggplot(filter(df_resultados,k %in% levels(df_resultados$k)[11:20]),aes(x=p,y=n_nRef)) + 
   geom_point() + facet_grid(k~MN) +
   # k
-  geom_ribbon(aes(ymin=exp(fit - 2*se.fit), ymax=exp(fit + 2*se.fit), x=p.z),
+  geom_ribbon(aes(ymin=I(fit - 2*se.fit), ymax=I(fit + 2*se.fit), x=p),
               data=filter(df_pred.k,k %in% levels(df_resultados$k)[11:20]), 
               alpha=0.3, 
               inherit.aes=FALSE,
               color="red") +
-  geom_line(aes(y=fit), data=filter(df_pred.k,k %in% levels(df_resultados$k)[11:20])) +
+  geom_line(aes(y=fit),color="white", data=filter(df_pred.k,k %in% levels(df_resultados$k)[11:20])) +
+  ylab("") + xlab("Proportion of Tree Cover") +
+  theme(panel.background = element_rect(fill = "gray"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())
   # k_1
-  geom_ribbon(aes(ymin=exp(fit - 2*se.fit), ymax=exp(fit + 2*se.fit), x=p.z),
-              data=filter(df_pred.k_1,k %in% levels(df_resultados$k)[11:20]), 
-              alpha=0.3, 
-              inherit.aes=FALSE,
-              color="blue") +
-  geom_line(aes(y=fit), data=filter(df_pred.k_1,k %in% levels(df_resultados$k)[11:20]))
-do.call("grid.arrange",c(l_p,ncol=2))
-
-```
-
-   
-  
-#### Inferência Estatística  
-
-```{r draw dos dois mais plausiveis}
-# load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/md_nRef.Rdata")
-gratia::draw(l_md[["k_1 MN|SiteCode"]])
-gratia::draw(l_md[["k MN|SiteCode"]])
-plot(l_md[["k MN|SiteCode"]])
-plot(l_md[["k_1 MN|SiteCode"]])
-gam.check(l_md[["k_1 MN|SiteCode"]])
-summary(l_md[[2]])
-p_plot <- DHARMa::simulateResiduals(l_md[["k_1 MN|SiteCode"]],n=1000)
-plot(p_plot)
-
-l_md1 <- l_md
-```
-
-# U - taxa de especiação necessária para obter a riqueza observada no equilíbrio  
-
-## Padrões Gerais  
-
-```{r padroes gerais U,echo=FALSE,fig.width=6,fig.height=4}
-# graficos
-l_p <- vector("list",4)
-l_p[[1]] <- ggplot(df_resultados,aes(x=k,y=U_med)) + 
-  geom_point() +
-  geom_line(aes(group=SiteCode)) + 
-  geom_boxplot(aes(group=k))
-l_p[[2]] <- ggplot(df_resultados,aes(x=p,y=U_med)) +
-  geom_point() +
-  geom_smooth(method = "auto") +
-  labs(y="")
-l_p[[3]] <- ggplot(df_resultados,aes(x=log(Stotal),y=U_med)) +
-  geom_point() +
-  geom_smooth(method = "auto")
-l_p[[4]] <- ggplot(df_resultados,aes(x=p,y=log(Stotal))) +
-  geom_point() + 
-  geom_smooth(method="auto")
+  # geom_ribbon(aes(ymin=exp(fit - 2*se.fit), ymax=exp(fit + 2*se.fit), x=p.z),
+  #             data=filter(df_pred.k_1,k %in% levels(df_resultados$k)[11:20]), 
+  #             alpha=0.3, 
+  #             inherit.aes=FALSE,
+  #             color="blue") +
+  # geom_line(aes(y=fit), data=filter(df_pred.k_1,k %in% levels(df_resultados$k)[11:20]))
 do.call("grid.arrange",c(l_p,ncol=2))
 ```
 
-__Figura 1__ Padrões gerais de U_med: ~ k (% de propágulos até a vizinhança imediata da planta progenitora); ~ Stotal (riqueza observada na área amostral). E o padrão empírico encontrado nos dados Stotal ~ p  
-    
+__Figura 1.4__ Observado e predito pelo modelo mais plausível. Eixo x = prop. de cobertura vegetal na paisagem; Eixo y: número de SADs não refutadas. Em branco o padrão geral estimado e em vermelho o erro padrão. 
   
-```{r padroes gerais U por SiteCode,echo=FALSE,fig.height=50,fig.width=12}
-# dados
-df_plot <- df_resultados %>% select(SiteCode,p,U_med,k,d_Lplot) %>% 
-  mutate(label_facet.wrap = paste0(SiteCode,";p=",round(p,4))) %>% 
-  distinct() %>% arrange(p)
-levels_label <- unique(df_plot$label_facet.wrap)
-df_plot$label_facet.wrap <- factor(df_plot$label_facet.wrap,levels = levels_label)
-# graficos
-l_p <- vector("list",2)
-l_p[[1]] <- ggplot(df_plot,aes(x=k,U_med)) +
+O padrão estimado parece ser muito sensível  a valores extremo: a média de EI parece estar muito abaixo da mediana; essa tendência também parece ser observada para algum grau do vale que surge para p.z ~ -1 e p->0.05.
+
+
+# diff_S = (S_obs - S_MN)/S_obs
+
+## Padrão Geral
+
+```{r preparacao dos dados}
+df_resultados %<>% mutate(diff_S0 = (Stotal-S.MN_mean)/Stotal)
+df_resultados$diff_S <- df_resultados$diff_S0 + min(df_resultados$diff_S)*(-1) + 0.01
+# hist(df_resultados$diff_S0,breaks=60)
+# boxplot(I(df_resultados$diff_S0))
+ggplot(df_resultados,aes(x=log(Stotal),y=diff_S,group=MN)) +
   geom_point() +
-  geom_line(aes(group=SiteCode)) +
-  facet_wrap(~label_facet.wrap,ncol=5,scales="free") +
-  ggtitle(label="eixo x = k")
-l_p[[2]] <- ggplot(df_plot,aes(x=d_Lplot,U_med)) +
-  geom_point() +
-  geom_line(aes(group=SiteCode)) +
-  facet_wrap(~label_facet.wrap,ncol=5,scales="free") +
-  ggtitle(label="eixo x = d / L_plot")  
-do.call("grid.arrange",c(l_p,ncol=1))
+  geom_smooth(method="loess") + 
+  ylab("(Sobs-S_MN)/Sobs") +
+  facet_wrap(~k,ncol=5,scales="free")
 ```
 
-__Figura 2__ Padrões gerais de U_med por SiteCode: ~ k (% de propágulos até a vizinhança imediata da planta progenitora); ~ d / L_plot (distância média de dispersão / Lado do área amostral)
+__Figura 2.1__ diff_S = (S_obs - S_MN)/S_obs + (-1) * min(diff_S) + 0.01, inclinação_MNEE ~ 0 para todo k.
+
+Parece que existem alguns outliers. De maneira geral MNEE apresenta boa congruência com os dados enquanto o comportamento de MNEI depende da dispersão: para k->100% o desvio aumento para ps extremos (bimodal/quadratica), apresentando boa congruência para proporção intermediárias de habitat, mas sempre subestimando S_obs. Com o aumento da capacidade de dispersão as estimavas de S se tornam mais próximas ao observado para p>0.5, superestimando o observado para valores elevados de p e k>0.5 o que leva a reduzir a porção de p em que MNEI faz uma boa aproximação.
+
+Para modelar o padrão não linear dos dados vou utilizar GAMM: normal e duas estruturas aleatórias (1|SiteCode e MN|SiteCode). 
 
 
-## Descrição Estatística:
-
-Para descrever o padrão de U em função da proporção de habitat disponível e da diminuição da limitação de dispersão vamos utilizar GAMM (generalized additive mixed models, Wood 2017). Há pelo menos 3 formas de descrevermos o padrão global (Pedersen et al. 2019): a) um intercepto por SiteCode (1|SiteCode); b) um smoother por SiteCode (dispersão | SiteCode), porém com penalização para aqueles smoothers muito distintos do padrão global; e c) um smoother por SiteCode (dispersão | SiteCode) com seu próprio parâmetro de 'flexibilidade' (smoothing parameter).   
-  
-GAMM oferecem grande flexibilidade ao custo de aumento do número de parâmetros estimados e do custo computacional, além da perda de interpretabilidade. Então irei começar por um modelo cuja estrutura aleatória é a mais simples possível (1 intercepto por SiteCode) para poder oferecer mais flexibilidade para o tensor(variável_dispersão,p).   
-
-### Seleção de Modelo cheio  
-
-- 2 famílias: gaussian e gamma  
-- 3 funções de ligação: identity (apenas para gaussian), log, inverse  
-- 2 variáveis concorrentes para descrever a dispersão: (1 - k) e (d/L_plot)  
-- log_Stotal.z como preditora linear  
-- (1|SiteCode) como estrutura aleatória  
-
-__exemplo de código:__  
-gam(U_med ~ s(d_Lplot.z) + s(p.z) + ti(d_Lplot.z,p.z) +  
-                      log_Stotal.z +  
-                      s(SiteCode,bs="re"),  
-                    family="gaussian",  
-                    data = df_resultados, method = "REML",control=ctrl)  
-
-__Tabela de Seleção do Modelo Mais plausível:__    
-
-```{r selecao de modelo cheio GAMM(U)}
-ctrl <- list(nthreads=3) #número de cores para paralelizar
-l_md <- vector("list",length = 15)
-names(l_md) <- c("d id normal","d log normal", "d inverse normal", "d log gamma", "d inverse gamma",
-                 "1-k id normal","1-k log normal", "1-k inverse normal", "1-k log gamma", "1-k inverse gamma",
-                 "k.f id normal","k.f log normal", "k.f inverse normal", "k.f log gamma", "k.f inverse gamma")
-l_md[[1]] <- gam(U_med ~ s(d_Lplot) + s(p) + ti(d_Lplot,p) +
-                  s(log_Stotal) +
-                  s(SiteCode,bs="re"),
-                family="gaussian",
-                data = df_resultados.U, method = "REML",control=ctrl)
-l_md[[2]] <- gam(U_med ~ s(d_Lplot) + s(p) + ti(d_Lplot,p) +
-                  s(log_Stotal) +
-                  s(SiteCode,bs="re"),
-                family=gaussian(link = "log"),
-                data = df_resultados.U, method = "REML",control=ctrl)
-l_md[[3]] <- gam(U_med ~ s(d_Lplot) + s(p) + ti(d_Lplot,p) +
-                  s(log_Stotal) +
-                  s(SiteCode,bs="re"),
-                family=gaussian(link = "inverse"),
-                data = df_resultados.U, method = "REML",control=ctrl)
-l_md[[4]] <- gam(U_med ~ s(d_Lplot) + s(p) + ti(d_Lplot,p) +
-                  s(log_Stotal) +
-                  s(SiteCode,bs="re"),
-                family=Gamma(link = "log"),
-                data = df_resultados.U, method = "REML",control=ctrl)
-l_md[[5]] <- gam(U_med ~ s(d_Lplot) + s(p) + ti(d_Lplot,p) +
-                  s(log_Stotal) +
-                  s(SiteCode,bs="re"),
-                family=Gamma(link = "inverse"),
-                data = df_resultados.U, method = "REML",control=ctrl)
-# k_1 
-l_md[[6]] <- gam(U_med ~ s(k.0_1) + s(p) + ti(k.0_1,p) +
-                  s(log_Stotal) +
-                  s(SiteCode,bs="re"),
-                family="gaussian",
-                data = df_resultados.U, method = "REML",control=ctrl)
-l_md[[7]] <- gam(U_med ~ s(k.0_1) + s(p) + ti(k.0_1,p) +
-                  s(log_Stotal) +
-                  s(SiteCode,bs="re"),
-                family=gaussian(link = "log"),
-                data = df_resultados.U, method = "REML",control=ctrl)
-l_md[[8]] <- gam(U_med ~ s(k.0_1) + s(p) + ti(k.0_1,p) +
-                  s(log_Stotal) +
-                  s(SiteCode,bs="re"),
-                family=gaussian(link = "inverse"),
-                data = df_resultados.U, method = "REML",control=ctrl)
-l_md[[9]] <- gam(U_med ~ s(k.0_1) + s(p) + ti(k.0_1,p) +
-                  s(log_Stotal) +
-                  s(SiteCode,bs="re"),
-                family=Gamma(link = "log"),
-                data = df_resultados.U, method = "REML",control=ctrl)
-l_md[[10]] <- gam(U_med ~ s(k.0_1) + s(p) + ti(k.0_1,p) +
-                  s(log_Stotal) +
-                  s(SiteCode,bs="re"),
-                family=Gamma(link = "inverse"),
-                data = df_resultados.U, method = "REML",control=ctrl)
-# k.f 
-l_md[[11]] <- gam(U_med ~ s(p,k,bs="fs") + k +
-                  s(log_Stotal) +
-                  s(SiteCode,bs="re"),
-                family="gaussian",
-                data = df_resultados.U, method = "REML",control=ctrl)
-l_md[[12]] <- gam(U_med ~ s(p,k,bs="fs") + k +
-                  s(log_Stotal) +
-                  s(SiteCode,bs="re"),
-                family=gaussian(link = "log"),
-                data = df_resultados.U, method = "REML",control=ctrl)
-l_md[[13]] <- gam(U_med ~ s(p,k,bs="fs") + k +
-                  s(log_Stotal) +
-                  s(SiteCode,bs="re"),
-                family=gaussian(link = "inverse"),
-                data = df_resultados.U, method = "REML",control=ctrl)
-l_md[[14]] <- gam(U_med ~ s(p,k,bs="fs") + k +
-                  s(log_Stotal) +
-                  s(SiteCode,bs="re"),
-                family=Gamma(link = "log"),
-                data = df_resultados.U, method = "REML",control=ctrl)
-l_md[[15]] <- gam(U_med ~ s(p,k,bs="fs") + k +
-                  s(log_Stotal) +
-                  s(SiteCode,bs="re"),
-                family=Gamma(link = "inverse"),
-                data = df_resultados.U, method = "REML",control=ctrl)
-AICctab(l_md,weights = TRUE)
-```
-
-O modelos cheio mais plausível possui família Gamma e função de ligação 'log" e utiliza a preditora d / L_plot.
-
-### Auditoria do modelo cheio mais plausível
-
-<!-- Protocolo de Wood (in Checking and Selecting GAMs): -->
-
-<!-- 1) Residual Checking:   -->
-<!-- a) fitted ~ residuals (1|SiteCode) -->
-<!-- a) fitted ~ residuals (1|SiteCode) -->
-<!-- b) residuals ~ preditoras   -->
-
-```{r auditoria md mais plausivel U 01} 
-# Dados
-md_U <- l_md[["d log gamma"]]
-# summary(md_U)
-## gam.check
-par(mfrow=c(2,2))
-gam.check(md_U)
-## intercepto por sitecode
-df_ <- data.frame(term=names(coef(l_md[[1]])),coef=as.numeric(coef(l_md[[1]])))
-df_ %>% filter(grepl("SiteCode",term)) %>% ggplot(aes(x="",y=coef)) + 
-  geom_boxplot() + geom_jitter()
-# df_ %>% filter(grepl("SiteCode",term)) %>% summary
-```
-
-__Figura 3__ gam.check(modelo cheio mais plausível)  
-
-
-```{r auditoria md mais plausivel U 2,warning=FALSE,message=FALSE}
-p_plot <- DHARMa::simulateResiduals(md_U,n=1000)
-plot(p_plot)
-```
-
-__Figura 3.2__ DHARMa::simulateResiduals(modelo cheio mais plausível)
-
-
-O Modelo mais plausível diverge do pressuposto de que a variável resposta pode ser aproximada por uma distribuição Gamma(link=log) para ambos diagnósticos. O gam.check indica que k=9 não é suficiente para modelar a variável d/L_plot.  
-  
-Segue avaliação dos efeitos:  
-  
-
-<!-- o que são os efeitos estimados? -->
-
-```{r auditoria md_U mais plausível U 3,fig.width=12}
-gratia::draw(md_U)
-par(mfrow=c(2,2))
-plot(md_U)
-```
-
-__Figura 4__ gratia::draw(md_U)
-
-A função que plota o gráfico dos efeitos acusa um erro: Removed 951 rows containing non-finite values (stat_contour). Esse problema decorreria de U_med->0 que na escala log -> a infinito? O quê de fato esta sendo plotado?[ESTUDAR] draw.derivates()?  
-
-
-__tabela __ Concurvidade dos smoothers
-
-```{r concurvidade md_U}
-concurvity(md_U,full = TRUE)
-```
-
-Os três indices variam entre 0 e 1, quando igual a 1 então o smoother apresenta concurvidade com algum outro smoother. O intercepto geral ('para'), o smoother de s(p) e o smoother s(log_Stotal) apresenta concurvidade 
-
-
-
-```{r auditoria md_U 4}
-df_ <- augment(md_U) %>% mutate(.predict=exp(.fitted))
-# gráficos exploratórios
-par(mfrow=c(1,2))
-hist(df_$.predict,breaks = 60)
-hist(df_resultados.U$U_med,breaks = 60)
-#
-summary(df_)
-```
-
-__Figura 5.1__ 
-
-O summary da tabela de md_U mostra que tanto U_med como o predito (na escala de U_med) estão dentro do esperado: valores positivos entre 0 e 1. O aviso de erro pode ser resultado do uso da função stat_contour (OLHAR HELP).
-
-
-```{r auditoria predicao md_U mais plausivel,fig.height=30,fig.width=12}
-# graficos por sitecode
-ggplot(df_,aes(x=.predict,y=U_med)) +
-  geom_point() +
-  geom_abline(slope = 1,intercept=0,color="red") +
-  geom_smooth(method="auto") +
-  facet_wrap(~SiteCode,ncol=5,scales = "free")
-```
-
-__Figura 5.2__ Observado X Predito U ~ s(%d.z) + s(p.z) + ti(%d.z,p.z) + log_Stotal.z + s(SiteCode,bs="re")  
-  
-  
-Para alguns sítios observa-se que a nuvem dos pontos se aproxima à reta, contudo para outros sítios o smoother global não descreve o padrão não-linear  (figura 5.2). Uma possibilidade é ajustar um smoother por SiteCode: a) compartilhando um mesmo parâmetro de penalidade (menor flexibilidade); b) com uma réplica do smoother global para cada sítio (mais flexível, muito mais oneroso computacionalmente).
-
-Em resumo, o modelo mais plausível i) não pode ser aproximado por uma distribuição Gamma com função de ligação log; e o smoother s(p) apresenta concurvidade com outros smoothers. Há formas alternativas de modelar a relação dispersão * p: te(dispersão,p) e t2(dispersão,p). 
-
-```{r md_U comparacao s+ti te e t2}
-# Dados
-l_md <- vector("list",5)
-names(l_md) <- c("s+ti","s + s","s(d) + ti(d,p)","te","t2")
-l_md[[1]] <- gam(U_med ~ s(d_Lplot.z) + s(p.z) + ti(d_Lplot.z,p.z) +
-                  log_Stotal.z +
-                  s(SiteCode,bs="re"),
-                family=Gamma(link = "log"),
-                data = df_resultados.U, method = "REML",control=as.list(3))
-l_md[[2]] <- gam(U_med ~ s(d_Lplot.z) + s(p.z) +
-                  log_Stotal.z +
-                  s(SiteCode,bs="re"),
-                family=Gamma(link = "log"),
-                data = df_resultados.U, method = "REML",control=as.list(3))
-l_md[[3]] <- gam(U_med ~ s(d_Lplot.z) + ti(d_Lplot.z,p.z) +
-                  log_Stotal.z +
-                  s(SiteCode,bs="re"),
-                family=Gamma(link = "log"),
-                data = df_resultados.U, method = "REML",control=as.list(3))
-l_md[[4]] <- gam(U_med ~ te(d_Lplot.z,p.z) +
-                  log_Stotal.z +
-                  s(SiteCode,bs="re"),
-                family=Gamma(link = "log"),
-                data = df_resultados.U, method = "REML",control=as.list(3))
-l_md[[5]] <- gam(U_med ~ t2(d_Lplot.z,p.z) +
-                  log_Stotal.z +
-                  s(SiteCode,bs="re"),
-                family=Gamma(link = "log"),
-                data = df_resultados.U, method = "REML",control=as.list(3))
-AICctab(l_md,weights=T)
-```
-
-
-O único modelo plausível, somando 0.82 do peso de evidência, pressupóem o smoother individual de d/L_plot e o tensor entre d/L_plot e de p; o segundo modelo mais plausível, com 0.18 de peso de evidência, considera adicionalmente o smoother individual para p. Os modelos com tensores te e t2 apresentam menos parâmetros porém não estão dentro do intervalo de plausibilidade; o modelo menos plausível considera os smoothers indivíduais de d/L_plot e p, mas desconsidera o tensor das preditoras. Os resultados corroboram o hipótese de que o smoother individual de p é concurvo ao tensor de d e p. Segue auditoria do modelo mais plausível:
-
-
-```{r auditoria 1 s(d)+ti(d,p)}
-par(mfrow=c(2,2))
-gam.check(l_md[["s(d) + ti(d,p)"]])
-```
-
-
-```{r auditoria 2 s(d)+ti(d,p)}
-p_plot <- DHARMa::simulateResiduals(l_md[["s(d) + ti(d,p)"]],n=1000)
-plot(p_plot)
-```
-
-Ambos diagnostico apontam que o pressuposto de distribuição gamma com função de ligação log não é uma boa aproximação, e pela comparação com o modelo anterior o ajuste do modelo com relação ao segundo mais plausível piorou. Segue avaliação dos efeitos:  
-  
-
-```{r auditoria 3 s(d)+ti(d,p)}
-gratia::draw(l_md[["s(d) + ti(d,p)"]])
-# gratia::draw(l_md[["s+ti"]])
-```
-  
-O gráfico de efeitos do smoother de d/L_plot mostra que o desvio padrão da estimativa aumenta com o aumento do preditor. Idealmente deveria ser homogeneo ao longo do gradite do preditor (REF). Segue avaliaão da concurvidade entre os smoothers:  
-  
-```{r auditoria 4 s(d)+ti(d,p)}
-concurvity(l_md[["s(d) + ti(d,p)"]])
-```
-
-O diagnostico de concurvidade indica que não há problemas. Ainda há possibilidade de aumentar o número de funções bases para ajustar o padrão, pois gam.check indica que talvez seja necessário aumentar o número de funções base para o smoother de d/L_plot
-
-```{r auditoria 5 s(d) + ti(d,p)}
-l_md[[3]] <- gam(U_med ~ s(d_Lplot.z,k=10) + ti(d_Lplot.z,p.z) +
-                  log_Stotal.z +
-                  s(SiteCode,bs="re"),
-                family=Gamma(link = "log"),
-                data = df_resultados.U, method = "REML",control=as.list(3))
-gam.check(l_md[[3]]) 
-gratia::draw(l_md[[3]])
-```
-
-Para k maiores (20,40) o diagnóstico da gam.check continua indicando que k não é suficiente, porem ao aumentar k promove o aumento de sobreajuste do modelo sem melhoras no pressuposto de distribuição gamma com função de ligação log.  
-
-
-#### Exploração de outras estruturas aleatórias
-
-```{r estruturas aleatorias alternativas U_med d}
-l_md <- vector("list",2)
-names(l_md) <- c("(1|SiteCode)","d|SiteCode,lambda comum") #,"d|SiteCode,lambda por SiteCode")
-l_md[[1]] <- gam(U_med ~ s(d_Lplot.z) + ti(d_Lplot.z,p.z) +
-                  log_Stotal.z +
-                  s(SiteCode,bs="re"),
-                family=Gamma(link = "log"),
-                data = df_resultados.U, method = "REML",control=as.list(3))
-l_md[[2]] <- gam(U_med ~ s(d_Lplot.z) + ti(d_Lplot.z,p.z) +
-                  log_Stotal.z +
-                  s(d_Lplot.z,SiteCode,bs="fs",m=2),
-                family=Gamma(link = "log"),
-                data = df_resultados.U, method = "REML",control=as.list(3))
-# l_md[[3]] <- gam(U_med ~ s(d_Lplot.z) + ti(d_Lplot.z,p.z) +
-#                   log_Stotal.z +
-#                   s(d_Lplot.z,by=SiteCode,m=1) + s(SiteCode,bs="re"),
-#                 family=Gamma(link = "log"),
-#                 data = df_resultados.U, method = "REML",control=as.list(3))
-AICctab(l_md,weights=TRUE)
-```
-
-O modelo que permite um smoother de dispersão por sitecode com lambda comum é o mais plausível. Segue auditoria do modelo:
-
-```{r auditoria 1 d|SiteCode lambda comum}
-par(mfrow=c(2,2))
-gam.check(l_md[[2]])
-```
-
-
-```{r auditoria 2 d|SiteCode lambda comum}
-p_plot <- DHARMa::simulateResiduals(l_md[[2]],n=1000)
-plot(p_plot)
-```
-
-Observa-se piora na adequação ao pressuposto de distribuição gamma(link=log)
-
-```{r auditoria 3 d|SiteCode lambda comum}
-gratia::draw(l_md[[2]])
-```
-
-
-#### Alternativas de configuração de gam  
-  
-i) mudança no tipo de funções base utilizada, o método padrão é o ts (thin plate regression spline).  
-ii) modificar em qual grau da derivada a flexibilidade do smoother é penalizada.  
-
-Como ii é feito por padrão, vou explorar i. O modelo que considera os smoothers indivíduais de d e p vai ser usado na exploração dos tipos de smoother. 
-
-opções:
-
-1) tp; 2) ts; 3) ds; 4) cr; cc; cs; 5) sos; cp; 6) mrf; 7) gp; 8) so; sw; sf 
-
-```{r comparação entre tipos de smoothers,include=FALSE,echo=FALSE}
-l_md <- vector("list",)
-names(l_md) <- c()
+```{r avaliação do padrão sem outliers}
+l_md.diff_S <- vector("list",length=10)
+names(l_md.diff_S) <- c("normal id MN|SiteCode","normal id 1|SiteCode",
+                        "normal log MN|SiteCode","normal log 1|SiteCode",
+                        "Gamma id MN|SiteCode","Gamma id 1|SiteCode",
+                        "Gamma log MN|SiteCode","Gamma log 1|SiteCode",
+                        "Gamma inverse MN|SiteCode","Gamma inverse 1|SiteCode")
+l_md.diff_S[[1]] <- gam(diff_S ~ k*MN + s(log_Stotal.z,bs="tp") + s(p.z,k,by=MN,bs="fs",xt=list(bs="tp")) +
+                          s(SiteCode,by=MN,bs="re"),
+                        data=df_resultados,
+                        family = "gaussian",
+                        method="REML")
+l_md.diff_S[[2]] <- gam(diff_S ~ k*MN + s(log_Stotal.z,bs="tp") + s(p.z,k,by=MN,bs="fs",xt=list(bs="tp")) +
+                          s(SiteCode,bs="re"),
+                        data=df_resultados,
+                        family = "gaussian",
+                        method="REML")
+l_md.diff_S[[3]] <- gam(diff_S ~ k*MN + s(log_Stotal.z,bs="tp") + s(p.z,k,by=MN,bs="fs",xt=list(bs="cr")) +
+                          s(SiteCode,by=MN,bs="re"),
+                        data=df_resultados,
+                        family = gaussian(family="log"),
+                        method="REML")
+l_md.diff_S[[4]] <- gam(diff_S ~ k*MN + s(log_Stotal.z,bs="tp") + s(p.z,k,by=MN,bs="fs",xt=list(bs="cr")) +
+                          s(SiteCode,bs="re"),
+                        data=df_resultados,
+                        family = gaussian(family="log"),
+                        method="REML")
+l_md.diff_S[[5]] <- gam(diff_S ~ k*MN + s(log_Stotal.z,bs="tp") + s(p.z,k,by=MN,bs="fs",xt=list(bs="cr")) +
+                          s(SiteCode,by=MN,bs="re"),
+                        data=df_resultados,
+                        family = Gamma(family="identity"),
+                        method="REML")
+l_md.diff_S[[6]] <- gam(diff_S ~ k*MN + s(log_Stotal.z,bs="tp") + s(p.z,k,by=MN,bs="fs",xt=list(bs="cr")) +
+                          s(SiteCode,bs="re"),
+                        data=df_resultados,
+                        family = Gamma(family="identity"),
+                        method="REML")
+l_md.diff_S[[7]] <- gam(diff_S ~ k*MN + s(log_Stotal.z,bs="tp") + s(p.z,k,by=MN,bs="fs",xt=list(bs="cr")) +
+                          s(SiteCode,by=MN,bs="re"),
+                        data=df_resultados,
+                        family = Gamma(family="log"),
+                        method="REML")
+l_md.diff_S[[8]] <- gam(diff_S ~ k*MN + s(log_Stotal.z,bs="tp") + s(p.z,k,by=MN,bs="fs",xt=list(bs="cr")) +
+                          s(SiteCode,bs="re"),
+                        data=df_resultados,
+                        family = Gamma(family="log"),
+                        method="REML")
+l_md.diff_S[[9]] <- gam(diff_S ~ k*MN + s(log_Stotal.z,bs="tp") + s(p.z,k,by=MN,bs="fs",xt=list(bs="cr")) +
+                          s(SiteCode,by=MN,bs="re"),
+                        data=df_resultados,
+                        family = Gamma(family="inverse"),
+                        method="REML")
+l_md.diff_S[[10]] <- gam(diff_S ~ k*MN + s(log_Stotal.z,bs="tp") + s(p.z,k,by=MN,bs="fs",xt=list(bs="cr")) +
+                          s(SiteCode,bs="re"),
+                        data=df_resultados,
+                        family = Gamma(family="inverse"),
+                        method="REML")
+AICctab(l_md.diff_S,weights=TRUE)
 
 ```
 
+```{r appraise l_md[[k|SiteCode]]}
+appraise(l_md.diff_S[["MN|SiteCode"]])
+```
+
+
+<!-- # U - taxa de especiação necessária para obter a riqueza observada no equilíbrio   -->
+
+<!-- ## Padrões Gerais   -->
+
+<!-- ```{r padroes gerais U,echo=FALSE,fig.width=6,fig.height=4} -->
+<!-- # graficos -->
+<!-- l_p <- vector("list",4) -->
+<!-- l_p[[1]] <- ggplot(df_resultados,aes(x=k,y=U_med)) +  -->
+<!--   geom_point() + -->
+<!--   geom_line(aes(group=SiteCode)) +  -->
+<!--   geom_boxplot(aes(group=k)) -->
+<!-- l_p[[2]] <- ggplot(df_resultados,aes(x=p,y=U_med)) + -->
+<!--   geom_point() + -->
+<!--   geom_smooth(method = "auto") + -->
+<!--   labs(y="") -->
+<!-- l_p[[3]] <- ggplot(df_resultados,aes(x=log(Stotal),y=U_med)) + -->
+<!--   geom_point() + -->
+<!--   geom_smooth(method = "auto") -->
+<!-- l_p[[4]] <- ggplot(df_resultados,aes(x=p,y=log(Stotal))) + -->
+<!--   geom_point() +  -->
+<!--   geom_smooth(method="auto") -->
+<!-- do.call("grid.arrange",c(l_p,ncol=2)) -->
+<!-- ``` -->
+
+<!-- __Figura 3.1__ Padrões gerais de U_med: ~ k (% de propágulos até a vizinhança imediata da planta progenitora); ~ Stotal (riqueza observada na área amostral). E o padrão empírico encontrado nos dados Stotal ~ p   -->
+
+
+<!-- ```{r padroes gerais U por SiteCode,echo=FALSE,fig.height=50,fig.width=12} -->
+<!-- # dados -->
+<!-- df_plot <- df_resultados %>% select(SiteCode,p,U_med,k,d_Lplot) %>%  -->
+<!--   mutate(label_facet.wrap = paste0(SiteCode,";p=",round(p,4))) %>%  -->
+<!--   distinct() %>% arrange(p) -->
+<!-- levels_label <- unique(df_plot$label_facet.wrap) -->
+<!-- df_plot$label_facet.wrap <- factor(df_plot$label_facet.wrap,levels = levels_label) -->
+<!-- # graficos -->
+<!-- l_p <- vector("list",2) -->
+<!-- l_p[[1]] <- ggplot(df_plot,aes(x=k,U_med)) + -->
+<!--   geom_point() + -->
+<!--   geom_line(aes(group=SiteCode)) + -->
+<!--   facet_wrap(~label_facet.wrap,ncol=5,scales="free") + -->
+<!--   ggtitle(label="eixo x = k") -->
+<!-- l_p[[2]] <- ggplot(df_plot,aes(x=d_Lplot,U_med)) + -->
+<!--   geom_point() + -->
+<!--   geom_line(aes(group=SiteCode)) + -->
+<!--   facet_wrap(~label_facet.wrap,ncol=5,scales="free") + -->
+<!--   ggtitle(label="eixo x = d / L_plot")   -->
+<!-- do.call("grid.arrange",c(l_p,ncol=1)) -->
+<!-- ``` -->
+
+<!-- __Figura 2__ Padrões gerais de U_med por SiteCode: ~ k (% de propágulos até a vizinhança imediata da planta progenitora); ~ d / L_plot (distância média de dispersão / Lado do área amostral) -->
+
+
+<!-- ## Descrição Estatística: -->
+
+<!-- Para descrever o padrão de U em função da proporção de habitat disponível e da diminuição da limitação de dispersão vamos utilizar GAMM (generalized additive mixed models, Wood 2017). Há pelo menos 3 formas de descrevermos o padrão global (Pedersen et al. 2019): a) um intercepto por SiteCode (1|SiteCode); b) um smoother por SiteCode (dispersão | SiteCode), porém com penalização para aqueles smoothers muito distintos do padrão global; e c) um smoother por SiteCode (dispersão | SiteCode) com seu próprio parâmetro de 'flexibilidade' (smoothing parameter).    -->
+
+<!-- GAMM oferecem grande flexibilidade ao custo de aumento do número de parâmetros estimados e do custo computacional, além da perda de interpretabilidade. Então irei começar por um modelo cuja estrutura aleatória é a mais simples possível (1 intercepto por SiteCode) para poder oferecer mais flexibilidade para o tensor(variável_dispersão,p).    -->
+
+<!-- ### Seleção de Modelo cheio   -->
+
+<!-- - 2 famílias: gaussian e gamma   -->
+<!-- - 3 funções de ligação: identity (apenas para gaussian), log, inverse   -->
+<!-- - 2 variáveis concorrentes para descrever a dispersão: (1 - k) e (d/L_plot)   -->
+<!-- - log_Stotal.z como preditora linear   -->
+<!-- - (1|SiteCode) como estrutura aleatória   -->
+
+<!-- __exemplo de código:__   -->
+<!-- gam(U_med ~ s(d_Lplot.z) + s(p.z) + ti(d_Lplot.z,p.z) +   -->
+<!--                       log_Stotal.z +   -->
+<!--                       s(SiteCode,bs="re"),   -->
+<!--                     family="gaussian",   -->
+<!--                     data = df_resultados, method = "REML",control=ctrl)   -->
+
+<!-- __Tabela de Seleção do Modelo Mais plausível:__     -->
+
+<!-- ```{r selecao de modelo cheio GAMM(U)} -->
+<!-- ctrl <- list(nthreads=3) #número de cores para paralelizar -->
+<!-- l_md <- vector("list",length = 15) -->
+<!-- names(l_md) <- c("d id normal","d log normal", "d inverse normal", "d log gamma", "d inverse gamma", -->
+<!--                  "1-k id normal","1-k log normal", "1-k inverse normal", "1-k log gamma", "1-k inverse gamma", -->
+<!--                  "k.f id normal","k.f log normal", "k.f inverse normal", "k.f log gamma", "k.f inverse gamma") -->
+<!-- l_md[[1]] <- gam(U_med ~ s(d_Lplot) + s(p) + ti(d_Lplot,p) + -->
+<!--                   s(log_Stotal) + -->
+<!--                   s(SiteCode,bs="re"), -->
+<!--                 family="gaussian", -->
+<!--                 data = df_resultados.U, method = "REML",control=ctrl) -->
+<!-- l_md[[2]] <- gam(U_med ~ s(d_Lplot) + s(p) + ti(d_Lplot,p) + -->
+<!--                   s(log_Stotal) + -->
+<!--                   s(SiteCode,bs="re"), -->
+<!--                 family=gaussian(link = "log"), -->
+<!--                 data = df_resultados.U, method = "REML",control=ctrl) -->
+<!-- l_md[[3]] <- gam(U_med ~ s(d_Lplot) + s(p) + ti(d_Lplot,p) + -->
+<!--                   s(log_Stotal) + -->
+<!--                   s(SiteCode,bs="re"), -->
+<!--                 family=gaussian(link = "inverse"), -->
+<!--                 data = df_resultados.U, method = "REML",control=ctrl) -->
+<!-- l_md[[4]] <- gam(U_med ~ s(d_Lplot) + s(p) + ti(d_Lplot,p) + -->
+<!--                   s(log_Stotal) + -->
+<!--                   s(SiteCode,bs="re"), -->
+<!--                 family=Gamma(link = "log"), -->
+<!--                 data = df_resultados.U, method = "REML",control=ctrl) -->
+<!-- l_md[[5]] <- gam(U_med ~ s(d_Lplot) + s(p) + ti(d_Lplot,p) + -->
+<!--                   s(log_Stotal) + -->
+<!--                   s(SiteCode,bs="re"), -->
+<!--                 family=Gamma(link = "inverse"), -->
+<!--                 data = df_resultados.U, method = "REML",control=ctrl) -->
+<!-- # k_1  -->
+<!-- l_md[[6]] <- gam(U_med ~ s(k.0_1) + s(p) + ti(k.0_1,p) + -->
+<!--                   s(log_Stotal) + -->
+<!--                   s(SiteCode,bs="re"), -->
+<!--                 family="gaussian", -->
+<!--                 data = df_resultados.U, method = "REML",control=ctrl) -->
+<!-- l_md[[7]] <- gam(U_med ~ s(k.0_1) + s(p) + ti(k.0_1,p) + -->
+<!--                   s(log_Stotal) + -->
+<!--                   s(SiteCode,bs="re"), -->
+<!--                 family=gaussian(link = "log"), -->
+<!--                 data = df_resultados.U, method = "REML",control=ctrl) -->
+<!-- l_md[[8]] <- gam(U_med ~ s(k.0_1) + s(p) + ti(k.0_1,p) + -->
+<!--                   s(log_Stotal) + -->
+<!--                   s(SiteCode,bs="re"), -->
+<!--                 family=gaussian(link = "inverse"), -->
+<!--                 data = df_resultados.U, method = "REML",control=ctrl) -->
+<!-- l_md[[9]] <- gam(U_med ~ s(k.0_1) + s(p) + ti(k.0_1,p) + -->
+<!--                   s(log_Stotal) + -->
+<!--                   s(SiteCode,bs="re"), -->
+<!--                 family=Gamma(link = "log"), -->
+<!--                 data = df_resultados.U, method = "REML",control=ctrl) -->
+<!-- l_md[[10]] <- gam(U_med ~ s(k.0_1) + s(p) + ti(k.0_1,p) + -->
+<!--                   s(log_Stotal) + -->
+<!--                   s(SiteCode,bs="re"), -->
+<!--                 family=Gamma(link = "inverse"), -->
+<!--                 data = df_resultados.U, method = "REML",control=ctrl) -->
+<!-- # k.f  -->
+<!-- l_md[[11]] <- gam(U_med ~ s(p,k,bs="fs") + k + -->
+<!--                   s(log_Stotal) + -->
+<!--                   s(SiteCode,bs="re"), -->
+<!--                 family="gaussian", -->
+<!--                 data = df_resultados.U, method = "REML",control=ctrl) -->
+<!-- l_md[[12]] <- gam(U_med ~ s(p,k,bs="fs") + k + -->
+<!--                   s(log_Stotal) + -->
+<!--                   s(SiteCode,bs="re"), -->
+<!--                 family=gaussian(link = "log"), -->
+<!--                 data = df_resultados.U, method = "REML",control=ctrl) -->
+<!-- l_md[[13]] <- gam(U_med ~ s(p,k,bs="fs") + k + -->
+<!--                   s(log_Stotal) + -->
+<!--                   s(SiteCode,bs="re"), -->
+<!--                 family=gaussian(link = "inverse"), -->
+<!--                 data = df_resultados.U, method = "REML",control=ctrl) -->
+<!-- l_md[[14]] <- gam(U_med ~ s(p,k,bs="fs") + k + -->
+<!--                   s(log_Stotal) + -->
+<!--                   s(SiteCode,bs="re"), -->
+<!--                 family=Gamma(link = "log"), -->
+<!--                 data = df_resultados.U, method = "REML",control=ctrl) -->
+<!-- l_md[[15]] <- gam(U_med ~ s(p,k,bs="fs") + k + -->
+<!--                   s(log_Stotal) + -->
+<!--                   s(SiteCode,bs="re"), -->
+<!--                 family=Gamma(link = "inverse"), -->
+<!--                 data = df_resultados.U, method = "REML",control=ctrl) -->
+<!-- AICctab(l_md,weights = TRUE) -->
+<!-- ``` -->
+
+<!-- O modelos cheio mais plausível possui família Gamma e função de ligação 'log" e utiliza a preditora d / L_plot. -->
+
+<!-- ### Auditoria do modelo cheio mais plausível -->
+
+<!-- <!-- Protocolo de Wood (in Checking and Selecting GAMs): --> -->
+
+<!-- <!-- 1) Residual Checking:   --> -->
+<!-- <!-- a) fitted ~ residuals (1|SiteCode) --> -->
+<!-- <!-- a) fitted ~ residuals (1|SiteCode) --> -->
+<!-- <!-- b) residuals ~ preditoras   --> -->
+
+<!-- ```{r auditoria md mais plausivel U 01}  -->
+<!-- # Dados -->
+<!-- md_U <- l_md[["d log gamma"]] -->
+<!-- # summary(md_U) -->
+<!-- ## gam.check -->
+<!-- par(mfrow=c(2,2)) -->
+<!-- gam.check(md_U) -->
+<!-- ## intercepto por sitecode -->
+<!-- df_ <- data.frame(term=names(coef(l_md[[1]])),coef=as.numeric(coef(l_md[[1]]))) -->
+<!-- df_ %>% filter(grepl("SiteCode",term)) %>% ggplot(aes(x="",y=coef)) +  -->
+<!--   geom_boxplot() + geom_jitter() -->
+<!-- # df_ %>% filter(grepl("SiteCode",term)) %>% summary -->
+<!-- ``` -->
+
+<!-- __Figura 3__ gam.check(modelo cheio mais plausível)   -->
+
+
+<!-- ```{r auditoria md mais plausivel U 2,warning=FALSE,message=FALSE} -->
+<!-- p_plot <- DHARMa::simulateResiduals(md_U,n=1000) -->
+<!-- plot(p_plot) -->
+<!-- ``` -->
+
+<!-- __Figura 3.2__ DHARMa::simulateResiduals(modelo cheio mais plausível) -->
+
+
+<!-- O Modelo mais plausível diverge do pressuposto de que a variável resposta pode ser aproximada por uma distribuição Gamma(link=log) para ambos diagnósticos. O gam.check indica que k=9 não é suficiente para modelar a variável d/L_plot.   -->
+
+<!-- Segue avaliação dos efeitos:   -->
+
+
+<!-- <!-- o que são os efeitos estimados? --> -->
+
+<!-- ```{r auditoria md_U mais plausível U 3,fig.width=12} -->
+<!-- gratia::draw(md_U) -->
+<!-- par(mfrow=c(2,2)) -->
+<!-- plot(md_U) -->
+<!-- ``` -->
+
+<!-- __Figura 4__ gratia::draw(md_U) -->
+
+<!-- A função que plota o gráfico dos efeitos acusa um erro: Removed 951 rows containing non-finite values (stat_contour). Esse problema decorreria de U_med->0 que na escala log -> a infinito? O quê de fato esta sendo plotado?[ESTUDAR] draw.derivates()?   -->
+
+
+<!-- __tabela __ Concurvidade dos smoothers -->
+
+<!-- ```{r concurvidade md_U} -->
+<!-- concurvity(md_U,full = TRUE) -->
+<!-- ``` -->
+
+<!-- Os três indices variam entre 0 e 1, quando igual a 1 então o smoother apresenta concurvidade com algum outro smoother. O intercepto geral ('para'), o smoother de s(p) e o smoother s(log_Stotal) apresenta concurvidade  -->
+
+
+
+<!-- ```{r auditoria md_U 4} -->
+<!-- df_ <- augment(md_U) %>% mutate(.predict=exp(.fitted)) -->
+<!-- # gráficos exploratórios -->
+<!-- par(mfrow=c(1,2)) -->
+<!-- hist(df_$.predict,breaks = 60) -->
+<!-- hist(df_resultados.U$U_med,breaks = 60) -->
+<!-- # -->
+<!-- summary(df_) -->
+<!-- ``` -->
+
+<!-- __Figura 5.1__  -->
+
+<!-- O summary da tabela de md_U mostra que tanto U_med como o predito (na escala de U_med) estão dentro do esperado: valores positivos entre 0 e 1. O aviso de erro pode ser resultado do uso da função stat_contour (OLHAR HELP). -->
+
+
+<!-- ```{r auditoria predicao md_U mais plausivel,fig.height=30,fig.width=12} -->
+<!-- # graficos por sitecode -->
+<!-- ggplot(df_,aes(x=.predict,y=U_med)) + -->
+<!--   geom_point() + -->
+<!--   geom_abline(slope = 1,intercept=0,color="red") + -->
+<!--   geom_smooth(method="auto") + -->
+<!--   facet_wrap(~SiteCode,ncol=5,scales = "free") -->
+<!-- ``` -->
+
+<!-- __Figura 5.2__ Observado X Predito U ~ s(%d.z) + s(p.z) + ti(%d.z,p.z) + log_Stotal.z + s(SiteCode,bs="re")   -->
+
+
+<!-- Para alguns sítios observa-se que a nuvem dos pontos se aproxima à reta, contudo para outros sítios o smoother global não descreve o padrão não-linear  (figura 5.2). Uma possibilidade é ajustar um smoother por SiteCode: a) compartilhando um mesmo parâmetro de penalidade (menor flexibilidade); b) com uma réplica do smoother global para cada sítio (mais flexível, muito mais oneroso computacionalmente). -->
+
+<!-- Em resumo, o modelo mais plausível i) não pode ser aproximado por uma distribuição Gamma com função de ligação log; e o smoother s(p) apresenta concurvidade com outros smoothers. Há formas alternativas de modelar a relação dispersão * p: te(dispersão,p) e t2(dispersão,p).  -->
+
+<!-- ```{r md_U comparacao s+ti te e t2} -->
+<!-- # Dados -->
+<!-- l_md <- vector("list",5) -->
+<!-- names(l_md) <- c("s+ti","s + s","s(d) + ti(d,p)","te","t2") -->
+<!-- l_md[[1]] <- gam(U_med ~ s(d_Lplot.z) + s(p.z) + ti(d_Lplot.z,p.z) + -->
+<!--                   log_Stotal.z + -->
+<!--                   s(SiteCode,bs="re"), -->
+<!--                 family=Gamma(link = "log"), -->
+<!--                 data = df_resultados.U, method = "REML",control=as.list(3)) -->
+<!-- l_md[[2]] <- gam(U_med ~ s(d_Lplot.z) + s(p.z) + -->
+<!--                   log_Stotal.z + -->
+<!--                   s(SiteCode,bs="re"), -->
+<!--                 family=Gamma(link = "log"), -->
+<!--                 data = df_resultados.U, method = "REML",control=as.list(3)) -->
+<!-- l_md[[3]] <- gam(U_med ~ s(d_Lplot.z) + ti(d_Lplot.z,p.z) + -->
+<!--                   log_Stotal.z + -->
+<!--                   s(SiteCode,bs="re"), -->
+<!--                 family=Gamma(link = "log"), -->
+<!--                 data = df_resultados.U, method = "REML",control=as.list(3)) -->
+<!-- l_md[[4]] <- gam(U_med ~ te(d_Lplot.z,p.z) + -->
+<!--                   log_Stotal.z + -->
+<!--                   s(SiteCode,bs="re"), -->
+<!--                 family=Gamma(link = "log"), -->
+<!--                 data = df_resultados.U, method = "REML",control=as.list(3)) -->
+<!-- l_md[[5]] <- gam(U_med ~ t2(d_Lplot.z,p.z) + -->
+<!--                   log_Stotal.z + -->
+<!--                   s(SiteCode,bs="re"), -->
+<!--                 family=Gamma(link = "log"), -->
+<!--                 data = df_resultados.U, method = "REML",control=as.list(3)) -->
+<!-- AICctab(l_md,weights=T) -->
+<!-- ``` -->
+
+
+<!-- O único modelo plausível, somando 0.82 do peso de evidência, pressupóem o smoother individual de d/L_plot e o tensor entre d/L_plot e de p; o segundo modelo mais plausível, com 0.18 de peso de evidência, considera adicionalmente o smoother individual para p. Os modelos com tensores te e t2 apresentam menos parâmetros porém não estão dentro do intervalo de plausibilidade; o modelo menos plausível considera os smoothers indivíduais de d/L_plot e p, mas desconsidera o tensor das preditoras. Os resultados corroboram o hipótese de que o smoother individual de p é concurvo ao tensor de d e p. Segue auditoria do modelo mais plausível: -->
+
+
+<!-- ```{r auditoria 1 s(d)+ti(d,p)} -->
+<!-- par(mfrow=c(2,2)) -->
+<!-- gam.check(l_md[["s(d) + ti(d,p)"]]) -->
+<!-- ``` -->
+
+
+<!-- ```{r auditoria 2 s(d)+ti(d,p)} -->
+<!-- p_plot <- DHARMa::simulateResiduals(l_md[["s(d) + ti(d,p)"]],n=1000) -->
+<!-- plot(p_plot) -->
+<!-- ``` -->
+
+<!-- Ambos diagnostico apontam que o pressuposto de distribuição gamma com função de ligação log não é uma boa aproximação, e pela comparação com o modelo anterior o ajuste do modelo com relação ao segundo mais plausível piorou. Segue avaliação dos efeitos:   -->
+
+
+<!-- ```{r auditoria 3 s(d)+ti(d,p)} -->
+<!-- gratia::draw(l_md[["s(d) + ti(d,p)"]]) -->
+<!-- # gratia::draw(l_md[["s+ti"]]) -->
+<!-- ``` -->
+
+<!-- O gráfico de efeitos do smoother de d/L_plot mostra que o desvio padrão da estimativa aumenta com o aumento do preditor. Idealmente deveria ser homogeneo ao longo do gradite do preditor (REF). Segue avaliaão da concurvidade entre os smoothers:   -->
+
+<!-- ```{r auditoria 4 s(d)+ti(d,p)} -->
+<!-- concurvity(l_md[["s(d) + ti(d,p)"]]) -->
+<!-- ``` -->
+
+<!-- O diagnostico de concurvidade indica que não há problemas. Ainda há possibilidade de aumentar o número de funções bases para ajustar o padrão, pois gam.check indica que talvez seja necessário aumentar o número de funções base para o smoother de d/L_plot -->
+
+<!-- ```{r auditoria 5 s(d) + ti(d,p)} -->
+<!-- l_md[[3]] <- gam(U_med ~ s(d_Lplot.z,k=10) + ti(d_Lplot.z,p.z) + -->
+<!--                   log_Stotal.z + -->
+<!--                   s(SiteCode,bs="re"), -->
+<!--                 family=Gamma(link = "log"), -->
+<!--                 data = df_resultados.U, method = "REML",control=as.list(3)) -->
+<!-- gam.check(l_md[[3]])  -->
+<!-- gratia::draw(l_md[[3]]) -->
+<!-- ``` -->
+
+<!-- Para k maiores (20,40) o diagnóstico da gam.check continua indicando que k não é suficiente, porem ao aumentar k promove o aumento de sobreajuste do modelo sem melhoras no pressuposto de distribuição gamma com função de ligação log.   -->
+
+
+<!-- #### Exploração de outras estruturas aleatórias -->
+
+<!-- ```{r estruturas aleatorias alternativas U_med d} -->
+<!-- l_md <- vector("list",2) -->
+<!-- names(l_md) <- c("(1|SiteCode)","d|SiteCode,lambda comum") #,"d|SiteCode,lambda por SiteCode") -->
+<!-- l_md[[1]] <- gam(U_med ~ s(d_Lplot.z) + ti(d_Lplot.z,p.z) + -->
+<!--                   log_Stotal.z + -->
+<!--                   s(SiteCode,bs="re"), -->
+<!--                 family=Gamma(link = "log"), -->
+<!--                 data = df_resultados.U, method = "REML",control=as.list(3)) -->
+<!-- l_md[[2]] <- gam(U_med ~ s(d_Lplot.z) + ti(d_Lplot.z,p.z) + -->
+<!--                   log_Stotal.z + -->
+<!--                   s(d_Lplot.z,SiteCode,bs="fs",m=2), -->
+<!--                 family=Gamma(link = "log"), -->
+<!--                 data = df_resultados.U, method = "REML",control=as.list(3)) -->
+<!-- # l_md[[3]] <- gam(U_med ~ s(d_Lplot.z) + ti(d_Lplot.z,p.z) + -->
+<!-- #                   log_Stotal.z + -->
+<!-- #                   s(d_Lplot.z,by=SiteCode,m=1) + s(SiteCode,bs="re"), -->
+<!-- #                 family=Gamma(link = "log"), -->
+<!-- #                 data = df_resultados.U, method = "REML",control=as.list(3)) -->
+<!-- AICctab(l_md,weights=TRUE) -->
+<!-- ``` -->
+
+<!-- O modelo que permite um smoother de dispersão por sitecode com lambda comum é o mais plausível. Segue auditoria do modelo: -->
+
+<!-- ```{r auditoria 1 d|SiteCode lambda comum} -->
+<!-- par(mfrow=c(2,2)) -->
+<!-- gam.check(l_md[[2]]) -->
+<!-- ``` -->
+
+
+<!-- ```{r auditoria 2 d|SiteCode lambda comum} -->
+<!-- p_plot <- DHARMa::simulateResiduals(l_md[[2]],n=1000) -->
+<!-- plot(p_plot) -->
+<!-- ``` -->
+
+<!-- Observa-se piora na adequação ao pressuposto de distribuição gamma(link=log) -->
+
+<!-- ```{r auditoria 3 d|SiteCode lambda comum} -->
+<!-- gratia::draw(l_md[[2]]) -->
+<!-- ``` -->
+
+
+<!-- #### Alternativas de configuração de gam   -->
+
+<!-- i) mudança no tipo de funções base utilizada, o método padrão é o ts (thin plate regression spline).   -->
+<!-- ii) modificar em qual grau da derivada a flexibilidade do smoother é penalizada.   -->
+
+<!-- Como ii é feito por padrão, vou explorar i. O modelo que considera os smoothers indivíduais de d e p vai ser usado na exploração dos tipos de smoother.  -->
+
+<!-- opções: -->
+
+<!-- 1) tp; 2) ts; 3) ds; 4) cr; cc; cs; 5) sos; cp; 6) mrf; 7) gp; 8) so; sw; sf  -->
+
+<!-- ```{r comparação entre tipos de smoothers,include=FALSE,echo=FALSE} -->
+<!-- l_md <- vector("list",) -->
+<!-- names(l_md) <- c() -->
+
+<!-- ``` -->
+
+<!-- # Apendice -->
+
+<!-- ## n_nRef GLMM binomial -->
+
+<!-- ### Modelo Cheio -->
+
+
+<!-- ```{r n_nRef comparacao modelos cheios} -->
+<!-- l_md <- vector("list",8) -->
+<!-- names(l_md) <- c("k0 1|Site","k0 MN|Site","k0 k0*MN|Site", -->
+<!--                  "kf 1|Site","kf MN|Site", -->
+<!--                  "d/L_plot 1|Site","d/L_plot MN|Site","d/L_plot d/L_plot*MN|Site") -->
+<!-- l_md[[1]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * k_1.z * MN + (1|SiteCode), -->
+<!--                    family = "binomial",data=df_resultados, -->
+<!--                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- l_md[[2]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * k_1.z * MN + (MN|SiteCode), -->
+<!--                    family = "binomial",data=df_resultados, -->
+<!--                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- l_md[[3]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * k_1.z * MN + (MN*k_1.z|SiteCode), -->
+<!--                    family = "binomial",data=df_resultados, -->
+<!--                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- l_md[[4]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * k * MN + (1|SiteCode), -->
+<!--                    family = "binomial",data=df_resultados, -->
+<!--                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- l_md[[5]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * k * MN + (MN|SiteCode), -->
+<!--                    family = "binomial",data=df_resultados, -->
+<!--                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- l_md[[6]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * d_Lplot.z * MN + (1|SiteCode), -->
+<!--                    family = "binomial",data=df_resultados, -->
+<!--                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- l_md[[7]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * d_Lplot.z * MN + (MN|SiteCode), -->
+<!--                    family = "binomial",data=df_resultados, -->
+<!--                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- l_md[[8]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * d_Lplot.z * MN + (MN*d_Lplot.z|SiteCode), -->
+<!--                    family = "binomial",data=df_resultados, -->
+<!--                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- AICctab(l_md,weights=T) -->
+<!-- ``` -->
+
+<!-- O único modelo plausível é aquele com função de ligação logito, a variável d/L_plot e a estrutura aleatória MN * d/L_plot|SiteCode. Segue avaliação do pressuposto binomial(link=cloglog): -->
+
+<!-- ```{r auditoria mais plausivel md_n.ref1} -->
+<!-- md_nRef <- l_md[["d/L_plot d/L_plot*MN|Site"]] -->
+<!-- p_plot <- DHARMa::simulateResiduals(md_nRef,n=1000) -->
+<!-- plot(p_plot) -->
+<!-- ``` -->
+
+<!-- __Figura 1.2__ Resíduos Quantílicos do modelo cheio para n_nRef ~ p*d_Lplot*MN + (d_Lplot*MN|SiteCode) -->
+
+<!-- Os resíduos quantílicos apontam que a distribuição dos resíduos não adere à distribuição uniforme, o que indica que a distribuição binomial(link=cloglog) não é um bom pressuposto para o conjunto dos dados. Segue resíduos pearson: -->
+
+<!-- ```{r auditoria mais plausivel md_n.ref2} -->
+<!-- l_p <- vector("list",4) -->
+<!-- l_p[[1]] <- plot(md_nRef, sqrt(abs(resid(.)))~fitted(.), -->
+<!--                  type=c("p","smooth"),ylab=expression(sqrt(abs(resid)))) -->
+<!-- l_p[[2]] <- plot(md_nRef,resid(.,type="pearson")~p.z, -->
+<!--       type=c("p","smooth"), -->
+<!--       id=0.05,idLabels=~SiteCode) -->
+<!-- l_p[[3]] <- plot(md_nRef,resid(.,type="pearson")~d_Lplot.z, -->
+<!--       type=c("p","smooth"), -->
+<!--       id=0.05,idLabels=~SiteCode) -->
+<!-- l_p[[4]] <- plot(md_nRef,MN~resid(.,type="pearson"), -->
+<!--       type=c("p","smooth"), -->
+<!--       id=0.05,idLabels=~SiteCode) -->
+<!-- do.call("grid.arrange",c(l_p,ncol=2)) -->
+<!-- ``` -->
+
+<!-- __Figura 1.3__ Resíduos "Pearson" do modelo cheio para n_ref ~ p * I(d/L_plot)*MN + (I(d/L_plot)|SiteCode) -->
+
+<!-- Os resíduos de Pearson indicam que podem existir outliers: alguns sítios apresentam erros agrupados em valores extremos. Pelo gráfico dos resíduos por MN parecem existir 5 sítios em que apresentam comportamento muito distinto dos demais. -->
+
+<!-- ```{r selecao do modelo cheio sem os sitios outliers} -->
+<!-- # prepração dos dados -->
+<!-- df_md_n_nRef <- augment(md_nRef) -->
+<!-- df_md_n_nRef$.pearson_resid <- resid(md_nRef,type="pearson") -->
+<!-- Sites <- df_md_n_nRef %>%  -->
+<!--   filter(.pearson_resid>100 | .pearson_resid< -50) %>% .$SiteCode %>% as.character() -->
+<!-- df_resultados.s_out <- df_resultados %>% filter(!(SiteCode %in% Sites)) -->
+<!-- # seleção do modelo mais plausível -->
+<!-- l_md <- vector("list",8) -->
+<!-- names(l_md) <- c("k0 1|Site","k0 MN|Site","k0 k0*MN|Site", -->
+<!--                  "kf 1|Site","kf MN|Site", -->
+<!--                  "d/L_plot 1|Site","d/L_plot MN|Site","d/L_plot d/L_plot*MN|Site") -->
+<!-- l_md[[1]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * k_1.z * MN + (1|SiteCode), -->
+<!--                    family = "binomial",data=df_resultados.s_out, -->
+<!--                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- l_md[[2]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * k_1.z * MN + (MN|SiteCode), -->
+<!--                    family = "binomial",data=df_resultados.s_out, -->
+<!--                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- l_md[[3]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * k_1.z * MN + (MN*k_1.z|SiteCode), -->
+<!--                    family = "binomial",data=df_resultados.s_out, -->
+<!--                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- l_md[[4]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * k * MN + (1|SiteCode), -->
+<!--                    family = "binomial",data=df_resultados.s_out, -->
+<!--                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- l_md[[5]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * k * MN + (MN|SiteCode), -->
+<!--                    family = "binomial",data=df_resultados.s_out, -->
+<!--                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- l_md[[6]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * d_Lplot.z * MN + (1|SiteCode), -->
+<!--                    family = "binomial",data=df_resultados.s_out, -->
+<!--                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- l_md[[7]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * d_Lplot.z * MN + (MN|SiteCode), -->
+<!--                    family = "binomial",data=df_resultados.s_out, -->
+<!--                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- l_md[[8]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * d_Lplot.z * MN + (MN*d_Lplot.z|SiteCode), -->
+<!--                    family = "binomial",data=df_resultados.s_out, -->
+<!--                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- AICctab(l_md,weights=T) -->
+<!-- ``` -->
+
+<!-- A seleção de modelos é robusta à remoção dos outliers: o único plausível é link=cloglog, d/L_plot e d/L_plot *MN | SiteCode -->
+
+<!-- ```{r auditoria md_n.ref sem outliers 1} -->
+<!-- p_plot <- DHARMa::simulateResiduals(l_md[["d/L_plot d/L_plot*MN|Site"]],n=1000) -->
+<!-- plot(p_plot) -->
+<!-- ``` -->
+
+<!-- __figura 1.4__ Resíduos Quantílicos do modelo cheio sem outliers -->
+
+
+<!-- O pressuposto de binomial(link=cloglog) continua não sendo adequado.   -->
+
+<!-- ### Modelo mais plausível: seleção e avaliação -->
+
+<!-- Sigo com a seleção das variáveis. A estrutura aleatória completa é (MN * d_Lplot.z | SiteCode) para os modelos que possuirem a interação MN*d_Lplot.z, para os demais modelos que não apresentam esse termo a estrutura aleatória segue a relação de MN e d_Lplot.z na estrutura fixa.  -->
+
+<!-- ```{r n_nRef selecao de modelos} -->
+<!-- l_md <- vector("list",19) -->
+<!-- names(l_md) <- c("p*d*MN",# modelo cheio -->
+<!--                  "p*d*MN-p:d:MN", #MC - 3a ordem -->
+<!--                  "p*(d+MN)","d*(p+MN)","MN*(p+d)", #2 interações -->
+<!--                  "p*d+MN","p*MN+d","d*MN+p", #1 interação + preditor -->
+<!--                  "p*d","p*MN","d*MN", #1 interação -->
+<!--                  "p+d+MN",#aditivo 3 -->
+<!--                  "p+d","p+MN","d+MN", #aditivo 2  -->
+<!--                  "p","d","MN", #preditor isolado -->
+<!--                  "1") #nulo -->
+<!-- #modelo cheio -->
+<!-- l_md[[1]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * d_Lplot.z * MN + (d_Lplot.z * MN|SiteCode), family = "binomial",data=df_resultados, -->
+<!--               control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- #modelo cheio - interação 3a ordem -->
+<!-- l_md[[2]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * d_Lplot.z * MN - p.z:d_Lplot.z:MN + (d_Lplot.z * MN|SiteCode), family = "binomial",data=df_resultados, -->
+<!--               control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- #2 interações -->
+<!-- l_md[[3]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * (d_Lplot.z + MN) + (MN+d_Lplot.z|SiteCode), family = "binomial",data=df_resultados, -->
+<!--               control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- l_md[[4]] <- glmer(cbind(n_nRef,100-n_nRef) ~ d_Lplot.z * (p.z + MN) + (d_Lplot.z * MN|SiteCode), family = "binomial",data=df_resultados, -->
+<!--               control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- l_md[[5]] <- glmer(cbind(n_nRef,100-n_nRef) ~ MN * (p.z + d_Lplot.z) + (d_Lplot.z * MN|SiteCode), family = "binomial",data=df_resultados, -->
+<!--               control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- #1 interação + preditor -->
+<!-- l_md[[6]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * d_Lplot.z + MN + (MN+d_Lplot.z|SiteCode), family = "binomial",data=df_resultados, -->
+<!--               control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- l_md[[7]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * MN + d_Lplot.z + (MN+d_Lplot.z|SiteCode), family = "binomial",data=df_resultados, -->
+<!--               control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- l_md[[8]] <- glmer(cbind(n_nRef,100-n_nRef) ~ d_Lplot.z * MN + p.z + (d_Lplot.z * MN|SiteCode), family = "binomial",data=df_resultados, -->
+<!--               control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- #1 interação -->
+<!-- l_md[[9]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * d_Lplot.z + (d_Lplot.z|SiteCode), family = "binomial",data=df_resultados, -->
+<!--               control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- l_md[[10]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * MN + (MN|SiteCode), family = "binomial",data=df_resultados, -->
+<!--               control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- l_md[[11]] <- glmer(cbind(n_nRef,100-n_nRef) ~ d_Lplot.z * MN + (d_Lplot.z * MN|SiteCode), family = "binomial",data=df_resultados, -->
+<!--               control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- #aditivo 3 -->
+<!-- l_md[[12]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z + d_Lplot.z + MN + (MN+d_Lplot.z|SiteCode), family = "binomial",data=df_resultados, -->
+<!--               control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- #aditivo 2 -->
+<!-- l_md[[13]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z + d_Lplot.z + (d_Lplot.z|SiteCode), family = "binomial",data=df_resultados, -->
+<!--               control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- l_md[[14]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z + MN + (MN|SiteCode), family = "binomial",data=df_resultados, -->
+<!--               control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- l_md[[15]] <- glmer(cbind(n_nRef,100-n_nRef) ~ d_Lplot.z + MN + (MN+d_Lplot.z|SiteCode), family = "binomial",data=df_resultados, -->
+<!--               control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- #aditivo 1 -->
+<!-- l_md[[16]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z + (1|SiteCode), family = "binomial",data=df_resultados, -->
+<!--               control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- l_md[[17]] <- glmer(cbind(n_nRef,100-n_nRef) ~ d_Lplot.z + (d_Lplot.z|SiteCode), family = "binomial",data=df_resultados, -->
+<!--               control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- l_md[[18]] <- glmer(cbind(n_nRef,100-n_nRef) ~ MN + (MN|SiteCode), family = "binomial",data=df_resultados, -->
+<!--               control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- # nulo -->
+<!-- l_md[[19]] <- glmer(cbind(n_nRef,100-n_nRef) ~ 1 + (1|SiteCode), family = "binomial",data=df_resultados, -->
+<!--               control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- AICctab(l_md,weights=T) -->
+<!-- ``` -->
+
+<!-- O único modelo plausível com 0.909 do peso de evidência é o modelo cheio. -->
+
+<!-- Como visto anteriormente este modelo não apresenta pressupostos que se aproximam do observado para os dados.    -->
+
+<!-- __Tabela 1__ Modelo mais plausível para descrever o número de SADs não refutadas   -->
+
+<!-- ```{r tabela do modelo plausivel} -->
+<!-- tab_model(l_md[["p*d*MN"]]) -->
+<!-- # summary(l_md[["p*d*MN"]]) -->
+<!-- ``` -->
+
+<!-- O R2 marginal é baixo (0.088) enquanto o R2 condicional é elevado (0.836). Segue avaliação visual da congruência com o observado comparando a probabilidade de se refutar uma predição neutra e a estimada pelo modelo.   -->
+
+<!-- ```{r auditoria modelo mais plausivel md_nRef,include=FALSE,echo=TRUE} -->
+<!-- df_plot <- df_resultados %>% select(SiteCode,p.z,d_Lplot.z,MN,n_nRef) %>% mutate(p_nRef = n_nRef/100) -->
+<!-- df_plot$predict <- predict(l_md[["p*d*MN"]],type="response") -->
+<!-- # grafico -->
+
+<!-- sites <- levels(df_plot$SiteCode) -->
+<!-- # l_p <- vector("list",length = 103) -->
+<!-- # par(mfrow=c(21,5)) -->
+<!-- for(i in 1:length(sites)){ -->
+<!--   df_ <- filter(df_plot,SiteCode == sites[i]) -->
+<!--   # l_p[[i]] <- ggplot(df_,aes(x=p_nRef,y=predict,colour=MN,shape=MN)) +  -->
+<!--   #   geom_point() + -->
+<!--   #   geom_abline(slope=1,intercept = 0,color="red") + -->
+<!--   #   scale_color_manual(values=c("#000000", "#0000FF")) + -->
+<!--   #   labs(title = sites[i]) -->
+<!--   plot(df_$predict ~ df_$p_nRef, -->
+<!--        xlim=c(0,1),ylim=c(0,1),col=df_$MN, -->
+<!--        main=sites[i], xlab="Prob. Obs", ylab="Prob. Est.") -->
+<!--   abline(a=0,b=1,color="red",add=TRUE) -->
+<!-- } -->
+<!-- # do.call("grid.arrange",c(l_p,ncol=10)) -->
+<!-- ``` -->
+
+<!-- __Figura 1.5__ Probabilidade de não refutar uma SAD neutra observada ~ predita pelo modelo mais plausível. Pontos pretos = MNEE, pontos vermelhos = MNEI -->
+
+<!-- Observamos que para alguns sítios os valores se aproximam de uma relação linear, como esperado pelo modelo, contudo para outros valores observa-se tendência não lineares onde alguns valores são bem ajustados enquanto outros aumentam e diminuiem. Isso pode indicar que seja mais adequado considerar um modelo que possibilite maior flexibilidade para estimar a tendência global dos dados.  -->
+
+<!-- Em resumo:   -->
+<!-- i) O modelo mais plausível apresenta R2_marginal > 80%, porém pouco é explicado pela estrutura fixa do modelo (R2_condicional < 10%);         -->
+<!-- ii) Os modelos neutros apresentam variância distinta: enquanto MNEE varia em valores próximos de 98 SADs não refutadas para a maior parte dos sítios, MNEI varia em [0;100].   -->
+<!-- iii) O pressuposto de linearidade pode não ser suficiente para estimar a tendência global para todos os sítios de amostragem, uma vez que outras tendências são observadas no gráfico de estimado X observado (figura 1.5).   -->
+
+<!-- ### Infêrência -->
+
+<!-- Uma avaliação direta da predição de que MNEE pode apresentar melhor congruência para paisagens com proporções intermediárias de cobertura vegetal é a de comparar a inclinação e intercepto do efeito do aumento da dispersão entre os modelos neutros por sítio e então plotar as estimativas pela proporção de cobertura vegetal.  -->
+
+<!-- __Esquema da Figura__ -->
+
+<!-- i) obter os coeficientes para cada sítio pela função coef();   -->
+<!-- ii) multiplicar todos os coeficientes que apresentam alguma relação com a preditora "p.z" pelo correspondete valor de p.z para aquele sítio;   -->
+<!-- iii) MNEE é o nível padrão e MNEI é o contraste.   -->
+<!-- iv) Assim, por SiteCode:    -->
+<!--   a) alfa_EE = intercept + p.z   -->
+<!--   b) beta_EE = d_Lplot.z + p.z:d_Lplot.z   -->
+<!--   c) alfa_EI = alfa_EE + MNEI + p:MNEI   -->
+<!--   d) beta_EI = beta_EE + d_Lplot:MNEI + p:d_Lplot:MNEI   -->
+
+
+<!-- ```{r inferencia n_nRef, warning=FALSE,message=FALSE,include=FALSE} -->
+<!-- # dados brutos -->
+<!-- df_coef.Site <- coef(l_md[["p*d*MN"]])$SiteCode -->
+<!-- ## arrumando os nomes -->
+<!-- df_coef.Site$SiteCode <- row.names(coef(l_md[["p*d*MN"]])$SiteCode)  -->
+<!-- row.names(df_coef.Site) <- NULL -->
+<!-- names(df_coef.Site) <- c("intercept","p_coef","d_Lplot_coef","MNEI","p__d_Lplot_coef","p__MNEI","d_Lplot__MNEI","p__d_Lplot__MNEI","SiteCode") -->
+<!-- # multiplicao pelo respectivo valor de p.z -->
+<!-- df_ <- df_coef.Site[,c(2,5,6,8,9)] %>% inner_join(x=., -->
+<!--                             y=distinct(select(df_resultados,SiteCode,p.z,p)), -->
+<!--                             by="SiteCode") %>%  -->
+<!--   adply(.,1,.fun=function(X) data.frame(coef_p = X$p.z * X$p_coef, -->
+<!--                                         coef_p__d_Lplot = X$p.z * X$p__d_Lplot_coef, -->
+<!--                                         coef_p__MNEI = X$p.z * X$p__MNEI, -->
+<!--                                         coef_p__d_Lplot__MNEI = X$p.z * X$p__d_Lplot__MNEI -->
+<!--                                         ) -->
+<!--         ) -->
+<!-- # merge e escolha das colunas que já foram multiplicados pelos valores de p.z -->
+<!-- df_coef.Site %<>% inner_join(x=., -->
+<!--                             y=df_[,5:11], -->
+<!--                             by="SiteCode") %>%  -->
+<!--   select(SiteCode, p.z, p, intercept, coef_p, d_Lplot_coef, MNEI, coef_p__d_Lplot, coef_p__MNEI, d_Lplot__MNEI,coef_p__d_Lplot__MNEI) -->
+<!-- # grafico -->
+<!-- ## dados -->
+<!-- df_plot <- df_coef.Site %>%  -->
+<!--   mutate(alfa_EE = intercept + coef_p,  -->
+<!--          beta_EE = d_Lplot_coef + coef_p__d_Lplot, -->
+<!--          alfa_EI = alfa_EE + MNEI + coef_p__MNEI,  -->
+<!--          beta_EI = beta_EE + d_Lplot__MNEI + coef_p__d_Lplot__MNEI) %>% -->
+<!--   select(SiteCode, p.z, p, alfa_EE, alfa_EI, beta_EE, beta_EI) %>%  -->
+<!--   gather(.,key="coef","logito_P.nRef",alfa_EE,alfa_EI,beta_EE,beta_EI) -->
+<!-- # filter(df_plot,coef %in% c("beta_EE","beta_EI")) %>% summary -->
+<!-- ## grafico -->
+<!-- l_p <- vector("list",2) -->
+<!-- l_p[[1]] <- ggplot(filter(df_plot,coef %in% c("alfa_EE","alfa_EI")), aes(x=p,y=logito_P.nRef,colour=coef,shape=coef,group=SiteCode)) + -->
+<!--   geom_line(color="#A9A9A9") + -->
+<!--   geom_point() + -->
+<!--   scale_color_manual(values=c("#000000", "#0000FF")) + -->
+<!--   xlim(0, 1) + ylim(-23.5, 8.5) +  -->
+<!--   geom_hline(yintercept = 0,color="red") -->
+<!-- l_p[[2]] <- ggplot(filter(df_plot,coef %in% c("beta_EE","beta_EI")), aes(x=p,y=logito_P.nRef,colour=coef,shape=coef,group=SiteCode)) + -->
+<!--   geom_line(color="#A9A9A9") + -->
+<!--   geom_point() + -->
+<!--   scale_color_manual(values=c("#000000", "#0000FF")) + -->
+<!--   xlim(0, 1) + ylim(-22.65, 5.8) +  -->
+<!--   geom_hline(yintercept = 0,color="red") -->
+<!-- do.call("grid.arrange",c(l_p,ncol=1)) -->
+<!-- ``` -->
+
+<!-- __Figura 1.6__ Coeficientes estimados por Sítio de Amostragem, logito(Probabilidade(não refutar uma SAD neutra) no eixo y e proporção de cobertura vegetal (p) no eixo x. Para sítios possibilitamos um intercepto e uma inclinação em d/Lplot por modelo neutro, no primeiro painel temos os interceptos e no segundo as inclinações. -->
+
+
+<!-- Essa figura não me auxilia na interpretação da predição. Gráficos de 3 dimensões (logito(Pr(nRef)) X p X d/L_plot) devem ser mais adequados para interpretar os resultados. Como este modelo não apresenta boa adequação ao conjunto de dados (pressuposto de binomial e padrões não lineares) vou seguir para um modelo que possibilita maior flexibilidade.   -->
