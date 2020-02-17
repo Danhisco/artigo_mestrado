@@ -21,7 +21,7 @@ knitr::opts_knit$set(root.dir = "~/Documentos/Doutorado/artigo_mestrado/1A.P_MOV
 setwd("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/")
 ```
 
-```{r pacotes,eval=TRUE,echo=TRUE}
+```{r pacotes,eval=TRUE,echo=F}
 library(gtools)
 library(doMC)
 library(mgcv)
@@ -113,29 +113,29 @@ names(l_md) <- c("k 1|SiteCode", "k MN|SiteCode",
                  "d/L 1|SiteCode","d/L MN|SiteCode")
 # muitos parametros para poucos dados "k_1 k_1 * MN|SiteCode","d_Lplot d_Lplot * MN|SiteCode")
 # k
-l_md[[1]] <- gam(cbind(n_nRef,100-n_nRef) ~ k * MN + s(p.z,MN,by=k,bs="fs") +
+l_md[[1]] <- gam(cbind(n_nRef,100-n_nRef) ~ k * MN + s(p.z,k,by=MN,bs="fs") +
                    s(SiteCode,bs="re"),
                    family = "binomial",
                    data = df_resultados, method = "REML")
-l_md[[2]] <- gam(cbind(n_nRef,100-n_nRef) ~ k * MN + s(p.z,MN,by=k,bs="fs") +
+l_md[[2]] <- gam(cbind(n_nRef,100-n_nRef) ~ k * MN + s(p.z,k,by=MN,bs="fs") +
                    s(SiteCode,by=MN,bs="re"),
                    family = "binomial",
                    data = df_resultados, method = "REML")
 # k_1
-l_md[[3]] <- gam(cbind(n_nRef,100-n_nRef) ~ MN + s(p.z,MN,bs="fs") + s(k_1.z,MN,bs="fs") + ti(p.z,k_1.z,by=MN,bs=c("tp","tp")) +
+l_md[[3]] <- gam(cbind(n_nRef,100-n_nRef) ~ MN + s(p.z,by=MN,bs="tp") + s(k_1.z,by=MN,bs="tp") + ti(p.z,k_1.z,by=MN,bs=c("tp","tp")) +
                    s(SiteCode,bs="re"),
                    family = "binomial",
                    data = df_resultados, method = "REML")
-l_md[[4]] <- gam(cbind(n_nRef,100-n_nRef) ~ MN +  s(p.z,MN,bs="fs") + s(k_1.z,MN,bs="fs") + ti(p.z,k_1.z,by=MN,bs=c("tp","tp")) +
+l_md[[4]] <- gam(cbind(n_nRef,100-n_nRef) ~ MN +  s(p.z,by=MN,bs="tp") + s(k_1.z,by=MN,bs="tp") + ti(p.z,k_1.z,by=MN,bs=c("tp","tp")) +
                    s(SiteCode,by=MN,bs="re"),
                    family = "binomial",
                    data = df_resultados, method = "REML")
 # d/L
-l_md[[5]] <- gam(cbind(n_nRef,100-n_nRef) ~ MN + s(p.z,MN,bs="fs") + s(d_Lplot.z,MN,bs="fs") + ti(p.z,d_Lplot.z,by=MN,bs=c("tp","tp")) +
+l_md[[5]] <- gam(cbind(n_nRef,100-n_nRef) ~ MN + s(p.z,by=MN,bs="tp") + s(d_Lplot.z,by=MN,bs="tp") + ti(p.z,d_Lplot.z,by=MN,bs=c("tp","tp")) +
                    s(SiteCode,bs="re"),
                    family = "binomial",
                    data = df_resultados, method = "REML")
-l_md[[6]] <- gam(cbind(n_nRef,100-n_nRef) ~ MN +  s(p.z,MN,bs="fs") + s(d_Lplot.z,MN,bs="fs") + ti(p.z,d_Lplot.z,by=MN,bs=c("tp","tp")) +
+l_md[[6]] <- gam(cbind(n_nRef,100-n_nRef) ~ MN +  s(p.z,by=MN,bs="tp") + s(d_Lplot.z,by=MN,bs="tp") + ti(p.z,d_Lplot.z,by=MN,bs=c("tp","tp")) +
                    s(SiteCode,by=MN,bs="re"),
                    family = "binomial",
                    data = df_resultados, method = "REML")
@@ -194,17 +194,17 @@ df_pred.k[,c("fit","se.fit")] <- df_pred.k[,c("fit","se.fit")]*100
 #                             by=c("k_1.z","p.z"))
 # Gráficos Exploratórios
 # l_p <- vector("list",2)
-# l_p[[1]] <- 
-  # ggplot(df_pred.k,aes(x=p,y=fit,color=MN)) + 
-  # geom_line() + 
-  # facet_wrap(~k,ncol=4) + 
-  # labs(title = "MN*k + s(p,k,by=MN,bs=fs)") + ylab("Pr(não refutar)") + 
-  # scale_color_manual(values=c("#FF0000", "#000000"))
-# l_p[[2]] <- ggplot(df_pred.k_1,aes(x=p.z,y=fit.k_1,color=MN)) + 
-#   geom_line() + 
-#   facet_wrap(~k,ncol=5) + 
-#   labs(title = "ti(p,k_1,by=MN)") +
-#   ylab("")
+# l_p[[1]] <-
+ggplot(df_pred.k,aes(x=p,y=fit,color=MN)) +
+geom_line() +
+facet_wrap(~k,ncol=4) +
+labs(title = "MN*k + s(p,k,by=MN,bs=fs)") + ylab("Pr(não refutar)") +
+scale_color_manual(values=c("#FF0000", "#000000"))
+# l_p[[2]] <- ggplot(df_pred.k_1,aes(x=p.z,y=fit.k_1,color=MN)) +
+  # geom_line() +
+  # facet_wrap(~k,ncol=5) +
+  # labs(title = "ti(p,k_1,by=MN)") +
+  # ylab("")
 # do.call("grid.arrange",c(l_p,ncol=2))
 ```
 
@@ -258,9 +258,15 @@ l_p[[2]] <- ggplot(filter(df_resultados,k %in% levels(df_resultados$k)[11:20]),a
 do.call("grid.arrange",c(l_p,ncol=2))
 ```
 
-__Figura 1.4__ Observado e predito pelo modelo mais plausível. Eixo x = prop. de cobertura vegetal na paisagem; Eixo y: número de SADs não refutadas. Em branco o padrão geral estimado e em vermelho o erro padrão. 
+__Figura 1.3__ Observado e predito pelo modelo mais plausível. Eixo x = prop. de cobertura vegetal na paisagem; Eixo y: número de SADs não refutadas. Em branco o padrão geral estimado e em vermelho o erro padrão. 
   
 O padrão estimado parece ser muito sensível  a valores extremo: a média de EI parece estar muito abaixo da mediana; essa tendência também parece ser observada para algum grau do vale que surge para p.z ~ -1 e p->0.05. Vejo duas opções: a) avaliar outliers e b) parâmetros da gam (parâmetro de penalidade, número de funções base; por padrão ambos são estimados utilizando REML, começar pelo parâmetro de penalidade)
+
+### Melhoria do modelo mais plausível: CONSTRUÇÃO
+
+#### comparação de smoothers
+
+#### comparação de parâmetro de penalização
 
 
 # diff_S = (S_obs - S_MN)/S_obs
@@ -283,10 +289,13 @@ __Figura 2.1__ diff_S = (S_obs - S_MN)/S_obs + (-1) * min(diff_S) + 0.01, inclin
 
 Parece que existem alguns outliers. De maneira geral MNEE apresenta boa congruência com os dados enquanto o comportamento de MNEI depende da dispersão: para k->100% o desvio aumento para ps extremos (bimodal/quadratica), apresentando boa congruência para proporção intermediárias de habitat, mas sempre subestimando S_obs. Com o aumento da capacidade de dispersão as estimavas de S se tornam mais próximas ao observado para p>0.5, superestimando o observado para valores elevados de p e k>0.5 o que leva a reduzir a porção de p em que MNEI faz uma boa aproximação.
 
-Para modelar o padrão não linear dos dados vou utilizar GAMM: normal e duas estruturas aleatórias (1|SiteCode e MN|SiteCode). 
+## GAMM: diff_S
 
+Para modelar o padrão não linear dos dados vou utilizar GAMM: normal, Gamma(log) e Gamma(inverse) com duas estruturas aleatórias (1|SiteCode e MN|SiteCode). 
 
-```{r avaliação do padrão sem outliers}
+### Modelo Cheio e Gráficos Diagnosticos
+
+```{r md cheio diff_S}
 l_md.diff_S <- vector("list",length=6)
 names(l_md.diff_S) <- c("normal id MN|SiteCode","normal id 1|SiteCode",
                         "Gamma log MN|SiteCode","Gamma log 1|SiteCode",
@@ -322,75 +331,128 @@ l_md.diff_S[[6]] <- gam(diff_S ~ k*MN + s(log_Stotal.z,bs="tp") + s(p.z,k,by=MN,
                         family = "Gamma"(link="log"),
                         method="REML")
 AICctab(l_md.diff_S,weights=TRUE)
+md_diffS <-  gam(diff_S0 ~ k*MN + s(log_Stotal.z,bs="tp") + s(p.z,k,by=MN,bs="fs",xt=list(bs="tp")) +
+                          s(SiteCode,by=MN,bs="re"),
+                        data=df_resultados,
+                        family = "gaussian",
+                        method="REML")
 # l_md1 <- l_md.diff_S[1:2]
 # l_md.diff_S[1:2] <- l_md1
+# save(l_md.diff_S,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md_diffS.Rdata")
+# save(md_diffS,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/md_diffS.Rdata")
+# load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/md_diffS.Rdata")
 ```
 
-```{r appraise l_md[[k|SiteCode]]}
-appraise(l_md.diff_S[["normal id MN|SiteCode"]])
+
+```{r appraise diff_S[[k|SiteCode]]}
+appraise(md_diffS)
 ```
 
 __Figura 2.2__ Graficos diagnosticos do modelo mais plausível para diff_S.   
-  
-  
-```{r }
 
+Parece que o pressuposto de distribuição normal não é adequado, assim como parece haver alguma tendência nos dados que não está sendo detectada. Especulo que existam outliers que estão inflenciando muito a estimativa dos dados. 
+
+#### Observado e Predito  
+  
+```{r observado e predito diff_S}
+df_pred.k <- expand.grid(SiteCode=levels(df_resultados$SiteCode)[1],
+                          MN=levels(df_resultados$MN),
+                          k=levels(df_resultados$k),
+                          p.z=seq(min(df_resultados$p.z),max(df_resultados$p.z),length=103),
+                          log_Stotal.z=seq(min(df_resultados$log_Stotal.z),max(df_resultados$log_Stotal.z),length=103)) %>% 
+  mutate(p = p.z * sd(df_resultados$p) + mean(df_resultados$p))
+df_pred.k <- cbind(df_pred.k,
+                   predict(md_diffS,
+                           df_pred.k,type="response",se.fit=TRUE))
+# grafico
+l_p <- vector("list",2)
+l_p[[1]] <- ggplot(filter(df_resultados,k %in% levels(df_resultados$k)[1:10]),aes(x=p,y=diff_S0)) + 
+  geom_point() + facet_grid(k~MN,scales="free") +
+  geom_ribbon(aes(ymin=I(fit - 2*se.fit), ymax=I(fit + 2*se.fit), x=p),
+              data=filter(df_pred.k,k %in% levels(df_resultados$k)[1:10]),
+              alpha=0.3,
+              inherit.aes=FALSE,
+              color="red") +
+  geom_line(aes(y=fit),color="white", data=filter(df_pred.k,k %in% levels(df_resultados$k)[1:10])) +
+  ylab("(S_obs - S_modelo.neutro) * S_obs^(-1)") + xlab("Proportion of Tree Cover") +
+  theme(panel.background = element_rect(fill = "gray"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())
+l_p[[2]] <- ggplot(filter(df_resultados,k %in% levels(df_resultados$k)[11:20]),aes(x=p,y=diff_S0)) + 
+  geom_point() + facet_grid(k~MN,scales="free") +
+  geom_ribbon(aes(ymin=I(fit - 2*se.fit), ymax=I(fit + 2*se.fit), x=p),
+              data=filter(df_pred.k,k %in% levels(df_resultados$k)[11:20]), 
+              alpha=0.3, 
+              inherit.aes=FALSE,
+              color="red") +
+  geom_line(aes(y=fit),color="white", data=filter(df_pred.k,k %in% levels(df_resultados$k)[11:20])) +
+  ylab("") + xlab("Proportion of Tree Cover") +
+  theme(panel.background = element_rect(fill = "gray"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())
+do.call("grid.arrange",c(l_p,ncol=2))
 ```
 
+__Figura 2.3__ Diferença na riqueza observada e estimada pela proporção de cobertura vegetal.
 
-<!-- # U - taxa de especiação necessária para obter a riqueza observada no equilíbrio   -->
-
-<!-- ## Padrões Gerais   -->
-
-<!-- ```{r padroes gerais U,echo=FALSE,fig.width=6,fig.height=4} -->
-<!-- # graficos -->
-<!-- l_p <- vector("list",4) -->
-<!-- l_p[[1]] <- ggplot(df_resultados,aes(x=k,y=U_med)) +  -->
-<!--   geom_point() + -->
-<!--   geom_line(aes(group=SiteCode)) +  -->
-<!--   geom_boxplot(aes(group=k)) -->
-<!-- l_p[[2]] <- ggplot(df_resultados,aes(x=p,y=U_med)) + -->
-<!--   geom_point() + -->
-<!--   geom_smooth(method = "auto") + -->
-<!--   labs(y="") -->
-<!-- l_p[[3]] <- ggplot(df_resultados,aes(x=log(Stotal),y=U_med)) + -->
-<!--   geom_point() + -->
-<!--   geom_smooth(method = "auto") -->
-<!-- l_p[[4]] <- ggplot(df_resultados,aes(x=p,y=log(Stotal))) + -->
-<!--   geom_point() +  -->
-<!--   geom_smooth(method="auto") -->
-<!-- do.call("grid.arrange",c(l_p,ncol=2)) -->
-<!-- ``` -->
-
-<!-- __Figura 3.1__ Padrões gerais de U_med: ~ k (% de propágulos até a vizinhança imediata da planta progenitora); ~ Stotal (riqueza observada na área amostral). E o padrão empírico encontrado nos dados Stotal ~ p   -->
+Os modelos ajustados para MNEI estão sistematicamente com problemas de errar a média (figura 1.1 e 1.4; figura 2.1 e 2.3). Especulo que talvez alguns pontos estão influenciando muito as estimativas centrais. Além disso para MNEI percebo que a tendência geral não está descrevendo o padrão dos dados, em especial para k->1.
 
 
-<!-- ```{r padroes gerais U por SiteCode,echo=FALSE,fig.height=50,fig.width=12} -->
-<!-- # dados -->
-<!-- df_plot <- df_resultados %>% select(SiteCode,p,U_med,k,d_Lplot) %>%  -->
-<!--   mutate(label_facet.wrap = paste0(SiteCode,";p=",round(p,4))) %>%  -->
-<!--   distinct() %>% arrange(p) -->
-<!-- levels_label <- unique(df_plot$label_facet.wrap) -->
-<!-- df_plot$label_facet.wrap <- factor(df_plot$label_facet.wrap,levels = levels_label) -->
-<!-- # graficos -->
-<!-- l_p <- vector("list",2) -->
-<!-- l_p[[1]] <- ggplot(df_plot,aes(x=k,U_med)) + -->
-<!--   geom_point() + -->
-<!--   geom_line(aes(group=SiteCode)) + -->
-<!--   facet_wrap(~label_facet.wrap,ncol=5,scales="free") + -->
-<!--   ggtitle(label="eixo x = k") -->
-<!-- l_p[[2]] <- ggplot(df_plot,aes(x=d_Lplot,U_med)) + -->
-<!--   geom_point() + -->
-<!--   geom_line(aes(group=SiteCode)) + -->
-<!--   facet_wrap(~label_facet.wrap,ncol=5,scales="free") + -->
-<!--   ggtitle(label="eixo x = d / L_plot")   -->
-<!-- do.call("grid.arrange",c(l_p,ncol=1)) -->
-<!-- ``` -->
+# U - taxa de especiação necessária para obter a riqueza observada no equilíbrio
 
-<!-- __Figura 2__ Padrões gerais de U_med por SiteCode: ~ k (% de propágulos até a vizinhança imediata da planta progenitora); ~ d / L_plot (distância média de dispersão / Lado do área amostral) -->
+## Padrões Gerais
+
+```{r padroes gerais U,echo=FALSE,fig.width=6,fig.height=4}
+# graficos
+l_p <- vector("list",4)
+l_p[[1]] <- ggplot(df_resultados,aes(x=k,y=U_med)) +
+  geom_point() +
+  geom_line(aes(group=SiteCode)) +
+  geom_boxplot(aes(group=k))
+l_p[[2]] <- ggplot(df_resultados,aes(x=p,y=U_med)) +
+  geom_point() +
+  geom_smooth(method = "auto") +
+  labs(y="")
+l_p[[3]] <- ggplot(df_resultados,aes(x=log(Stotal),y=U_med)) +
+  geom_point() +
+  geom_smooth(method = "auto")
+l_p[[4]] <- ggplot(df_resultados,aes(x=p,y=log(Stotal))) +
+  geom_point() +
+  geom_smooth(method="auto")
+do.call("grid.arrange",c(l_p,ncol=2))
+```
+
+__Figura 3.1__ Padrões gerais de U_med: ~ k (% de propágulos até a vizinhança imediata da planta progenitora); ~ Stotal (riqueza observada na área amostral). E o padrão empírico encontrado nos dados Stotal ~ p
 
 
-<!-- ## Descrição Estatística: -->
+```{r padroes gerais U por SiteCode,echo=FALSE,fig.height=50,fig.width=12,include=FALSE}
+# dados
+df_plot <- df_resultados %>% select(SiteCode,p,U_med,k,d_Lplot) %>%
+  mutate(label_facet.wrap = paste0(SiteCode,";p=",round(p,4))) %>%
+  distinct() %>% arrange(p)
+levels_label <- unique(df_plot$label_facet.wrap)
+df_plot$label_facet.wrap <- factor(df_plot$label_facet.wrap,levels = levels_label)
+# graficos
+l_p <- vector("list",2)
+l_p[[1]] <- ggplot(df_plot,aes(x=k,U_med)) +
+  geom_point() +
+  geom_line(aes(group=SiteCode)) +
+  facet_wrap(~label_facet.wrap,ncol=5,scales="free") +
+  ggtitle(label="eixo x = k")
+l_p[[2]] <- ggplot(df_plot,aes(x=d_Lplot,U_med)) +
+  geom_point() +
+  geom_line(aes(group=SiteCode)) +
+  facet_wrap(~label_facet.wrap,ncol=5,scales="free") +
+  ggtitle(label="eixo x = d / L_plot")
+do.call("grid.arrange",c(l_p,ncol=1))
+```
+
+<!-- __Figura 3.2__ Padrões gerais de U_med por SiteCode: ~ k (% de propágulos até a vizinhança imediata da planta progenitora); ~ d / L_plot (distância média de dispersão / Lado do área amostral) -->
+
+
+## GAMM
+
+Como os modelos com estrutura aleatória mais complexa levam muito tempo para estimar, irei começar com a estrutura aleatória mais simples para avaliar qual a melhor variável de dispersão e se for necessário refazer a seleção da estrutura aleatória.
 
 <!-- Para descrever o padrão de U em função da proporção de habitat disponível e da diminuição da limitação de dispersão vamos utilizar GAMM (generalized additive mixed models, Wood 2017). Há pelo menos 3 formas de descrevermos o padrão global (Pedersen et al. 2019): a) um intercepto por SiteCode (1|SiteCode); b) um smoother por SiteCode (dispersão | SiteCode), porém com penalização para aqueles smoothers muito distintos do padrão global; e c) um smoother por SiteCode (dispersão | SiteCode) com seu próprio parâmetro de 'flexibilidade' (smoothing parameter).    -->
 
@@ -410,94 +472,140 @@ __Figura 2.2__ Graficos diagnosticos do modelo mais plausível para diff_S.
 <!--                       s(SiteCode,bs="re"),   -->
 <!--                     family="gaussian",   -->
 <!--                     data = df_resultados, method = "REML",control=ctrl)   -->
+  
+__Tabela de Seleção do Modelo Mais plausível:__  
+  
+```{r selecao de modelo cheio GAMM(U)}
+ctrl <- list(nthreads=3) #número de cores para paralelizar
+l_md.U <- vector("list",length = 15)
+names(l_md.U) <- c("d id normal","d log normal", "d inverse normal", "d log gamma", "d inverse gamma",
+                 "1-k id normal","1-k log normal", "1-k inverse normal", "1-k log gamma", "1-k inverse gamma",
+                 "k.f id normal","k.f log normal", "k.f inverse normal", "k.f log gamma", "k.f inverse gamma")
+l_md.U[[1]] <- gam(U_med ~ s(d_Lplot) + s(p) + ti(d_Lplot,p) +
+                  s(log_Stotal) +
+                  s(SiteCode,bs="re"),
+                family="gaussian",
+                data = df_resultados.U, method = "REML",control=ctrl)
+l_md.U[[2]] <- gam(U_med ~ s(d_Lplot) + s(p) + ti(d_Lplot,p) +
+                  s(log_Stotal) +
+                  s(SiteCode,bs="re"),
+                family=gaussian(link = "log"),
+                data = df_resultados.U, method = "REML",control=ctrl)
+l_md.U[[3]] <- gam(U_med ~ s(d_Lplot) + s(p) + ti(d_Lplot,p) +
+                  s(log_Stotal) +
+                  s(SiteCode,bs="re"),
+                family=gaussian(link = "inverse"),
+                data = df_resultados.U, method = "REML",control=ctrl)
+l_md.U[[4]] <- gam(U_med ~ s(d_Lplot) + s(p) + ti(d_Lplot,p) +
+                  s(log_Stotal) +
+                  s(SiteCode,bs="re"),
+                family=Gamma(link = "log"),
+                data = df_resultados.U, method = "REML",control=ctrl)
+l_md.U[[5]] <- gam(U_med ~ s(d_Lplot) + s(p) + ti(d_Lplot,p) +
+                  s(log_Stotal) +
+                  s(SiteCode,bs="re"),
+                family=Gamma(link = "inverse"),
+                data = df_resultados.U, method = "REML",control=ctrl)
+# k_1
+l_md.U[[6]] <- gam(U_med ~ s(k.0_1) + s(p) + ti(k.0_1,p) +
+                  s(log_Stotal) +
+                  s(SiteCode,bs="re"),
+                family="gaussian",
+                data = df_resultados.U, method = "REML",control=ctrl)
+l_md.U[[7]] <- gam(U_med ~ s(k.0_1) + s(p) + ti(k.0_1,p) +
+                  s(log_Stotal) +
+                  s(SiteCode,bs="re"),
+                family=gaussian(link = "log"),
+                data = df_resultados.U, method = "REML",control=ctrl)
+l_md.U[[8]] <- gam(U_med ~ s(k.0_1) + s(p) + ti(k.0_1,p) +
+                  s(log_Stotal) +
+                  s(SiteCode,bs="re"),
+                family=gaussian(link = "inverse"),
+                data = df_resultados.U, method = "REML",control=ctrl)
+l_md.U[[9]] <- gam(U_med ~ s(k.0_1) + s(p) + ti(k.0_1,p) +
+                  s(log_Stotal) +
+                  s(SiteCode,bs="re"),
+                family=Gamma(link = "log"),
+                data = df_resultados.U, method = "REML",control=ctrl)
+l_md.U[[10]] <- gam(U_med ~ s(k.0_1) + s(p) + ti(k.0_1,p) +
+                  s(log_Stotal) +
+                  s(SiteCode,bs="re"),
+                family=Gamma(link = "inverse"),
+                data = df_resultados.U, method = "REML",control=ctrl)
+# k.f
+l_md.U[[11]] <- gam(U_med ~ s(p,k,bs="fs") + k +
+                  s(log_Stotal) +
+                  s(SiteCode,bs="re"),
+                family="gaussian",
+                data = df_resultados.U, method = "REML",control=ctrl)
+l_md.U[[12]] <- gam(U_med ~ s(p,k,bs="fs") + k +
+                  s(log_Stotal) +
+                  s(SiteCode,bs="re"),
+                family=gaussian(link = "log"),
+                data = df_resultados.U, method = "REML",control=ctrl)
+l_md.U[[13]] <- gam(U_med ~ s(p,k,bs="fs") + k +
+                  s(log_Stotal) +
+                  s(SiteCode,bs="re"),
+                family=gaussian(link = "inverse"),
+                data = df_resultados.U, method = "REML",control=ctrl)
+l_md.U[[14]] <- gam(U_med ~ s(p,k,bs="fs") + k +
+                  s(log_Stotal) +
+                  s(SiteCode,bs="re"),
+                family=Gamma(link = "log"),
+                data = df_resultados.U, method = "REML",control=ctrl)
+l_md.U[[15]] <- gam(U_med ~ s(p,k,bs="fs") + k +
+                  s(log_Stotal) +
+                  s(SiteCode,bs="re"),
+                family=Gamma(link = "inverse"),
+                data = df_resultados.U, method = "REML",control=ctrl)
+AICctab(l_md.U,weights=TRUE)
+# save(l_md.U,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md_U.Rdata")
+```
 
-<!-- __Tabela de Seleção do Modelo Mais plausível:__     -->
+Segue gráficos diagnosticos do modelo mais plausível
 
-<!-- ```{r selecao de modelo cheio GAMM(U)} -->
-<!-- ctrl <- list(nthreads=3) #número de cores para paralelizar -->
-<!-- l_md <- vector("list",length = 15) -->
-<!-- names(l_md) <- c("d id normal","d log normal", "d inverse normal", "d log gamma", "d inverse gamma", -->
-<!--                  "1-k id normal","1-k log normal", "1-k inverse normal", "1-k log gamma", "1-k inverse gamma", -->
-<!--                  "k.f id normal","k.f log normal", "k.f inverse normal", "k.f log gamma", "k.f inverse gamma") -->
-<!-- l_md[[1]] <- gam(U_med ~ s(d_Lplot) + s(p) + ti(d_Lplot,p) + -->
-<!--                   s(log_Stotal) + -->
-<!--                   s(SiteCode,bs="re"), -->
-<!--                 family="gaussian", -->
-<!--                 data = df_resultados.U, method = "REML",control=ctrl) -->
-<!-- l_md[[2]] <- gam(U_med ~ s(d_Lplot) + s(p) + ti(d_Lplot,p) + -->
-<!--                   s(log_Stotal) + -->
-<!--                   s(SiteCode,bs="re"), -->
-<!--                 family=gaussian(link = "log"), -->
-<!--                 data = df_resultados.U, method = "REML",control=ctrl) -->
-<!-- l_md[[3]] <- gam(U_med ~ s(d_Lplot) + s(p) + ti(d_Lplot,p) + -->
-<!--                   s(log_Stotal) + -->
-<!--                   s(SiteCode,bs="re"), -->
-<!--                 family=gaussian(link = "inverse"), -->
-<!--                 data = df_resultados.U, method = "REML",control=ctrl) -->
-<!-- l_md[[4]] <- gam(U_med ~ s(d_Lplot) + s(p) + ti(d_Lplot,p) + -->
-<!--                   s(log_Stotal) + -->
-<!--                   s(SiteCode,bs="re"), -->
-<!--                 family=Gamma(link = "log"), -->
-<!--                 data = df_resultados.U, method = "REML",control=ctrl) -->
-<!-- l_md[[5]] <- gam(U_med ~ s(d_Lplot) + s(p) + ti(d_Lplot,p) + -->
-<!--                   s(log_Stotal) + -->
-<!--                   s(SiteCode,bs="re"), -->
-<!--                 family=Gamma(link = "inverse"), -->
-<!--                 data = df_resultados.U, method = "REML",control=ctrl) -->
-<!-- # k_1  -->
-<!-- l_md[[6]] <- gam(U_med ~ s(k.0_1) + s(p) + ti(k.0_1,p) + -->
-<!--                   s(log_Stotal) + -->
-<!--                   s(SiteCode,bs="re"), -->
-<!--                 family="gaussian", -->
-<!--                 data = df_resultados.U, method = "REML",control=ctrl) -->
-<!-- l_md[[7]] <- gam(U_med ~ s(k.0_1) + s(p) + ti(k.0_1,p) + -->
-<!--                   s(log_Stotal) + -->
-<!--                   s(SiteCode,bs="re"), -->
-<!--                 family=gaussian(link = "log"), -->
-<!--                 data = df_resultados.U, method = "REML",control=ctrl) -->
-<!-- l_md[[8]] <- gam(U_med ~ s(k.0_1) + s(p) + ti(k.0_1,p) + -->
-<!--                   s(log_Stotal) + -->
-<!--                   s(SiteCode,bs="re"), -->
-<!--                 family=gaussian(link = "inverse"), -->
-<!--                 data = df_resultados.U, method = "REML",control=ctrl) -->
-<!-- l_md[[9]] <- gam(U_med ~ s(k.0_1) + s(p) + ti(k.0_1,p) + -->
-<!--                   s(log_Stotal) + -->
-<!--                   s(SiteCode,bs="re"), -->
-<!--                 family=Gamma(link = "log"), -->
-<!--                 data = df_resultados.U, method = "REML",control=ctrl) -->
-<!-- l_md[[10]] <- gam(U_med ~ s(k.0_1) + s(p) + ti(k.0_1,p) + -->
-<!--                   s(log_Stotal) + -->
-<!--                   s(SiteCode,bs="re"), -->
-<!--                 family=Gamma(link = "inverse"), -->
-<!--                 data = df_resultados.U, method = "REML",control=ctrl) -->
-<!-- # k.f  -->
-<!-- l_md[[11]] <- gam(U_med ~ s(p,k,bs="fs") + k + -->
-<!--                   s(log_Stotal) + -->
-<!--                   s(SiteCode,bs="re"), -->
-<!--                 family="gaussian", -->
-<!--                 data = df_resultados.U, method = "REML",control=ctrl) -->
-<!-- l_md[[12]] <- gam(U_med ~ s(p,k,bs="fs") + k + -->
-<!--                   s(log_Stotal) + -->
-<!--                   s(SiteCode,bs="re"), -->
-<!--                 family=gaussian(link = "log"), -->
-<!--                 data = df_resultados.U, method = "REML",control=ctrl) -->
-<!-- l_md[[13]] <- gam(U_med ~ s(p,k,bs="fs") + k + -->
-<!--                   s(log_Stotal) + -->
-<!--                   s(SiteCode,bs="re"), -->
-<!--                 family=gaussian(link = "inverse"), -->
-<!--                 data = df_resultados.U, method = "REML",control=ctrl) -->
-<!-- l_md[[14]] <- gam(U_med ~ s(p,k,bs="fs") + k + -->
-<!--                   s(log_Stotal) + -->
-<!--                   s(SiteCode,bs="re"), -->
-<!--                 family=Gamma(link = "log"), -->
-<!--                 data = df_resultados.U, method = "REML",control=ctrl) -->
-<!-- l_md[[15]] <- gam(U_med ~ s(p,k,bs="fs") + k + -->
-<!--                   s(log_Stotal) + -->
-<!--                   s(SiteCode,bs="re"), -->
-<!--                 family=Gamma(link = "inverse"), -->
-<!--                 data = df_resultados.U, method = "REML",control=ctrl) -->
-<!-- AICctab(l_md,weights = TRUE) -->
-<!-- ``` -->
+
+```{r diag gamm(U) modelo cheio}
+appraise(l_md.U[["d log gamma"]])
+```
+
+__Figura 3.2__ Gráficos Diagnóstico do modelo mais plausível
+
+O modelo apresenta boa congruência com os dados, porém parece existir outliers  no entando.
+
+```{r avaliacao outliers gammU}
+# install.packages("mgcViz")
+# library(mgcViz)
+df_mdU <- augment(l_md.U[["d log gamma"]])
+# df_mdU %>% str
+l_p <- vector("list",length = 2)
+l_p[[1]] <- ggplot(df_mdU,aes(x=.fitted,y=.hat)) +
+  geom_point()
+l_p[[2]] <- ggplot(df_mdU,aes(x=.fitted,y=.cooksd)) +
+  geom_point()
+l_p[[3]] <- ggplot(df_mdU,aes(x=.fitted,y=.resid)) +
+  geom_point()
+do.call("grid.arrange",c(l_p,ncol=3))
+```
+
+__Figura 3.3__ Métricas de influência dos dados (broom::augment())
+
+Exclui os dois sítios com valores de grande influência do conjunto de dados:
+
+```{r modelo mais plausivel sem outliers U_med}
+Site_outliers <- df_mdU %>% filter(.fitted < -7.5 & .resid < -0.5 | .cooksd > 0.01) %>% .$SiteCode %>% unique
+md_U.sOut <- update(l_md.U[["d log gamma"]],data=filter(df_resultados.U,!(SiteCode %in% Site_outliers)))
+appraise(md_U.sOut)
+```
+
+__Figura 3.4__ Grafico diagnostico do modelo mais plausivel sem os outliers.
+
+```{r draw md_U}
+gratia::draw(md_U.sOut)
+```
+
+__Figura 4.5__ Efeitos Parciais do modelo mais plausível  
+
 
 <!-- O modelos cheio mais plausível possui família Gamma e função de ligação 'log" e utiliza a preditora d / L_plot. -->
 
