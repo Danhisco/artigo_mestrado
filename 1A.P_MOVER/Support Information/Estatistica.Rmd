@@ -7,7 +7,7 @@ output:
     toc: true
     toc_depth: 5
 editor_options: 
-  chunk_output_type: inline
+  chunk_output_type: console
 ---
 
 <style>
@@ -165,7 +165,22 @@ AICctab(l_md,weights=TRUE)
 # load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/md_nRef.Rdata")
 ```
 
-O único modelo plausível considera a variável k (fator) e estrutura aleatória MN|SiteCode.  
+O único modelo plausível considera a variável k (fator) e estrutura aleatória MN|SiteCode. 
+
+```{r comparacao setting up do modelo mais plausivel n_nRef}
+l_md.nRef1 <- vector("list",length = 2)
+names(l_md.nRef1) <- c("by=k","by=MN")
+l_md.nRef1[[2]] <- gam(cbind(n_nRef,100-n_nRef) ~ k * MN + s(p.z,k,by=MN,bs="fs") +
+                   s(SiteCode,by=MN,bs="re"),
+                   family = "binomial",
+                   data = df_resultados, method = "REML")
+l_md.nRef1[[1]] <- gam(cbind(n_nRef,100-n_nRef) ~ k * MN + s(p.z,MN,by=k,bs="fs") +
+                   s(SiteCode,by=MN,bs="re"),
+                   family = "binomial",
+                   data = df_resultados, method = "REML")
+AICctab(l_md.nRef1,weights=TRUE)
+```
+
   
 ### Diagnostico do Modelo Cheio   
 
@@ -219,10 +234,10 @@ l_p[[1]] <- ggplot(filter(df_plot,k %in% levels(df_resultados$k)[1:10]),aes(x=p,
               inherit.aes=FALSE,
               color="red") +
   geom_line(aes(y=fit),color="white", data=filter(df_pred.k,k %in% levels(df_resultados$k)[1:10])) +
-  ylab("logit(not ref. SAD)") + xlab("Proportion of Tree Cover") +
-  theme(panel.background = element_rect(fill = "gray"),
-        panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank())
+  ylab("logit(not ref. SAD)") + xlab("Proportion of Tree Cover") #+
+  # theme(panel.background = element_rect(fill = "gray"),
+  #       panel.grid.major = element_blank(),
+  #       panel.grid.minor = element_blank())
 l_p[[2]] <- ggplot(filter(df_plot,k %in% levels(df_resultados$k)[11:20]),aes(x=p,y=logit_nRef)) + 
   geom_point() + facet_grid(k~MN) +
   # k
@@ -232,10 +247,10 @@ l_p[[2]] <- ggplot(filter(df_plot,k %in% levels(df_resultados$k)[11:20]),aes(x=p
               inherit.aes=FALSE,
               color="red") +
   geom_line(aes(y=fit),color="white", data=filter(df_pred.k,k %in% levels(df_resultados$k)[11:20])) +
-  ylab("") + xlab("Proportion of Tree Cover") +
-  theme(panel.background = element_rect(fill = "gray"),
-        panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank())
+  ylab("") + xlab("Proportion of Tree Cover") # +
+  # theme(panel.background = element_rect(fill = "gray"),
+  #       panel.grid.major = element_blank(),
+  #       panel.grid.minor = element_blank())
 do.call("grid.arrange",c(l_p,ncol=2))
 ```
 
@@ -265,19 +280,24 @@ __Figura 1.4__ residuals.gam(l_md[["k MN|SiteCode"]]) ~ p (~k*MN).
 Os resíduos do tipo 'deviance' não indicam erro na estimativa quanto à tendência global.  
   
 ```{r fig 1.5 residuos caseiros pelas preditoras}
+## dados
 df_plot <- augment(l_md[["k MN|SiteCode"]]) %>% as.data.frame()
-df_plot$logit_nRef <- car::logit(df_plot[,1][,1]/100)
-df_plot %<>% mutate(res_ = logit_nRef - .fitted,
-                    p = p.z * sd(df_resultados$p) + mean(df_resultados$p))
-
-## 
+df_plot <- cbind(df_plot,
+                 predict(l_md[["k MN|SiteCode"]],type="response",se=TRUE))
+df_plot %<>% mutate(p = p.z * sd(df_resultados$p) + mean(df_resultados$p),
+                    Prob_nRef = df_plot[,1][,1]/100,
+                    logit_nRef = arm::logit(Prob_nRef),
+                    link_res = logit_nRef - .fitted,
+                    response_res = Prob_nRef - fit)
+df_plot$n_nRef <- df_plot[,1][,1]
+## graficos 
 l_p <- vector("list",2)
-l_p[[1]] <- ggplot(filter(df_plot,k %in% levels(df_resultados$k)[1:10]),aes(x=p,y=res_)) + 
-  geom_point() + geom_abline(intercept=0,slope = 0,col="red") + facet_grid(k~MN) +
-  ylab("logit_obs - logit_fit") + xlab("Proportion of Tree Cover")
-l_p[[2]] <- ggplot(filter(df_plot,k %in% levels(df_resultados$k)[11:20]),aes(x=p,y=res_)) + 
-  geom_point() + geom_abline(intercept=0,slope = 0,col="red") + facet_grid(k~MN) +
-  ylab("logit_obs - logit_fit") + xlab("Proportion of Tree Cover")
+l_p[[1]] <- ggplot(filter(df_plot,k %in% levels(df_resultados$k)[1:10]),aes(x=p,y=response_res)) + 
+  geom_point() + geom_smooth(method="loess") + facet_grid(k~MN) +
+  ylab("Prob_nRef - fit") + xlab("Proportion of Tree Cover")
+l_p[[2]] <- ggplot(filter(df_plot,k %in% levels(df_resultados$k)[11:20]),aes(x=p,y=response_res)) + 
+  geom_point() + geom_smooth(method="loess") + facet_grid(k~MN) +
+  ylab("Prob_nRef - fit") + xlab("Proportion of Tree Cover")
 do.call("grid.arrange",c(l_p,ncol=2))
 #
 l_p <- vector("list",2)
@@ -290,19 +310,47 @@ l_p[[2]] <- ggplot(filter(df_plot,k %in% levels(df_resultados$k)[11:20]),aes(x=p
 do.call("grid.arrange",c(l_p,ncol=2))
 ```
 
-
+Ainda não estou convencido de que o padrão esta fazendo um bom ajuste - não vejo o padrão estimado nos resíduos CONTINUAR
 
 ### Melhoria do modelo mais plausível: CONSTRUÇÃO
 
+__Opções__
+
+#### 1) modificar método de estimativa de smoother parameter: 4 opções
+
+```{r method smoothing parameter n_nRef}
+l_md.SP <- vector("list",length = 4)
+names(l_md.SP) <- c("REML","ML","GACV.Cp","GCV.Cp")
+l_md.SP[[1]] <- gam(cbind(n_nRef,100-n_nRef) ~ k * MN + s(p.z,k,by=MN,bs="fs") +
+                   s(SiteCode,by=MN,bs="re"),
+                   family = "binomial",
+                   data = df_resultados, method = "REML")
+l_md.SP[[2]] <- gam(cbind(n_nRef,100-n_nRef) ~ k * MN + s(p.z,k,by=MN,bs="fs") +
+                   s(SiteCode,by=MN,bs="re"),
+                   family = "binomial",
+                   data = df_resultados, method = "ML")
+l_md.SP[[3]] <- gam(cbind(n_nRef,100-n_nRef) ~ k * MN + s(p.z,k,by=MN,bs="fs") +
+                   s(SiteCode,by=MN,bs="re"),
+                   family = "binomial",
+                   data = df_resultados, method = "GACV.Cp")
+l_md.SP[[4]] <- gam(cbind(n_nRef,100-n_nRef) ~ k * MN + s(p.z,k,by=MN,bs="fs") +
+                   s(SiteCode,by=MN,bs="re"),
+                   family = "binomial",
+                   data = df_resultados, method = "GCV.Cp")
+AICctab(l_md.SP,weights="TRUE")
+```
+
+
+#### 2) modificar o tipo de smoother: 
+
 ```{r}
-l_p <- vector("list",2)
-l_p[[1]] <- ggplot(filter(df_nRef,k %in% levels(df_resultados$k)[1:10]),aes(x=p.z,y=dev_Res)) + 
-  geom_point() + geom_smooth() +
-  facet_grid(k~MN)
-l_p[[2]] <- ggplot(filter(df_nRef,k %in% levels(df_resultados$k)[11:20]),aes(x=p.z,y=dev_Res)) + 
-  geom_point() + geom_smooth() +
-  facet_grid(k~MN)
-do.call("grid.arrange",c(l_p,ncol=2))
+l_md.BS <- vector("list",length = )
+names(l_md.BS) <- c()
+l_md.BS[[1]] <- gam(cbind(n_nRef,100-n_nRef) ~ k * MN + s(p.z,k,by=MN,bs="fs",) +
+                   s(SiteCode,by=MN,bs="re"),
+                   family = "binomial",
+                   data = df_resultados, method = "REML")
+AICctab(l_md.BS,weights="TRUE")
 
 # ggplot(df_resultados,aes(x=MN,y=n_nRef)) + geom_jitter() + geom_boxplot() + facet_wrap(~k,ncol=4)
 ```
