@@ -79,29 +79,50 @@ df_resultados.U <- df_resultados %>% filter(MN=="EE") %>% distinct()
 ## Padrões gerais
 
 ```{r n_nRef padroes gerais}
+# escala da função de ligação
+df_resultados %<>% mutate(logit_nRef = car::logit(n_nRef/100))
+# plot(x=df_resultados$n_nRef,y=df_resultados$logit_nRef)
 l_p <- vector("list",2)
 l_p[[1]] <- ggplot(filter(df_resultados,k %in% levels(df_resultados$k)[1:10]),
-                   aes(x=p,y=n_nRef)) + 
+                   aes(x=p,y=logit_nRef)) + 
   geom_point() + 
   geom_smooth(method="loess") +
   facet_grid(k~MN)
 l_p[[2]] <- ggplot(filter(df_resultados,k %in% levels(df_resultados$k)[11:20]),
-                   aes(x=p,y=n_nRef)) + 
+                   aes(x=p,y=logit_nRef)) + 
   geom_point() + 
   geom_smooth(method="loess") +
   facet_grid(k~MN) 
 do.call("grid.arrange",c(l_p,ncol=2))
+# 
+# v_Sites <- df_resultados %>% filter(n_nRef == 0 & p>0.5 & p<0.7) %>% .$SiteCode %>% unique
+# 
+# df_resultados %>% filter(SiteCode %in% v_Sites) %>% ddply("SiteCode",summarise,mean_nRef = mean(n_nRef))
+# 
+# 
+# 
+# l_p <- vector("list",2)
+# l_p[[1]] <- ggplot(filter(df_resultados,SiteCode %in% v_Sites & k %in% levels(df_resultados$k)[1:10]),
+#                    aes(x=p,y=n_nRef)) + 
+#   geom_point() + 
+#   # geom_smooth(method="loess") +
+#   facet_grid(k~MN)
+# l_p[[2]] <- ggplot(filter(df_resultados,SiteCode %in% v_Sites & k %in% levels(df_resultados$k)[11:20]),
+#                    aes(x=p,y=n_nRef)) + 
+#   geom_point() + 
+#   # geom_smooth(method="loess") +
+#   facet_grid(k~MN) 
+# do.call("grid.arrange",c(l_p,ncol=2))
 ```
 
-__Figura 1.1__ número de SADs não refutadas ~ p * I(1-k) * MN. A linha azul é uma estimativa baseada em 'loess'. 
+__Figura 1.1__ logito(número de SADs não refutadas) ~ p *  k * MN. A linha azul é uma estimativa baseada em 'loess'. 
 
-Para descrever estatisticamente o número de SADs preditas não refutadas iremos utilizar a distribuição binomial com função de ligação logito. Agruparemos os dados pelo sítio de amostragem. Esperamos que MNEE apresente melhor congruência com o observado para sítios em paisagens com proporção intermediária de cobertura vegetal e para cenários de extrema limitação de dispersão. Uma interpretação desta predição pode ser obtida se possibilitarmos que, para cada sítios de amostragem, a probabilidade de uma predição ser refutada seja uma função da variável de dispersão para cada modelo, ou seja, (dispersão * modelo neutro | sítio de amostragem). O modelo cheio considera a interação de terceira ordem entre as preditoras cobertura vegetal (p, contínua), dispersão (k, categorica; k_1, contínua; d_Lplot, contínua) e a classe do modelo neutro (MNEE e MNEI). Utilizamos uma abordagem baseada em seleção de modelos para determinar a relação entre as variáveis mais parcimoniosa.
+A figura 1.1 mostra que o padrão geral dos dados não é linear na escala da função de ligação, assim utilizamos GAM. Possibilitamos até 1 intercepto por modelo neutro por sítio de amostragem (MN|SiteCode); para modelos com variáveis de dispersão continua não foi possível um smoother por Sítio de Amostragem e Modelo Neutro
+ 
 
   
 ## GAMM binomial: número de predições não refutadas  
   
-A hipótese de trabalho é sobre uma relação não linear, uma escolha são generalized additive models onde há maior flexibilidade para estimar a tendência global dos dados (Wood 2017).
-
 
 ### Comparação de Modelos Cheios
 
@@ -144,27 +165,22 @@ AICctab(l_md,weights=TRUE)
 # load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/md_nRef.Rdata")
 ```
 
-O único modelo plausível considera a variável k (fator) e estrutura aleatória MN|SiteCode.
+O único modelo plausível considera a variável k (fator) e estrutura aleatória MN|SiteCode.  
+  
+### Diagnostico do Modelo Cheio   
 
-```{r appraise l_md[[k MN|SiteCode]] 1}
+```{r appraise l_md[[k MN|SiteCode]] 1,message=FALSE}
 appraise(l_md[["k MN|SiteCode"]])
 ```
 
 __Figura 1.2__ appraise(gam( cbind(n_nRef,100-n_nRef) ~ k*MN + s(p.z,MN,by=k), binomial(logit) )  
 
-```{r sumario md_nRef mais plausivel}
+O modelo mais plausível não apresenta boa congruência com os dados: a distribuição binomial não parece se adequar bem aos dados e o predito e observado podem ser muito divergentes.
+
+```{r sumario md_nRef mais plausivel,include=FALSE}
 summary(l_md[["k MN|SiteCode"]])
 ```
 
-```{r estudo gamm4,include=FALSE}
-teste_gamm4 <- gamm4(cbind(n_nRef,100-n_nRef) ~ k * MN + s(p.z,MN,by=k,bs="fs"),
-                     random = ~(MN|SiteCode),
-                     family = "binomial",
-                     data = df_resultados, method = "REML")
-```
-
-
-### Comparação com o observado  
 
 ```{r predicao n_nRef}
 ## modelo mais plausível
@@ -174,48 +190,27 @@ df_pred.k <- expand.grid(SiteCode=levels(df_resultados$SiteCode)[1],
                           p.z=seq(min(df_resultados$p.z),max(df_resultados$p.z),length=103)) %>% 
   mutate(p = p.z * sd(df_resultados$p) + mean(df_resultados$p))
 df_pred.k <- cbind(df_pred.k,
-                   predict(l_md[["k MN|SiteCode"]],
-                           df_pred.k,type="response",se.fit=TRUE))
-df_pred.k[,c("fit","se.fit")] <- df_pred.k[,c("fit","se.fit")]*100
+                   predict.gam(l_md[["k MN|SiteCode"]],
+                           df_pred.k,type="link",se.fit=TRUE))
+# df_pred.k[,c("fit","se.fit")] <- df_pred.k[,c("fit","se.fit")]*100
 
-
-## segundo modelo mais plausível (mais fácil de interpretar)
-# df_pred.k_1 <- expand.grid(SiteCode=levels(df_resultados$SiteCode)[1],
-#                             MN=levels(df_resultados$MN),
-#                             k_1.z=unique(df_resultados$k_1.z),
-#                             p.z=seq(min(df_resultados$p.z),max(df_resultados$p.z),length=103))
-# df_pred.k_1 <- cbind(df_pred.k_1,
-#                      predict(l_md[["k_1 MN|SiteCode"]],
-#                              df_pred.k_1,type="response",se.fit=TRUE))
-# df_pred.k_1[,c("fit","se.fit")] <- df_pred.k_1[,c("fit","se.fit")]*100
-# names(df_pred.k_1)[5:6] <- c("fit.k_1","se.k_1")
-# df_pred.k_1 %<>% inner_join(x=.,
-#                             y=distinct(select(df_resultados,k,k_1.z,p,p.z)),
-#                             by=c("k_1.z","p.z"))
-# Gráficos Exploratórios
-# l_p <- vector("list",2)
-# l_p[[1]] <-
-ggplot(df_pred.k,aes(x=p,y=fit,color=MN)) +
-geom_line() +
-facet_wrap(~k,ncol=4) +
-labs(title = "MN*k + s(p,k,by=MN,bs=fs)") + ylab("Pr(não refutar)") +
-scale_color_manual(values=c("#FF0000", "#000000"))
-# l_p[[2]] <- ggplot(df_pred.k_1,aes(x=p.z,y=fit.k_1,color=MN)) +
-  # geom_line() +
-  # facet_wrap(~k,ncol=5) +
-  # labs(title = "ti(p,k_1,by=MN)") +
-  # ylab("")
-# do.call("grid.arrange",c(l_p,ncol=2))
+# ggplot(df_pred.k,aes(x=p,y=fit,color=MN)) +
+# geom_line() +
+# facet_wrap(~k,ncol=4) +
+# labs(title = "MN*k + s(p,k,by=MN,bs=fs)") + ylab("logito(não refutar)") +
+# scale_color_manual(values=c("#FF0000", "#000000"))
 ```
 
 <!-- __Figura 1.3__ Probabilidade de não refutar uma SAD neutra para cada modelo estatístico (título dos paineis); na esquerda o modelo mais plausível, na esquerda o segundo modelo plausível (>1000 deltaAIC). Os valores médios de cada modelo neutro apresentam semelhante entre os dois gráficos, contudo o modelo mais plausível apresenta maior flexibilidade na descrição dos modelos.  -->
   
   
-```{r predito e observado n_nRef graficos}
+```{r predito e observado n_nRef graficos fig 1.3,message=FALSE}
 # código adaptado de Pedersen et al. 2017 Support Information
 # gráficos
+df_plot <- df_resultados
+df_plot$logit_nRef <- car::logit(df_resultados$n_nRef/100)
 l_p <- vector("list",2)
-l_p[[1]] <- ggplot(filter(df_resultados,k %in% levels(df_resultados$k)[1:10]),aes(x=p,y=n_nRef)) + 
+l_p[[1]] <- ggplot(filter(df_plot,k %in% levels(df_resultados$k)[1:10]),aes(x=p,y=logit_nRef)) + 
   geom_point() + facet_grid(k~MN) +
   # k
   geom_ribbon(aes(ymin=I(fit - 2*se.fit), ymax=I(fit + 2*se.fit), x=p),
@@ -224,18 +219,11 @@ l_p[[1]] <- ggplot(filter(df_resultados,k %in% levels(df_resultados$k)[1:10]),ae
               inherit.aes=FALSE,
               color="red") +
   geom_line(aes(y=fit),color="white", data=filter(df_pred.k,k %in% levels(df_resultados$k)[1:10])) +
-  ylab("Pr(not ref. SAD)") + xlab("Proportion of Tree Cover") +
+  ylab("logit(not ref. SAD)") + xlab("Proportion of Tree Cover") +
   theme(panel.background = element_rect(fill = "gray"),
         panel.grid.major = element_blank(),
         panel.grid.minor = element_blank())
-  # # k_1
-  # geom_ribbon(aes(ymin=exp(fit.k_1 - 2*se.k_1), ymax=exp(fit.k_1 + 2*se.k_1), x=p.z),
-  #             data=filter(df_pred.k_1,k %in% levels(df_resultados$k)[1:10]), 
-  #             alpha=0.3, 
-  #             inherit.aes=FALSE,
-  #             color="blue") +
-  # geom_line(aes(y=fit.k_1), data=filter(df_pred.k_1,k %in% levels(df_resultados$k)[1:10]))
-l_p[[2]] <- ggplot(filter(df_resultados,k %in% levels(df_resultados$k)[11:20]),aes(x=p,y=n_nRef)) + 
+l_p[[2]] <- ggplot(filter(df_plot,k %in% levels(df_resultados$k)[11:20]),aes(x=p,y=logit_nRef)) + 
   geom_point() + facet_grid(k~MN) +
   # k
   geom_ribbon(aes(ymin=I(fit - 2*se.fit), ymax=I(fit + 2*se.fit), x=p),
@@ -248,21 +236,169 @@ l_p[[2]] <- ggplot(filter(df_resultados,k %in% levels(df_resultados$k)[11:20]),a
   theme(panel.background = element_rect(fill = "gray"),
         panel.grid.major = element_blank(),
         panel.grid.minor = element_blank())
-  # k_1
-  # geom_ribbon(aes(ymin=exp(fit - 2*se.fit), ymax=exp(fit + 2*se.fit), x=p.z),
-  #             data=filter(df_pred.k_1,k %in% levels(df_resultados$k)[11:20]), 
-  #             alpha=0.3, 
-  #             inherit.aes=FALSE,
-  #             color="blue") +
-  # geom_line(aes(y=fit), data=filter(df_pred.k_1,k %in% levels(df_resultados$k)[11:20]))
 do.call("grid.arrange",c(l_p,ncol=2))
 ```
 
 __Figura 1.3__ Observado e predito pelo modelo mais plausível. Eixo x = prop. de cobertura vegetal na paisagem; Eixo y: número de SADs não refutadas. Em branco o padrão geral estimado e em vermelho o erro padrão. 
   
-O padrão estimado parece ser muito sensível  a valores extremo: a média de EI parece estar muito abaixo da mediana; essa tendência também parece ser observada para algum grau do vale que surge para p.z ~ -1 e p->0.05. Vejo duas opções: a) avaliar outliers e b) parâmetros da gam (parâmetro de penalidade, número de funções base; por padrão ambos são estimados utilizando REML, começar pelo parâmetro de penalidade)
+o modelo não apresenta bom ajuste aos dados:   
+i) MNEE: de maneira geral a tendência global parece estar de acordo com o observado. Contudo, para k<0.5, a estimativa parece ser muito influenciada por pontos extremos.  
+ii) MNEI: para todo k, a tendência global não parece apresentar boa congruência com o observado principalmente quanto aos valores médios observados, e.g., para k>0.50 a tendência global parece subestimar o observado. Para k<0.5 há um ponto  que parece ser de grande influência (k=0.25 p->0.5).    
+
+
+```{r fig 1.4 residuos pelas preditoras}
+df_plot <- df_resultados
+df_plot$devRes <- residuals.gam(l_md[["k MN|SiteCode"]],type = "deviance")
+
+l_p <- vector("list",2)
+l_p[[1]] <- ggplot(filter(df_plot,k %in% levels(df_resultados$k)[1:10]),aes(x=p,y=devRes)) + 
+  geom_point() + geom_smooth() + facet_grid(k~MN,scales="free") +
+  ylab("Deviance Residuals") + xlab("Proportion of Tree Cover")
+l_p[[2]] <- ggplot(filter(df_plot,k %in% levels(df_resultados$k)[11:20]),aes(x=p,y=devRes)) + 
+  geom_point() + geom_smooth() + facet_grid(k~MN,scales="free") +
+  ylab("Deviance Residuals") + xlab("Proportion of Tree Cover")
+do.call("grid.arrange",c(l_p,ncol=2))
+```
+
+__Figura 1.4__ residuals.gam(l_md[["k MN|SiteCode"]]) ~ p (~k*MN).
+
+Os resíduos do tipo 'deviance' não indicam erro na estimativa quanto à tendência global.  
+  
+```{r fig 1.5 residuos caseiros pelas preditoras}
+df_plot <- augment(l_md[["k MN|SiteCode"]]) %>% as.data.frame()
+df_plot$logit_nRef <- car::logit(df_plot[,1][,1]/100)
+df_plot %<>% mutate(res_ = logit_nRef - .fitted,
+                    p = p.z * sd(df_resultados$p) + mean(df_resultados$p))
+
+## 
+l_p <- vector("list",2)
+l_p[[1]] <- ggplot(filter(df_plot,k %in% levels(df_resultados$k)[1:10]),aes(x=p,y=res_)) + 
+  geom_point() + geom_abline(intercept=0,slope = 0,col="red") + facet_grid(k~MN) +
+  ylab("logit_obs - logit_fit") + xlab("Proportion of Tree Cover")
+l_p[[2]] <- ggplot(filter(df_plot,k %in% levels(df_resultados$k)[11:20]),aes(x=p,y=res_)) + 
+  geom_point() + geom_abline(intercept=0,slope = 0,col="red") + facet_grid(k~MN) +
+  ylab("logit_obs - logit_fit") + xlab("Proportion of Tree Cover")
+do.call("grid.arrange",c(l_p,ncol=2))
+#
+l_p <- vector("list",2)
+l_p[[1]] <- ggplot(filter(df_plot,k %in% levels(df_resultados$k)[1:10]),aes(x=p,y=n_nRef)) + 
+  geom_point() + facet_grid(k~MN) +
+  ylab("logit_obs") + xlab("Proportion of Tree Cover")
+l_p[[2]] <- ggplot(filter(df_plot,k %in% levels(df_resultados$k)[11:20]),aes(x=p,y=n_nRef)) + 
+  geom_point() + facet_grid(k~MN) +
+  ylab("logit_obs") + xlab("Proportion of Tree Cover")
+do.call("grid.arrange",c(l_p,ncol=2))
+```
+
+
 
 ### Melhoria do modelo mais plausível: CONSTRUÇÃO
+
+```{r}
+l_p <- vector("list",2)
+l_p[[1]] <- ggplot(filter(df_nRef,k %in% levels(df_resultados$k)[1:10]),aes(x=p.z,y=dev_Res)) + 
+  geom_point() + geom_smooth() +
+  facet_grid(k~MN)
+l_p[[2]] <- ggplot(filter(df_nRef,k %in% levels(df_resultados$k)[11:20]),aes(x=p.z,y=dev_Res)) + 
+  geom_point() + geom_smooth() +
+  facet_grid(k~MN)
+do.call("grid.arrange",c(l_p,ncol=2))
+
+# ggplot(df_resultados,aes(x=MN,y=n_nRef)) + geom_jitter() + geom_boxplot() + facet_wrap(~k,ncol=4)
+```
+
+__Figura 1.4__ Resíduos do modelo mais plausível como na figura 1.3
+
+
+#### Avaliação do conjunto de dados
+
+Apenas para MN==EI
+
+```{r gam binomial n_nRef MN=EI, echo=TRUE}
+l_md <- vector("list",3)
+names(l_md) <- c("k 1|SiteCode","k_1 1|SiteCode","d/L 1|SiteCode")
+# muitos parametros para poucos dados "k_1 k_1 * MN|SiteCode","d_Lplot d_Lplot * MN|SiteCode")
+# k
+l_md[[1]] <- gam(cbind(n_nRef,100-n_nRef) ~ k + s(p.z,by=k,bs="cr") +
+                   s(SiteCode,bs="re"),
+                   family = "binomial",
+                   data = filter(df_resultados,MN=="EI"), method = "REML")
+# k_1
+l_md[[2]] <- gam(cbind(n_nRef,100-n_nRef) ~ s(p.z,bs="cr") + s(k_1.z,bs="cr") + ti(p.z,k_1.z,bs=c("cr","cr")) +
+                   s(SiteCode,bs="re"),
+                   family = "binomial",
+                   data = filter(df_resultados,MN=="EI"), method = "REML")
+# d/L
+l_md[[3]] <- gam(cbind(n_nRef,100-n_nRef) ~ s(p.z,bs="cr") + s(d_Lplot.z,bs="cr") + ti(p.z,d_Lplot.z,bs=c("cr","cr")) +
+                   s(SiteCode,bs="re"),
+                   family = "binomial",
+                   data = filter(df_resultados,MN=="EI"), method = "REML")
+AICctab(l_md,weights=TRUE)
+
+```
+
+```{r modelo mais plausivel n_nRef MNEI}
+gratia::appraise(l_md[[1]])
+```
+
+```{r}
+## modelo mais plausível
+df_pred.k <- expand.grid(SiteCode=levels(df_resultados$SiteCode)[1],
+                          k=levels(df_resultados$k),
+                          p.z=seq(min(df_resultados$p.z),max(df_resultados$p.z),length=103)) %>% 
+  mutate(p = p.z * sd(df_resultados$p) + mean(df_resultados$p))
+df_pred.k <- cbind(df_pred.k,
+                   predict(l_md[["k 1|SiteCode"]],
+                           df_pred.k,type="response",se.fit=TRUE))
+df_pred.k[,c("fit","se.fit")] <- df_pred.k[,c("fit","se.fit")]*100
+
+ggplot(filter(df_resultados,MN=="EI"),aes(x=p,y=n_nRef)) + 
+  geom_point() + facet_wrap(~k,ncol=4) +
+  # k
+  geom_ribbon(aes(ymin=I(fit - 2*se.fit), ymax=I(fit + 2*se.fit), x=p),
+              data=df_pred.k,
+              alpha=0.3,
+              inherit.aes=FALSE,
+              color="red") +
+  geom_line(aes(y=fit),color="white", data=df_pred.k) +
+  ylab("Pr(not ref. SAD)") + xlab("Proportion of Tree Cover") +
+  theme(panel.background = element_rect(fill = "gray"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())
+df_resultados %>% filter(MN=="EI") %>% ddply("SiteCode",summarise,mean_nRef = mean(n_nRef))
+
+#################################################################################
+
+teste <- update(l_md[[1]],data=filter(df_resultados,MN=="EI" & !(SiteCode %in% c("MGlavr3","SCside4"))))
+gratia::draw(teste)
+
+df_pred.k <- expand.grid(SiteCode=levels(df_resultados$SiteCode)[1],
+                          k=levels(df_resultados$k),
+                          p.z=seq(min(df_resultados$p.z),max(df_resultados$p.z),length=103)) %>% 
+  mutate(p = p.z * sd(df_resultados$p) + mean(df_resultados$p))
+df_pred.k <- cbind(df_pred.k,
+                   predict(l_md[["k 1|SiteCode"]],
+                           df_pred.k,type="response",se.fit=TRUE))
+df_pred.k[,c("fit","se.fit")] <- df_pred.k[,c("fit","se.fit")]*100
+
+ggplot(filter(df_resultados,MN=="EI"),aes(x=p,y=n_nRef)) + 
+  geom_point() + facet_wrap(~k,ncol=4) +
+  # k
+  geom_ribbon(aes(ymin=I(fit - 2*se.fit), ymax=I(fit + 2*se.fit), x=p),
+              data=df_pred.k,
+              alpha=0.3,
+              inherit.aes=FALSE,
+              color="red") +
+  geom_line(aes(y=fit),color="white", data=df_pred.k) +
+  ylab("Pr(not ref. SAD)") + xlab("Proportion of Tree Cover") +
+  theme(panel.background = element_rect(fill = "gray"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())
+df_resultados %>% filter(MN=="EI") %>% ddply("SiteCode",summarise,mean_nRef = mean(n_nRef))
+
+
+```
+
 
 #### comparação de smoothers
 
@@ -652,7 +788,7 @@ __Figura 5.2.1__ m' ~ p (~k). A variável m' é uma função de p, d e I(1/J)
 
 ### Descrição Estatística
 
-```{r md_m_}
+```{r md_m_ e diagnostico}
 l_md_m <- vector("list",length = 2)
 l_md_m[[1]] <- gam(m_ ~ s(p) + s(d) + ti(p,d) + s(I(1/Ntotal)) + s(SiteCode,bs="re"), 
                    family = Gamma(link = "log"),filter(df_resultados,MN=="EI"),method="REML")
@@ -666,6 +802,7 @@ appraise(l_md_m[[2]])
 # gratia::draw(l_md_m[[2]])
 ```
 
+__Figura 5.2.2__ Diagnostico do modelo mais plausivel
 
 ## theta
 
@@ -673,9 +810,10 @@ appraise(l_md_m[[2]])
 
 ```{r padroes gerais theta}
 df_resultados %>% ggplot(aes(x=p,y=log(theta))) + geom_point() + facet_wrap(~k,ncol=4,scales="free")
-hist(df_resultados$theta,breaks=60)
+# hist(df_resultados$theta,breaks=60)
 ```
 
+__Figura 5.3.1__ Padrão Geral de theta considerando escala log
 
 ### Descrição Estatística
 
@@ -683,11 +821,12 @@ hist(df_resultados$theta,breaks=60)
 md_theta <- glmer(theta ~ I(p*U_med)*k + (1|SiteCode), family=gaussian(link = "log"),data=filter(df_resultados,MN=="EI"))
 df_theta <- augment(md_theta)
 p_plot <- DHARMa::simulateResiduals(md_theta,n=1000)
-
-
-
-
+plot(p_plot)
 ```
+
+
+
+
 
 
 <!-- O modelos cheio mais plausível possui família Gamma e função de ligação 'log" e utiliza a preditora d / L_plot. -->
