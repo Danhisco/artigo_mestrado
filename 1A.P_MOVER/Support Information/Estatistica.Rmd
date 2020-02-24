@@ -7,7 +7,7 @@ output:
     toc: true
     toc_depth: 5
 editor_options: 
-  chunk_output_type: console
+  chunk_output_type: inline
 ---
 
 <style>
@@ -193,7 +193,7 @@ __Figura 1.2__ appraise(gam( cbind(n_nRef,100-n_nRef) ~ k*MN + s(p.z,MN,by=k), b
 O modelo mais plausível não apresenta boa congruência com os dados: a distribuição binomial não parece se adequar bem aos dados e o predito e observado podem ser muito divergentes.
 
 ```{r sumario md_nRef mais plausivel,include=FALSE}
-summary(l_md[["k MN|SiteCode"]])
+# summary(l_md[["k MN|SiteCode"]])
 ```
 
 
@@ -206,17 +206,23 @@ df_pred.k <- expand.grid(SiteCode=levels(df_resultados$SiteCode)[1],
   mutate(p = p.z * sd(df_resultados$p) + mean(df_resultados$p))
 df_pred.k <- cbind(df_pred.k,
                    predict.gam(l_md[["k MN|SiteCode"]],
-                           df_pred.k,type="link",se.fit=TRUE))
-# df_pred.k[,c("fit","se.fit")] <- df_pred.k[,c("fit","se.fit")]*100
+                           df_pred.k,type="response",se.fit=TRUE))
 
-# ggplot(df_pred.k,aes(x=p,y=fit,color=MN)) +
-# geom_line() +
-# facet_wrap(~k,ncol=4) +
-# labs(title = "MN*k + s(p,k,by=MN,bs=fs)") + ylab("logito(não refutar)") +
-# scale_color_manual(values=c("#FF0000", "#000000"))
+# df_pred.k1 <- cbind(df_resultados,
+#                     predict.gam(l_md[["k MN|SiteCode"]],type="response",se.fit=TRUE)) 
+# df_pred.k1[,c("fit","se.fit")] <- df_pred.k1[,c("fit","se.fit")]*100
+
+# plot(df_pred.k1$n_nRef ~ df_pred.k1$fit)
+
+####
+ggplot(df_pred.k,aes(x=p,y=fit,color=MN)) +
+geom_line() + 
+facet_wrap(~k,ncol=4) +
+labs(title = "MN*k + s(p,k,by=MN,bs=fs)") + ylab("logito(não refutar)") +
+scale_color_manual(values=c("#FF0000", "#000000"))
 ```
 
-<!-- __Figura 1.3__ Probabilidade de não refutar uma SAD neutra para cada modelo estatístico (título dos paineis); na esquerda o modelo mais plausível, na esquerda o segundo modelo plausível (>1000 deltaAIC). Os valores médios de cada modelo neutro apresentam semelhante entre os dois gráficos, contudo o modelo mais plausível apresenta maior flexibilidade na descrição dos modelos.  -->
+__Figura 1.3__ Probabilidade de não refutar uma SAD neutra para cada modelo estatístico (título dos paineis); na esquerda o modelo mais plausível, na esquerda o segundo modelo plausível (>1000 deltaAIC). Os valores médios de cada modelo neutro apresentam semelhante entre os dois gráficos, contudo o modelo mais plausível apresenta maior flexibilidade na descrição dos modelos.
   
   
 ```{r predito e observado n_nRef graficos fig 1.3,message=FALSE}
@@ -225,7 +231,7 @@ df_pred.k <- cbind(df_pred.k,
 df_plot <- df_resultados
 df_plot$logit_nRef <- car::logit(df_resultados$n_nRef/100)
 l_p <- vector("list",2)
-l_p[[1]] <- ggplot(filter(df_plot,k %in% levels(df_resultados$k)[1:10]),aes(x=p,y=logit_nRef)) + 
+l_p[[1]] <- ggplot(filter(df_plot,k %in% levels(df_resultados$k)[1:10]),aes(x=p,y=n_nRef)) + 
   geom_point() + facet_grid(k~MN) +
   # k
   geom_ribbon(aes(ymin=I(fit - 2*se.fit), ymax=I(fit + 2*se.fit), x=p),
@@ -238,7 +244,7 @@ l_p[[1]] <- ggplot(filter(df_plot,k %in% levels(df_resultados$k)[1:10]),aes(x=p,
   # theme(panel.background = element_rect(fill = "gray"),
   #       panel.grid.major = element_blank(),
   #       panel.grid.minor = element_blank())
-l_p[[2]] <- ggplot(filter(df_plot,k %in% levels(df_resultados$k)[11:20]),aes(x=p,y=logit_nRef)) + 
+l_p[[2]] <- ggplot(filter(df_plot,k %in% levels(df_resultados$k)[11:20]),aes(x=p,y=n_nRef)) + 
   geom_point() + facet_grid(k~MN) +
   # k
   geom_ribbon(aes(ymin=I(fit - 2*se.fit), ymax=I(fit + 2*se.fit), x=p),
@@ -254,7 +260,7 @@ l_p[[2]] <- ggplot(filter(df_plot,k %in% levels(df_resultados$k)[11:20]),aes(x=p
 do.call("grid.arrange",c(l_p,ncol=2))
 ```
 
-__Figura 1.3__ Observado e predito pelo modelo mais plausível. Eixo x = prop. de cobertura vegetal na paisagem; Eixo y: número de SADs não refutadas. Em branco o padrão geral estimado e em vermelho o erro padrão. 
+__Figura 1.4__ Observado e predito pelo modelo mais plausível. Eixo x = prop. de cobertura vegetal na paisagem; Eixo y: número de SADs não refutadas. Em branco o padrão geral estimado e em vermelho o erro padrão. 
   
 o modelo não apresenta bom ajuste aos dados:   
 i) MNEE: de maneira geral a tendência global parece estar de acordo com o observado. Contudo, para k<0.5, a estimativa parece ser muito influenciada por pontos extremos.  
@@ -265,60 +271,33 @@ ii) MNEI: para todo k, a tendência global não parece apresentar boa congruênc
 df_plot <- df_resultados
 df_plot$devRes <- residuals.gam(l_md[["k MN|SiteCode"]],type = "deviance")
 
+df_aug_nRef <- augment(l_md[["k MN|SiteCode"]]) %>% as.data.frame()
+# df_aug_nRef %>% names
+
+
 l_p <- vector("list",2)
-l_p[[1]] <- ggplot(filter(df_plot,k %in% levels(df_resultados$k)[1:10]),aes(x=p,y=devRes)) + 
+l_p[[1]] <- ggplot(filter(df_plot,k %in% levels(df_resultados$k)[1:10]),aes(x=p.z,y=devRes)) + 
   geom_point() + geom_smooth() + facet_grid(k~MN,scales="free") +
   ylab("Deviance Residuals") + xlab("Proportion of Tree Cover")
-l_p[[2]] <- ggplot(filter(df_plot,k %in% levels(df_resultados$k)[11:20]),aes(x=p,y=devRes)) + 
+l_p[[2]] <- ggplot(filter(df_plot,k %in% levels(df_resultados$k)[11:20]),aes(x=p.z,y=devRes)) + 
   geom_point() + geom_smooth() + facet_grid(k~MN,scales="free") +
   ylab("Deviance Residuals") + xlab("Proportion of Tree Cover")
 do.call("grid.arrange",c(l_p,ncol=2))
+ggplot(df_aug_nRef,aes(x=MN,y=.cooksd)) + geom_jitter() + geom_boxplot() + facet_wrap(~k,ncol=4,scales="free")
 ```
 
-__Figura 1.4__ residuals.gam(l_md[["k MN|SiteCode"]]) ~ p (~k*MN).
+__Figura 1.5__ residuals.gam(l_md[["k MN|SiteCode"]]) ~ p (~k*MN).
 
-Os resíduos do tipo 'deviance' não indicam erro na estimativa quanto à tendência global.  
-  
-```{r fig 1.5 residuos caseiros pelas preditoras}
-## dados
-df_plot <- augment(l_md[["k MN|SiteCode"]]) %>% as.data.frame()
-df_plot <- cbind(df_plot,
-                 predict(l_md[["k MN|SiteCode"]],type="response",se=TRUE))
-df_plot %<>% mutate(p = p.z * sd(df_resultados$p) + mean(df_resultados$p),
-                    Prob_nRef = df_plot[,1][,1]/100,
-                    logit_nRef = arm::logit(Prob_nRef),
-                    link_res = logit_nRef - .fitted,
-                    response_res = Prob_nRef - fit)
-df_plot$n_nRef <- df_plot[,1][,1]
-## graficos 
-l_p <- vector("list",2)
-l_p[[1]] <- ggplot(filter(df_plot,k %in% levels(df_resultados$k)[1:10]),aes(x=p,y=response_res)) + 
-  geom_point() + geom_smooth(method="loess") + facet_grid(k~MN) +
-  ylab("Prob_nRef - fit") + xlab("Proportion of Tree Cover")
-l_p[[2]] <- ggplot(filter(df_plot,k %in% levels(df_resultados$k)[11:20]),aes(x=p,y=response_res)) + 
-  geom_point() + geom_smooth(method="loess") + facet_grid(k~MN) +
-  ylab("Prob_nRef - fit") + xlab("Proportion of Tree Cover")
-do.call("grid.arrange",c(l_p,ncol=2))
-#
-l_p <- vector("list",2)
-l_p[[1]] <- ggplot(filter(df_plot,k %in% levels(df_resultados$k)[1:10]),aes(x=p,y=n_nRef)) + 
-  geom_point() + facet_grid(k~MN) +
-  ylab("logit_obs") + xlab("Proportion of Tree Cover")
-l_p[[2]] <- ggplot(filter(df_plot,k %in% levels(df_resultados$k)[11:20]),aes(x=p,y=n_nRef)) + 
-  geom_point() + facet_grid(k~MN) +
-  ylab("logit_obs") + xlab("Proportion of Tree Cover")
-do.call("grid.arrange",c(l_p,ncol=2))
-```
-
-Ainda não estou convencido de que o padrão esta fazendo um bom ajuste - não vejo o padrão estimado nos resíduos CONTINUAR
+Os resíduos do tipo 'deviance' não indicam erro na estimativa quanto à tendência global; o quê para mim está errado principalmente para MNEI.  
 
 ### Melhoria do modelo mais plausível: CONSTRUÇÃO
 
 __Opções__
 
-#### 1) modificar método de estimativa de smoother parameter: 4 opções
+#### Comparação metodo para estimar sp e classe de bs
 
-```{r method smoothing parameter n_nRef}
+```{r method smoothing parameter n_nRef e bs type}
+##### method smoothing parameter
 l_md.SP <- vector("list",length = 4)
 names(l_md.SP) <- c("REML","ML","GACV.Cp","GCV.Cp")
 l_md.SP[[1]] <- gam(cbind(n_nRef,100-n_nRef) ~ k * MN + s(p.z,k,by=MN,bs="fs") +
@@ -338,55 +317,293 @@ l_md.SP[[4]] <- gam(cbind(n_nRef,100-n_nRef) ~ k * MN + s(p.z,k,by=MN,bs="fs") +
                    family = "binomial",
                    data = df_resultados, method = "GCV.Cp")
 AICctab(l_md.SP,weights="TRUE")
-```
 
-
-#### 2) modificar o tipo de smoother: 
-
-```{r}
-l_md.BS <- vector("list",length = )
-names(l_md.BS) <- c()
-l_md.BS[[1]] <- gam(cbind(n_nRef,100-n_nRef) ~ k * MN + s(p.z,k,by=MN,bs="fs",) +
+############# bs class
+l_md.BS <- vector("list",length = 8)
+names(l_md.BS) <- c("tp","ts","cr","cs","cc","ps","cp","ad")
+l_md.BS[[1]] <- gam(cbind(n_nRef,100-n_nRef) ~ k * MN + s(p.z,k,by=MN,bs="fs",xt="tp") +
                    s(SiteCode,by=MN,bs="re"),
                    family = "binomial",
                    data = df_resultados, method = "REML")
-AICctab(l_md.BS,weights="TRUE")
+l_md.BS[[2]] <- gam(cbind(n_nRef,100-n_nRef) ~ k * MN + s(p.z,k,by=MN,bs="fs",xt="ts") +
+                   s(SiteCode,by=MN,bs="re"),
+                   family = "binomial",
+                   data = df_resultados, method = "REML")
+l_md.BS[[3]] <- gam(cbind(n_nRef,100-n_nRef) ~ k * MN + s(p.z,k,by=MN,bs="fs",xt="cr") +
+                   s(SiteCode,by=MN,bs="re"),
+                   family = "binomial",
+                   data = df_resultados, method = "REML")
+l_md.BS[[4]] <- gam(cbind(n_nRef,100-n_nRef) ~ k * MN + s(p.z,k,by=MN,bs="fs",xt="cs") +
+                   s(SiteCode,by=MN,bs="re"),
+                   family = "binomial",
+                   data = df_resultados, method = "REML")
+l_md.BS[[5]] <- gam(cbind(n_nRef,100-n_nRef) ~ k * MN + s(p.z,k,by=MN,bs="fs",xt="cc") +
+                   s(SiteCode,by=MN,bs="re"),
+                   family = "binomial",
+                   data = df_resultados, method = "REML")
+l_md.BS[[6]] <- gam(cbind(n_nRef,100-n_nRef) ~ k * MN + s(p.z,k,by=MN,bs="fs",xt="ps") +
+                   s(SiteCode,by=MN,bs="re"),
+                   family = "binomial",
+                   data = df_resultados, method = "REML")
+l_md.BS[[7]] <- gam(cbind(n_nRef,100-n_nRef) ~ k * MN + s(p.z,k,by=MN,bs="fs",xt="cp") +
+                   s(SiteCode,by=MN,bs="re"),
+                   family = "binomial",
+                   data = df_resultados, method = "REML")
+l_md.BS[[8]] <- gam(cbind(n_nRef,100-n_nRef) ~ k * MN + s(p.z,k,by=MN,bs="fs",xt="ad") +
+                   s(SiteCode,by=MN,bs="re"),
+                   family = "binomial",
+                   data = df_resultados, method = "REML")
+l_ <- l_md.BS[c(1,3,5:7)]
+AICctab(l_,weights="TRUE")
+# AICctab(l_md.SP[[4]],l_md.BS[[3]],weights=TRUE)
+# appraise(l_md.BS[["cr"]])
 
-# ggplot(df_resultados,aes(x=MN,y=n_nRef)) + geom_jitter() + geom_boxplot() + facet_wrap(~k,ncol=4)
+#### comparação método com o bs mais plausível
+l_md.SP_cr <- vector("list",length = 4)
+names(l_md.SP_cr) <- c("REML","ML","GACV.Cp","GCV.Cp")
+l_md.SP_cr[[1]] <- gam(cbind(n_nRef,100-n_nRef) ~ k * MN + s(p.z,k,by=MN,bs="fs",xt="cr") +
+                   s(SiteCode,by=MN,bs="re"),
+                   family = "binomial",
+                   data = df_resultados, method = "REML")
+l_md.SP_cr[[2]] <- gam(cbind(n_nRef,100-n_nRef) ~ k * MN + s(p.z,k,by=MN,bs="fs",xt="cr") +
+                   s(SiteCode,by=MN,bs="re"),
+                   family = "binomial",
+                   data = df_resultados, method = "ML")
+l_md.SP_cr[[3]] <- gam(cbind(n_nRef,100-n_nRef) ~ k * MN + s(p.z,k,by=MN,bs="fs",xt="cr") +
+                   s(SiteCode,by=MN,bs="re"),
+                   family = "binomial",
+                   data = df_resultados, method = "GACV.Cp",gamma = 1.5)
+l_md.SP_cr[[4]] <- gam(cbind(n_nRef,100-n_nRef) ~ k * MN + s(p.z,k,by=MN,bs="fs",xt="cr") +
+                   s(SiteCode,by=MN,bs="re"),
+                   family = "binomial",
+                   data = df_resultados, method = "GCV.Cp",gamma = 1.5)
+AICctab(l_md.SP_cr,weights="TRUE")
+appraise(l_md.SP_cr[[3]])
 ```
 
-__Figura 1.4__ Resíduos do modelo mais plausível como na figura 1.3
+  
+
+```{r comparacao bs n_nRef fig16}
+## predição e observação
+### dados
+df_pred.k <- expand.grid(SiteCode=levels(df_resultados$SiteCode)[1],
+                          MN=levels(df_resultados$MN),
+                          k=levels(df_resultados$k),
+                          p.z=seq(min(df_resultados$p.z),max(df_resultados$p.z),length=103)) %>% 
+  mutate(p = p.z * sd(df_resultados$p) + mean(df_resultados$p))
+df_pred.k <- cbind(df_pred.k,
+                   predict.gam(l_md.SP_cr[[3]],
+                           df_pred.k,type="response",se.fit=TRUE))
+df_pred.k[,c("fit","se.fit")] <- df_pred.k[,c("fit","se.fit")]*100
+
+### graficos
+l_p <- vector("list",2)
+l_p[[1]] <- ggplot(filter(df_resultados,k %in% levels(df_resultados$k)[1:10]),aes(x=p,y=n_nRef)) + 
+  geom_point(alpha=0.3) + facet_grid(k~MN) +
+  # k
+  # geom_ribbon(aes(ymin=I(fit - 2*se.fit), ymax=I(fit + 2*se.fit), x=p),
+  #             data=filter(df_pred.k,k %in% levels(df_resultados$k)[1:10]),
+  #             alpha=0.3,
+  #             inherit.aes=FALSE,
+  #             color="red") +
+  geom_line(aes(y=fit),color="red", data=filter(df_pred.k,k %in% levels(df_resultados$k)[1:10])) +
+  ylab("n_nRef") + xlab("Proportion of Tree Cover") #+
+l_p[[2]] <- ggplot(filter(df_resultados,k %in% levels(df_resultados$k)[11:20]),aes(x=p,y=n_nRef)) + 
+  geom_point(alpha=0.3) + facet_grid(k~MN) +
+  # k
+  # geom_ribbon(aes(ymin=I(fit - 2*se.fit), ymax=I(fit + 2*se.fit), x=p),
+  #             data=filter(df_pred.k,k %in% levels(df_resultados$k)[11:20]), 
+  #             alpha=0.3, 
+  #             inherit.aes=FALSE,
+  #             color="red") +
+  geom_line(aes(y=fit),color="red", data=filter(df_pred.k,k %in% levels(df_resultados$k)[11:20])) +
+  ylab("") + xlab("Proportion of Tree Cover") # +
+do.call("grid.arrange",c(l_p,ncol=2))
+```
+
+__Figura 1.6__ Predito pelo gam com method=GACV.Cp e bs=cr. O intervalo de confiança foi removido por apresentar valores negativos.  
+  
+Apesar das mudanças na configuração o modelo continua estimando MNEI errado.  
+
+Resumo dos achados da comparação:  
+  
+i) GCV.Cp e GACV.Cp são os métodos mais plausíveis para o smoothing type padrão ("tp") e para o mais plausível ("cr").
+ii) Porém estes métodos de estimativa do parâmetro de smoothing apresentam ajustes estranhos aos padrões observados.
+iii) O smoother type "mais plausível"cr" ainda apresenta o mesmo problema do anterior: MNEI não está fazendo bom ajuste.  
+  
+a) Como não consegui configurar os métodos GCV.Cp e GACV.Cp para um padrão mais adequado sigo com o terceiro mais plausível ("REML", o padrão).
+b) Vou explorar ajustar modelos separados para cada conjunto de dados
 
 
-#### Avaliação do conjunto de dados
+#### funções de ligação para distribuição binomial
 
-Apenas para MN==EI
+```{r comparacao funcao de ligacao e graficos diag n_nRef}
+l_md <- vector("list",length = 3)
+names(l_md) <- c("logit","probit","cloglog")
+l_md[[1]] <- gam(cbind(n_nRef,100-n_nRef) ~ k * MN + s(p.z,k,by=MN,bs="fs",xt="cr") +
+                   s(SiteCode,by=MN,bs="re"),
+                   family = "binomial",
+                   data = df_resultados, method = "REML")
+l_md[[2]] <- gam(cbind(n_nRef,100-n_nRef) ~ k * MN + s(p.z,k,by=MN,bs="fs",xt="cr") +
+                   s(SiteCode,by=MN,bs="re"),
+                   family = "binomial"(link="probit"),
+                   data = df_resultados, method = "REML")
+l_md[[3]] <- gam(cbind(n_nRef,100-n_nRef) ~ k * MN + s(p.z,k,by=MN,bs="fs",xt="cr") +
+                   s(SiteCode,by=MN,bs="re"),
+                   family = "binomial"(link="cloglog"),
+                   data = df_resultados, method = "REML")
+AICctab(l_md,weights=TRUE)
+appraise(l_md[[3]])
+```
+
+__Figura 1.7__ Gráficos Diagnósticos do modelo mais plausível binomial(link=cloglog)  
+  
+  
+A qualidade do modelo não melhorou.
+
+
+```{r predicao cloglog fig18}
+## predição e observação
+### dados
+df_pred.k <- expand.grid(SiteCode=levels(df_resultados$SiteCode)[1],
+                          MN=levels(df_resultados$MN),
+                          k=levels(df_resultados$k),
+                          p.z=seq(min(df_resultados$p.z),max(df_resultados$p.z),length=103)) %>% 
+  mutate(p = p.z * sd(df_resultados$p) + mean(df_resultados$p))
+df_pred.k <- cbind(df_pred.k,
+                   predict.gam(l_md[[3]],
+                           df_pred.k,type="response",se.fit=TRUE))
+df_pred.k[,c("fit","se.fit")] <- df_pred.k[,c("fit","se.fit")]*100
+
+### graficos
+l_p <- vector("list",2)
+l_p[[1]] <- ggplot(filter(df_resultados,k %in% levels(df_resultados$k)[1:10]),aes(x=p,y=n_nRef)) + 
+  geom_point(alpha=0.3) + facet_grid(k~MN) +
+  # k
+  geom_ribbon(aes(ymin=I(fit - 2*se.fit), ymax=I(fit + 2*se.fit), x=p),
+              data=filter(df_pred.k,k %in% levels(df_resultados$k)[1:10]),
+              alpha=0.3,
+              inherit.aes=FALSE,
+              color="red") +
+  geom_line(aes(y=fit),color="white", data=filter(df_pred.k,k %in% levels(df_resultados$k)[1:10])) +
+  ylab("n_nRef") + xlab("Proportion of Tree Cover") #+
+l_p[[2]] <- ggplot(filter(df_resultados,k %in% levels(df_resultados$k)[11:20]),aes(x=p,y=n_nRef)) + 
+  geom_point(alpha=0.3) + facet_grid(k~MN) +
+  # k
+  geom_ribbon(aes(ymin=I(fit - 2*se.fit), ymax=I(fit + 2*se.fit), x=p),
+              data=filter(df_pred.k,k %in% levels(df_resultados$k)[11:20]),
+              alpha=0.3,
+              inherit.aes=FALSE,
+              color="red") +
+  geom_line(aes(y=fit),color="white", data=filter(df_pred.k,k %in% levels(df_resultados$k)[11:20])) +
+  ylab("") + xlab("Proportion of Tree Cover") # +
+do.call("grid.arrange",c(l_p,ncol=2))
+```
+
+__Figura 1.8__ Predição pelo modelo com função de ligação "cloglog"  
+  
+Para MNEI o problema persiste.
+  
+##### transformação do conjunto de dados e distribuicao normal e gamma
+
+
+```{r transformacao para logit e uso de outras distribuicoes}
+# dados
+df_resultados %<>% mutate(logit1_nRef = logit_nRef + min(logit_nRef)*(-1) +0.01)
+# grafico
+l_p <- vector("list",2)
+l_p[[1]] <- ggplot(filter(df_resultados,k %in% levels(df_resultados$k)[1:10]),aes(x=p,y=logit1_nRef)) + geom_point() + facet_grid(k~MN)
+l_p[[2]] <- ggplot(filter(df_resultados,k %in% levels(df_resultados$k)[11:20]),aes(x=p,y=logit1_nRef)) + geom_point() + facet_grid(k~MN)
+do.call("grid.arrange",c(l_p,ncol=2))
+# modelos
+l_md.Distr <- vector("list",length = 3)
+names(l_md.Distr) <- c("normal","gamma inverse","gamma log")
+l_md.Distr[[1]] <- gam(logit1_nRef ~ k * MN + s(p.z,k,by=MN,bs="fs",xt="cr") +
+                        s(SiteCode,by=MN,bs="re"),
+                        family = "gaussian",
+                        data = df_resultados, method = "REML")
+l_md.Distr[[2]] <- gam(logit1_nRef ~ k * MN + s(p.z,k,by=MN,bs="fs",xt="cr") +
+                        s(SiteCode,by=MN,bs="re"),
+                        family = "Gamma"(link = "inverse"),
+                        data = df_resultados, method = "REML")
+l_md.Distr[[3]] <- gam(logit1_nRef ~ k * MN + s(p.z,k,by=MN,bs="fs",xt="cr") +
+                        s(SiteCode,by=MN,bs="re"),
+                        family = "Gamma"(link = "log"),
+                        data = df_resultados, method = "REML")
+AICctab(l_md.Distr,weights=TRUE)
+# save(l_md.Distr,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/md_nRef_Dist.Rdata")
+# save(l_md,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/md_nRef.Rdata")
+```
+
+__Figura 1.9__ Resíduos logit_nRef normal  
+  
+    
+```{r logit_nRef normal predicao e observacao}
+## predição e observação
+### dados
+df_pred.k <- expand.grid(SiteCode=levels(df_resultados$SiteCode)[1],
+                          MN=levels(df_resultados$MN),
+                          k=levels(df_resultados$k),
+                          p.z=seq(min(df_resultados$p.z),max(df_resultados$p.z),length=103)) %>% 
+  mutate(p = p.z * sd(df_resultados$p) + mean(df_resultados$p))
+df_pred.k <- cbind(df_pred.k,
+                   predict.gam(l_md.Distr[[1]],
+                           df_pred.k,type="response",se.fit=TRUE))
+df_pred.k[,c("fit","se.fit")] <- arm::invlogit(df_pred.k[,c("fit","se.fit")]) 
+### graficos
+l_p <- vector("list",2)
+l_p[[1]] <- ggplot(filter(df_resultados,k %in% levels(df_resultados$k)[1:10]),aes(x=p,y=logit_nRef)) + 
+  geom_point(alpha=0.3) + facet_grid(k~MN) +
+  # k
+  geom_ribbon(aes(ymin=I(fit - 2*se.fit), ymax=I(fit + 2*se.fit), x=p),
+              data=filter(df_pred.k,k %in% levels(df_resultados$k)[1:10]),
+              alpha=0.3,
+              inherit.aes=FALSE,
+              color="red") +
+  geom_line(aes(y=fit),color="white", data=filter(df_pred.k,k %in% levels(df_resultados$k)[1:10])) +
+  ylab("n_nRef") + xlab("Proportion of Tree Cover") #+
+l_p[[2]] <- ggplot(filter(df_resultados,k %in% levels(df_resultados$k)[11:20]),aes(x=p,y=logit_nRef)) + 
+  geom_point(alpha=0.3) + facet_grid(k~MN) +
+  # k
+  geom_ribbon(aes(ymin=I(fit - 2*se.fit), ymax=I(fit + 2*se.fit), x=p),
+              data=filter(df_pred.k,k %in% levels(df_resultados$k)[11:20]),
+              alpha=0.3,
+              inherit.aes=FALSE,
+              color="red") +
+  geom_line(aes(y=fit),color="white", data=filter(df_pred.k,k %in% levels(df_resultados$k)[11:20])) +
+  ylab("") + xlab("Proportion of Tree Cover") # +
+do.call("grid.arrange",c(l_p,ncol=2))
+```
+
+
+#### Avaliação do conjunto de dados separadamente
+
+##### MNEE
 
 ```{r gam binomial n_nRef MN=EI, echo=TRUE}
-l_md <- vector("list",3)
-names(l_md) <- c("k 1|SiteCode","k_1 1|SiteCode","d/L 1|SiteCode")
+l_md.EE <- vector("list",3)
+names(l_md.EE) <- c("k 1|SiteCode","k_1 1|SiteCode","d/L 1|SiteCode")
 # muitos parametros para poucos dados "k_1 k_1 * MN|SiteCode","d_Lplot d_Lplot * MN|SiteCode")
 # k
-l_md[[1]] <- gam(cbind(n_nRef,100-n_nRef) ~ k + s(p.z,by=k,bs="cr") +
+l_md.EE[[1]] <- gam(cbind(n_nRef,100-n_nRef) ~ k + s(p.z,by=k,bs="cr") +
                    s(SiteCode,bs="re"),
                    family = "binomial",
-                   data = filter(df_resultados,MN=="EI"), method = "REML")
+                   data = filter(df_resultados,MN=="EE"), method = "REML")
 # k_1
-l_md[[2]] <- gam(cbind(n_nRef,100-n_nRef) ~ s(p.z,bs="cr") + s(k_1.z,bs="cr") + ti(p.z,k_1.z,bs=c("cr","cr")) +
+l_md.EE[[2]] <- gam(cbind(n_nRef,100-n_nRef) ~ s(p.z,bs="cr") + s(k_1.z,bs="cr") + ti(p.z,k_1.z,bs=c("cr","cr")) +
                    s(SiteCode,bs="re"),
                    family = "binomial",
-                   data = filter(df_resultados,MN=="EI"), method = "REML")
+                   data = filter(df_resultados,MN=="EE"), method = "REML")
 # d/L
-l_md[[3]] <- gam(cbind(n_nRef,100-n_nRef) ~ s(p.z,bs="cr") + s(d_Lplot.z,bs="cr") + ti(p.z,d_Lplot.z,bs=c("cr","cr")) +
+l_md.EE[[3]] <- gam(cbind(n_nRef,100-n_nRef) ~ s(p.z,bs="cr") + s(d_Lplot.z,bs="cr") + ti(p.z,d_Lplot.z,bs=c("cr","cr")) +
                    s(SiteCode,bs="re"),
                    family = "binomial",
-                   data = filter(df_resultados,MN=="EI"), method = "REML")
-AICctab(l_md,weights=TRUE)
-
+                   data = filter(df_resultados,MN=="EE"), method = "REML")
+AICctab(l_md.EE,weights=TRUE)
 ```
 
 ```{r modelo mais plausivel n_nRef MNEI}
-gratia::appraise(l_md[[1]])
+gratia::appraise(l_md.EE[[1]])
 ```
 
 ```{r}
@@ -396,12 +613,12 @@ df_pred.k <- expand.grid(SiteCode=levels(df_resultados$SiteCode)[1],
                           p.z=seq(min(df_resultados$p.z),max(df_resultados$p.z),length=103)) %>% 
   mutate(p = p.z * sd(df_resultados$p) + mean(df_resultados$p))
 df_pred.k <- cbind(df_pred.k,
-                   predict(l_md[["k 1|SiteCode"]],
+                   predict(l_md.EE[["k 1|SiteCode"]],
                            df_pred.k,type="response",se.fit=TRUE))
 df_pred.k[,c("fit","se.fit")] <- df_pred.k[,c("fit","se.fit")]*100
 
-ggplot(filter(df_resultados,MN=="EI"),aes(x=p,y=n_nRef)) + 
-  geom_point() + facet_wrap(~k,ncol=4) +
+ggplot(filter(df_resultados,MN=="EE"),aes(x=p,y=n_nRef)) + 
+  geom_point(alpha=0.5) + facet_wrap(~k,ncol=4) +
   # k
   geom_ribbon(aes(ymin=I(fit - 2*se.fit), ymax=I(fit + 2*se.fit), x=p),
               data=df_pred.k,
@@ -409,42 +626,10 @@ ggplot(filter(df_resultados,MN=="EI"),aes(x=p,y=n_nRef)) +
               inherit.aes=FALSE,
               color="red") +
   geom_line(aes(y=fit),color="white", data=df_pred.k) +
-  ylab("Pr(not ref. SAD)") + xlab("Proportion of Tree Cover") +
-  theme(panel.background = element_rect(fill = "gray"),
-        panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank())
-df_resultados %>% filter(MN=="EI") %>% ddply("SiteCode",summarise,mean_nRef = mean(n_nRef))
-
-#################################################################################
-
-teste <- update(l_md[[1]],data=filter(df_resultados,MN=="EI" & !(SiteCode %in% c("MGlavr3","SCside4"))))
-gratia::draw(teste)
-
-df_pred.k <- expand.grid(SiteCode=levels(df_resultados$SiteCode)[1],
-                          k=levels(df_resultados$k),
-                          p.z=seq(min(df_resultados$p.z),max(df_resultados$p.z),length=103)) %>% 
-  mutate(p = p.z * sd(df_resultados$p) + mean(df_resultados$p))
-df_pred.k <- cbind(df_pred.k,
-                   predict(l_md[["k 1|SiteCode"]],
-                           df_pred.k,type="response",se.fit=TRUE))
-df_pred.k[,c("fit","se.fit")] <- df_pred.k[,c("fit","se.fit")]*100
-
-ggplot(filter(df_resultados,MN=="EI"),aes(x=p,y=n_nRef)) + 
-  geom_point() + facet_wrap(~k,ncol=4) +
-  # k
-  geom_ribbon(aes(ymin=I(fit - 2*se.fit), ymax=I(fit + 2*se.fit), x=p),
-              data=df_pred.k,
-              alpha=0.3,
-              inherit.aes=FALSE,
-              color="red") +
-  geom_line(aes(y=fit),color="white", data=df_pred.k) +
-  ylab("Pr(not ref. SAD)") + xlab("Proportion of Tree Cover") +
-  theme(panel.background = element_rect(fill = "gray"),
-        panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank())
-df_resultados %>% filter(MN=="EI") %>% ddply("SiteCode",summarise,mean_nRef = mean(n_nRef))
-
-
+  ylab("Pr(not ref. SAD)") + xlab("Proportion of Tree Cover") 
+# 
+# l_md.EE[["k 1|SiteCode"]]$sp
+# l_md.EE[["k 1|SiteCode"]]$sp %>% min
 ```
 
 
