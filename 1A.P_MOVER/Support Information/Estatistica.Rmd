@@ -72,6 +72,7 @@ df_resultados %<>% cbind(.,df_resultados.z)
 names(df_resultados)[c(5:6,26,33)] <- c("n_nRef","n_Ref","d_Lplot","d_Lplot.z")
 df_resultados.U <- df_resultados %>% filter(MN=="EE") %>% distinct() 
 # summary(df_resultados)
+df_resultados %<>% mutate(logit_nRef = car::logit(n_nRef/100))
 ```
 
 # Número de SADs preditas não refutadas
@@ -296,7 +297,7 @@ __Opções__
 
 #### Comparação metodo para estimar sp e classe de bs
 
-```{r method smoothing parameter n_nRef e bs type}
+```{r n_nRef smoothing parameter methods,include=FALSE}
 ##### method smoothing parameter
 l_md.SP <- vector("list",length = 4)
 names(l_md.SP) <- c("REML","ML","GACV.Cp","GCV.Cp")
@@ -317,46 +318,58 @@ l_md.SP[[4]] <- gam(cbind(n_nRef,100-n_nRef) ~ k * MN + s(p.z,k,by=MN,bs="fs") +
                    family = "binomial",
                    data = df_resultados, method = "GCV.Cp")
 AICctab(l_md.SP,weights="TRUE")
+```
 
+__smoother type__
+
+```{r n_nRef e bs type}
 ############# bs class
-l_md.BS <- vector("list",length = 8)
-names(l_md.BS) <- c("tp","ts","cr","cs","cc","ps","cp","ad")
+l_md.BS <- vector("list",length = 5)
+names(l_md.BS) <- c("tp",
+                    # "ts",
+                    "cr",
+                    #"cs",
+                    "cc","ps","cp" #,
+                    #"ad"
+                    )
 l_md.BS[[1]] <- gam(cbind(n_nRef,100-n_nRef) ~ k * MN + s(p.z,k,by=MN,bs="fs",xt="tp") +
                    s(SiteCode,by=MN,bs="re"),
                    family = "binomial",
                    data = df_resultados, method = "REML")
-l_md.BS[[2]] <- gam(cbind(n_nRef,100-n_nRef) ~ k * MN + s(p.z,k,by=MN,bs="fs",xt="ts") +
+# l_md.BS[[2]] <- gam(cbind(n_nRef,100-n_nRef) ~ k * MN + s(p.z,k,by=MN,bs="fs",xt="ts") +
+#                    s(SiteCode,by=MN,bs="re"),
+#                    family = "binomial",
+#                    data = df_resultados, method = "REML")
+l_md.BS[[2]] <- gam(cbind(n_nRef,100-n_nRef) ~ k * MN + s(p.z,k,by=MN,bs="fs",xt="cr") +
                    s(SiteCode,by=MN,bs="re"),
                    family = "binomial",
                    data = df_resultados, method = "REML")
-l_md.BS[[3]] <- gam(cbind(n_nRef,100-n_nRef) ~ k * MN + s(p.z,k,by=MN,bs="fs",xt="cr") +
+# l_md.BS[[3]] <- gam(cbind(n_nRef,100-n_nRef) ~ k * MN + s(p.z,k,by=MN,bs="fs",xt="cs") +
+#                    s(SiteCode,by=MN,bs="re"),
+#                    family = "binomial",
+#                    data = df_resultados, method = "REML")
+l_md.BS[[3]] <- gam(cbind(n_nRef,100-n_nRef) ~ k * MN + s(p.z,k,by=MN,bs="fs",xt="cc") +
                    s(SiteCode,by=MN,bs="re"),
                    family = "binomial",
                    data = df_resultados, method = "REML")
-l_md.BS[[4]] <- gam(cbind(n_nRef,100-n_nRef) ~ k * MN + s(p.z,k,by=MN,bs="fs",xt="cs") +
+l_md.BS[[4]] <- gam(cbind(n_nRef,100-n_nRef) ~ k * MN + s(p.z,k,by=MN,bs="fs",xt="ps") +
                    s(SiteCode,by=MN,bs="re"),
                    family = "binomial",
                    data = df_resultados, method = "REML")
-l_md.BS[[5]] <- gam(cbind(n_nRef,100-n_nRef) ~ k * MN + s(p.z,k,by=MN,bs="fs",xt="cc") +
+l_md.BS[[5]] <- gam(cbind(n_nRef,100-n_nRef) ~ k * MN + s(p.z,k,by=MN,bs="fs",xt="cp") +
                    s(SiteCode,by=MN,bs="re"),
                    family = "binomial",
                    data = df_resultados, method = "REML")
-l_md.BS[[6]] <- gam(cbind(n_nRef,100-n_nRef) ~ k * MN + s(p.z,k,by=MN,bs="fs",xt="ps") +
-                   s(SiteCode,by=MN,bs="re"),
-                   family = "binomial",
-                   data = df_resultados, method = "REML")
-l_md.BS[[7]] <- gam(cbind(n_nRef,100-n_nRef) ~ k * MN + s(p.z,k,by=MN,bs="fs",xt="cp") +
-                   s(SiteCode,by=MN,bs="re"),
-                   family = "binomial",
-                   data = df_resultados, method = "REML")
-l_md.BS[[8]] <- gam(cbind(n_nRef,100-n_nRef) ~ k * MN + s(p.z,k,by=MN,bs="fs",xt="ad") +
-                   s(SiteCode,by=MN,bs="re"),
-                   family = "binomial",
-                   data = df_resultados, method = "REML")
-l_ <- l_md.BS[c(1,3,5:7)]
-AICctab(l_,weights="TRUE")
-# AICctab(l_md.SP[[4]],l_md.BS[[3]],weights=TRUE)
+# l_md.BS[[6]] <- gam(cbind(n_nRef,100-n_nRef) ~ k * MN + s(p.z,k,by=MN,bs="fs",xt="ad") +
+#                    s(SiteCode,by=MN,bs="re"),
+#                    family = "binomial",
+#                    data = df_resultados, method = "REML")
+AICctab(l_md.BS,weights="TRUE")
 # appraise(l_md.BS[["cr"]])
+```
+
+
+```{r n_nRef bs mais plausivel e metodo de estimativa}
 
 #### comparação método com o bs mais plausível
 l_md.SP_cr <- vector("list",length = 4)
@@ -381,7 +394,7 @@ AICctab(l_md.SP_cr,weights="TRUE")
 appraise(l_md.SP_cr[[3]])
 ```
 
-  
+
 
 ```{r comparacao bs n_nRef fig16}
 ## predição e observação
@@ -547,12 +560,14 @@ df_pred.k <- expand.grid(SiteCode=levels(df_resultados$SiteCode)[1],
                           p.z=seq(min(df_resultados$p.z),max(df_resultados$p.z),length=103)) %>% 
   mutate(p = p.z * sd(df_resultados$p) + mean(df_resultados$p))
 df_pred.k <- cbind(df_pred.k,
-                   predict.gam(l_md.Distr[[1]],
+                   predict.gam(l_md.Distr[["normal"]],
                            df_pred.k,type="response",se.fit=TRUE))
+df_pred.k %<>% mutate(response_nRef.fit = fit - min(df_resultados$logit_nRef)*(-1) - 0.01,
+                      response_nRef.sd = se.fit - min(df_resultados$logit_nRef)*(-1) - 0.01)
 df_pred.k[,c("fit","se.fit")] <- arm::invlogit(df_pred.k[,c("fit","se.fit")]) 
 ### graficos
 l_p <- vector("list",2)
-l_p[[1]] <- ggplot(filter(df_resultados,k %in% levels(df_resultados$k)[1:10]),aes(x=p,y=logit_nRef)) + 
+l_p[[1]] <- ggplot(filter(df_resultados,k %in% levels(df_resultados$k)[1:10]),aes(x=p,y=n_nRef)) + 
   geom_point(alpha=0.3) + facet_grid(k~MN) +
   # k
   geom_ribbon(aes(ymin=I(fit - 2*se.fit), ymax=I(fit + 2*se.fit), x=p),
@@ -562,7 +577,7 @@ l_p[[1]] <- ggplot(filter(df_resultados,k %in% levels(df_resultados$k)[1:10]),ae
               color="red") +
   geom_line(aes(y=fit),color="white", data=filter(df_pred.k,k %in% levels(df_resultados$k)[1:10])) +
   ylab("n_nRef") + xlab("Proportion of Tree Cover") #+
-l_p[[2]] <- ggplot(filter(df_resultados,k %in% levels(df_resultados$k)[11:20]),aes(x=p,y=logit_nRef)) + 
+l_p[[2]] <- ggplot(filter(df_resultados,k %in% levels(df_resultados$k)[11:20]),aes(x=p,y=n_nRef)) + 
   geom_point(alpha=0.3) + facet_grid(k~MN) +
   # k
   geom_ribbon(aes(ymin=I(fit - 2*se.fit), ymax=I(fit + 2*se.fit), x=p),
@@ -574,46 +589,78 @@ l_p[[2]] <- ggplot(filter(df_resultados,k %in% levels(df_resultados$k)[11:20]),a
   ylab("") + xlab("Proportion of Tree Cover") # +
 do.call("grid.arrange",c(l_p,ncol=2))
 ```
+  
+__Figura 1.10__ Predito pelo modelo com distribuição normal
 
+Apesar de possibilitar uma boa estimativa da média o modelos é muito 
 
 #### Avaliação do conjunto de dados separadamente
 
 ##### MNEE
 
-```{r gam binomial n_nRef MN=EI, echo=TRUE}
-l_md.EE <- vector("list",3)
-names(l_md.EE) <- c("k 1|SiteCode","k_1 1|SiteCode","d/L 1|SiteCode")
+```{r gam binomial n_nRef MNEE}
+l_md.EE <- vector("list",9)
+names(l_md.EE) <- c("k 1|SiteCode logit","k 1|SiteCode probit","k 1|SiteCode cloglog",
+                    "k_1|SiteCode logit","k_1|SiteCode probit","k_1|SiteCode cloglog",
+                    "d/L 1|SiteCode logit","d/L 1|SiteCode probit","d/L 1|SiteCode cloglog")
 # muitos parametros para poucos dados "k_1 k_1 * MN|SiteCode","d_Lplot d_Lplot * MN|SiteCode")
 # k
 l_md.EE[[1]] <- gam(cbind(n_nRef,100-n_nRef) ~ k + s(p.z,by=k,bs="cr") +
                    s(SiteCode,bs="re"),
                    family = "binomial",
                    data = filter(df_resultados,MN=="EE"), method = "REML")
+l_md.EE[[2]] <- gam(cbind(n_nRef,100-n_nRef) ~ k + s(p.z,by=k,bs="cr") +
+                   s(SiteCode,bs="re"),
+                   family = "binomial"(link="probit"),
+                   data = filter(df_resultados,MN=="EE"), method = "REML")
+l_md.EE[[3]] <- gam(cbind(n_nRef,100-n_nRef) ~ k + s(p.z,by=k,bs="cr") +
+                   s(SiteCode,bs="re"),
+                   family = "binomial"(link="cloglog"),
+                   data = filter(df_resultados,MN=="EE"), method = "REML")
 # k_1
-l_md.EE[[2]] <- gam(cbind(n_nRef,100-n_nRef) ~ s(p.z,bs="cr") + s(k_1.z,bs="cr") + ti(p.z,k_1.z,bs=c("cr","cr")) +
+l_md.EE[[4]] <- gam(cbind(n_nRef,100-n_nRef) ~ s(p.z,bs="cr") + s(k_1.z,bs="cr") + ti(p.z,k_1.z,bs=c("cr","cr")) +
                    s(SiteCode,bs="re"),
                    family = "binomial",
                    data = filter(df_resultados,MN=="EE"), method = "REML")
+l_md.EE[[5]] <- gam(cbind(n_nRef,100-n_nRef) ~ s(p.z,bs="cr") + s(k_1.z,bs="cr") + ti(p.z,k_1.z,bs=c("cr","cr")) +
+                   s(SiteCode,bs="re"),
+                   family = "binomial"(link="probit"),
+                   data = filter(df_resultados,MN=="EE"), method = "REML")
+l_md.EE[[6]] <- gam(cbind(n_nRef,100-n_nRef) ~ s(p.z,bs="cr") + s(k_1.z,bs="cr") + ti(p.z,k_1.z,bs=c("cr","cr")) +
+                   s(SiteCode,bs="re"),
+                   family = "binomial"(link="cloglog"),
+                   data = filter(df_resultados,MN=="EE"), method = "REML")
 # d/L
-l_md.EE[[3]] <- gam(cbind(n_nRef,100-n_nRef) ~ s(p.z,bs="cr") + s(d_Lplot.z,bs="cr") + ti(p.z,d_Lplot.z,bs=c("cr","cr")) +
+l_md.EE[[7]] <- gam(cbind(n_nRef,100-n_nRef) ~ s(p.z,bs="cr") + s(d_Lplot.z,bs="cr") + ti(p.z,d_Lplot.z,bs=c("cr","cr")) +
+                   s(SiteCode,bs="re"),
+                   family = "binomial",
+                   data = filter(df_resultados,MN=="EE"), method = "REML")
+l_md.EE[[8]] <- gam(cbind(n_nRef,100-n_nRef) ~ s(p.z,bs="cr") + s(d_Lplot.z,bs="cr") + ti(p.z,d_Lplot.z,bs=c("cr","cr")) +
+                   s(SiteCode,bs="re"),
+                   family = "binomial",
+                   data = filter(df_resultados,MN=="EE"), method = "REML")
+l_md.EE[[9]] <- gam(cbind(n_nRef,100-n_nRef) ~ s(p.z,bs="cr") + s(d_Lplot.z,bs="cr") + ti(p.z,d_Lplot.z,bs=c("cr","cr")) +
                    s(SiteCode,bs="re"),
                    family = "binomial",
                    data = filter(df_resultados,MN=="EE"), method = "REML")
 AICctab(l_md.EE,weights=TRUE)
 ```
 
-```{r modelo mais plausivel n_nRef MNEI}
-gratia::appraise(l_md.EE[[1]])
+```{r graf diag modelo mais plausivel n_nRef MNEE}
+gratia::appraise(l_md.EE[["k 1|SiteCode logit"]])
 ```
 
-```{r}
+__Figura 1.11__ Gráficos Diagnósticos do modelo mais plausível para o conjunto de dados MN:EE    
+  
+  
+```{r predito para conjunto de dados MNEE}
 ## modelo mais plausível
 df_pred.k <- expand.grid(SiteCode=levels(df_resultados$SiteCode)[1],
                           k=levels(df_resultados$k),
                           p.z=seq(min(df_resultados$p.z),max(df_resultados$p.z),length=103)) %>% 
   mutate(p = p.z * sd(df_resultados$p) + mean(df_resultados$p))
 df_pred.k <- cbind(df_pred.k,
-                   predict(l_md.EE[["k 1|SiteCode"]],
+                   predict(l_md.EE[["k 1|SiteCode logit"]],
                            df_pred.k,type="response",se.fit=TRUE))
 df_pred.k[,c("fit","se.fit")] <- df_pred.k[,c("fit","se.fit")]*100
 
@@ -631,12 +678,227 @@ ggplot(filter(df_resultados,MN=="EE"),aes(x=p,y=n_nRef)) +
 # l_md.EE[["k 1|SiteCode"]]$sp
 # l_md.EE[["k 1|SiteCode"]]$sp %>% min
 ```
+  
+__Figura 1.12__ Predito para o conjunto de dados MNEE  
+  
+  Parece que alguns pontos tem grande grande influência nos dados. Sigo comparação de diferentes tipos de smoothers
+  
+```{r n_nRef MNEE comparacao smoothers type}
+############# bs class
+l_mdEE_bs <- vector("list",length = 7)
+# l_mdEE_bs <- l_mdEE_bs[1:7]
+names(l_mdEE_bs) <- c("tp",
+                    "ts",
+                    "cr",
+                    "cs",
+                    "cc","ps","cp" #,
+          #          "ad"
+                    )
+l_mdEE_bs[[1]] <- gam(cbind(n_nRef,100-n_nRef) ~ k + s(p.z,by=k,bs="tp") +
+                   s(SiteCode,bs="re"),
+                   family = "binomial",
+                   data = filter(df_resultados,MN=="EE"), method = "REML")
+l_mdEE_bs[[2]] <- gam(cbind(n_nRef,100-n_nRef) ~ k + s(p.z,by=k,bs="ts") +
+                   s(SiteCode,bs="re"),
+                   family = "binomial",
+                   data = filter(df_resultados,MN=="EE"), method = "REML")
+l_mdEE_bs[[3]] <- gam(cbind(n_nRef,100-n_nRef) ~ k + s(p.z,by=k,bs="cr") +
+                   s(SiteCode,bs="re"),
+                   family = "binomial",
+                   data = filter(df_resultados,MN=="EE"), method = "REML")
+l_mdEE_bs[[4]] <- gam(cbind(n_nRef,100-n_nRef) ~ k + s(p.z,by=k,bs="cs") +
+                   s(SiteCode,bs="re"),
+                   family = "binomial",
+                   data = filter(df_resultados,MN=="EE"), method = "REML")
+l_mdEE_bs[[5]] <- gam(cbind(n_nRef,100-n_nRef) ~ k + s(p.z,by=k,bs="cc") +
+                   s(SiteCode,bs="re"),
+                   family = "binomial",
+                   data = filter(df_resultados,MN=="EE"), method = "REML")
+l_mdEE_bs[[6]] <- gam(cbind(n_nRef,100-n_nRef) ~ k + s(p.z,by=k,bs="ps") +
+                   s(SiteCode,bs="re"),
+                   family = "binomial",
+                   data = filter(df_resultados,MN=="EE"), method = "REML")
+l_mdEE_bs[[7]] <- gam(cbind(n_nRef,100-n_nRef) ~ k + s(p.z,by=k,bs="cp") +
+                   s(SiteCode,bs="re"),
+                   family = "binomial",
+                   data = filter(df_resultados,MN=="EE"), method = "REML")
+# não roda
+# l_mdEE_bs[[8]] <- gam(cbind(n_nRef,100-n_nRef) ~ k + s(p.z,by=k,bs="ad") +
+#                    s(SiteCode,bs="re"),
+#                    family = "binomial",
+#                    data = filter(df_resultados,MN=="EE"), method = "REML")
+AICctab(l_mdEE_bs,weights="TRUE")
+```
+
+```{r n_nRef MNEE appraise l_mdEEbs tp}
+appraise(l_mdEE_bs[["tp"]])
+```
+  
+__Figura 1.13__ Graficos Diagnosticos para MNEE e bs=tp  
+  
+```{r predicao para MNEE bs tp n_nref fig 114}
+## modelo mais plausível
+df_pred.k <- expand.grid(SiteCode=levels(df_resultados$SiteCode)[1],
+                          k=levels(df_resultados$k),
+                          p.z=seq(min(df_resultados$p.z),max(df_resultados$p.z),length=103)) %>% 
+  mutate(p = p.z * sd(df_resultados$p) + mean(df_resultados$p))
+df_pred.k <- cbind(df_pred.k,
+                   predict(l_mdEE_bs[["tp"]],
+                           df_pred.k,type="response",se.fit=TRUE))
+df_pred.k[,c("fit","se.fit")] <- df_pred.k[,c("fit","se.fit")]*100
+
+ggplot(filter(df_resultados,MN=="EE"),aes(x=p,y=n_nRef)) + 
+  geom_point(alpha=0.5) + facet_wrap(~k,ncol=4) +
+  # k
+  geom_ribbon(aes(ymin=I(fit - 2*se.fit), ymax=I(fit + 2*se.fit), x=p),
+              data=df_pred.k,
+              alpha=0.3,
+              inherit.aes=FALSE,
+              color="red") +
+  geom_line(aes(y=fit),color="white", data=df_pred.k) +
+  ylab("Pr(not ref. SAD)") + xlab("Proportion of Tree Cover") 
+```
+  
+__Figura 1.14__ Predito para MNEE e bs="tp"
+  
+Ainda observo valores  de grande influência.
+  
+##### MNEI
+
+```{r gam binomial n_nRef MNEI}
+l_md.EI <- vector("list",9)
+names(l_md.EI) <- c("k 1|SiteCode logit","k 1|SiteCode probit","k 1|SiteCode cloglog",
+                    "k_1|SiteCode logit","k_1|SiteCode probit","k_1|SiteCode cloglog",
+                    "d/L 1|SiteCode logit","d/L 1|SiteCode probit","d/L 1|SiteCode cloglog")
+# muitos parametros para poucos dados "k_1 k_1 * MN|SiteCode","d_Lplot d_Lplot * MN|SiteCode")
+# k
+l_md.EI[[1]] <- gam(cbind(n_nRef,100-n_nRef) ~ k + s(p.z,by=k,bs="cr") +
+                   s(SiteCode,bs="re"),
+                   family = "binomial",
+                   data = filter(df_resultados,MN=="EI"), method = "REML")
+l_md.EI[[2]] <- gam(cbind(n_nRef,100-n_nRef) ~ k + s(p.z,by=k,bs="cr") +
+                   s(SiteCode,bs="re"),
+                   family = "binomial"(link="probit"),
+                   data = filter(df_resultados,MN=="EI"), method = "REML")
+l_md.EI[[3]] <- gam(cbind(n_nRef,100-n_nRef) ~ k + s(p.z,by=k,bs="cr") +
+                   s(SiteCode,bs="re"),
+                   family = "binomial"(link="cloglog"),
+                   data = filter(df_resultados,MN=="EI"), method = "REML")
+# k_1
+l_md.EI[[4]] <- gam(cbind(n_nRef,100-n_nRef) ~ s(p.z,bs="cr") + s(k_1.z,bs="cr") + ti(p.z,k_1.z,bs=c("cr","cr")) +
+                   s(SiteCode,bs="re"),
+                   family = "binomial",
+                   data = filter(df_resultados,MN=="EI"), method = "REML")
+l_md.EI[[5]] <- gam(cbind(n_nRef,100-n_nRef) ~ s(p.z,bs="cr") + s(k_1.z,bs="cr") + ti(p.z,k_1.z,bs=c("cr","cr")) +
+                   s(SiteCode,bs="re"),
+                   family = "binomial"(link="probit"),
+                   data = filter(df_resultados,MN=="EI"), method = "REML")
+l_md.EI[[6]] <- gam(cbind(n_nRef,100-n_nRef) ~ s(p.z,bs="cr") + s(k_1.z,bs="cr") + ti(p.z,k_1.z,bs=c("cr","cr")) +
+                   s(SiteCode,bs="re"),
+                   family = "binomial"(link="cloglog"),
+                   data = filter(df_resultados,MN=="EI"), method = "REML")
+# d/L
+l_md.EI[[7]] <- gam(cbind(n_nRef,100-n_nRef) ~ s(p.z,bs="cr") + s(d_Lplot.z,bs="cr") + ti(p.z,d_Lplot.z,bs=c("cr","cr")) +
+                   s(SiteCode,bs="re"),
+                   family = "binomial",
+                   data = filter(df_resultados,MN=="EI"), method = "REML")
+l_md.EI[[8]] <- gam(cbind(n_nRef,100-n_nRef) ~ s(p.z,bs="cr") + s(d_Lplot.z,bs="cr") + ti(p.z,d_Lplot.z,bs=c("cr","cr")) +
+                   s(SiteCode,bs="re"),
+                   family = "binomial",
+                   data = filter(df_resultados,MN=="EI"), method = "REML")
+l_md.EI[[9]] <- gam(cbind(n_nRef,100-n_nRef) ~ s(p.z,bs="cr") + s(d_Lplot.z,bs="cr") + ti(p.z,d_Lplot.z,bs=c("cr","cr")) +
+                   s(SiteCode,bs="re"),
+                   family = "binomial",
+                   data = filter(df_resultados,MN=="EI"), method = "REML")
+AICctab(l_md.EI,weights=TRUE)
+```  
+
+```{r graf diag modelo mais plausivel n_nRef MNEI}
+gratia::appraise(l_md.EI[["k 1|SiteCode cloglog"]])
+```
+
+__Figura 1.15__ Gráficos Diagnósticos do modelo mais plausível para o conjunto de dados MN:EI    
+  
+  
+```{r predito para conjunto de dados MNEI}
+## modelo mais plausível
+df_pred.k <- expand.grid(SiteCode=levels(df_resultados$SiteCode)[1],
+                          k=levels(df_resultados$k),
+                          p.z=seq(min(df_resultados$p.z),max(df_resultados$p.z),length=103)) %>% 
+  mutate(p = p.z * sd(df_resultados$p) + mean(df_resultados$p))
+df_pred.k <- cbind(df_pred.k,
+                   predict(l_md.EI[["k 1|SiteCode logit"]],
+                           df_pred.k,type="response",se.fit=TRUE))
+df_pred.k[,c("fit","se.fit")] <- df_pred.k[,c("fit","se.fit")]*100
+
+ggplot(filter(df_resultados,MN=="EI"),aes(x=p,y=n_nRef)) + 
+  geom_point(alpha=0.5) + facet_wrap(~k,ncol=4) +
+  # k
+  geom_ribbon(aes(ymin=I(fit - 2*se.fit), ymax=I(fit + 2*se.fit), x=p),
+              data=df_pred.k,
+              alpha=0.3,
+              inherit.aes=FALSE,
+              color="red") +
+  geom_line(aes(y=fit),color="white", data=df_pred.k) +
+  ylab("Pr(not ref. SAD)") + xlab("Proportion of Tree Cover") 
+# 
+# l_md.EE[["k 1|SiteCode"]]$sp
+# l_md.EE[["k 1|SiteCode"]]$sp %>% min
+```
+  
+__Figura 1.16__ Predito para o conjunto de dados MNEI  
+  
+O problema de estimativa errada persiste. Vou avaliar outros tipos de smoothers.
 
 
-#### comparação de smoothers
+```{r n_nRef MNEI basis smoother}
+l_mdEI_bs <- vector("list",length = 7)
+names(l_mdEI_bs) <- c("tp",
+                    "ts",
+                    "cr",
+                    "cs",
+                    "cc","ps","cp" #,
+          #          "ad"
+                    )
+l_mdEI_bs[[1]] <- gam(cbind(n_nRef,100-n_nRef) ~ k + s(p.z,by=k,bs="tp") +
+                    s(SiteCode,bs="re"),
+                    family = "binomial"(link="cloglog"),
+                    data = filter(df_resultados,MN=="EI"), method = "REML")
+l_mdEI_bs[[2]] <- gam(cbind(n_nRef,100-n_nRef) ~ k + s(p.z,by=k,bs="ts") +
+                   s(SiteCode,bs="re"),
+                   family = "binomial"(link="cloglog"),
+                   data = filter(df_resultados,MN=="EI"), method = "REML")
+l_mdEI_bs[[3]] <- gam(cbind(n_nRef,100-n_nRef) ~ k + s(p.z,by=k,bs="cr") +
+                   s(SiteCode,bs="re"),
+                   family = "binomial"(link="cloglog"),
+                   data = filter(df_resultados,MN=="EI"), method = "REML")
+l_mdEI_bs[[4]] <- gam(cbind(n_nRef,100-n_nRef) ~ k + s(p.z,by=k,bs="cs") +
+                   s(SiteCode,bs="re"),
+                   family = "binomial"(link="cloglog"),
+                   data = filter(df_resultados,MN=="EI"), method = "REML")
+l_mdEI_bs[[5]] <- gam(cbind(n_nRef,100-n_nRef) ~ k + s(p.z,by=k,bs="cc") +
+                   s(SiteCode,bs="re"),
+                   family = "binomial"(link="cloglog"),
+                   data = filter(df_resultados,MN=="EI"), method = "REML")
+l_mdEI_bs[[6]] <- gam(cbind(n_nRef,100-n_nRef) ~ k + s(p.z,by=k,bs="ps") +
+                   s(SiteCode,bs="re"),
+                   family = "binomial"(link="cloglog"),
+                   data = filter(df_resultados,MN=="EI"), method = "REML")
+l_mdEI_bs[[7]] <- gam(cbind(n_nRef,100-n_nRef) ~ k + s(p.z,by=k,bs="cp") +
+                   s(SiteCode,bs="re"),
+                   family = "binomial"(link="cloglog"),
+                   data = filter(df_resultados,MN=="EI"), method = "REML")
+# não roda
+# l_mdEE_bs[[8]] <- gam(cbind(n_nRef,100-n_nRef) ~ k + s(p.z,by=k,bs="ad") +
+#                    s(SiteCode,bs="re"),
+#                    family = "binomial",
+#                    data = filter(df_resultados,MN=="EE"), method = "REML")
+AICctab(l_mdEI_bs,weights="TRUE")
+```
 
-#### comparação de parâmetro de penalização
+O smoother type "cr", modelo utilizado até o momento, é o mais plausívels
 
+__Alternativas__
 
 # diff_S = (S_obs - S_MN)/S_obs
 
