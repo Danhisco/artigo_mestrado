@@ -85,12 +85,12 @@ df_resultados %<>% mutate(logit_nRef = car::logit(n_nRef/100))
 # plot(x=df_resultados$n_nRef,y=df_resultados$logit_nRef)
 l_p <- vector("list",2)
 l_p[[1]] <- ggplot(filter(df_resultados,k %in% levels(df_resultados$k)[1:10]),
-                   aes(x=p,y=logit_nRef)) + 
+                   aes(x=p,y=n_nRef)) + 
   geom_point() + 
   geom_smooth(method="loess") +
   facet_grid(k~MN)
 l_p[[2]] <- ggplot(filter(df_resultados,k %in% levels(df_resultados$k)[11:20]),
-                   aes(x=p,y=logit_nRef)) + 
+                   aes(x=p,y=n_nRef)) + 
   geom_point() + 
   geom_smooth(method="loess") +
   facet_grid(k~MN) 
@@ -208,7 +208,7 @@ df_pred.k <- expand.grid(SiteCode=levels(df_resultados$SiteCode)[1],
 df_pred.k <- cbind(df_pred.k,
                    predict.gam(l_md[["k MN|SiteCode"]],
                            df_pred.k,type="response",se.fit=TRUE))
-
+df_pred.k[,c("fit","se.fit")] <- df_pred.k[,c("fit","se.fit")]*100
 # df_pred.k1 <- cbind(df_resultados,
 #                     predict.gam(l_md[["k MN|SiteCode"]],type="response",se.fit=TRUE)) 
 # df_pred.k1[,c("fit","se.fit")] <- df_pred.k1[,c("fit","se.fit")]*100
@@ -233,7 +233,7 @@ df_plot <- df_resultados
 df_plot$logit_nRef <- car::logit(df_resultados$n_nRef/100)
 l_p <- vector("list",2)
 l_p[[1]] <- ggplot(filter(df_plot,k %in% levels(df_resultados$k)[1:10]),aes(x=p,y=n_nRef)) + 
-  geom_point() + facet_grid(k~MN) +
+  geom_point(alpha=0.3) + facet_grid(k~MN) +
   # k
   geom_ribbon(aes(ymin=I(fit - 2*se.fit), ymax=I(fit + 2*se.fit), x=p),
               data=filter(df_pred.k,k %in% levels(df_resultados$k)[1:10]),
@@ -241,12 +241,12 @@ l_p[[1]] <- ggplot(filter(df_plot,k %in% levels(df_resultados$k)[1:10]),aes(x=p,
               inherit.aes=FALSE,
               color="red") +
   geom_line(aes(y=fit),color="white", data=filter(df_pred.k,k %in% levels(df_resultados$k)[1:10])) +
-  ylab("logit(not ref. SAD)") + xlab("Proportion of Tree Cover") #+
+  ylab("logit(not ref. SAD)") + xlab("Proportion of Tree Cover") + theme_classic()
   # theme(panel.background = element_rect(fill = "gray"),
   #       panel.grid.major = element_blank(),
   #       panel.grid.minor = element_blank())
 l_p[[2]] <- ggplot(filter(df_plot,k %in% levels(df_resultados$k)[11:20]),aes(x=p,y=n_nRef)) + 
-  geom_point() + facet_grid(k~MN) +
+  geom_point(alpha=0.3) + facet_grid(k~MN) +
   # k
   geom_ribbon(aes(ymin=I(fit - 2*se.fit), ymax=I(fit + 2*se.fit), x=p),
               data=filter(df_pred.k,k %in% levels(df_resultados$k)[11:20]), 
@@ -254,7 +254,7 @@ l_p[[2]] <- ggplot(filter(df_plot,k %in% levels(df_resultados$k)[11:20]),aes(x=p
               inherit.aes=FALSE,
               color="red") +
   geom_line(aes(y=fit),color="white", data=filter(df_pred.k,k %in% levels(df_resultados$k)[11:20])) +
-  ylab("") + xlab("Proportion of Tree Cover") # +
+  ylab("") + xlab("Proportion of Tree Cover")  + theme_classic()
   # theme(panel.background = element_rect(fill = "gray"),
   #       panel.grid.major = element_blank(),
   #       panel.grid.minor = element_blank())
@@ -515,84 +515,8 @@ do.call("grid.arrange",c(l_p,ncol=2))
 
 __Figura 1.8__ Predição pelo modelo com função de ligação "cloglog"  
   
-Para MNEI o problema persiste.
+Para MNEI o problema persiste. Além disso para MNEE parece que o ajuste piorou.  
   
-##### transformação do conjunto de dados e distribuicao normal e gamma
-
-
-```{r transformacao para logit e uso de outras distribuicoes}
-# dados
-df_resultados %<>% mutate(logit1_nRef = logit_nRef + min(logit_nRef)*(-1) +0.01)
-# grafico
-l_p <- vector("list",2)
-l_p[[1]] <- ggplot(filter(df_resultados,k %in% levels(df_resultados$k)[1:10]),aes(x=p,y=logit1_nRef)) + geom_point() + facet_grid(k~MN)
-l_p[[2]] <- ggplot(filter(df_resultados,k %in% levels(df_resultados$k)[11:20]),aes(x=p,y=logit1_nRef)) + geom_point() + facet_grid(k~MN)
-do.call("grid.arrange",c(l_p,ncol=2))
-# modelos
-l_md.Distr <- vector("list",length = 3)
-names(l_md.Distr) <- c("normal","gamma inverse","gamma log")
-l_md.Distr[[1]] <- gam(logit1_nRef ~ k * MN + s(p.z,k,by=MN,bs="fs",xt="cr") +
-                        s(SiteCode,by=MN,bs="re"),
-                        family = "gaussian",
-                        data = df_resultados, method = "REML")
-l_md.Distr[[2]] <- gam(logit1_nRef ~ k * MN + s(p.z,k,by=MN,bs="fs",xt="cr") +
-                        s(SiteCode,by=MN,bs="re"),
-                        family = "Gamma"(link = "inverse"),
-                        data = df_resultados, method = "REML")
-l_md.Distr[[3]] <- gam(logit1_nRef ~ k * MN + s(p.z,k,by=MN,bs="fs",xt="cr") +
-                        s(SiteCode,by=MN,bs="re"),
-                        family = "Gamma"(link = "log"),
-                        data = df_resultados, method = "REML")
-AICctab(l_md.Distr,weights=TRUE)
-# save(l_md.Distr,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/md_nRef_Dist.Rdata")
-# save(l_md,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/md_nRef.Rdata")
-```
-
-__Figura 1.9__ Resíduos logit_nRef normal  
-  
-    
-```{r logit_nRef normal predicao e observacao}
-## predição e observação
-### dados
-df_pred.k <- expand.grid(SiteCode=levels(df_resultados$SiteCode)[1],
-                          MN=levels(df_resultados$MN),
-                          k=levels(df_resultados$k),
-                          p.z=seq(min(df_resultados$p.z),max(df_resultados$p.z),length=103)) %>% 
-  mutate(p = p.z * sd(df_resultados$p) + mean(df_resultados$p))
-df_pred.k <- cbind(df_pred.k,
-                   predict.gam(l_md.Distr[["normal"]],
-                           df_pred.k,type="response",se.fit=TRUE))
-df_pred.k %<>% mutate(response_nRef.fit = fit - min(df_resultados$logit_nRef)*(-1) - 0.01,
-                      response_nRef.sd = se.fit - min(df_resultados$logit_nRef)*(-1) - 0.01)
-df_pred.k[,c("fit","se.fit")] <- arm::invlogit(df_pred.k[,c("fit","se.fit")]) 
-### graficos
-l_p <- vector("list",2)
-l_p[[1]] <- ggplot(filter(df_resultados,k %in% levels(df_resultados$k)[1:10]),aes(x=p,y=n_nRef)) + 
-  geom_point(alpha=0.3) + facet_grid(k~MN) +
-  # k
-  geom_ribbon(aes(ymin=I(fit - 2*se.fit), ymax=I(fit + 2*se.fit), x=p),
-              data=filter(df_pred.k,k %in% levels(df_resultados$k)[1:10]),
-              alpha=0.3,
-              inherit.aes=FALSE,
-              color="red") +
-  geom_line(aes(y=fit),color="white", data=filter(df_pred.k,k %in% levels(df_resultados$k)[1:10])) +
-  ylab("n_nRef") + xlab("Proportion of Tree Cover") #+
-l_p[[2]] <- ggplot(filter(df_resultados,k %in% levels(df_resultados$k)[11:20]),aes(x=p,y=n_nRef)) + 
-  geom_point(alpha=0.3) + facet_grid(k~MN) +
-  # k
-  geom_ribbon(aes(ymin=I(fit - 2*se.fit), ymax=I(fit + 2*se.fit), x=p),
-              data=filter(df_pred.k,k %in% levels(df_resultados$k)[11:20]),
-              alpha=0.3,
-              inherit.aes=FALSE,
-              color="red") +
-  geom_line(aes(y=fit),color="white", data=filter(df_pred.k,k %in% levels(df_resultados$k)[11:20])) +
-  ylab("") + xlab("Proportion of Tree Cover") # +
-do.call("grid.arrange",c(l_p,ncol=2))
-```
-  
-__Figura 1.10__ Predito pelo modelo com distribuição normal
-
-Apesar de possibilitar uma boa estimativa da média o modelos é muito 
 
 #### Avaliação do conjunto de dados separadamente
 
@@ -650,7 +574,7 @@ AICctab(l_md.EE,weights=TRUE)
 gratia::appraise(l_md.EE[["k 1|SiteCode logit"]])
 ```
 
-__Figura 1.11__ Gráficos Diagnósticos do modelo mais plausível para o conjunto de dados MN:EE    
+__Figura 1.9__ Gráficos Diagnósticos do modelo mais plausível para o conjunto de dados MN:EE    
   
   
 ```{r predito para conjunto de dados MNEE}
@@ -679,7 +603,7 @@ ggplot(filter(df_resultados,MN=="EE"),aes(x=p,y=n_nRef)) +
 # l_md.EE[["k 1|SiteCode"]]$sp %>% min
 ```
   
-__Figura 1.12__ Predito para o conjunto de dados MNEE  
+__Figura 1.10__ Predito para o conjunto de dados MNEE  
   
   Parece que alguns pontos tem grande grande influência nos dados. Sigo comparação de diferentes tipos de smoothers
   
@@ -734,7 +658,7 @@ AICctab(l_mdEE_bs,weights="TRUE")
 appraise(l_mdEE_bs[["tp"]])
 ```
   
-__Figura 1.13__ Graficos Diagnosticos para MNEE e bs=tp  
+__Figura 1.11__ Graficos Diagnosticos para MNEE e bs=tp  
   
 ```{r predicao para MNEE bs tp n_nref fig 114}
 ## modelo mais plausível
@@ -759,7 +683,7 @@ ggplot(filter(df_resultados,MN=="EE"),aes(x=p,y=n_nRef)) +
   ylab("Pr(not ref. SAD)") + xlab("Proportion of Tree Cover") 
 ```
   
-__Figura 1.14__ Predito para MNEE e bs="tp"
+__Figura 1.12__ Predito para MNEE e bs="tp"
   
 Ainda observo valores  de grande influência.
   
@@ -817,10 +741,10 @@ AICctab(l_md.EI,weights=TRUE)
 gratia::appraise(l_md.EI[["k 1|SiteCode cloglog"]])
 ```
 
-__Figura 1.15__ Gráficos Diagnósticos do modelo mais plausível para o conjunto de dados MN:EI    
+__Figura 1.13__ Gráficos Diagnósticos do modelo mais plausível para o conjunto de dados MN:EI    
   
   
-```{r predito para conjunto de dados MNEI}
+```{r predito para conjunto de dados MNEI,echo=TRUE}
 ## modelo mais plausível
 df_pred.k <- expand.grid(SiteCode=levels(df_resultados$SiteCode)[1],
                           k=levels(df_resultados$k),
@@ -841,12 +765,9 @@ ggplot(filter(df_resultados,MN=="EI"),aes(x=p,y=n_nRef)) +
               color="red") +
   geom_line(aes(y=fit),color="white", data=df_pred.k) +
   ylab("Pr(not ref. SAD)") + xlab("Proportion of Tree Cover") 
-# 
-# l_md.EE[["k 1|SiteCode"]]$sp
-# l_md.EE[["k 1|SiteCode"]]$sp %>% min
 ```
   
-__Figura 1.16__ Predito para o conjunto de dados MNEI  
+__Figura 1.14__ Predito para o conjunto de dados MNEI  
   
 O problema de estimativa errada persiste. Vou avaliar outros tipos de smoothers.
 
@@ -896,9 +817,74 @@ l_mdEI_bs[[7]] <- gam(cbind(n_nRef,100-n_nRef) ~ k + s(p.z,by=k,bs="cp") +
 AICctab(l_mdEI_bs,weights="TRUE")
 ```
 
-O smoother type "cr", modelo utilizado até o momento, é o mais plausívels
+O smoother type "cr", modelo utilizado até o momento, é o mais plausível. Vou avaliar se a remoção de alguns pontos de grande influência podem melhorar o ajuste.
+  
+  
+## GLMM com resposta quadratica  
 
-__Alternativas__
+### Modelo Cheio
+
+
+```{r glmm n_nRef comparacao modelos cheios}
+l_md <- vector("list",8)
+names(l_md) <- c("k0 1|Site","k0 MN|Site","k0 k0*MN|Site",
+                 "kf 1|Site","kf MN|Site",
+                 "d/L_plot 1|Site","d/L_plot MN|Site","d/L_plot d/L_plot*MN|Site")
+l_md[[1]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * k_1.z * MN + I(p.z^2) * k_1.z * MN + (1|SiteCode),
+                   family = "binomial",data=df_resultados,
+                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[2]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * k_1.z * MN + I(p.z^2) * k_1.z * MN + (MN|SiteCode),
+                   family = "binomial",data=df_resultados,
+                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[3]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * k_1.z * MN + I(p.z^2) * k_1.z * MN + (k_1.z*MN|SiteCode),
+                   family = "binomial",data=df_resultados,
+                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[4]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * k * MN + I(p.z^2) * k * MN + (1|SiteCode),
+                   family = "binomial",data=df_resultados,
+                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[5]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * k * MN + I(p.z^2) * k * MN + (MN|SiteCode),
+                   family = "binomial",data=df_resultados,
+                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[6]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * d_Lplot.z * MN + I(p.z^2) * d_Lplot.z * MN + (1|SiteCode),
+                   family = "binomial",data=df_resultados,
+                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[7]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * d_Lplot.z * MN + I(p.z^2) * d_Lplot.z * MN + (MN|SiteCode),
+                   family = "binomial",data=df_resultados,
+                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[8]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * d_Lplot.z * MN + I(p.z^2) * d_Lplot.z * MN + (d_Lplot.z*MN|SiteCode),
+                   family = "binomial",data=df_resultados,
+                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+AICctab(l_md,weights=T)
+l_md_nRef.GLMM <- l_md
+# save(l_md_nRef.GLMM,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md_nRef_GLMM.Rdata")
+```
+
+O único modelo plausível é aquele com função de ligação logito, a variável d/L_plot e a estrutura aleatória MN * d/L_plot|SiteCode.
+
+
+```{r auditoria mais plausivel md_n.ref1}
+md_nRef <- l_md[["d/L_plot d/L_plot*MN|Site"]]
+p_plot <- DHARMa::simulateResiduals(md_nRef,n=1000)
+plot(p_plot)
+```
+
+__Figura 1.15__ Resíduos Quantílicos do modelo cheio para n_nRef ~ p*d_Lplot*MN + (d_Lplot*MN|SiteCode)
+
+
+__Tabela do modelo mais plausível:__
+  
+```{r codigo do modelo mais plausivel, include=FALSE,echo=TRUE}
+md_nRef <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * d_Lplot.z * MN + I(p.z^2) * d_Lplot.z * MN + (d_Lplot.z*MN|SiteCode),
+                   family = "binomial",data=df_resultados,
+                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+```
+
+
+```{r summary modelo mais plausivel glmm n_nref}
+tab_model(md_nRef)
+```
+
+
 
 # diff_S = (S_obs - S_MN)/S_obs
 
