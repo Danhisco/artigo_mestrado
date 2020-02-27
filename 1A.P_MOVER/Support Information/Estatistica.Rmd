@@ -825,45 +825,51 @@ O smoother type "cr", modelo utilizado até o momento, é o mais plausível. Vou
 ### Modelo Cheio
 
 
-```{r glmm n_nRef comparacao modelos cheios}
-l_md <- vector("list",8)
-names(l_md) <- c("k0 1|Site","k0 MN|Site","k0 k0*MN|Site",
-                 "kf 1|Site","kf MN|Site",
-                 "d/L_plot 1|Site","d/L_plot MN|Site","d/L_plot d/L_plot*MN|Site")
-l_md[[1]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * k_1.z * MN + I(p.z^2) * k_1.z * MN + (1|SiteCode),
-                   family = "binomial",data=df_resultados,
-                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md[[2]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * k_1.z * MN + I(p.z^2) * k_1.z * MN + (MN|SiteCode),
-                   family = "binomial",data=df_resultados,
-                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md[[3]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * k_1.z * MN + I(p.z^2) * k_1.z * MN + (k_1.z*MN|SiteCode),
-                   family = "binomial",data=df_resultados,
-                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md[[4]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * k * MN + I(p.z^2) * k * MN + (1|SiteCode),
-                   family = "binomial",data=df_resultados,
-                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md[[5]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * k * MN + I(p.z^2) * k * MN + (MN|SiteCode),
-                   family = "binomial",data=df_resultados,
-                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md[[6]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * d_Lplot.z * MN + I(p.z^2) * d_Lplot.z * MN + (1|SiteCode),
-                   family = "binomial",data=df_resultados,
-                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md[[7]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * d_Lplot.z * MN + I(p.z^2) * d_Lplot.z * MN + (MN|SiteCode),
-                   family = "binomial",data=df_resultados,
-                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md[[8]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * d_Lplot.z * MN + I(p.z^2) * d_Lplot.z * MN + (d_Lplot.z*MN|SiteCode),
-                   family = "binomial",data=df_resultados,
-                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-AICctab(l_md,weights=T)
-l_md_nRef.GLMM <- l_md
+```{r glmm n_nRef comparacao modelos cheios,include=FALSE}
+# l_md <- vector("list",8)
+# names(l_md) <- c("k0 1|Site","k0 MN|Site","k0 k0*MN|Site",
+#                  "kf 1|Site","kf MN|Site",
+#                  "d/L_plot 1|Site","d/L_plot MN|Site","d/L_plot d/L_plot*MN|Site")
+# l_md[[1]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * k_1.z * MN + I(p.z^2) * k_1.z * MN + (1|SiteCode),
+#                    family = "binomial",data=df_resultados,
+#                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+# l_md[[2]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * k_1.z * MN + I(p.z^2) * k_1.z * MN + (MN|SiteCode),
+#                    family = "binomial",data=df_resultados,
+#                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+# l_md[[3]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * k_1.z * MN + I(p.z^2) * k_1.z * MN + (k_1.z*MN|SiteCode),
+#                    family = "binomial",data=df_resultados,
+#                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+# l_md[[4]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * k * MN + I(p.z^2) * k * MN + (1|SiteCode),
+#                    family = "binomial",data=df_resultados,
+#                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+# l_md[[5]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * k * MN + I(p.z^2) * k * MN + (MN|SiteCode),
+#                    family = "binomial",data=df_resultados,
+#                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+# l_md[[6]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * d_Lplot.z * MN + I(p.z^2) * d_Lplot.z * MN + (1|SiteCode),
+#                    family = "binomial",data=df_resultados,
+#                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+# l_md[[7]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * d_Lplot.z * MN + I(p.z^2) * d_Lplot.z * MN + (MN|SiteCode),
+#                    family = "binomial",data=df_resultados,
+#                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+# l_md[[8]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * d_Lplot.z * MN + I(p.z^2) * d_Lplot.z * MN + (d_Lplot.z*MN|SiteCode),
+#                    family = "binomial",data=df_resultados,
+#                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+# l_md_nRef.GLMM <- l_md
 # save(l_md_nRef.GLMM,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md_nRef_GLMM.Rdata")
+# l_md_nRef.GLMM[[8]]
 ```
+
+```{r AICctab n_nRef p^2 n_nRef}
+load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md_nRef_GLMM.Rdata")
+AICctab(l_md_nRef.GLMM,weights=T)
+```
+
 
 O único modelo plausível é aquele com função de ligação logito, a variável d/L_plot e a estrutura aleatória MN * d/L_plot|SiteCode.
 
 
 ```{r auditoria mais plausivel md_n.ref1}
-md_nRef <- l_md[["d/L_plot d/L_plot*MN|Site"]]
+md_nRef <- l_md_nRef.GLMM[["d/L_plot d/L_plot*MN|Site"]]
 p_plot <- DHARMa::simulateResiduals(md_nRef,n=1000)
 plot(p_plot)
 ```
@@ -871,7 +877,41 @@ plot(p_plot)
 __Figura 1.15__ Resíduos Quantílicos do modelo cheio para n_nRef ~ p*d_Lplot*MN + (d_Lplot*MN|SiteCode)
 
 
-__Tabela do modelo mais plausível:__
+```{r graf diag 2 glmm p^2 n_nRef}
+df_plot <- augment(md_nRef) %>% as.data.frame()
+# df_plot %>% names
+l_p <- vector("list",3)
+l_p[[1]] <- ggplot(df_plot,aes(x=p.z,y=.fitted)) + geom_point(alpha=0.3) + geom_line(aes(group=SiteCode)) + facet_wrap(~MN,ncol=2)
+l_p[[2]] <- ggplot(df_plot,aes(x=I.p.z.2.,y=.fitted)) + geom_point(alpha=0.3) + geom_line(aes(group=SiteCode)) + facet_wrap(~MN,ncol=2)
+l_p[[3]] <- ggplot(df_plot,aes(x=d_Lplot.z,y=.fitted)) + geom_point(alpha=0.3) + geom_line(aes(group=SiteCode)) + facet_wrap(~MN,ncol=2)
+do.call("grid.arrange",c(l_p,ncol=1))
+```
+
+__Figura 1.16__ Valores ajustados contra as preditoras lineares  
+  
+  
+```{r avaliacao por site}
+df_plot <- df_resultados
+df_plot$Pr_nRef <- predict(md_nRef,type="response")*100
+# df_plot %<>% mutate(Site = as.character(SiteCode))
+title <- df_resultados %>% mutate(title = paste(SiteCode," p=",round(p,3),sep="")) %>% arrange(.,p) %>% 
+  .$title %>% unique
+Site <- df_resultados %>% mutate(title = paste(SiteCode," p=",round(p,3),sep="")) %>% arrange(.,p) %>% 
+  .$SiteCode %>% as.character() %>% unique
+par(mfrow=c(4,26))
+for(i in 1:length(Site)){
+  print(ggplot(filter(df_plot,SiteCode == Site[i]),aes(x=d_Lplot.z,y=n_nRef,group=MN)) + 
+  geom_point(aes(color=MN)) + 
+  geom_line(aes(y=Pr_nRef,color=MN)) +
+  scale_color_manual(values=c("#FF0000", "#000000")) +
+  ggtitle(title[i]) + theme_classic())
+}
+
+```
+
+__Figura 1.17__ Predito e observado por SiteCode  
+  
+__Tabela do modelo mais plausível:__  
   
 ```{r codigo do modelo mais plausivel, include=FALSE,echo=TRUE}
 md_nRef <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * d_Lplot.z * MN + I(p.z^2) * d_Lplot.z * MN + (d_Lplot.z*MN|SiteCode),
@@ -884,8 +924,30 @@ md_nRef <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * d_Lplot.z * MN + I(p.z^2) * d_
 tab_model(md_nRef)
 ```
 
+```{r efeito predito}
+df_pred <- expand.grid(SiteCode=levels(df_resultados$SiteCode)[1],
+                       MN=levels(df_resultados$MN),
+                       d_Lplot.z=seq(min(df_resultados$d_Lplot.z),max(df_resultados$d_Lplot.z),length=20),
+                       p.z=seq(min(df_resultados$p.z),max(df_resultados$p.z),length=103))
+df_pred <- cbind(df_pred,
+  predictInterval(merMod = md_nRef, newdata = df_pred,
+                         level = 0.95, n.sims=200,
+                         stat="median",type = "probability",
+                         include.resid.var = TRUE)
+                 ) %>% 
+  mutate(p = p.z * sd(df_resultados$p) + mean(df_resultados$p),
+         d_Lplot = d_Lplot.z*sd(df_resultados$d_Lplot) + mean(df_resultados$d_Lplot))
 
-
+ggplot(df_pred,aes(p,d_Lplot,fill=fit)) + 
+  geom_tile() +
+  scale_fill_gradient2(low="red",mid="white",  high="blue", 
+                       midpoint=median(df_pred$fit)) +
+  labs(title="Prob de não Refutar",
+       fill="Probability") + facet_wrap(~MN,ncol=2) + theme_classic()
+```
+  
+__Figura 1.18__ Probabilidade predito pelo modelo mais plausível  
+  
 # diff_S = (S_obs - S_MN)/S_obs
 
 ## Padrão Geral
