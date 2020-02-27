@@ -961,6 +961,126 @@ ggplot(df_pred,aes(p,d_Lplot,fill=fit)) +
 ```
   
 __Figura 1.18__ Probabilidade predito pelo modelo mais plausível  
+
+### n_nRef subset:MN==EE
+
+```{r glmm quadratico n_nRef MNEE modelo cheio}
+l_md <- vector("list",3)
+names(l_md) <- c("1|Site","d|Site","d + d^2|Site")
+l_md[[1]] <- glmer(cbind(n_nRef,100-n_nRef) ~ 
+                     p.z + d_Lplot.z + I(p.z^2) + I(d_Lplot.z^2) +
+                     p.z:d_Lplot.z + 
+                     p.z:I(d_Lplot.z^2) + d_Lplot.z:I(p.z^2) +
+                     I(p.z^2):I(d_Lplot.z^2) +
+                     (1|SiteCode),
+                   family = "binomial",data=filter(df_resultados,MN=="EE"),
+                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[2]] <- glmer(cbind(n_nRef,100-n_nRef) ~ 
+                     p.z + d_Lplot.z + I(p.z^2) + I(d_Lplot.z^2) +
+                     p.z:d_Lplot.z + 
+                     p.z:I(d_Lplot.z^2) + d_Lplot.z:I(p.z^2) +
+                     I(p.z^2):I(d_Lplot.z^2) +
+                     (d_Lplot.z|SiteCode),
+                   family = "binomial",data=filter(df_resultados,MN=="EE"),
+                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[3]] <- glmer(cbind(n_nRef,100-n_nRef) ~ 
+                     p.z + d_Lplot.z + I(p.z^2) + I(d_Lplot.z^2) +
+                     p.z:d_Lplot.z + 
+                     p.z:I(d_Lplot.z^2) + d_Lplot.z:I(p.z^2) +
+                     I(p.z^2):I(d_Lplot.z^2) +
+                     (d_Lplot.z + I(d_Lplot.z^2)|SiteCode),
+                   family = "binomial",data=filter(df_resultados,MN=="EE"),
+                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md_nRef.GLMM_EE <- l_md
+AICctab(l_md_nRef.GLMM_EE,weights=TRUE)
+# save(l_md_nRef.GLMM_EE,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md_nRef_GLMM_EE.Rdata")
+```
+  
+O modelo mais plausível considera um termo linear e quadrático para d na estrutura aletória. Segue seleção de variáveis.
+
+```{r glmm quadratico n_nRef MNEE selecao de variaveis}
+l_md <- vector("list",length = 12)
+names(l_md) <- c("full model",
+                 "-(p2:d2)",
+                 "-(p2:d2)-(d:p2)","-(p2:d2)-(d2:p)",
+                 "-(p2:d2)-(d2:p)-(d:p2)",
+                 "no interactions",
+                 "p + d + p2","p + d + d2",
+                 "p + d","p","d","1")
+l_md[[1]] <- glmer(cbind(n_nRef,100-n_nRef) ~ 
+                     p.z + d_Lplot.z + I(p.z^2) + I(d_Lplot.z^2) +
+                     p.z:d_Lplot.z + 
+                     p.z:I(d_Lplot.z^2) + d_Lplot.z:I(p.z^2) +
+                     I(p.z^2):I(d_Lplot.z^2) +
+                     (d_Lplot.z + I(d_Lplot.z^2)|SiteCode),
+                   family = "binomial",data=filter(df_resultados,MN=="EE"),
+                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[2]] <- glmer(cbind(n_nRef,100-n_nRef) ~ 
+                     p.z + d_Lplot.z + I(p.z^2) + I(d_Lplot.z^2) +
+                     p.z:d_Lplot.z + 
+                     p.z:I(d_Lplot.z^2) + d_Lplot.z:I(p.z^2) +
+                     (d_Lplot.z + I(d_Lplot.z^2)|SiteCode),
+                   family = "binomial",data=filter(df_resultados,MN=="EE"),
+                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[3]] <- glmer(cbind(n_nRef,100-n_nRef) ~ 
+                     p.z + d_Lplot.z + I(p.z^2) + I(d_Lplot.z^2) +
+                     p.z:d_Lplot.z + 
+                     p.z:I(d_Lplot.z^2) +
+                     (d_Lplot.z + I(d_Lplot.z^2)|SiteCode),
+                   family = "binomial",data=filter(df_resultados,MN=="EE"),
+                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[4]] <- glmer(cbind(n_nRef,100-n_nRef) ~ 
+                     p.z + d_Lplot.z + I(p.z^2) + I(d_Lplot.z^2) +
+                     p.z:d_Lplot.z + 
+                     d_Lplot.z:I(p.z^2) +
+                     (d_Lplot.z + I(d_Lplot.z^2)|SiteCode),
+                   family = "binomial",data=filter(df_resultados,MN=="EE"),
+                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[5]] <- glmer(cbind(n_nRef,100-n_nRef) ~ 
+                     p.z + d_Lplot.z + I(p.z^2) + I(d_Lplot.z^2) +
+                     p.z:d_Lplot.z + 
+                     (d_Lplot.z + I(d_Lplot.z^2)|SiteCode),
+                   family = "binomial",data=filter(df_resultados,MN=="EE"),
+                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[6]] <- glmer(cbind(n_nRef,100-n_nRef) ~ 
+                     p.z + d_Lplot.z + I(p.z^2) + I(d_Lplot.z^2) +
+                     (d_Lplot.z + I(d_Lplot.z^2)|SiteCode),
+                   family = "binomial",data=filter(df_resultados,MN=="EE"),
+                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[7]] <- glmer(cbind(n_nRef,100-n_nRef) ~ 
+                     p.z + d_Lplot.z + I(p.z^2) +
+                     (d_Lplot.z|SiteCode),
+                   family = "binomial",data=filter(df_resultados,MN=="EE"),
+                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[8]] <- glmer(cbind(n_nRef,100-n_nRef) ~ 
+                     p.z + d_Lplot.z + I(d_Lplot.z^2) +
+                     (d_Lplot.z + I(d_Lplot.z^2)|SiteCode),
+                   family = "binomial",data=filter(df_resultados,MN=="EE"),
+                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[9]] <- glmer(cbind(n_nRef,100-n_nRef) ~ 
+                     p.z + d_Lplot.z +
+                     (d_Lplot.z|SiteCode),
+                   family = "binomial",data=filter(df_resultados,MN=="EE"),
+                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[10]] <- glmer(cbind(n_nRef,100-n_nRef) ~ 
+                     p.z +
+                     (1|SiteCode),
+                   family = "binomial",data=filter(df_resultados,MN=="EE"),
+                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[11]] <- glmer(cbind(n_nRef,100-n_nRef) ~ 
+                     d_Lplot.z +
+                     (d_Lplot.z|SiteCode),
+                   family = "binomial",data=filter(df_resultados,MN=="EE"),
+                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[12]] <- glmer(cbind(n_nRef,100-n_nRef) ~ 
+                     1 +
+                     (1|SiteCode),
+                   family = "binomial",data=filter(df_resultados,MN=="EE"),
+                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md.nRef.GLMM_EEvars <- l_md
+AICctab(l_md.nRef.GLMM_EEvars,weights=TRUE) 
+```
+
   
 # diff_S = (S_obs - S_MN)/S_obs
 
