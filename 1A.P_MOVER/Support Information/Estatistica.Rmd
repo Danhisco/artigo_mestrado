@@ -175,7 +175,7 @@ p_plot <- DHARMa::simulateResiduals(md_nRef,n=1000)
 plot(p_plot)
 ```
 
-__Figura 1.15__ Resíduos Quantílicos do modelo cheio para n_nRef ~ p*d_Lplot*MN + (d_Lplot*MN|SiteCode)
+__Figura 1.2__ Resíduos Quantílicos do modelo cheio para n_nRef ~ p*d_Lplot*MN + (d_Lplot*MN|SiteCode)
 
 
 ```{r graf diag 2 glmm p^2 n_nRef}
@@ -188,7 +188,7 @@ l_p[[3]] <- ggplot(df_plot,aes(x=d_Lplot.z,y=.fitted)) + geom_point(alpha=0.3) +
 do.call("grid.arrange",c(l_p,ncol=1))
 ```
 
-__Figura 1.16__ Valores ajustados contra as preditoras lineares  
+__Figura 1.3__ Valores ajustados contra as preditoras lineares  
   
   
 ```{r avaliacao por site}
@@ -229,7 +229,7 @@ for(i in 1:length(Site)){
 # do.call("grid.arrange",c(l_p,ncol=4))
 ```
 
-__Figura 1.17__ Predito e observado por SiteCode  
+__Figura 1.4__ Predito e observado por SiteCode  
   
 __Tabela do modelo mais plausível:__  
   
@@ -266,7 +266,7 @@ ggplot(df_pred,aes(p,d_Lplot,fill=fit)) +
        fill="Probability") + facet_wrap(~MN,ncol=2) + theme_classic()
 ```
   
-__Figura 1.18__ Probabilidade predito pelo modelo mais plausível  
+__Figura 1.5__ Probabilidade predito pelo modelo mais plausível  
 
 ### n_nRef subset:MN==EE
 
@@ -274,33 +274,22 @@ __Figura 1.18__ Probabilidade predito pelo modelo mais plausível
 l_md <- vector("list",3)
 names(l_md) <- c("1|Site","d|Site","d + d^2|Site")
 l_md[[1]] <- glmer(cbind(n_nRef,100-n_nRef) ~ 
-                     p.z + d_Lplot.z + I(p.z^2) + I(d_Lplot.z^2) +
-                     p.z:d_Lplot.z + 
-                     p.z:I(d_Lplot.z^2) + d_Lplot.z:I(p.z^2) +
-                     I(p.z^2):I(d_Lplot.z^2) +
+                     ( p.z + I(p.z^2) ) * ( d_Lplot.z + I(d_Lplot.z^2) ) +
                      (1|SiteCode),
                    family = "binomial",data=filter(df_resultados,MN=="EE"),
                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
 l_md[[2]] <- glmer(cbind(n_nRef,100-n_nRef) ~ 
-                     p.z + d_Lplot.z + I(p.z^2) + I(d_Lplot.z^2) +
-                     p.z:d_Lplot.z + 
-                     p.z:I(d_Lplot.z^2) + d_Lplot.z:I(p.z^2) +
-                     I(p.z^2):I(d_Lplot.z^2) +
+                     ( p.z + I(p.z^2) ) * ( d_Lplot.z + I(d_Lplot.z^2) ) +
                      (d_Lplot.z|SiteCode),
                    family = "binomial",data=filter(df_resultados,MN=="EE"),
                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
 l_md[[3]] <- glmer(cbind(n_nRef,100-n_nRef) ~ 
-                     p.z + d_Lplot.z + I(p.z^2) + I(d_Lplot.z^2) +
-                     p.z:d_Lplot.z + 
-                     p.z:I(d_Lplot.z^2) + d_Lplot.z:I(p.z^2) +
-                     I(p.z^2):I(d_Lplot.z^2) +
+                     ( p.z + I(p.z^2) ) * ( d_Lplot.z + I(d_Lplot.z^2) ) +
                      (d_Lplot.z + I(d_Lplot.z^2)|SiteCode),
                    family = "binomial",data=filter(df_resultados,MN=="EE"),
                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
 l_md_nRef.GLMM_EE <- l_md
 AICctab(l_md_nRef.GLMM_EE,weights=TRUE)
-# save(l_md_nRef.GLMM_EE,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md_nRef_GLMM_EE.Rdata")
-# load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md_nRef_GLMM_EE.Rdata")
 ```
   
 O modelo mais plausível considera um termo linear e quadrático para d na estrutura aletória. Segue seleção de variáveis.
@@ -310,13 +299,12 @@ p_plot <- DHARMa::simulateResiduals(l_md_nRef.GLMM_EE[["d + d^2|Site"]],n=1000)
 plot(p_plot)  
 ```
   
-__Figura 1.19__ Resíduos Quantílicos do glmm cheio para MNEE  
+__Figura 1.6__ Resíduos Quantílicos do glmm cheio para MNEE  
 
   
 #### Seleção de Variáveis
   
-
-```{r glmm quadratico n_nRef MNEE selecao de variaveis}
+```{r glmm quadratico n_nRef MNEE selecao de variaveis, include=FALSE,echo=FALSE}
 l_md <- vector("list",length = 12)
 names(l_md) <- c("full model",
                  "-(p2:d2)",
@@ -399,6 +387,9 @@ l_md.nRef.GLMM_EEvars <- l_md
 AICctab(l_md.nRef.GLMM_EEvars,weights=TRUE) 
 ```
 
+
+
+
 ```{r glmm quadratico n_nRef MNEE selecao de variaveis VERSAO MUMIN}
 # Modelo Global
 df_md <- filter(df_resultados,MN=="EE")
@@ -408,24 +399,21 @@ global_md <- glmer(cbind(n_nRef,100-n_nRef) ~
                    family = "binomial",data=df_md,
                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)),na.action = "na.fail")
 # Todas as combinações de Modelos
-dredge_nRef.EE <- dredge(global_md,trace = 2)
+mdAvg_nRefEE <- model.avg(lapply(dredge(global_md,trace = 2,evaluate=FALSE), eval),subset<7)
+# Predição
+df_md$Pr_nRef <- predict(mdAvg_nRefEE,type="response")*100
+# Gráfico
+df_md %<>% mutate(title = paste0(SiteCode," p=",round(p,3))) %>% arrange(p)
+df_md$title <- factor(df_md$title,levels = unique(df_md$title))
+ggplot(filter(df_md,SiteCode %in% levels(df_md$SiteCode)[1:8]),aes(x=d_Lplot,y=n_nRef)) + 
+  geom_point() + geom_line(aes(y=Pr_nRef)) + 
+  facet_wrap(~title,ncol=5) + theme_classic()
 ```
 
+__Figura 1.7__ Predições por sítio de amostragem; pontos: número de SADs neutras refutadas para uma bateria de simulações com um determinada distância média de dispersão; eixo x = distância média de dispersão / largura da área de amostragem; a linha é a probabilidade de não refutar uma SAD neutra segundo a predição média do conjunto de sub-modelos dentro do intervalo de plausibilidade de 7 (Burnham et al 2011)
 
 
-__Predições dos Modelos Plausíveis e Model Averaging destes__
 
-```{r fig 120 predicoes por SiteCode }
-library(AICcmodavg)
-df_pred <- expand.grid(SiteCode=levels(df_resultados$SiteCode)[1],
-                          k=levels(df_resultados$k),
-                          p.z=seq(min(df_resultados$p.z),max(df_resultados$p.z),length=103)) %>% 
-  mutate(p = p.z * sd(df_resultados$p) + mean(df_resultados$p))
-
-
-teste <- modavgPred(l_md.nRef.GLMM_EEvars,newdata = filter(df_resultados,MN=="EE"))
-teste %>% as.data.frame()
-```
 
   
   
@@ -969,7 +957,7 @@ plot(p_plot)
 
 # Apendice: código extra
 
-## n_nRef: GAMM
+<!-- ## n_nRef: GAMM -->
 
 ### Comparação de Modelos Cheios
 
