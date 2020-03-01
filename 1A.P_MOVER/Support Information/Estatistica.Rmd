@@ -178,7 +178,7 @@ plot(p_plot)
 __Figura 1.2__ Resíduos Quantílicos do modelo cheio para n_nRef ~ p*d_Lplot*MN + (d_Lplot*MN|SiteCode)
 
 
-```{r graf diag 2 glmm p^2 n_nRef}
+```{r graf diag 2 glmm p^2 n_nRef fig 13}
 df_plot <- augment(md_nRef) %>% as.data.frame()
 # df_plot %>% names
 l_p <- vector("list",3)
@@ -190,8 +190,24 @@ do.call("grid.arrange",c(l_p,ncol=1))
 
 __Figura 1.3__ Valores ajustados contra as preditoras lineares  
   
+  __Tabela do modelo mais plausível:__  
   
-```{r avaliacao por site}
+```{r codigo do modelo mais plausivel, include=FALSE,echo=TRUE}
+md_nRef <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * d_Lplot.z * MN + I(p.z^2) * d_Lplot.z * MN + (d_Lplot.z*MN|SiteCode),
+                   family = "binomial",data=df_resultados,
+                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+print(md_nRef)
+```
+
+
+```{r summary modelo mais plausivel glmm n_nref}
+tab_model(md_nRef)
+```
+ 
+  
+  
+```{r avaliacao por site fig 14,fig.width=8, fig.height=30}
+# Dados
 df_plot <- df_resultados
 df_plot <- cbind(df_plot,
   predictInterval(merMod = md_nRef,
@@ -200,49 +216,19 @@ df_plot <- cbind(df_plot,
                          include.resid.var = TRUE)*100
                  )
 df_plot$Pr_nRef <- predict(md_nRef,type="response")*100
-# df_plot %<>% mutate(Site = as.character(SiteCode))
-# par(mfrow=c(4,26))
-title <- df_resultados %>% mutate(title = paste(SiteCode," p=",round(p,3),sep="")) %>% arrange(.,p) %>% 
-  .$title %>% unique
-Site <- df_resultados %>% mutate(title = paste(SiteCode," p=",round(p,3),sep="")) %>% arrange(.,p) %>% 
-  .$SiteCode %>% as.character() %>% unique
-for(i in 1:length(Site)){
-  print(ggplot(filter(df_plot,SiteCode == Site[i]),aes(x=d_Lplot.z,y=n_nRef,group=MN)) +
+# Graficos
+df_plot %<>% mutate(title = paste0(SiteCode, " p=",round(p,digits = 3))) %>% arrange(p)
+df_plot$title <- factor(df_plot$title,levels = unique(df_plot$title))
+ggplot(df_plot,aes(x=d_Lplot.z,y=n_nRef,group=MN)) +
   geom_point(aes(color=MN)) +
   geom_line(aes(y=Pr_nRef,color=MN)) +
   scale_color_manual(values=c("#FF0000", "#000000")) +
-  ggtitle(title[i]) + theme_classic())
-  # save plots as .png
-    # ggsave(plot, file=paste(results, 
-    #                        'projection_graphs/county_graphs/',
-    #                        county_list[i], ".png", sep=''), scale=2)
-   
-}
-# l_p <- vector("list",length = 103)
-# for(i in 1:length(Site)){
-# l_p[[i]]  <- ggplot(filter(df_plot,SiteCode == Site[i]),aes(x=d_Lplot.z,y=n_nRef,group=MN)) + 
-#   geom_point(aes(color=MN)) + 
-#   geom_line(aes(y=Pr_nRef,color=MN)) +
-#   scale_color_manual(values=c("#FF0000", "#000000")) +
-#   ggtitle(title[i]) + theme_classic()
-# }
-# do.call("grid.arrange",c(l_p,ncol=4))
+  theme_classic() + theme(legend.position="top") + facet_wrap(~title,ncol=5)
 ```
 
 __Figura 1.4__ Predito e observado por SiteCode  
   
-__Tabela do modelo mais plausível:__  
-  
-```{r codigo do modelo mais plausivel, include=FALSE,echo=TRUE}
-md_nRef <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * d_Lplot.z * MN + I(p.z^2) * d_Lplot.z * MN + (d_Lplot.z*MN|SiteCode),
-                   family = "binomial",data=df_resultados,
-                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-```
 
-
-```{r summary modelo mais plausivel glmm n_nref}
-tab_model(md_nRef)
-```
 
 ```{r efeito predito}
 df_pred <- expand.grid(SiteCode=levels(df_resultados$SiteCode)[1],
@@ -304,109 +290,41 @@ __Figura 1.6__ Resíduos Quantílicos do glmm cheio para MNEE
   
 #### Seleção de Variáveis
   
-```{r glmm quadratico n_nRef MNEE selecao de variaveis, include=FALSE,echo=FALSE}
-l_md <- vector("list",length = 12)
-names(l_md) <- c("full model",
-                 "-(p2:d2)",
-                 "-(p2:d2)-(d:p2)","-(p2:d2)-(d2:p)",
-                 "-(p2:d2)-(d2:p)-(d:p2)",
-                 "no interactions",
-                 "p + d + p2","p + d + d2",
-                 "p + d","p","d","1")
-l_md[[1]] <- glmer(cbind(n_nRef,100-n_nRef) ~ 
-                     p.z + d_Lplot.z + I(p.z^2) + I(d_Lplot.z^2) +
-                     p.z:d_Lplot.z + 
-                     p.z:I(d_Lplot.z^2) + d_Lplot.z:I(p.z^2) +
-                     I(p.z^2):I(d_Lplot.z^2) +
-                     (d_Lplot.z + I(d_Lplot.z^2)|SiteCode),
-                   family = "binomial",data=filter(df_resultados,MN=="EE"),
-                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md[[2]] <- glmer(cbind(n_nRef,100-n_nRef) ~ 
-                     p.z + d_Lplot.z + I(p.z^2) + I(d_Lplot.z^2) +
-                     p.z:d_Lplot.z + 
-                     p.z:I(d_Lplot.z^2) + d_Lplot.z:I(p.z^2) +
-                     (d_Lplot.z + I(d_Lplot.z^2)|SiteCode),
-                   family = "binomial",data=filter(df_resultados,MN=="EE"),
-                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md[[3]] <- glmer(cbind(n_nRef,100-n_nRef) ~ 
-                     p.z + d_Lplot.z + I(p.z^2) + I(d_Lplot.z^2) +
-                     p.z:d_Lplot.z + 
-                     p.z:I(d_Lplot.z^2) +
-                     (d_Lplot.z + I(d_Lplot.z^2)|SiteCode),
-                   family = "binomial",data=filter(df_resultados,MN=="EE"),
-                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md[[4]] <- glmer(cbind(n_nRef,100-n_nRef) ~ 
-                     p.z + d_Lplot.z + I(p.z^2) + I(d_Lplot.z^2) +
-                     p.z:d_Lplot.z + 
-                     d_Lplot.z:I(p.z^2) +
-                     (d_Lplot.z + I(d_Lplot.z^2)|SiteCode),
-                   family = "binomial",data=filter(df_resultados,MN=="EE"),
-                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md[[5]] <- glmer(cbind(n_nRef,100-n_nRef) ~ 
-                     p.z + d_Lplot.z + I(p.z^2) + I(d_Lplot.z^2) +
-                     p.z:d_Lplot.z + 
-                     (d_Lplot.z + I(d_Lplot.z^2)|SiteCode),
-                   family = "binomial",data=filter(df_resultados,MN=="EE"),
-                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md[[6]] <- glmer(cbind(n_nRef,100-n_nRef) ~ 
-                     p.z + d_Lplot.z + I(p.z^2) + I(d_Lplot.z^2) +
-                     (d_Lplot.z + I(d_Lplot.z^2)|SiteCode),
-                   family = "binomial",data=filter(df_resultados,MN=="EE"),
-                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md[[7]] <- glmer(cbind(n_nRef,100-n_nRef) ~ 
-                     p.z + d_Lplot.z + I(p.z^2) +
-                     (d_Lplot.z|SiteCode),
-                   family = "binomial",data=filter(df_resultados,MN=="EE"),
-                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md[[8]] <- glmer(cbind(n_nRef,100-n_nRef) ~ 
-                     p.z + d_Lplot.z + I(d_Lplot.z^2) +
-                     (d_Lplot.z + I(d_Lplot.z^2)|SiteCode),
-                   family = "binomial",data=filter(df_resultados,MN=="EE"),
-                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md[[9]] <- glmer(cbind(n_nRef,100-n_nRef) ~ 
-                     p.z + d_Lplot.z +
-                     (d_Lplot.z|SiteCode),
-                   family = "binomial",data=filter(df_resultados,MN=="EE"),
-                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md[[10]] <- glmer(cbind(n_nRef,100-n_nRef) ~ 
-                     p.z +
-                     (1|SiteCode),
-                   family = "binomial",data=filter(df_resultados,MN=="EE"),
-                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md[[11]] <- glmer(cbind(n_nRef,100-n_nRef) ~ 
-                     d_Lplot.z +
-                     (d_Lplot.z|SiteCode),
-                   family = "binomial",data=filter(df_resultados,MN=="EE"),
-                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md[[12]] <- glmer(cbind(n_nRef,100-n_nRef) ~ 
-                     1 +
-                     (1|SiteCode),
-                   family = "binomial",data=filter(df_resultados,MN=="EE"),
-                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md.nRef.GLMM_EEvars <- l_md
-AICctab(l_md.nRef.GLMM_EEvars,weights=TRUE) 
-```
 
-
-
-
-```{r glmm quadratico n_nRef MNEE selecao de variaveis VERSAO MUMIN}
-# Modelo Global
+```{r modelo global, include=TRUE,echo=TRUE}
+# dados
 df_md <- filter(df_resultados,MN=="EE")
-global_md <- glmer(cbind(n_nRef,100-n_nRef) ~ 
+# modelo global
+global_md <- glmer(cbind(n_nRef,100-n_nRef) ~
                      ( p.z + I(p.z^2) ) * ( d_Lplot.z + I(d_Lplot.z^2) ) +
                      (d_Lplot.z + I(d_Lplot.z^2)|SiteCode),
                    family = "binomial",data=df_md,
                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)),na.action = "na.fail")
-# Todas as combinações de Modelos
-mdAvg_nRefEE <- model.avg(lapply(dredge(global_md,trace = 2,evaluate=FALSE), eval),subset<7)
+```
+
+
+```{r model averaging EE}
+# model averagin de todas as combinações de modelo
+mdAvg_nRefEE <- model.avg(lapply(dredge(global_md,trace = FALSE,evaluate=FALSE), eval),subset<2) #,
+# armazenamento
+save(mdAvg_nRefEE,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_nRefEE.Rdata")
+```
+
+
+
+```{r glmm quadratico n_nRef MNEE selecao de variaveis, comment=FALSE, message=FALSE,warning=FALSE,results="hide",fig.width=8, fig.height=30}
+# Modelo Global
+load(file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_nRefEE.Rdata")
 # Predição
 df_md$Pr_nRef <- predict(mdAvg_nRefEE,type="response")*100
 # Gráfico
 df_md %<>% mutate(title = paste0(SiteCode," p=",round(p,3))) %>% arrange(p)
 df_md$title <- factor(df_md$title,levels = unique(df_md$title))
-ggplot(filter(df_md,SiteCode %in% levels(df_md$SiteCode)[1:8]),aes(x=d_Lplot,y=n_nRef)) + 
-  geom_point() + geom_line(aes(y=Pr_nRef)) + 
+ggplot(df_md,aes(x=d_Lplot,y=n_nRef)) + 
+  geom_point() + geom_line(aes(y=Pr_nRef),color="red") + 
+  labs(x="Dispersão Média per capita / Lado da Área Amostrada",
+       y="Número de SADs não Refutadas",
+       title="Prob. Não Refutar uma SAD neutra MN=EE") +
   facet_wrap(~title,ncol=5) + theme_classic()
 ```
 
@@ -414,126 +332,78 @@ __Figura 1.7__ Predições por sítio de amostragem; pontos: número de SADs neu
 
 
 
-
+### n_nRef subset:MN==EI  
   
   
-### n_nRef subset:MN==EI
-
 ```{r glmm quadratico n_nRef MNEI modelo cheio}
 l_md <- vector("list",3)
 names(l_md) <- c("1|Site","d|Site","d + d^2|Site")
 l_md[[1]] <- glmer(cbind(n_nRef,100-n_nRef) ~ 
-                     p.z + d_Lplot.z + I(p.z^2) + I(d_Lplot.z^2) +
-                     p.z:d_Lplot.z + 
-                     p.z:I(d_Lplot.z^2) + d_Lplot.z:I(p.z^2) +
-                     I(p.z^2):I(d_Lplot.z^2) +
+                     ( p.z + I(p.z^2) ) * ( d_Lplot.z + I(d_Lplot.z^2) ) +
                      (1|SiteCode),
                    family = "binomial",data=filter(df_resultados,MN=="EI"),
                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
 l_md[[2]] <- glmer(cbind(n_nRef,100-n_nRef) ~ 
-                     p.z + d_Lplot.z + I(p.z^2) + I(d_Lplot.z^2) +
-                     p.z:d_Lplot.z + 
-                     p.z:I(d_Lplot.z^2) + d_Lplot.z:I(p.z^2) +
-                     I(p.z^2):I(d_Lplot.z^2) +
+                     ( p.z + I(p.z^2) ) * ( d_Lplot.z + I(d_Lplot.z^2) ) +
                      (d_Lplot.z|SiteCode),
                    family = "binomial",data=filter(df_resultados,MN=="EI"),
                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
 l_md[[3]] <- glmer(cbind(n_nRef,100-n_nRef) ~ 
-                     p.z + d_Lplot.z + I(p.z^2) + I(d_Lplot.z^2) +
-                     p.z:d_Lplot.z + 
-                     p.z:I(d_Lplot.z^2) + d_Lplot.z:I(p.z^2) +
-                     I(p.z^2):I(d_Lplot.z^2) +
+                     ( p.z + I(p.z^2) ) * ( d_Lplot.z + I(d_Lplot.z^2) ) +
                      (d_Lplot.z + I(d_Lplot.z^2)|SiteCode),
                    family = "binomial",data=filter(df_resultados,MN=="EI"),
                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
 l_md_nRef.GLMM_EI <- l_md
 AICctab(l_md_nRef.GLMM_EI,weights=TRUE)
-# save(l_md_nRef.GLMM_EE,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md_nRef_GLMM_EE.Rdata")
-```  
-  O modelo mais plausível considera um termo linear e quadrático para d na estrutura aletória. Segue seleção de variáveis.
-
-```{r glmm quadratico n_nRef MNEI selecao de variaveis}
-l_md <- vector("list",length = 12)
-names(l_md) <- c("full model",
-                 "-(p2:d2)",
-                 "-(p2:d2)-(d:p2)","-(p2:d2)-(d2:p)",
-                 "-(p2:d2)-(d2:p)-(d:p2)",
-                 "no interactions",
-                 "p + d + p2","p + d + d2",
-                 "p + d","p","d","1")
-l_md[[1]] <- glmer(cbind(n_nRef,100-n_nRef) ~ 
-                     p.z + d_Lplot.z + I(p.z^2) + I(d_Lplot.z^2) +
-                     p.z:d_Lplot.z + 
-                     p.z:I(d_Lplot.z^2) + d_Lplot.z:I(p.z^2) +
-                     I(p.z^2):I(d_Lplot.z^2) +
-                     (d_Lplot.z + I(d_Lplot.z^2)|SiteCode),
-                   family = "binomial",data=filter(df_resultados,MN=="EI"),
-                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md[[2]] <- glmer(cbind(n_nRef,100-n_nRef) ~ 
-                     p.z + d_Lplot.z + I(p.z^2) + I(d_Lplot.z^2) +
-                     p.z:d_Lplot.z + 
-                     p.z:I(d_Lplot.z^2) + d_Lplot.z:I(p.z^2) +
-                     (d_Lplot.z + I(d_Lplot.z^2)|SiteCode),
-                   family = "binomial",data=filter(df_resultados,MN=="EI"),
-                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md[[3]] <- glmer(cbind(n_nRef,100-n_nRef) ~ 
-                     p.z + d_Lplot.z + I(p.z^2) + I(d_Lplot.z^2) +
-                     p.z:d_Lplot.z + 
-                     p.z:I(d_Lplot.z^2) +
-                     (d_Lplot.z + I(d_Lplot.z^2)|SiteCode),
-                   family = "binomial",data=filter(df_resultados,MN=="EI"),
-                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md[[4]] <- glmer(cbind(n_nRef,100-n_nRef) ~ 
-                     p.z + d_Lplot.z + I(p.z^2) + I(d_Lplot.z^2) +
-                     p.z:d_Lplot.z + 
-                     d_Lplot.z:I(p.z^2) +
-                     (d_Lplot.z + I(d_Lplot.z^2)|SiteCode),
-                   family = "binomial",data=filter(df_resultados,MN=="EI"),
-                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md[[5]] <- glmer(cbind(n_nRef,100-n_nRef) ~ 
-                     p.z + d_Lplot.z + I(p.z^2) + I(d_Lplot.z^2) +
-                     p.z:d_Lplot.z + 
-                     (d_Lplot.z + I(d_Lplot.z^2)|SiteCode),
-                   family = "binomial",data=filter(df_resultados,MN=="EI"),
-                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md[[6]] <- glmer(cbind(n_nRef,100-n_nRef) ~ 
-                     p.z + d_Lplot.z + I(p.z^2) + I(d_Lplot.z^2) +
-                     (d_Lplot.z + I(d_Lplot.z^2)|SiteCode),
-                   family = "binomial",data=filter(df_resultados,MN=="EI"),
-                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md[[7]] <- glmer(cbind(n_nRef,100-n_nRef) ~ 
-                     p.z + d_Lplot.z + I(p.z^2) +
-                     (d_Lplot.z|SiteCode),
-                   family = "binomial",data=filter(df_resultados,MN=="EI"),
-                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md[[8]] <- glmer(cbind(n_nRef,100-n_nRef) ~ 
-                     p.z + d_Lplot.z + I(d_Lplot.z^2) +
-                     (d_Lplot.z + I(d_Lplot.z^2)|SiteCode),
-                   family = "binomial",data=filter(df_resultados,MN=="EI"),
-                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md[[9]] <- glmer(cbind(n_nRef,100-n_nRef) ~ 
-                     p.z + d_Lplot.z +
-                     (d_Lplot.z|SiteCode),
-                   family = "binomial",data=filter(df_resultados,MN=="EI"),
-                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md[[10]] <- glmer(cbind(n_nRef,100-n_nRef) ~ 
-                     p.z +
-                     (1|SiteCode),
-                   family = "binomial",data=filter(df_resultados,MN=="EI"),
-                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md[[11]] <- glmer(cbind(n_nRef,100-n_nRef) ~ 
-                     d_Lplot.z +
-                     (d_Lplot.z|SiteCode),
-                   family = "binomial",data=filter(df_resultados,MN=="EI"),
-                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md[[12]] <- glmer(cbind(n_nRef,100-n_nRef) ~ 
-                     1 +
-                     (1|SiteCode),
-                   family = "binomial",data=filter(df_resultados,MN=="EI"),
-                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md.nRef.GLMM_EIvars <- l_md
-AICctab(l_md.nRef.GLMM_EIvars,weights=TRUE) 
 ```
+  
+O modelo mais plausível considera um termo linear e quadrático para d na estrutura aletória. Segue seleção de variáveis.
+
+```{r fig 119 res quant glmm cheio MNEI}
+p_plot <- DHARMa::simulateResiduals(l_md_nRef.GLMM_EI[["d + d^2|Site"]],n=1000)
+plot(p_plot)  
+```
+  
+__Figura 1.6__ Resíduos Quantílicos do glmm cheio para MNEE  
+
+  
+#### Seleção de Variáveis
+  
+  
+```{r modelo global e model averaging EI, include=TRUE,echo=TRUE}
+# dados
+df_md <- filter(df_resultados,MN=="EI")
+# modelo global
+global_md <- glmer(cbind(n_nRef,100-n_nRef) ~
+                     ( p.z + I(p.z^2) ) * ( d_Lplot.z + I(d_Lplot.z^2) ) +
+                     (d_Lplot.z + I(d_Lplot.z^2)|SiteCode),
+                   family = "binomial",data=df_md,
+                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)),na.action = "na.fail")
+# model averagin de todas as combinações de modelo
+mdAvg_nRefEI <- model.avg(lapply(dredge(global_md,trace = FALSE,evaluate=FALSE), eval),subset<7)
+# armazenamento
+save(mdAvg_nRefEI,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_nRefEI.Rdata")
+```
+  
+  
+
+```{r glmm quadratico n_nRef MNEI selecao de variaveis, comment=FALSE, message=FALSE,warning=FALSE,results="hide",fig.width=8, fig.height=30}
+# Model Averaging 
+load(file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_nRefEI.Rdata")
+# Predição
+df_md$Pr_nRef <- predict(mdAvg_nRefEE,type="response")*100
+# Gráfico
+df_md %<>% mutate(title = paste0(SiteCode," p=",round(p,3))) %>% arrange(p)
+df_md$title <- factor(df_md$title,levels = unique(df_md$title))
+ggplot(df_md,aes(x=d_Lplot,y=n_nRef)) + 
+  geom_point() + geom_line(aes(y=Pr_nRef),color="red") + 
+  labs(x="Dispersão Média per capita / Lado da Área Amostrada",
+       y="Número de SADs não Refutadas",
+       title="Prob. Não Refutar uma SAD neutra MN=EE") +
+  facet_wrap(~title,ncol=5) + theme_classic()
+```
+
+__Figura 1.7__ Predições por sítio de amostragem; pontos: número de SADs neutras refutadas para uma bateria de simulações com um determinada distância média de dispersão; eixo x = distância média de dispersão / largura da área de amostragem; a linha é a probabilidade de não refutar uma SAD neutra segundo a predição média do conjunto de sub-modelos dentro do intervalo de plausibilidade de 7 (Burnham et al 2011)
 
 # diff_S = (S_obs - S_MN)/S_obs
 
