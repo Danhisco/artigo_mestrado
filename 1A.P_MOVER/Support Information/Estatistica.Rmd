@@ -76,9 +76,8 @@ df_resultados.U <- df_resultados %>% filter(MN=="EE") %>% distinct()
 df_resultados %<>% mutate(logit_nRef = car::logit(n_nRef/100))
 ```
 
-# Número de SADs preditas não refutadas
+# 1 - Número de SADs preditas não refutadas
 
-## Padrões gerais
 
 ```{r n_nRef padroes gerais fig11}
 l_p <- vector("list",2)
@@ -99,10 +98,11 @@ __Figura 1.1__ logito(número de SADs não refutadas) ~ p *  k * MN. A linha azu
 
 A figura 1.1 mostra que o padrão geral dos dados não é linear na escala da função de ligação, assim utilizamos GAM. Possibilitamos até 1 intercepto por modelo neutro por sítio de amostragem (MN|SiteCode); para modelos com variáveis de dispersão continua não foi possível um smoother por Sítio de Amostragem e Modelo Neutro
 
-## GLMM com resposta quadratica  
 
-### Modelo Cheio
 
+## 1.1 GLMM binomial
+
+### 1.1.1 Modelo Cheio e Auditoria
 
 ```{r glmm n_nRef comparacao modelos cheios,include=FALSE}
 l_md <- vector("list",11)
@@ -134,13 +134,13 @@ l_md[[7]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * d.z * MN + I(p.z^2) * d.z * 
 l_md[[8]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * d.z * MN + I(p.z^2) * d.z * MN + (d.z*MN|SiteCode),
                    family = "binomial",data=df_resultados,
                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md[[10]] <- glmer(cbind(n_nRef,1d_Lplot.z00-n_nRef) ~ p.z * d_Lplot.z * MN + I(p.z^2) * d_Lplot.z * MN + (1|SiteCode),
+l_md[[9]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * d_Lplot.z * MN + I(p.z^2) * d_Lplot.z * MN + (1|SiteCode),
                    family = "binomial",data=df_resultados,
                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md[[11]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * d_Lplot.z * MN + I(p.z^2) * d_Lplot.z * MN + (MN|SiteCode),
+l_md[[10]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * d_Lplot.z * MN + I(p.z^2) * d_Lplot.z * MN + (MN|SiteCode),
                    family = "binomial",data=df_resultados,
                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md[[12]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * d_Lplot.z * MN + I(p.z^2) * d_Lplot.z * MN + (d_Lplot.z*MN|SiteCode),
+l_md[[11]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * d_Lplot.z * MN + I(p.z^2) * d_Lplot.z * MN + (d_Lplot.z*MN|SiteCode),
                    family = "binomial",data=df_resultados,
                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
 l_md_nRef.GLMM <- l_md
@@ -157,16 +157,17 @@ O único modelo plausível é aquele com função de ligação logito, a variáv
 
 
 ```{r auditoria mais plausivel md_n.ref1}
-md_nRef <- l_md_nRef.GLMM[["d/L_plot d/L_plot*MN|Site"]]
+md_nRef <- l_md_nRef.GLMM[["d d*MN|Site"]]
 p_plot <- DHARMa::simulateResiduals(md_nRef,n=1000)
 plot(p_plot)
 ```
 
-__Figura 1.2__ Resíduos Quantílicos do modelo cheio para n_nRef ~ p*d_Lplot*MN + (d_Lplot*MN|SiteCode)
+__Figura 1.2__ Resíduos Quantílicos do modelo cheio para n_nRef ~ p*d*MN + p^2*d*MN + (d*MN|SiteCode)
 
 
-```{r graf diag 2 glmm p^2 n_nRef fig 13}
-df_plot <- augment(md_nRef) %>% as.data.frame()
+```{r graf diag 2 glmm p^2 n_nRef fig 13, include=FALSE}
+teste <- augment(lm(log(Stotal) ~ p,df_resultados)) %>% as.data.frame()
+df_plot <- augment(md_nRef) %>% as.data.frame() # demorando muito
 # df_plot %>% names
 l_p <- vector("list",3)
 l_p[[1]] <- ggplot(df_plot,aes(x=p.z,y=.fitted)) + geom_point(alpha=0.3) + geom_line(aes(group=SiteCode)) + facet_wrap(~MN,ncol=2)
@@ -175,9 +176,9 @@ l_p[[3]] <- ggplot(df_plot,aes(x=d_Lplot.z,y=.fitted)) + geom_point(alpha=0.3) +
 do.call("grid.arrange",c(l_p,ncol=1))
 ```
 
-__Figura 1.3__ Valores ajustados contra as preditoras lineares  
+__Figura 1.3__ Valores ajustados contra as preditoras lineares  - ESTA DEMORANDO MUITO PARA RODAR AUGMENT PARA O MODELO MAIS PLAUSIVEL
   
-  __Tabela do modelo mais plausível:__  
+### 1.1.2 Modelo cheio: predições
   
 ```{r codigo do modelo mais plausivel, include=FALSE,echo=TRUE}
 md_nRef <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * d_Lplot.z * MN + I(p.z^2) * d_Lplot.z * MN + (d_Lplot.z*MN|SiteCode),
@@ -193,7 +194,7 @@ tab_model(md_nRef)
  
   
   
-```{r avaliacao por site fig 14,fig.width=8, fig.height=30}
+```{r avaliacao por site fig 14,fig.width=8, fig.height=30,message=FALSE}
 # Dados
 df_plot <- df_resultados
 df_plot <- cbind(df_plot,
@@ -206,7 +207,7 @@ df_plot$Pr_nRef <- predict(md_nRef,type="response")*100
 # Graficos
 df_plot %<>% mutate(title = paste0(SiteCode, " p=",round(p,digits = 3))) %>% arrange(p)
 df_plot$title <- factor(df_plot$title,levels = unique(df_plot$title))
-ggplot(df_plot,aes(x=d_Lplot.z,y=n_nRef,group=MN)) +
+ggplot(df_plot,aes(x=d.z,y=n_nRef,group=MN)) +
   geom_point(aes(color=MN)) +
   geom_line(aes(y=Pr_nRef,color=MN)) +
   scale_color_manual(values=c("#FF0000", "#000000")) +
@@ -220,7 +221,7 @@ __Figura 1.4__ Predito e observado por SiteCode
 ```{r predito para novo conjunto de dados glmm n_nRef fig 15}
 df_pred <- expand.grid(SiteCode=levels(df_resultados$SiteCode)[1],
                        MN=levels(df_resultados$MN),
-                       d_Lplot.z=seq(min(df_resultados$d_Lplot.z),max(df_resultados$d_Lplot.z),length=20),
+                       d.z=seq(min(df_resultados$d_Lplot.z),max(df_resultados$d_Lplot.z),length=20),
                        p.z=seq(min(df_resultados$p.z),max(df_resultados$p.z),length=103))
 df_pred <- cbind(df_pred,
   predictInterval(merMod = md_nRef, newdata = df_pred,
@@ -229,36 +230,35 @@ df_pred <- cbind(df_pred,
                          include.resid.var = TRUE)
                  ) %>% 
   mutate(p = p.z * sd(df_resultados$p) + mean(df_resultados$p),
-         d_Lplot = d_Lplot.z*sd(df_resultados$d_Lplot) + mean(df_resultados$d_Lplot))
+         d = d.z*sd(df_resultados$d) + mean(df_resultados$d))
 
-ggplot(df_pred,aes(p,d_Lplot,fill=fit)) + 
+ggplot(df_pred,aes(p,d,fill=fit)) + 
   geom_tile() +
-  scale_fill_gradient2(low="red",mid="white",  high="blue", 
-                       midpoint=median(df_pred$fit)) +
+  scale_fill_gradient2(limits = c(0,1),midpoint=0, low="red", high="blue",mid="green") +
   labs(title="Prob de não Refutar",
        fill="Probability") + facet_wrap(~MN,ncol=2) + theme_classic()
 ```
   
 __Figura 1.5__ Probabilidade predito pelo modelo mais plausível  
 
-### n_nRef subset:MN==EE
+## 1.2 GLMM binomail subset:MN==EE
 
 ```{r glmm quadratico n_nRef MNEE modelo cheio}
 l_md <- vector("list",3)
 names(l_md) <- c("1|Site","d|Site","d + d^2|Site")
 l_md[[1]] <- glmer(cbind(n_nRef,100-n_nRef) ~ 
-                     ( p.z + I(p.z^2) ) * ( d_Lplot.z + I(d_Lplot.z^2) ) +
+                     ( p.z + I(p.z^2) ) * ( d.z + I(d.z^2) ) +
                      (1|SiteCode),
                    family = "binomial",data=filter(df_resultados,MN=="EE"),
                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
 l_md[[2]] <- glmer(cbind(n_nRef,100-n_nRef) ~ 
-                     ( p.z + I(p.z^2) ) * ( d_Lplot.z + I(d_Lplot.z^2) ) +
-                     (d_Lplot.z|SiteCode),
+                     ( p.z + I(p.z^2) ) * ( d.z + I(d.z^2) ) +
+                     (d.z|SiteCode),
                    family = "binomial",data=filter(df_resultados,MN=="EE"),
                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
 l_md[[3]] <- glmer(cbind(n_nRef,100-n_nRef) ~ 
-                     ( p.z + I(p.z^2) ) * ( d_Lplot.z + I(d_Lplot.z^2) ) +
-                     (d_Lplot.z + I(d_Lplot.z^2)|SiteCode),
+                     ( p.z + I(p.z^2) ) * ( d.z + I(d.z^2) ) +
+                     (d.z + I(d.z^2)|SiteCode),
                    family = "binomial",data=filter(df_resultados,MN=="EE"),
                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
 l_md_nRef.GLMM_EE <- l_md
@@ -283,27 +283,41 @@ __Figura 1.6__ Resíduos Quantílicos do glmm cheio para MNEE
 df_md <- filter(df_resultados,MN=="EE")
 # modelo global
 global_md <- glmer(cbind(n_nRef,100-n_nRef) ~
-                     ( p.z + I(p.z^2) ) * ( d_Lplot.z + I(d_Lplot.z^2) ) +
-                     (d_Lplot.z + I(d_Lplot.z^2)|SiteCode),
+                     ( p.z + I(p.z^2) ) * ( d.z + I(d.z^2) ) +
+                     (d.z + I(d.z^2)|SiteCode),
                    family = "binomial",data=df_md,
                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)),na.action = "na.fail")
+dredge_glmmEE <- dredge(global_md,trace = FALSE,evaluate=TRUE)
+subset(dredge_glmmEE,delta<7)
 ```
 
 
-```{r model averaging EE}
-# model averagin de todas as combinações de modelo
-mdAvg_nRefEE <- model.avg(lapply(dredge(global_md,trace = FALSE,evaluate=FALSE), eval)) #,subset<2
+
+
+```{r model dredge EE,message=FALSE,include=FALSE}
+# todas as combinações de modelo do modelo cheio
+l_md.dredge_nRefEE <- lapply(dredge(global_md,trace = FALSE,evaluate=FALSE), eval)
+# Model Averaging for SiteCode predictions
+mdAvg_nRefEE__MuMIn <- model.avg(l_md.dredge_nRefEE) #,subset<2
+save(mdAvg_nRefEE__MuMIn,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_nRefEE__MuMIn.Rdata")
+# Model Averaging for new data predictions
+df_pred <- expand.grid(SiteCode=levels(df_resultados$SiteCode)[1],
+                       d.z=seq(min(df_resultados$d_Lplot.z),max(df_resultados$d_Lplot.z),length=20),
+                       p.z=seq(min(df_resultados$p.z),max(df_resultados$p.z),length=103))
+mdAvg_nRefEE__AICcmodavg <- modavgPred(l_md.dredge_nRefEE,newdata = df_pred) %>% 
+  cbind(df_pred)
+save(mdAvg_nRefEE__AICcmodavg,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_nRefEE__AICcmodavg.Rdata")
 # armazenamento
-save(mdAvg_nRefEE,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_nRefEE.Rdata")
+# l_md.dredge_nRefEE[[1]]
 ```
 
-
+##### Predito para cada Sítio
 
 ```{r glmm quadratico n_nRef MNEE selecao de variaveis, comment=FALSE, message=FALSE,warning=FALSE,results="hide",fig.width=8, fig.height=30}
 # Modelo Global
 load(file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_nRefEE.Rdata")
 # Predição
-df_md$Pr_nRef <- predict(mdAvg_nRefEE,type="response")*100
+df_md$Pr_nRef <- predict(mdAvg_nRefEE__MuMIn,type="response")*100
 # Gráfico
 df_md %<>% mutate(title = paste0(SiteCode," p=",round(p,3))) %>% arrange(p)
 df_md$title <- factor(df_md$title,levels = unique(df_md$title))
@@ -316,6 +330,71 @@ ggplot(df_md,aes(x=d_Lplot,y=n_nRef)) +
 ```
 
 __Figura 1.7__ Predições por sítio de amostragem; pontos: número de SADs neutras refutadas para uma bateria de simulações com um determinada distância média de dispersão; eixo x = distância média de dispersão / largura da área de amostragem; a linha é a probabilidade de não refutar uma SAD neutra segundo a predição média do conjunto de sub-modelos dentro do intervalo de plausibilidade de 7 (Burnham et al 2011)
+  
+  
+##### Predito para novo conjunto de dados
+
+```{r fig 18 }
+# dados
+## modelo médio
+load(file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_nRefEE.Rdata")
+## novo conjunto de dados
+df_pred <- expand.grid(SiteCode=levels(df_resultados$SiteCode)[1],
+                       # MN=levels(df_resultados$MN),
+                       d_Lplot.z=seq(min(df_resultados$d_Lplot.z),max(df_resultados$d_Lplot.z),length=20),
+                       p.z=seq(min(df_resultados$p.z),max(df_resultados$p.z),length=103))
+# funções para predição condicional e marginal
+f1 <- function(.) predict(., newdata=df_pred) # marginal
+f2 <- function(.) predict(., newdata=df_pred, re.form=~0) # condicional
+# bootstrap
+b3 <- bootMer(global_md, FUN = f1, nsim=1000, parallel="multicore", ncpus=2)
+b4 <- bootMer(global_md, FUN = f2, nsim=1000, parallel="multicore", ncpus=2)
+# métricas de interesse
+df_pred %<>% mutate(p = p.z * sd(df_resultados$p) + mean(df_resultados$p),
+                    d_Lplot = d_Lplot.z*sd(df_resultados$d_Lplot) + mean(df_resultados$d_Lplot))
+df_pred$mean <- apply(b3$t,2,mean)
+df_pred$IC.low <- apply(b3$t,2,quantile, 0.025)
+df_pred$IC.upp <- apply(b3$t,2,quantile, 0.975)
+df_pred$mean.fixed <- apply(b4$t,2,mean)
+df_pred$IC.low.fixed <- apply(b4$t,2,quantile, 0.025)
+df_pred$IC.upp.fixed <- apply(b4$t,2,quantile, 0.975)
+```
+
+
+
+```{r}
+# Uma regressao entre log_S.z e pz ##
+lm1 <- lm(lS.z ~ p.z, data=df_resultados[duplicated(df_resultados$Site),]) # estima relacao linear entre log S e p.z
+cf1 <- unname(coef(lm1)) ## guarda os coeficientes dessa regressao para usar no bootstrap
+
+## Intervalo de Confiança Bootstrap ##
+# novo conjunto de dados
+df_newdat <- expand.grid(Site=df_resultados$Site[1],
+                         k=unique(df_resultados$k),
+                         p.z = seq(min(df_resultados$p.z)*1.1,max(df_resultados$p.z)*1.1, length=50))
+# Adiciona a média de log(S) padronizado para cada cobertura, estimado pela regrassao Sxp
+df_newdat %<>% mutate(lS.z = cf1[1] + cf1[2]*p.z) %>% as.data.frame()
+## Passo 2: crie as função que devem ser calculadas dos modelos a cada simulação
+## Previstos por efeitos fixos e aleatórios
+f1 <- function(.) predict(., newdata=df_newdat)
+## Previstos por efeitos fixos (argumento re.form=~0)
+f2 <- function(.) predict(., newdata=df_newdat, re.form=~0)
+## Os dois bootstraps. Ajuste o argumento ncpus para o numero de cores de seu computador
+md_U <- l_md[["p * k + S"]]
+b3 <- bootMer(md_U, FUN = f1, nsim=1000, parallel="multicore", ncpus=2)
+b4 <- bootMer(md_U, FUN = f2, nsim=1000, parallel="multicore", ncpus=2)
+## calcula as médias e intervalos de confiança quantílicos para cada combinação de preditoras
+## no novo conjunto de dados
+df_newdat$p <- df_newdat$p.z*sd(df_resultados$p) + mean(df_resultados$p)
+df_newdat$mean <- apply(b3$t,2,mean)
+df_newdat$IC.low <- apply(b3$t,2,quantile, 0.025)
+df_newdat$IC.upp <- apply(b3$t,2,quantile, 0.975)
+df_newdat$mean.fixed <- apply(b4$t,2,mean)
+df_newdat$IC.low.fixed <- apply(b4$t,2,quantile, 0.025)
+df_newdat$IC.upp.fixed <- apply(b4$t,2,quantile, 0.975)
+
+```
+
 
 
 
