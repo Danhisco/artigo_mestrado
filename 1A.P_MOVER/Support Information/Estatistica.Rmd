@@ -23,6 +23,7 @@ knitr::opts_knit$set(root.dir = "~/Documentos/Doutorado/artigo_mestrado/1A.P_MOV
 
 ```{r pacotes,eval=TRUE,echo=F}
 library(gtools)
+library(GGally)
 library(doMC)
 library(DHARMa)
 library(MuMIn)
@@ -698,23 +699,24 @@ grid.arrange(l_p.nRefEE_AICcmodavg[[1]],l_p.nRefEE_AICcmodavg[[2]],l_p.nRefEE_AI
 __Figura 1.12__ Probabilidade de não refutar uma SAD neutra em função do modelo neutro (EE e EI), proporção de cobertura vegetal (p) e distância média de dispersão (d)
 
 
-<!-- # diff_S = (S_obs - S_MN)/S_obs -->
+# 2 diff_S = (S_obs - S_MN)/S_obs
 
-<!-- ## Padrão Geral -->
+__Padrão Geral__
 
-<!-- ```{r preparacao dos dados 1} -->
-<!-- df_resultados %<>% mutate(diff_S0 = (Stotal-S.MN_mean)/Stotal) -->
-<!-- df_resultados$diff_S <- df_resultados$diff_S0 + min(df_resultados$diff_S)*(-1) + 0.01 -->
-<!-- # hist(df_resultados$diff_S0,breaks=60) -->
-<!-- # boxplot(I(df_resultados$diff_S0)) -->
-<!-- ggplot(df_resultados,aes(x=log(Stotal),y=diff_S,group=MN)) + -->
-<!--   geom_point() + -->
-<!--   geom_smooth(method="loess") +  -->
-<!--   ylab("(Sobs-S_MN)/Sobs") + -->
-<!--   facet_wrap(~k,ncol=5,scales="free") -->
-<!-- ``` -->
+```{r preparacao dos dados 1,message=FALSE}
+# dados
+df_resultados %<>% mutate(diff_S0 = (S.MN_mean-Stotal)/Stotal)
+df_resultados$diff_S <- df_resultados$diff_S0 + min(df_resultados$diff_S)*(-1) + 0.01
+# graficos 
+filter(df_resultados,MN=="EE") %>% select(diff_S0, p, d, Stotal, Ntotal) %>% ggpairs() + labs(title="MNEE")
+filter(df_resultados,MN=="EI") %>% select(diff_S0, p, d, Stotal, Ntotal) %>% ggpairs() + labs(title="MNEI")
+# do.call("grid.arrange",c(l_p,ncol=1))
+```
 
-<!-- __Figura 2.1__ diff_S = (S_obs - S_MN)/S_obs + (-1) * min(diff_S) + 0.01, inclinação_MNEE ~ 0 para todo k. -->
+__Figura 2.1__ diff_S = (S_obs - S_MN)/S_obs + (-1) * min(diff_S) + 0.01, inclinação_MNEE ~ 0 para todo k.
+
+Para MNEE vou utilizar uma distribuição normal e avaliar
+
 
 <!-- Parece que existem alguns outliers. De maneira geral MNEE apresenta boa congruência com os dados enquanto o comportamento de MNEI depende da dispersão: para k->100% o desvio aumento para ps extremos (bimodal/quadratica), apresentando boa congruência para proporção intermediárias de habitat, mas sempre subestimando S_obs. Com o aumento da capacidade de dispersão as estimavas de S se tornam mais próximas ao observado para p>0.5, superestimando o observado para valores elevados de p e k>0.5 o que leva a reduzir a porção de p em que MNEI faz uma boa aproximação. -->
 
@@ -1658,7 +1660,8 @@ __Figura 1.12__ Probabilidade de não refutar uma SAD neutra em função do mode
 
 <!-- __Figura 1.14__ Predito para o conjunto de dados MNEI   -->
 
-<!-- O problema de estimativa errada persiste. Vou avaliar outros tipos de smoothers. -->
+<!-- O problema de estimativa errada persisteF701
+. Vou avaliar outros tipos de smoothers. -->
 
 
 <!-- ```{r n_nRef MNEI basis smoother} -->
