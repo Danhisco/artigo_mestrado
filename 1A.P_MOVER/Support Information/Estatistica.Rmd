@@ -949,14 +949,41 @@ gratia::draw(l_md.diff_S.EI__GAMM2[["d|Site"]])
   
 __Figura 2.7__ gratia::draw() gamm mais plausível com estrutura similar a (d|Site)  
   
-Este modelo parece apresentar problema de concurvidade.  
+Este modelo apresenta problema de concurvidade. Assim vou refazer a comparação com configuração adequada:  
+
+```{r updata gamm cheio mais plausível d Site,eval=FALSE}
+df_md <- filter(df_resultados,MN=="EI")
+l_md.diff_S.EI__GAMM2[[2]] <- gam(diff_S ~ s(p.z,bs="cr") + s(d.z,bs="cr") + ti(p.z,d.z,bs=c("cr","cr")) +
+                   s(d.z,SiteCode,bs="fs",xt=list(bs="cp"), m=1),
+                 data=df_md,family = "Gamma"(link="log"))
+
+md_gam.diff_S.EI__update <- l_md.diff_S.EI__GAMM2[[2]]
+save(md_gam.diff_S.EI__update,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/md_diff_S_EI__GAMM_update.Rdata")
+```
+
+
+
   
 ```{r  diff_S MNEI gamm cheio segundo plausivel,message=FALSE,warning=FALSE,results="hide"}
-gratia::draw(l_md.diff_S.EI__GAMM2[["1|Site"]])
+gratia::draw(l_md.diff_S.EI__GAMM2[["d|Site"]])
+gratia::appraise(l_md.diff_S.EI__GAMM2[["d|Site"]])
 ```
   
 __Figura 2.8__ gratia::draw() gamm (1|Site)  
   
+### Figura Final
+
+```{r gamm diff_S predicao novo conjunto de dados}
+df_pred <- df_pred <- expand.grid(SiteCode=levels(df_resultados$SiteCode)[1],
+                       d.z=seq(min(df_resultados$d.z),max(df_resultados$d.z),length=20),
+                       p.z=seq(min(df_resultados$p.z),max(df_resultados$p.z),length=103))
+df_pred <- cbind(df_pred,
+                 predict(l_md.diff_S.EI__GAMM2[["1|Site"]],df_pred,type="response",se.fit=TRUE)) %>% 
+  mutate(p = p.z * sd(df_resultados$p) + mean(df_resultados$p),
+         d = d.z * sd(df_resultados$d) + mean(df_resultados$d))
+```
+
+
 ```{r predito pelo modelo cheio selecionado, fig.width=8, fig.height=30,eval=FALSE}
 df_plot <- df_resultados %>% filter(MN=="EI")
 df_plot$predicao <- predict(l_md[[4]],type = "response")
