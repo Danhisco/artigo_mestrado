@@ -52,7 +52,7 @@ library(dplyr)
 ```{r dados,message=FALSE}
 ### dados ###
 # leitura
-df_resultados <- read.table(file="./resultados/df_resultados.csv",header = TRUE,sep = ";",dec = ".",as.is=FALSE)
+df_resultados <- read.table(file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/resultados/df_resultados.csv",header = TRUE,sep = ";",dec = ".",as.is=FALSE)
 df_resultados$k.0_1 <- 1 - df_resultados$k.0
 # padronização
 level_k <- unique(as.character(df_resultados$k))
@@ -75,7 +75,8 @@ df_resultados %<>% cbind(.,df_resultados.z)
 names(df_resultados)[c(5:6,26,33)] <- c("n_nRef","n_Ref","d_Lplot","d_Lplot.z")
 df_resultados.U <- df_resultados %>% filter(MN=="EE") %>% distinct() 
 # summary(df_resultados)
-df_resultados %<>% mutate(logit_nRef = car::logit(n_nRef/100))
+df_resultados %<>% mutate(diff_S0 = (S.MN_mean-Stotal)/Stotal,
+                          diff_S = diff_S0 + min(diff_S0)*(-1) + 0.01)
 ```
 
 # 1 - Número de SADs preditas não refutadas
@@ -106,7 +107,7 @@ A figura 1.1 mostra que o padrão geral dos dados não é linear na escala da fu
 
 ### 1.1.1 Modelo Cheio e Auditoria
 
-```{r glmm n_nRef comparacao modelos cheios,include=FALSE,echo=FALSE,eval=FALSE}
+```{r glmm n_nRef comparacao modelos cheios,include=FALSE,echo=FALSE,eval=FALSE,cache=TRUE}
 l_md <- vector("list",11)
 names(l_md) <- c("k0 1|Site","k0 MN|Site","k0 k0*MN|Site",
                  "kf 1|Site","kf MN|Site",
@@ -703,24 +704,307 @@ __Figura 1.12__ Probabilidade de não refutar uma SAD neutra em função do mode
 
 __Padrão Geral__
 
-```{r preparacao dos dados 1,message=FALSE}
-# dados
-df_resultados %<>% mutate(diff_S0 = (S.MN_mean-Stotal)/Stotal)
-df_resultados$diff_S <- df_resultados$diff_S0 + min(df_resultados$diff_S)*(-1) + 0.01
-# graficos 
-filter(df_resultados,MN=="EE") %>% select(diff_S0, p, d, Stotal, Ntotal) %>% ggpairs() + labs(title="MNEE")
-filter(df_resultados,MN=="EI") %>% select(diff_S0, p, d, Stotal, Ntotal) %>% ggpairs() + labs(title="MNEI")
+```{r preparacao dos dados 1,message=FALSE,eval=TRUE}
+# gráfico
+df_resultados %>% ggplot(aes(x=p,y=diff_S0,group=MN)) + 
+  geom_abline(intercept = 0,slope = 0,col="blue") +
+  geom_point(aes(color=MN),alpha=0.3) +
+  scale_color_manual(values=c("#FF0000", "#000000")) +
+  labs(title="diff_S = (S_MN - S_obs)/S_obs",x="p",y="diff_S") +
+  facet_wrap(~k,ncol=5,scales="free") + theme_light()
+# # graficos 
+# filter(df_resultados,MN=="EE") %>% select(diff_S0, p, d, Stotal, Ntotal) %>% ggpairs() + labs(title="MNEE")
 # do.call("grid.arrange",c(l_p,ncol=1))
 ```
 
-__Figura 2.1__ diff_S = (S_obs - S_MN)/S_obs + (-1) * min(diff_S) + 0.01, inclinação_MNEE ~ 0 para todo k.
-
-Para MNEE vou utilizar uma distribuição normal e avaliar
+__Figura 2.1__ diff_S (y-axis), p (x-axis).
 
 
-<!-- Parece que existem alguns outliers. De maneira geral MNEE apresenta boa congruência com os dados enquanto o comportamento de MNEI depende da dispersão: para k->100% o desvio aumento para ps extremos (bimodal/quadratica), apresentando boa congruência para proporção intermediárias de habitat, mas sempre subestimando S_obs. Com o aumento da capacidade de dispersão as estimavas de S se tornam mais próximas ao observado para p>0.5, superestimando o observado para valores elevados de p e k>0.5 o que leva a reduzir a porção de p em que MNEI faz uma boa aproximação. -->
 
 
+## 2.1 MNEE
+
+
+
+```{r diff_S MNEE modelo cheio,echo=TRUE}
+l_md <- vector("list",9)
+names(l_md) <- c("1-k 1|Site","1-k I(1-k)|Site",
+                 "k 1|Site",
+                 "d 1|Site","d d|Site",
+                 "d/L 1|Site","d/L I(d/L)|Site",
+                 "1 1|Site",
+                 "1")
+df_md <- df_resultados %>% filter(MN=="EE")
+l_md[[1]] <- lmer(diff_S0 ~ (p.z + I(p.z^2)) * k_1.z + (1|SiteCode),
+                   data=df_md,na.action = "na.fail")
+l_md[[2]] <- lmer(diff_S0 ~ (p.z + I(p.z^2)) * k_1.z + (k_1.z|SiteCode),
+                   data=df_md,na.action = "na.fail")
+l_md[[3]] <- lmer(diff_S0 ~ (p.z + I(p.z^2)) * k + (1|SiteCode),
+                   data=df_md,na.action = "na.fail")
+l_md[[4]] <- lmer(diff_S0 ~ (p.z + I(p.z^2)) * d.z + (1|SiteCode),
+                   data=df_md,na.action = "na.fail")
+l_md[[5]] <- lmer(diff_S0 ~ (p.z + I(p.z^2)) * d.z + (d.z|SiteCode),
+                   data=df_md,na.action = "na.fail")
+l_md[[6]] <- lmer(diff_S0 ~ (p.z + I(p.z^2)) * d_Lplot.z + (1|SiteCode),
+                   data=df_md,na.action = "na.fail")
+l_md[[7]] <- lmer(diff_S0 ~ (p.z + I(p.z^2)) * d_Lplot.z + (d_Lplot.z|SiteCode),
+                   data=df_md,na.action = "na.fail")
+l_md[[8]] <- lmer(diff_S0 ~ 1 + (1|SiteCode),
+                   data=df_md,na.action = "na.fail")
+l_md[[9]] <- lm(diff_S0 ~ 1,
+                  data=df_md,na.action = "na.fail")
+AICctab(l_md,weights=T)
+```
+
+Alguns modelos utilizados para estimar diff_S apresentaram "singularidade" (estimativas não diferem de zero), dentre eles o único modelo plausível. Isso indica que modelo com a estrutura aleatória mais simples devem ser ajustados aos dados, assim vou descartar aqueles com inclinação para a variável de dispersão por Sítio.
+
+```{r diff_S modelo cheio 2}
+l_md <- vector("list",6)
+names(l_md) <- c("1-k 1|Site",
+                 "k 1|Site",
+                 "d 1|Site",
+                 "d/L 1|Site",
+                 "1 1|Site",
+                 "1")
+df_md <- df_resultados %>% filter(MN=="EE")
+l_md[[1]] <- lmer(diff_S0 ~ (p.z + I(p.z^2)) * k_1.z + (1|SiteCode),
+                   data=df_md,na.action = "na.fail")
+l_md[[2]] <- lmer(diff_S0 ~ (p.z + I(p.z^2)) * k + (1|SiteCode),
+                   data=df_md,na.action = "na.fail")
+l_md[[3]] <- lmer(diff_S0 ~ (p.z + I(p.z^2)) * d.z + (1|SiteCode),
+                   data=df_md,na.action = "na.fail")
+l_md[[4]] <- lmer(diff_S0 ~ (p.z + I(p.z^2)) * d_Lplot.z + (1|SiteCode),
+                   data=df_md,na.action = "na.fail")
+l_md[[5]] <- lmer(diff_S0 ~ 1 + (1|SiteCode),
+                   data=df_md,na.action = "na.fail")
+l_md[[6]] <- lm(diff_S0 ~ 1,
+                   data=df_md,na.action = "na.fail")
+AICctab(l_md,weights=T)
+```
+  
+Nenhum destes modelos apresentou singularidade, o modelo nulo sem estrutura aleatória foi o único plausível. Segue gráfico diagnóstico:  
+
+
+```{r graf diag modelo cheio mais plausivel diff_S MNEE,message=FALSE,warning=FALSE}
+p_plot <- simulateResiduals(l_md[["1"]],n = 1000)
+plot(p_plot)
+```
+
+__Figura 2.2__ Resíduos Quantílicos do modelo mais plausível para diff_S subset=MNEE (diff_S ~ 1)
+
+__Tabela 2.3__ Sumário do modelo mais plausível para diff_S MNEE  
+
+```{r}
+summary(l_md[["1"]])
+```
+  
+## MNEI  
+
+```{r padroes gerais diff S MNEI, warning=FALSE,message=FALSE}
+df_plot <- df_resultados %>% filter(MN=="EI")
+ggplot(df_plot,aes(x=p,y=diff_S)) + 
+  geom_smooth() + 
+  geom_point(alpha=0.3) + 
+  facet_wrap(~k,ncol=5,scales="free")
+```
+
+__Figura 2.3__ diff_S para MNEI, preditoras de interesse e alguns possíveis variáveis de controle (número de indivíduos observado (Ntotal) e riqueza observada (Stotal))  
+
+Vou iniciar apenas com as preditoras de interesse (p e variáveis de dispersão). Devido a clara ausência de simetria de diff_S desloquei a distribuição apenas para valores positivos (figura 2.3 primeiro quadro) e utilizarei distribuição Gamma para ajustar os modelos com função de ligação 'log'.
+
+```{r diff_S MNEI por sitio,fig.width=8, fig.height=30}
+df_plot <- df_resultados %>% filter(MN=="EI")
+df_plot %<>% mutate(title = paste0(SiteCode, " p=",round(p,digits = 3))) %>% arrange(p)
+df_plot$title <- factor(df_plot$title,levels = unique(df_plot$title))
+## por sítio de amostragem
+ggplot(df_plot,aes(x=d,y=diff_S)) +
+  geom_point() +
+  geom_smooth(method="loess",col="blue") + geom_smooth(method="lm",col="red") + 
+  theme_classic() + theme(legend.position="top") +
+  facet_wrap(~title,ncol=5,scales="free")
+```
+
+__Figura 2.4__ diff_S por sítio de amostragem e d
+
+### Seleção do Modelo cheio
+
+```{r modelo cheio diff_S MNEI, echo=TRUE,warning=TRUE,message=TRUE}
+df_md <- df_resultados %>% filter(MN=="EI")
+# df_md$diff_S %>% summary
+l_md <- vector("list",6)
+names(l_md) <- c("1|Site","d|Site",
+                 "p2*k log",
+                 "p2*d2 id 1|Site",
+                 "p2*d2 id d|Site",
+                 "p2*d2 id d2|Site")
+# modelos mínimos
+l_md[[1]] <- glmer(diff_S ~ p.z*d.z + (1|SiteCode),
+                   data=df_md,family="Gamma"(link="log"))
+l_md[[2]] <- glmer(diff_S ~ p.z*d.z  + (d.z|SiteCode),
+                   data=df_md,family="Gamma"(link="log"))
+# com p2
+## erro
+l_md[[3]] <- glmer(diff_S ~ (p+I(p.z^2))*k + (1|SiteCode),
+                   data=df_md,family="Gamma"(link="log"))
+v_vars <- getME(l_md[[3]],c("theta","fixef"))
+l_md[[3]] <- update(l_md[[3]],start=v_vars,control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
+l_md[[3]] <- glmer(diff_S ~ I(p.z^2)*k + (1|SiteCode),
+                   data=df_md,family="Gamma"(link="log"))
+# com p2 e d2
+#######################
+# Model failed to converge with max|grad| = 0.00556207 (tol = 0.002, component 1)Model is nearly unidentifiable: very large eigenvalue
+#  - Rescale variables?
+l_md[[4]] <- glmer(diff_S ~ (p.z + I(p.z^2))*(d.z + I(d.z^2)) + (1|SiteCode),
+                   data=df_md,family="Gamma"(link="log"))
+v_vars <- getME(l_md[[4]],c("theta","fixef"))
+l_md[[4]] <- update(l_md[[4]],start=v_vars,control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
+#######################
+#######################
+# Model failed to converge with max|grad| = 0.0608783 (tol = 0.002, component 1)Model is nearly unidentifiable: very large eigenvalue
+#  - Rescale variables?
+l_md[[5]] <- glmer(diff_S ~ (p.z + I(p.z^2))*(d.z + I(d.z^2)) + (d.z|SiteCode),
+                   data=df_md,family="Gamma"(link="log"))
+v_vars <- getME(l_md[[5]],c("theta","fixef"))
+l_md[[5]] <- update(l_md[[5]],start=v_vars,control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
+#######################
+# Model failed to converge with max|grad| = 0.336616 (tol = 0.002, component 1)Model is nearly unidentifiable: very large eigenvalue
+#  - Rescale variables?
+l_md[[6]] <- glmer(diff_S ~ (p.z + I(p.z^2))*(d.z + I(d.z^2)) + (d.z + I(d.z^2)|SiteCode),
+                   data=df_md,family="Gamma"(link="log"))
+v_vars <- getME(l_md[[6]],c("theta","fixef"))
+l_md[[6]] <- update(l_md[[6]],start=v_vars,control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
+#######################
+AICctab(l_md,weights=TRUE)
+```
+  
+Não foi possível ajustar os modelos com estrutura fixa mais complexa. Vou avaliar se GAMM oferecem melhor ajuste aos dados
+
+### GAMM cheio
+
+```{r diff_S MNEI GAMM cheio,eval=FALSE}
+l_md <- vector("list",4)
+names(l_md) <- c("tp by=k","cr by=k",
+                 "tp ti","cr ti")
+l_md[[1]] <- gam(diff_S ~ s(p.z,by=k,bs="tp") + 
+                   s(SiteCode,bs="re"),
+                 data=df_md,family = "Gamma"(link="log"))
+l_md[[2]] <- gam(diff_S ~ s(p.z,by=k,bs="cr") + 
+                   s(SiteCode,bs="re"),
+                 data=df_md,family = "Gamma"(link="log"))
+l_md[[3]] <- gam(diff_S ~ s(p.z,bs="tp") + s(d.z,bs="tp") + ti(p.z,d.z,bs=c("tp","tp")) +
+                   s(SiteCode,bs="re"),
+                 data=df_md,family = "Gamma"(link="log"))
+l_md[[4]] <- gam(diff_S ~ s(p.z,bs="cr") + s(d.z,bs="cr") + ti(p.z,d.z,bs=c("cr","cr")) +
+                   s(SiteCode,bs="re"),
+                 data=df_md,family = "Gamma"(link="log"))
+l_md.diff_S.EI__GAMM <- l_md
+save(l_md.diff_S.EI__GAMM,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md_diff_S_EI__GAMM.Rdata")
+```
+  
+  
+```{r AICctab modelos cheios diff_S EI GAMM}
+load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md_diff_S_EI__GAMM.Rdata")
+AICctab(l_md.diff_S.EI__GAMM,weights=TRUE)
+```
+
+
+O único modelo cheio plausível considera as variáveis p e d (um smoother para cada mais um tensor para ambas) e 1 intercepto por Sítio de Amostragem.
+
+
+```{r gamm cheio selecionado diff_S MNEI, warning=FALSE,message=FALSE}
+appraise(l_md.diff_S.EI__GAMM[["cr ti"]])
+```
+
+__Figura 2.5__ Gráficos Diagnostico do gamm cheio mais plausível para diff_S MN==EI
+
+De maneira geral o modelo esta fazendo um bom ajuste, contudo alguns sítios distoam do padrão geral dos dados. Há duas alternativas: i) possibilitar um smoother por sítio de amostragem com um parâmetro de penalização comum; ou ii) remover sítios outliers.
+
+```{r updata gamm cheio mais plausivel diff_S MNEI,eval=FALSE}
+l_md <- vector("list",2)
+names(l_md) <- c("1|Site","d|Site")
+l_md[[1]] <- gam(diff_S ~ s(p.z,bs="cr") + s(d.z,bs="cr") + ti(p.z,d.z,bs=c("cr","cr")) +
+                   s(SiteCode,bs="re"),
+                 data=df_md,family = "Gamma"(link="log"))
+l_md[[2]] <- gam(diff_S ~ s(p.z,bs="cr") + s(d.z,bs="cr") + ti(p.z,d.z,bs=c("cr","cr")) +
+                   s(d.z,SiteCode,bs="fs",xt="cr"),
+                 data=df_md,family = "Gamma"(link="log"))
+l_md.diff_S.EI__GAMM2 <- l_md
+save(l_md.diff_S.EI__GAMM2,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md_diff_S_EI__GAMM2.Rdata")
+```
+
+```{r AICctab gamm cheio diff_S MNEI 2}
+load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md_diff_S_EI__GAMM2.Rdata")
+AICctab(l_md.diff_S.EI__GAMM2)
+```
+
+```{r graf diag gamm2 diff_S MNEI}
+appraise(l_md.diff_S.EI__GAMM2[["d|Site"]])
+```
+
+__Figura 2.6__ Gráfico Diagnóstico gamm cheio com segunda estrutra aleatória diff_S MM==EI
+
+```{r diff_S MNEI modelo cheio avaliacao,message=FALSE,warning=FALSE,results="hide"}
+gratia::draw(l_md.diff_S.EI__GAMM2[["d|Site"]])
+```
+  
+__Figura 2.7__ gratia::draw() gamm mais plausível com estrutura similar a (d|Site)  
+  
+Este modelo parece apresentar problema de concurvidade.  
+  
+```{r  diff_S MNEI gamm cheio segundo plausivel,message=FALSE,warning=FALSE,results="hide"}
+gratia::draw(l_md.diff_S.EI__GAMM2[["1|Site"]])
+```
+  
+__Figura 2.8__ gratia::draw() gamm (1|Site)  
+  
+```{r predito pelo modelo cheio selecionado, fig.width=8, fig.height=30,eval=FALSE}
+df_plot <- df_resultados %>% filter(MN=="EI")
+df_plot$predicao <- predict(l_md[[4]],type = "response")
+# Graficos
+df_plot %<>% mutate(title = paste0(SiteCode, " p=",round(p,digits = 3))) %>% arrange(p)
+df_plot$title <- factor(df_plot$title,levels = unique(df_plot$title))
+ggplot(df_plot,aes(x=d.z,y=diff_S)) +
+  geom_point() +
+  geom_line(aes(y=predicao),color="red") +
+  # theme_classic() + theme(legend.position="top") + 
+  facet_wrap(~title,ncol=5,scales="free")
+```
+
+<!-- __Figura 2.6__ Predito pelo modelo mais plausível para diff_S MNEI pelo sítio de amostragem -->
+
+<!-- Há um erro sistemático para superestimar valores elevados de d.z e talvez de subestimar para valores do 1o quarto de d.z.   -->
+  
+```{r fig 25 predicao para modelo cheio,eval=FALSE}
+# Dados
+df_pred <- expand.grid(SiteCode=levels(df_resultados$SiteCode)[1],
+                       d.z=seq(min(df_resultados$d.z),max(df_resultados$d.z),length=20),
+                       p.z=seq(min(df_resultados$p.z),max(df_resultados$p.z),length=103))
+df_pred$predito <- predict(l_md[[4]],df_pred,type="response")
+
+
+
+
+
+
+# Graficos
+df_plot %<>% mutate(title = paste0(SiteCode, " p=",round(p,digits = 3))) %>% arrange(p)
+df_plot$title <- factor(df_plot$title,levels = unique(df_plot$title))
+ggplot(df_plot,aes(x=d.z,y=n_nRef,group=MN)) +
+  geom_point(aes(color=MN)) +
+  geom_line(aes(y=Pr_nRef,color=MN)) +
+  scale_color_manual(values=c("#FF0000", "#000000")) +
+  theme_classic() + theme(legend.position="top") + facet_wrap(~title,ncol=5)
+                 
+                 
+
+teste <- glm(diff_S ~ p.z*d.z,data=df_md,family="Gamma"(link="identity"))
+df_plot$predito <- predict(teste,type="response")
+# Graficos
+ggplot(df_plot,aes(x=p.z,y=d.z,fill=predito)) + geom_tile() 
+
+```
+  
+  
 <!-- # U - taxa de especiação necessária para obter a riqueza observada no equilíbrio -->
 
 <!-- ## Padrões Gerais -->
