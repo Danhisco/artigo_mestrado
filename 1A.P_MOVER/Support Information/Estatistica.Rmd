@@ -107,7 +107,7 @@ A figura 1.1 mostra que o padrão geral dos dados não é linear na escala da fu
 
 ### 1.1.1 Modelo Cheio e Auditoria
 
-```{r glmm n_nRef comparacao modelos cheios,include=FALSE,echo=FALSE,eval=FALSE,cache=TRUE}
+```{r glmm n_nRef comparacao modelos cheios,echo=TRUE,eval=FALSE,cache=TRUE}
 l_md <- vector("list",11)
 names(l_md) <- c("k0 1|Site","k0 MN|Site","k0 k0*MN|Site",
                  "kf 1|Site","kf MN|Site",
@@ -219,7 +219,7 @@ Observamos que é necessário considerar também um termo quadrático para d. En
 
 __Tabela 1.2 __ R2 condicional e marginal do modelo cheio com termo quadrático para p e d 
 
-```{r md_nRef2 e r2cm}
+```{r md_nRef2 e r2cm,echo=TRUE,cache=TRUE}
 md_nRef2 <- glmer(cbind(n_nRef,100-n_nRef) ~ 
                      (p.z + I(p.z^2)) * (d.z + I(d.z^2)) * MN + ((d.z + I(d.z^2)) * MN|SiteCode),
                    family = "binomial",data=df_resultados,
@@ -266,26 +266,29 @@ O modelo cheio com termo quadrático para p e d não foi foi suficiente para des
 
 ### Modelo cheio
 
-```{r glmm quadratico n_nRef MNEE modelo cheio,include=FALSE,eval=FALSE}
-# l_md <- vector("list",3)
-# names(l_md) <- c("1|Site","d|Site","d + d^2|Site")
-# l_md[[1]] <- glmer(cbind(n_nRef,100-n_nRef) ~ 
-#                      ( p.z + I(p.z^2) ) * ( d.z + I(d.z^2) ) +
-#                      (1|SiteCode),
-#                    family = "binomial",data=filter(df_resultados,MN=="EE"),
-#                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-# l_md[[2]] <- glmer(cbind(n_nRef,100-n_nRef) ~ 
-#                      ( p.z + I(p.z^2) ) * ( d.z + I(d.z^2) ) +
-#                      (d.z|SiteCode),
-#                    family = "binomial",data=filter(df_resultados,MN=="EE"),
-#                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-# l_md[[3]] <- glmer(cbind(n_nRef,100-n_nRef) ~ 
-#                      ( p.z + I(p.z^2) ) * ( d.z + I(d.z^2) ) +
-#                      (d.z + I(d.z^2)|SiteCode),
-#                    family = "binomial",data=filter(df_resultados,MN=="EE"),
-#                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-# l_md_nRef.GLMM_EE <- l_md
-# save(l_md_nRef.GLMM_EE,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md_nRef.GLMM_EE.Rdata")
+```{r glmm quadratico n_nRef MNEE modelo cheio,echo=TRUE,eval=FALSE}
+l_md <- vector("list",3)
+names(l_md) <- c("1|Site","d|Site","d + d^2|Site")
+l_md[[1]] <- glmer(cbind(n_nRef,100-n_nRef) ~
+                     ( p.z + I(p.z^2) ) * ( d.z + I(d.z^2) ) +
+                     (1|SiteCode),
+                   family = "binomial",data=filter(df_resultados,MN=="EE"),
+                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[2]] <- glmer(cbind(n_nRef,100-n_nRef) ~
+                     ( p.z + I(p.z^2) ) * ( d.z + I(d.z^2) ) +
+                     (d.z|SiteCode),
+                   family = "binomial",data=filter(df_resultados,MN=="EE"),
+                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[3]] <- glmer(cbind(n_nRef,100-n_nRef) ~
+                     ( p.z + I(p.z^2) ) * ( d.z + I(d.z^2) ) +
+                     (d.z + I(d.z^2)|SiteCode),
+                   family = "binomial",data=filter(df_resultados,MN=="EE"),
+                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+```
+
+```{r l_md_nRef.GLMM_EE,echo=FALSE,eval=FALSE}
+l_md_nRef.GLMM_EE <- l_md
+save(l_md_nRef.GLMM_EE,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md_nRef.GLMM_EE.Rdata")
 ```
 
 __Tabela 1.2.1__ AICctab para n_nRef MNEE 
@@ -340,7 +343,7 @@ ggplot(df_plot,aes(x=d.z,y=n_nRef)) +
   
 
 
-```{r modelo global e R2m/c MNEE, include=TRUE,cache=TRUE}
+```{r modelo global e R2m/c MNEE, echo=TRUE,cache=TRUE}
 # dados
 df_md <- filter(df_resultados,MN=="EE")
 # modelo global
@@ -349,7 +352,6 @@ global_md <- glmer(cbind(n_nRef,100-n_nRef) ~
                      (d.z + I(d.z^2)|SiteCode),
                    family = "binomial",data=df_md,
                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)),na.action = "na.fail")
-# r.squaredGLMM(global_md)
 ```
   
   
@@ -365,7 +367,7 @@ subset(dredge_glmmEE,delta<7)
 
 
 
-```{r model averaging EE MuMIn e AICcmodavg,message=FALSE,include=FALSE,eval=FALSE}
+```{r model averaging EE MuMIn e AICcmodavg,message=FALSE,eval=FALSE}
 library(AICcmodavg)
 # todas as combinações de modelo do modelo cheio
 l_md.dredge_nRefEE <- lapply(dredge(global_md,trace = FALSE,evaluate=FALSE), eval)
@@ -390,6 +392,7 @@ Para avaliar o ajuste do modelo ao conjunto de dados utilizo funções do pacote
 # Modelo Global
 load(file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_nRefEE__MuMIn.Rdata")
 # Predição
+df_md <- df_resultados %>% filter(MN=="EE")
 df_md$Pr_nRef <- predict(mdAvg_nRefEE__MuMIn,type="response")*100
 # Gráfico
 df_md %<>% mutate(title = paste0(SiteCode," p=",round(p,3))) %>% arrange(p)
@@ -447,48 +450,11 @@ grid.arrange(l_p.nRefEE_AICcmodavg[[1]],l_p.nRefEE_AICcmodavg[[2]],l_p.nRefEE_AI
   
 __Figura 1.8__ Efeito predito de d e p na Probabilidade de não refutar segundo o modelo médio para MN==EE.  No painel superior a predição média, nos paineis inferiores o intervalo de confiança.  
   
-COISAS PARA FAZER FIG 18:
-i) melhorar a figura
-ii) comparar com o mesmo gráfico para o predito e IC bootsrap para o modelo cheio [SUGESTÃO POR EMAIL PI]
-
-  
-  
-```{r codigo para IC bootstrap apenas para modelos nao medios,include=FALSE}
-## novo conjunto de dados
-# df_pred <- expand.grid(SiteCode=levels(df_resultados$SiteCode)[1],
-#                        # MN=levels(df_resultados$MN),
-#                        d_Lplot.z=seq(min(df_resultados$d_Lplot.z),max(df_resultados$d_Lplot.z),length=20),
-#                        p.z=seq(min(df_resultados$p.z),max(df_resultados$p.z),length=103))
-# # funções para predição condicional e marginal
-# f1 <- function(.) predict(., newdata=df_pred) # marginal
-# f2 <- function(.) predict(., newdata=df_pred, re.form=~0) # condicional
-# # bootstrap
-# b3 <- bootMer(global_md, FUN = f1, nsim=1000, parallel="multicore", ncpus=2)
-# b4 <- bootMer(global_md, FUN = f2, nsim=1000, parallel="multicore", ncpus=2)
-# l_bstrap.nRefEE <- list(marginal = b3, condicional = b4)
-# save(l_bstrap.nRefEE,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_bstrap.nRefEE.Rdata")
-```
-
-
-```{r grafico de IC bootstrap nRefEE, include=FALSE,eval=FALSE}
-# load(l_bstrap.nRefEE,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_bstrap.nRefEE.Rdata")
-# # métricas de interesse
-# df_pred %<>% mutate(p = p.z * sd(df_resultados$p) + mean(df_resultados$p),
-#                     d = d.z*sd(df_resultados$d) + mean(df_resultados$d))
-# df_pred$mean <- apply(l_bstrap.nRefEE$marginal,2,mean)
-# df_pred$IC.low <- apply(l_bstrap.nRefEE$marginal,2,quantile, 0.025)
-# df_pred$IC.upp <- apply(l_bstrap.nRefEE$marginal,2,quantile, 0.975)
-# df_pred %<>% mutate(IQR_95IC_marginal = IC.upp - IC.low)
-# df_pred$mean.fixed <- apply(b4$t,2,mean)
-# df_pred$IC.low.fixed <- apply(b4$t,2,quantile, 0.025)
-# df_pred$IC.upp.fixed <- apply(b4$t,2,quantile, 0.975)
-```
-
 
 ## 1.3 n_nRef subset:MN==EI  
   
   
-```{r glmm quadratico n_nRef MNEI modelo cheio,include=FALSE,eval=FALSE}
+```{r glmm quadratico n_nRef MNEI modelo cheio,include=FALSE,eval=FALSE,echo=TRUE}
 l_md <- vector("list",3)
 names(l_md) <- c("1|Site","d|Site","d + d^2|Site")
 l_md[[1]] <- glmer(cbind(n_nRef,100-n_nRef) ~
@@ -506,9 +472,13 @@ l_md[[3]] <- glmer(cbind(n_nRef,100-n_nRef) ~
                      (d.z + I(d.z^2)|SiteCode),
                    family = "binomial",data=filter(df_resultados,MN=="EI"),
                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+```
+
+```{r l_md_nRef.GLMM_EI,eval=FALSE}
 l_md_nRef.GLMM_EI <- l_md
 save(l_md_nRef.GLMM_EI,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md_nRef.GLMM_EI.Rdata")
 ```
+
 
 
 __Tabela 1.3.1__ AICctab n_nRef MNEI  
@@ -559,7 +529,7 @@ subset(dredge_glmmEI,delta<7)
 
 
 
-```{r model averaging EI MuMIn e AICcmodavg,message=FALSE,include=FALSE,eval=FALSE}
+```{r model averaging EI MuMIn e AICcmodavg,message=FALSE,eval=FALSE}
 # todas as combinações de modelo do modelo cheio
 l_md.dredge_nRefEI <- lapply(dredge(global_md,trace = FALSE,evaluate=FALSE), eval)
 # Model Averaging for SiteCode predictions
@@ -583,6 +553,7 @@ Para avaliar o ajuste do modelo ao conjunto de dados utilizo funções do pacote
 # Modelo Global
 load(file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_nRefEI__MuMIn.Rdata")
 # Predição
+df_md <- df_resultados %>% filter(MN=="EI")
 df_md$Pr_nRef <- predict(mdAvg_nRefEI__MuMIn,type="response")*100
 # Gráfico
 df_md %<>% mutate(title = paste0(SiteCode," p=",round(p,3))) %>% arrange(p)
@@ -758,7 +729,7 @@ AICctab(l_md,weights=T)
 
 Alguns modelos utilizados para estimar diff_S apresentaram "singularidade" (estimativas não diferem de zero), dentre eles o único modelo plausível. Isso indica que modelo com a estrutura aleatória mais simples devem ser ajustados aos dados, assim vou descartar aqueles com inclinação para a variável de dispersão por Sítio.
 
-```{r diff_S modelo cheio 2}
+```{r diff_S modelo cheio 2,echo=TRUE}
 l_md <- vector("list",6)
 names(l_md) <- c("1-k 1|Site",
                  "k 1|Site",
@@ -808,7 +779,7 @@ ggplot(df_plot,aes(x=p,y=diff_S)) +
   facet_wrap(~k,ncol=5,scales="free")
 ```
 
-__Figura 2.3__ diff_S para MNEI, preditoras de interesse e alguns possíveis variáveis de controle (número de indivíduos observado (Ntotal) e riqueza observada (Stotal))  
+__Figura 2.3__ diffS_EI ~p*k  
 
 Vou iniciar apenas com as preditoras de interesse (p e variáveis de dispersão). Devido a clara ausência de simetria de diff_S desloquei a distribuição apenas para valores positivos (figura 2.3 primeiro quadro) e utilizarei distribuição Gamma para ajustar os modelos com função de ligação 'log'.
 
@@ -820,15 +791,16 @@ df_plot$title <- factor(df_plot$title,levels = unique(df_plot$title))
 ggplot(df_plot,aes(x=d,y=diff_S)) +
   geom_point() +
   geom_smooth(method="loess",col="blue") + geom_smooth(method="lm",col="red") + 
-  theme_classic() + theme(legend.position="top") +
+  theme_classic() + theme(legend.position="top") + 
+  labs(title=" red = lm; blue = 'loess' ") +
   facet_wrap(~title,ncol=5,scales="free")
 ```
 
 __Figura 2.4__ diff_S por sítio de amostragem e d
 
-### Seleção do Modelo cheio
+### Seleção do Modelo cheio: GLMM
 
-```{r modelo cheio diff_S MNEI, echo=TRUE,warning=TRUE,message=TRUE}
+```{r modelo cheio diff_S MNEI, echo=TRUE,warning=TRUE,message=TRUE,eval=FALSE}
 df_md <- df_resultados %>% filter(MN=="EI")
 # df_md$diff_S %>% summary
 l_md <- vector("list",6)
@@ -874,14 +846,24 @@ l_md[[6]] <- glmer(diff_S ~ (p.z + I(p.z^2))*(d.z + I(d.z^2)) + (d.z + I(d.z^2)|
 v_vars <- getME(l_md[[6]],c("theta","fixef"))
 l_md[[6]] <- update(l_md[[6]],start=v_vars,control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
 #######################
-AICctab(l_md,weights=TRUE)
 ```
+
+```{r l_md.diffS_EI_glmm,eval=FALSE}
+l_md.diffS_EI_glmm <- l_md
+save(l_md.diffS_EI_glmm,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md_diffS_EI_glmm.Rdata")
+```
+
+```{r AICctab l_md.diffS_EI_glmm}
+load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md_diffS_EI_glmm.Rdata")
+AICctab(l_md.diffS_EI_glmm,weights=TRUE)
+```
+
   
 Não foi possível ajustar os modelos com estrutura fixa mais complexa. Vou avaliar se GAMM oferecem melhor ajuste aos dados
 
 ### GAMM cheio
 
-```{r diff_S MNEI GAMM cheio,eval=FALSE}
+```{r diff_S MNEI GAMM cheio,eval=FALSE,echo=TRUE}
 l_md <- vector("list",4)
 names(l_md) <- c("tp by=k","cr by=k",
                  "tp ti","cr ti")
@@ -897,10 +879,14 @@ l_md[[3]] <- gam(diff_S ~ s(p.z,bs="tp") + s(d.z,bs="tp") + ti(p.z,d.z,bs=c("tp"
 l_md[[4]] <- gam(diff_S ~ s(p.z,bs="cr") + s(d.z,bs="cr") + ti(p.z,d.z,bs=c("cr","cr")) +
                    s(SiteCode,bs="re"),
                  data=df_md,family = "Gamma"(link="log"))
+```
+
+
+```{r l_md.diff_S.EI__GAMM,eval=FALSE}
 l_md.diff_S.EI__GAMM <- l_md
 save(l_md.diff_S.EI__GAMM,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md_diff_S_EI__GAMM.Rdata")
 ```
-  
+
   
 ```{r AICctab modelos cheios diff_S EI GAMM}
 load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md_diff_S_EI__GAMM.Rdata")
@@ -919,7 +905,7 @@ __Figura 2.5__ Gráficos Diagnostico do gamm cheio mais plausível para diff_S M
 
 De maneira geral o modelo esta fazendo um bom ajuste, contudo alguns sítios distoam do padrão geral dos dados. Há duas alternativas: i) possibilitar um smoother por sítio de amostragem com um parâmetro de penalização comum; ou ii) remover sítios outliers.
 
-```{r updata gamm cheio mais plausivel diff_S MNEI,eval=FALSE}
+```{r update gamm cheio mais plausivel diff_S MNEI,eval=FALSE,echo=TRUE}
 l_md <- vector("list",2)
 names(l_md) <- c("1|Site","d|Site")
 l_md[[1]] <- gam(diff_S ~ s(p.z,bs="cr") + s(d.z,bs="cr") + ti(p.z,d.z,bs=c("cr","cr")) +
@@ -928,9 +914,15 @@ l_md[[1]] <- gam(diff_S ~ s(p.z,bs="cr") + s(d.z,bs="cr") + ti(p.z,d.z,bs=c("cr"
 l_md[[2]] <- gam(diff_S ~ s(p.z,bs="cr") + s(d.z,bs="cr") + ti(p.z,d.z,bs=c("cr","cr")) +
                    s(d.z,SiteCode,bs="fs",xt="cr"),
                  data=df_md,family = "Gamma"(link="log"))
+```
+
+  
+```{r l_md.diff_S.EI__GAMM2,eval=FALSE}
 l_md.diff_S.EI__GAMM2 <- l_md
 save(l_md.diff_S.EI__GAMM2,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md_diff_S_EI__GAMM2.Rdata")
 ```
+
+
 
 ```{r AICctab gamm cheio diff_S MNEI 2}
 load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md_diff_S_EI__GAMM2.Rdata")
@@ -938,7 +930,7 @@ AICctab(l_md.diff_S.EI__GAMM2)
 ```
 
 ```{r graf diag gamm2 diff_S MNEI}
-appraise(l_md.diff_S.EI__GAMM2[["d|Site"]])
+gratia::appraise(l_md.diff_S.EI__GAMM2[["d|Site"]])
 ```
 
 __Figura 2.6__ Gráfico Diagnóstico gamm cheio com segunda estrutra aleatória diff_S MM==EI
@@ -951,87 +943,130 @@ __Figura 2.7__ gratia::draw() gamm mais plausível com estrutura similar a (d|Si
   
 Este modelo apresenta problema de concurvidade. Assim vou refazer a comparação com configuração adequada:  
 
-```{r updata gamm cheio mais plausível d Site,eval=FALSE}
+```{r updata gamm cheio mais plausível d Site,eval=FALSE,echo=TRUE}
 df_md <- filter(df_resultados,MN=="EI")
-l_md.diff_S.EI__GAMM2[[2]] <- gam(diff_S ~ s(p.z,bs="cr") + s(d.z,bs="cr") + ti(p.z,d.z,bs=c("cr","cr")) +
+md_gam.diff_S.EI__update <- gam(diff_S ~ s(p.z,bs="cr") + s(d.z,bs="cr") + ti(p.z,d.z,bs=c("cr","cr")) +
                    s(d.z,SiteCode,bs="fs",xt=list(bs="cp"), m=1),
                  data=df_md,family = "Gamma"(link="log"))
+```
 
-md_gam.diff_S.EI__update <- l_md.diff_S.EI__GAMM2[[2]]
+```{r md_gam.diff_S.EI__update,eval=FALSE}
 save(md_gam.diff_S.EI__update,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/md_diff_S_EI__GAMM_update.Rdata")
 ```
 
 
+```{r draw update gamm cheio mais plausivel d Site}
+load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/md_diff_S_EI__GAMM_update.Rdata")
+l_md.diff_S.EI__GAMM2[[2]] <- md_gam.diff_S.EI__update
+gratia::draw(md_gam.diff_S.EI__update)
+```
 
+__Figura 2.8__ Update do modelo da figura 2.7 com o smoother da estrutura aleatória penalizada pela 1a derivada para diminuir a concurvidade (Perdersen et al. 2019)  
+
+O modelo diminuiu a concurvidade da estimativa.
   
 ```{r  diff_S MNEI gamm cheio segundo plausivel,message=FALSE,warning=FALSE,results="hide"}
-gratia::draw(l_md.diff_S.EI__GAMM2[["d|Site"]])
-gratia::appraise(l_md.diff_S.EI__GAMM2[["d|Site"]])
+gratia::appraise(md_gam.diff_S.EI__update)
 ```
   
-__Figura 2.8__ gratia::draw() gamm (1|Site)  
+__Figura 2.9__ Appraise do gamm cheio atualizado (smoother de estrutura aleatória: m=1).  
   
-### Figura Final
+### Remoção de Outliers
 
-```{r gamm diff_S predicao novo conjunto de dados}
+Remoção sítios com observações fora do intervalo [-1.5;1.5] dos resíduos deviance.  
+  
+```{r outliers diffS_MNEI gamm,eval=FALSE,echo=TRUE}
+# dados completos
+df_md <- df_resultados %>% filter(MN=="EI")
+df_md$resDev <- residuals.gam(md_gam.diff_S.EI__update)
+# sítios considerados outliers
+v_SiteOut <- df_md %>% filter(resDev < -0.15 | resDev > 0.15) %>% .$SiteCode %>% unique
+# update da comparação
+l_md <- vector("list",2)
+names(l_md) <- c("1|Site","d|Site")
+l_md[[1]] <- gam(diff_S ~ s(p.z,bs="cr") + s(d.z,bs="cr") + ti(p.z,d.z,bs=c("cr","cr")) +
+                   s(SiteCode,bs="re"),
+                 data=filter(df_md,!(SiteCode %in% v_SiteOut)),
+                 family = "Gamma"(link="log"))
+l_md[[2]] <- gam(diff_S ~ s(p.z,bs="cr") + s(d.z,bs="cr") + ti(p.z,d.z,bs=c("cr","cr")) +
+                   s(d.z,SiteCode,bs="fs",xt=list(bs="cp"),m=1),
+                 data=filter(df_md,!(SiteCode %in% v_SiteOut)),
+                 family = "Gamma"(link="log"))
+```
+
+```{r l_md.diff_S.EI__GAMM_sOut,eval=FALSE}
+l_md.diff_S.EI__GAMM_sOut <- l_md
+save(l_md.diff_S.EI__GAMM_sOut,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md_diff_S_EI__GAMM_sOut.Rdata")
+```
+
+
+```{r AICctab gamm cheio sem outliers}
+load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md_diff_S_EI__GAMM_sOut.Rdata")
+AICctab(l_md.diff_S.EI__GAMM_sOut,weights=TRUE)
+```
+
+```{r appraise gamm diffS_EI sOut}
+gratia::appraise(l_md.diff_S.EI__GAMM_sOut[["d|Site"]])
+```
+
+__Figura 2.10__ Gráficos diagnóstico do gamm cheio mais plausível sem outliers
+
+A remoção de outliers não melhorou o ajuste do modelo.
+
+```{r graw gamm cheio diffS_EI sOut}
+gratia::draw(l_md.diff_S.EI__GAMM_sOut[["d|Site"]])
+```
+
+__Figura 2.11__ Efeitos estimados para o gamm cheio diffS_EI sOut
+
+Não vejo melhora quanto à variação no efeito de p.z.  
+
+
+```{r fig 212 appraise gamm cheio 1Site}
+gratia::appraise(l_md.diff_S.EI__GAMM_sOut[["1|Site"]])
+```
+
+__Figura 2.12__ graf diag gamm cheio 1|Site sOut
+
+
+```{r fig 213 draw gamm cheio diffS_EI 1Site}
+gratia::draw(l_md.diff_S.EI__GAMM_sOut[["1|Site"]])
+```
+
+__Figura 2.13__ Efeitos estimados do gamm cheio 
+
+  
+## Figura Final
+
+```{r gamm diff_S predicao novo conjunto de dados,eval=FALSE}
+l_p <- list()
+# dados
+## MNEE
+df_md <- df_resultados %>% filter(MN=="EE")
+md_diffS_EE <- lm(diff_S0 ~ 1,data=df_md)
+coef_diffS_EE <- summary(md_diffS_EE)$coef
+coef_diffS_EE[2]
+l_p[[1]] <- ggplot(df_md,aes(y=diff_S0,x="")) + geom_jitter() + stat_summary(fun.data = "mean_cl_boot", colour = "red")
+  
+## MNEI
 df_pred <- df_pred <- expand.grid(SiteCode=levels(df_resultados$SiteCode)[1],
                        d.z=seq(min(df_resultados$d.z),max(df_resultados$d.z),length=20),
                        p.z=seq(min(df_resultados$p.z),max(df_resultados$p.z),length=103))
 df_pred <- cbind(df_pred,
-                 predict(l_md.diff_S.EI__GAMM2[["1|Site"]],df_pred,type="response",se.fit=TRUE)) %>% 
+                 predict(l_md.diff_S.EI__GAMM_sOut[["d|Site"]],df_pred,type="response",se.fit=TRUE)) %>% 
   mutate(p = p.z * sd(df_resultados$p) + mean(df_resultados$p),
-         d = d.z * sd(df_resultados$d) + mean(df_resultados$d))
+         d = d.z * sd(df_resultados$d) + mean(df_resultados$d),
+         fit_diff_S0 = fit - min(df_resultados$diff_S0) - 0.01,
+         se.fit_diff_S0 = se.fit - min(df_resultados$diff_S0) - 0.01,)
+df_pred$fit_diff_S0 %>% summary
+l_p[[2]] <- ggplot(df_pred,aes(x=p,y=d,fill=fit)) + geom_tile()
 ```
 
 
-```{r predito pelo modelo cheio selecionado, fig.width=8, fig.height=30,eval=FALSE}
-df_plot <- df_resultados %>% filter(MN=="EI")
-df_plot$predicao <- predict(l_md[[4]],type = "response")
-# Graficos
-df_plot %<>% mutate(title = paste0(SiteCode, " p=",round(p,digits = 3))) %>% arrange(p)
-df_plot$title <- factor(df_plot$title,levels = unique(df_plot$title))
-ggplot(df_plot,aes(x=d.z,y=diff_S)) +
-  geom_point() +
-  geom_line(aes(y=predicao),color="red") +
-  # theme_classic() + theme(legend.position="top") + 
-  facet_wrap(~title,ncol=5,scales="free")
-```
-
-<!-- __Figura 2.6__ Predito pelo modelo mais plausível para diff_S MNEI pelo sítio de amostragem -->
-
-<!-- Há um erro sistemático para superestimar valores elevados de d.z e talvez de subestimar para valores do 1o quarto de d.z.   -->
-  
-```{r fig 25 predicao para modelo cheio,eval=FALSE}
-# Dados
-df_pred <- expand.grid(SiteCode=levels(df_resultados$SiteCode)[1],
-                       d.z=seq(min(df_resultados$d.z),max(df_resultados$d.z),length=20),
-                       p.z=seq(min(df_resultados$p.z),max(df_resultados$p.z),length=103))
-df_pred$predito <- predict(l_md[[4]],df_pred,type="response")
 
 
 
 
-
-
-# Graficos
-df_plot %<>% mutate(title = paste0(SiteCode, " p=",round(p,digits = 3))) %>% arrange(p)
-df_plot$title <- factor(df_plot$title,levels = unique(df_plot$title))
-ggplot(df_plot,aes(x=d.z,y=n_nRef,group=MN)) +
-  geom_point(aes(color=MN)) +
-  geom_line(aes(y=Pr_nRef,color=MN)) +
-  scale_color_manual(values=c("#FF0000", "#000000")) +
-  theme_classic() + theme(legend.position="top") + facet_wrap(~title,ncol=5)
-                 
-                 
-
-teste <- glm(diff_S ~ p.z*d.z,data=df_md,family="Gamma"(link="identity"))
-df_plot$predito <- predict(teste,type="response")
-# Graficos
-ggplot(df_plot,aes(x=p.z,y=d.z,fill=predito)) + geom_tile() 
-
-```
-  
-  
 <!-- # U - taxa de especiação necessária para obter a riqueza observada no equilíbrio -->
 
 <!-- ## Padrões Gerais -->
