@@ -77,8 +77,6 @@ df_resultados.U <- df_resultados %>% filter(MN=="EE") %>% distinct()
 # summary(df_resultados)
 df_resultados %<>% mutate(diff_S0 = (S.MN_mean-Stotal)/Stotal,
                           diff_S = diff_S0 + min(diff_S0)*(-1) + 0.01)
-summary(df_resultados[,c("diff_S0","diff_S")])
-lm(df_resultados$diff_S~df_resultados$diff_S0)
 ```
 
 # 1 - Número de SADs preditas não refutadas
@@ -1097,7 +1095,9 @@ l_p[[2]] <- ggplot(df_pred,aes(x=p,y=d,fill=fit)) + geom_tile()
 
 
 
-# Comparação n_nRef e diff_S
+# 3 Comparação n_nRef e diff_S
+
+__Figura 3.1__ Observado (pontos) e predito (linhas) para diffS e n_nRef (segunda linha no facet) em função de d*MN, por sítio de amostragem (primeira linha no facet).
 
 ```{r comparacao n_nRef e diff_S,fig.height=65,fig.width=11}
 # dados
@@ -1139,4 +1139,65 @@ df_plot %>% #filter(title %in% unique(df_plot$title)[1:10]) %>%
   facet_wrap(~title+response_class,ncol=6,scales="free") + labs(y="") +
   theme_light() + theme(legend.position="top")
 ```
+  
+
+    
+      
+__Figura 3.2__ |diffS| ~ n_nRef * k, subset=MNEI
+
+```{r figura 32,fig.height=10,fig.width=7}
+# dados  ,fig.height=10
+df_plot <- df_resultados %>% filter(MN=="EI") %>% 
+  mutate(modulo_diffS = abs(diff_S0))
+# graficos
+l_p <- list()
+l_p[[1]] <- ggplot(df_plot,aes(x=k,y=modulo_diffS)) + 
+  geom_boxplot(col="blue") +
+  geom_jitter(alpha=0.3)
+l_p[[2]] <- ggplot(df_plot,aes(x=k,y=n_nRef)) + 
+  geom_boxplot(col="blue") +
+  geom_jitter(alpha=0.3)
+l_p[[3]] <- ggplot(df_plot,aes(y=modulo_diffS,x=n_nRef)) +
+  geom_smooth(method="loess",se=FALSE) +
+  geom_point(alpha=0.3) + 
+  facet_wrap(~k,ncol=4,scales="free")
+# do.call("grid.arrange",c(l_p,ncol=1))
+grid.arrange(l_p[[1]],l_p[[2]],l_p[[3]],
+             layout_matrix=rbind(c(1,2),
+                                 c(3,3),
+                                 c(3,3)) )
+```
+
+
+
+__Figura 3.3__ n_nRef ~ |diffS| (~SiteCode), subset=MNEI
+
+```{r figura 33,fig.width=8, fig.height=30}
+# dados
+df_plot %<>% left_join(x=.,
+                       y=ddply(.,"SiteCode",summarise,max_mod_diffS=max(modulo_diffS)),
+                       by="SiteCode") %>% 
+  arrange(max_mod_diffS) %>%
+  mutate(title=paste0(SiteCode," max(|diffS|)=",round(max_mod_diffS,2) ) )
+df_plot$title <- factor(df_plot$title,levels = unique(df_plot$title))
+# graficos
+df_plot %>% ggplot(aes(x=n_nRef,y=modulo_diffS)) +
+  geom_point() +
+  xlim(0,100) +
+  facet_wrap(~title,ncol=4,scales="free_y")
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
