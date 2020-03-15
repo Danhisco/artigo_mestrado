@@ -1151,15 +1151,20 @@ df_plot <- df_resultados %>% filter(MN=="EI") %>%
   mutate(modulo_diffS = abs(diff_S0))
 # graficos
 l_p <- list()
-l_p[[1]] <- ggplot(df_plot,aes(x=k,y=modulo_diffS)) + 
-  geom_boxplot(col="blue") +
-  geom_jitter(alpha=0.3)
-l_p[[2]] <- ggplot(df_plot,aes(x=k,y=n_nRef)) + 
-  geom_boxplot(col="blue") +
-  geom_jitter(alpha=0.3)
-l_p[[3]] <- ggplot(df_plot,aes(y=modulo_diffS,x=n_nRef)) +
-  geom_smooth(method="loess",se=FALSE) +
-  geom_point(alpha=0.3) + 
+l_p[[1]] <- ggplot(df_plot,aes(x=d,y=modulo_diffS)) + 
+  # geom_boxplot(col="blue") +
+  # geom_jitter(alpha=0.3)
+  geom_point(alpha=0.3) + geom_smooth(method = "auto",se=FALSE,color="blue")
+l_p[[2]] <- ggplot(df_plot,aes(x=d,y=n_nRef)) + 
+  # geom_boxplot(col="blue") +
+  # geom_jitter(alpha=0.3)
+  geom_point(alpha=0.3) + geom_smooth(method = "auto",se=FALSE,color="blue")
+l_p[[3]] <- df_plot %>% 
+  mutate(logito_nRef = logit(n_nRef/100)) %>% 
+  ggplot(aes(x=log(modulo_diffS),y=logito_nRef)) + 
+  geom_smooth(method="lm",se=FALSE) +
+  geom_point(alpha=0.3) + labs(title="logit( n_nRef/100 ) ~ log( |diffS| ) * k",
+                               y="logit( n_nRef/100 )",x="log( |diffS| )") +
   facet_wrap(~k,ncol=4,scales="free")
 # do.call("grid.arrange",c(l_p,ncol=1))
 grid.arrange(l_p[[1]],l_p[[2]],l_p[[3]],
@@ -1174,30 +1179,268 @@ __Figura 3.3__ n_nRef ~ |diffS| (~SiteCode), subset=MNEI
 
 ```{r figura 33,fig.width=8, fig.height=30}
 # dados
-df_plot %<>% left_join(x=.,
-                       y=ddply(.,"SiteCode",summarise,max_mod_diffS=max(modulo_diffS)),
+df_plot1  <-  left_join(x=df_plot,
+                       y=ddply(df_plot,"SiteCode",summarise,max_mod_diffS=max(modulo_diffS)),
                        by="SiteCode") %>% 
   arrange(max_mod_diffS) %>%
   mutate(title=paste0(SiteCode," max(|diffS|)=",round(max_mod_diffS,2) ) )
-df_plot$title <- factor(df_plot$title,levels = unique(df_plot$title))
+df_plot1$title <- factor(df_plot1$title,levels = unique(df_plot1$title))
 # graficos
-df_plot %>% ggplot(aes(x=n_nRef,y=modulo_diffS)) +
-  geom_point() +
-  xlim(0,100) +
+df_plot1 %>% ggplot(aes(x=log(modulo_diffS),y=n_nRef)) +
+  geom_point(alpha=0.3) +
+  ylim(0,100) + theme_light() + labs(title="n_nRef ~ (log( |diffS| ) | SiteCode)") + 
   facet_wrap(~title,ncol=4,scales="free_y")
 ```
 
+  
+__Estratégia__  
+  
+i) estrutura do tipo:  
+  
+cbind(n_nRef,100-n_nRef) ~ log(modulo_diffS) * d + ( log(modulo_diffS) * d | SiteCode)  
+  
+ii) expectativa:  
+  
+a) esperavamos que se o teste é adequado então deve existir um erro de estimativa da riqueza máximo no qual a probabilidade de não se refutar uma SAD se torna muito diminuta.  
+b) e uma vez que não é suficiente apresentar boa estimativa da riqueza para apresentar boa congruência, então esperava que a nuvem de pontos pudesse ser aproximada por um triangulo retangulo com angulo reto na origem. 
 
 
 
 
+# 4 U 
+
+## Padrões Gerais  
+  
+__figura 4.1 __ U ~ padrões gerais  
+  
+
+```{r padroes gerais U,warning=FALSE,message=FALSE}
+# graficos
+l_p <- vector("list",4)
+l_p[[1]] <- ggplot(df_resultados,aes(x=k,y=U_med)) +
+  geom_point() +
+  geom_line(aes(group=SiteCode)) +
+  geom_boxplot(aes(group=k))
+l_p[[2]] <- ggplot(df_resultados,aes(x=p,y=U_med)) +
+  geom_point() +
+  geom_smooth(method = "auto") +
+  labs(y="")
+l_p[[3]] <- ggplot(df_resultados,aes(x=log(Stotal),y=U_med)) +
+  geom_point() +
+  geom_smooth(method = "auto")
+l_p[[4]] <- ggplot(df_resultados,aes(x=p,y=log(Stotal))) +
+  geom_point() +
+  geom_smooth(method="auto")
+do.call("grid.arrange",c(l_p,ncol=2))
+```
+
+__Figura 4.2__ U ~ d (~SiteCode)
+
+```{r figura 42 U d Site,fig.height=45,fig.width=8}
+df_plot <- df_resultados %>% 
+  filter(MN=="EE") %>% 
+  mutate(title = paste0(SiteCode," p=",round(p,3))) %>% arrange(p)
+df_plot$title <- factor(df_plot$title,levels = unique(df_plot$title))
+df_plot %>% ggplot(aes(x=d,y=U_med)) +
+  geom_point(alpha=0.3) + theme_light() +
+  facet_wrap(~title,ncol=4,scales="free")
+```
 
 
+## GAMM
+
+```{r selecao de variavel de dispersao modelo cheio GAMM(U),eval=FALSE}
+ctrl <- list(nthreads=3) #número de cores para paralelizar
+l_md.U <- vector("list",length = 20)
+names(l_md.U) <- c("d/L id normal","d/L log normal", "d/L inverse normal", "d/L log gamma", "d/L inverse gamma",
+                   "1-k id normal","1-k log normal", "1-k inverse normal", "1-k log gamma", "1-k inverse gamma",
+                   "k id normal","k log normal", "k inverse normal", "k log gamma", "k inverse gamma",
+                   "d id normal","d log normal", "d inverse normal", "d log gamma", "d inverse gamma")
+# d/L
+l_md.U[[1]] <- gam(U_med ~ s(d_Lplot.z) + s(p.z) + ti(d_Lplot.z,p.z) +
+                  s(log_Stotal) +
+                  s(SiteCode,bs="re"),
+                family="gaussian",
+                data = df_resultados.U, method = "REML",control=ctrl)
+l_md.U[[2]] <- gam(U_med ~ s(d_Lplot.z) + s(p.z) + ti(d_Lplot.z,p.z) +
+                  s(log_Stotal) +
+                  s(SiteCode,bs="re"),
+                family=gaussian(link = "log"),
+                data = df_resultados.U, method = "REML",control=ctrl)
+l_md.U[[3]] <- gam(U_med ~ s(d_Lplot.z) + s(p.z) + ti(d_Lplot.z,p.z) +
+                  s(log_Stotal) +
+                  s(SiteCode,bs="re"),
+                family=gaussian(link = "inverse"),
+                data = df_resultados.U, method = "REML",control=ctrl)
+l_md.U[[4]] <- gam(U_med ~ s(d_Lplot.z) + s(p.z) + ti(d_Lplot.z,p.z) +
+                  s(log_Stotal) +
+                  s(SiteCode,bs="re"),
+                family=Gamma(link = "log"),
+                data = df_resultados.U, method = "REML",control=ctrl)
+l_md.U[[5]] <- gam(U_med ~ s(d_Lplot.z) + s(p.z) + ti(d_Lplot.z,p.z) +
+                  s(log_Stotal) +
+                  s(SiteCode,bs="re"),
+                family=Gamma(link = "inverse"),
+                data = df_resultados.U, method = "REML",control=ctrl)
+# k_1
+l_md.U[[6]] <- gam(U_med ~ s(k_1.z) + s(p.z) + ti(k_1.z,p.z) +
+                  s(log_Stotal) +
+                  s(SiteCode,bs="re"),
+                family="gaussian",
+                data = df_resultados.U, method = "REML",control=ctrl)
+l_md.U[[7]] <- gam(U_med ~ s(k_1.z) + s(p.z) + ti(k_1.z,p.z) +
+                  s(log_Stotal) +
+                  s(SiteCode,bs="re"),
+                family=gaussian(link = "log"),
+                data = df_resultados.U, method = "REML",control=ctrl)
+l_md.U[[8]] <- gam(U_med ~ s(k_1.z) + s(p.z) + ti(k_1.z,p.z) +
+                  s(log_Stotal) +
+                  s(SiteCode,bs="re"),
+                family=gaussian(link = "inverse"),
+                data = df_resultados.U, method = "REML",control=ctrl)
+l_md.U[[9]] <- gam(U_med ~ s(k_1.z) + s(p.z) + ti(k_1.z,p.z) +
+                  s(log_Stotal) +
+                  s(SiteCode,bs="re"),
+                family=Gamma(link = "log"),
+                data = df_resultados.U, method = "REML",control=ctrl)
+l_md.U[[10]] <- gam(U_med ~ s(k_1.z) + s(p.z) + ti(k_1.z,p.z) +
+                  s(log_Stotal) +
+                  s(SiteCode,bs="re"),
+                family=Gamma(link = "inverse"),
+                data = df_resultados.U, method = "REML",control=ctrl)
+# k.f
+l_md.U[[11]] <- gam(U_med ~ s(p.z,k,bs="fs") + k +
+                  s(log_Stotal) +
+                  s(SiteCode,bs="re"),
+                family="gaussian",
+                data = df_resultados.U, method = "REML",control=ctrl)
+l_md.U[[12]] <- gam(U_med ~ s(p.z,k,bs="fs") + k +
+                  s(log_Stotal) +
+                  s(SiteCode,bs="re"),
+                family=gaussian(link = "log"),
+                data = df_resultados.U, method = "REML",control=ctrl)
+l_md.U[[13]] <- gam(U_med ~ s(p.z,k,bs="fs") + k +
+                  s(log_Stotal) +
+                  s(SiteCode,bs="re"),
+                family=gaussian(link = "inverse"),
+                data = df_resultados.U, method = "REML",control=ctrl)
+l_md.U[[14]] <- gam(U_med ~ s(p.z,k,bs="fs") + k +
+                  s(log_Stotal) +
+                  s(SiteCode,bs="re"),
+                family=Gamma(link = "log"),
+                data = df_resultados.U, method = "REML",control=ctrl)
+l_md.U[[15]] <- gam(U_med ~ s(p.z,k,bs="fs") + k +
+                  s(log_Stotal) +
+                  s(SiteCode,bs="re"),
+                family=Gamma(link = "inverse"),
+                data = df_resultados.U, method = "REML",control=ctrl)
+# d
+l_md.U[[16]] <- gam(U_med ~ s(d.z) + s(p.z) + ti(d.z,p.z) +
+                  s(log_Stotal) +
+                  s(SiteCode,bs="re"),
+                family="gaussian",
+                data = df_resultados.U, method = "REML",control=ctrl)
+l_md.U[[17]] <- gam(U_med ~ s(d.z) + s(p.z) + ti(d.z,p.z) +
+                  s(log_Stotal) +
+                  s(SiteCode,bs="re"),
+                family=gaussian(link = "log"),
+                data = df_resultados.U, method = "REML",control=ctrl)
+l_md.U[[18]] <- gam(U_med ~ s(d.z) + s(p.z) + ti(d.z,p.z) +
+                  s(log_Stotal) +
+                  s(SiteCode,bs="re"),
+                family=gaussian(link = "inverse"),
+                data = df_resultados.U, method = "REML",control=ctrl)
+l_md.U[[19]] <- gam(U_med ~ s(d.z) + s(p.z) + ti(d.z,p.z) +
+                  s(log_Stotal) +
+                  s(SiteCode,bs="re"),
+                family=Gamma(link = "log"),
+                data = df_resultados.U, method = "REML",control=ctrl)
+l_md.U[[20]] <- gam(U_med ~ s(d.z) + s(p.z) + ti(d.z,p.z) +
+                  s(log_Stotal) +
+                  s(SiteCode,bs="re"),
+                family=Gamma(link = "inverse"),
+                data = df_resultados.U, method = "REML",control=ctrl)
+AICctab(l_md.U,weights=TRUE)
+l_md_U_selVar_disp_1Site <- l_md.U 
+save(l_md_U_selVar_disp_1Site,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md_U_selVar_disp_1Site.Rdata")
 
 
+############### exemplo de código para estrutura aleatoria mais complexa
+# l_md[[3]] <- gam(U_med ~ s(d.z,bs="tp") + s(p.z,bs="tp") + ti(d.z,p.z,ns=c("tp","tp")) +
+#                   s(log_Stotal,bs="tp") +
+#                   s(d.z,by=SiteCode,bs="tp",m=1)
+#                   s(SiteCode,bs="re"),
+#                 family=gaussian(link = "log"),
+#                 data = df_resultados.U, method = "REML",control=ctrl)
+```
 
 
+### Modelo Cheio: comparação estrutura aleatória
+
+Variável de dispersão: d (como para n_nRef)
+
+i) Na escala log a variável parece ser simetrica, então vou comparar a distribuição normal e gamma;    
+ii) É possível apresentar 3 estruturas: a) 1|Site; b) d|Site, penalizacao comum; c) d|Site, penalizacao por Site [que não vou incluir a priori pelo custo computacional]  
+iii) pelo menos 2 smoother type (tp,cr)  
 
 
+```{r gamm cheio U_med,eval=FALSE}
+ctrl <- list(nthreads=3)
+l_md <- vector("list",8)
+names(l_md) <- c("tp normal 1|Site","tp normal d|Site","cr normal 1|Site","cr normal d|Site",
+                 "tp gamma 1|Site","tp gamma d|Site","cr gamma 1|Site","cr gamma d|Site")
+### Gaussian
+l_md[[1]] <- gam(U_med ~ s(d.z,bs="tp") + s(p.z,bs="tp") + ti(d.z,p.z,bs=c("tp","tp")) +
+                  s(log_Stotal,bs="tp") +
+                  s(SiteCode,bs="re"),
+                family=gaussian(link = "log"),
+                data = df_resultados.U, method = "REML",control=ctrl)
+l_md[[2]] <- gam(U_med ~ s(d.z,bs="tp") + s(p.z,bs="tp") + ti(d.z,p.z,bs=c("tp","tp")) +
+                  s(log_Stotal,bs="tp") +
+                  s(d.z,SiteCode,bs="fs",m=1,xt=list(bs="tp")),
+                family=gaussian(link = "log"),
+                data = df_resultados.U, method = "REML",control=ctrl)
+l_md[[3]] <- gam(U_med ~ s(d.z,bs="cr") + s(p.z,bs="cr") + ti(d.z,p.z,bs=c("cr","cr")) +
+                  s(log_Stotal,bs="cr") +
+                  s(SiteCode,bs="re"),
+                family=gaussian(link = "log"),
+                data = df_resultados.U, method = "REML",control=ctrl)
+l_md[[4]] <- gam(U_med ~ s(d.z,bs="cr") + s(p.z,bs="cr") + ti(d.z,p.z,bs=c("cr","cr")) +
+                  s(log_Stotal,bs="cr") +
+                  s(d.z,SiteCode,bs="fs",m=1,xt=list(bs="cr")),
+                family=gaussian(link = "log"),
+                data = df_resultados.U, method = "REML",control=ctrl)
+### Gamma
+l_md[[5]] <- gam(U_med ~ s(d.z,bs="tp") + s(p.z,bs="tp") + ti(d.z,p.z,bs=c("tp","tp")) +
+                  s(log_Stotal,bs="tp") +
+                  s(SiteCode,bs="re"),
+                family=Gamma(link = "log"),
+                data = df_resultados.U, method = "REML",control=ctrl)
+l_md[[6]] <- gam(U_med ~ s(d.z,bs="tp") + s(p.z,bs="tp") + ti(d.z,p.z,bs=c("tp","tp")) +
+                  s(log_Stotal,bs="tp") +
+                  s(d.z,SiteCode,bs="fs",m=1,xt=list(bs="tp")),
+                family=Gamma(link = "log"),
+                data = df_resultados.U, method = "REML",control=ctrl)
+l_md[[7]] <- gam(U_med ~ s(d.z,bs="cr") + s(p.z,bs="cr") + ti(d.z,p.z,bs=c("cr","cr")) +
+                  s(log_Stotal,bs="cr") +
+                  s(SiteCode,bs="re"),
+                family=Gamma(link = "log"),
+                data = df_resultados.U, method = "REML",control=ctrl)
+l_md[[8]] <- gam(U_med ~ s(d.z,bs="cr") + s(p.z,bs="cr") + ti(d.z,p.z,bs=c("cr","cr")) +
+                  s(log_Stotal,bs="cr") +
+                  s(d.z,SiteCode,bs="fs",m=1,xt=list(bs="cr")),
+                family=Gamma(link = "log"),
+                data = df_resultados.U, method = "REML",control=ctrl)
+l_md_U_gammCheio <- l_md
+AICctab(l_md)
+save(l_md_U_gammCheio,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md_U_gammCheio.Rdata")
+```
 
+
+__Figura 4.3__ Graf Diag Gamm cheio mais plausível
+
+```{r gamm cheio U_med graf diag} 
+load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md_U_gammCheio.Rdata")
+gratia::appraise(l_md_U_gammCheio[["cr gamma d|Site"]])
+```
 
