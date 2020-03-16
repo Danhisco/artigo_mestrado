@@ -6,6 +6,8 @@ output:
   html_document:
     toc: true
     toc_depth: 5
+editor_options: 
+  chunk_output_type: console
 ---
 
 <style>
@@ -26,11 +28,13 @@ library(gtools)
 library(GGally)
 library(doMC)
 library(DHARMa)
+library(broom.mixed)
 library(MuMIn)
 library(mgcv)
 library(gratia)
 library(GUILDS)
 library(broom)
+library(sads)
 library(bbmle)
 library(gamm4)
 library(lme4)
@@ -69,14 +73,23 @@ f_z <- function(x){
   return(output)
 } 
 # names(df_resultados)
-df_resultados.z <- as.data.frame(apply(df_resultados[c("p","Ntotal","log_Stotal","k.0","k.0_1","d_Lplot","d")],2,f_z))
-names(df_resultados.z) <- sapply(names(df_resultados.z), function(x) paste(gsub(".0","",x),".z",sep=""))
-df_resultados %<>% cbind(.,df_resultados.z)
-names(df_resultados)[c(5:6,26,33)] <- c("n_nRef","n_Ref","d_Lplot","d_Lplot.z")
-df_resultados.U <- df_resultados %>% filter(MN=="EE") %>% distinct() 
 # summary(df_resultados)
 df_resultados %<>% mutate(diff_S0 = (S.MN_mean-Stotal)/Stotal,
-                          diff_S = diff_S0 + min(diff_S0)*(-1) + 0.01)
+                          diff_S = diff_S0 + min(diff_S0)*(-1) + 0.01,
+                          modulo_diffS = abs(diff_S0))
+
+df_resultados.z <- as.data.frame(apply(df_resultados[c("p","Ntotal","log_Stotal","k.0","k.0_1","d_Lplot","d","modulo_diffS")],2,f_z))
+names(df_resultados.z) <- sapply(names(df_resultados.z), function(x) paste(gsub(".0","",x),".z",sep=""))
+df_resultados %<>% cbind(.,df_resultados.z)
+names(df_resultados)[5:6] <- c("n_nRef","n_Ref")
+# df_U
+df_resultados.U <- df_resultados %>% filter(MN=="EE") %>% distinct()
+# df_EI
+df_resultados.EI <- df_resultados %>% filter(MN=="EI") %>% distinct()
+df_resultados.EI$modulo_diffS[df_resultados.EI$modulo_diffS == 0] <- 
+  min(df_resultados.EI$modulo_diffS[df_resultados.EI$modulo_diffS != 0])*IQR(df_resultados.EI$modulo_diffS)/max(df_resultados.EI$modulo_diffS)
+df_resultados.EI %<>% mutate(log_modulo_diffS = log(modulo_diffS),
+                             log_modulo_diffS.z = f_z(log_modulo_diffS))
 ```
 
 # 1 - Número de SADs preditas não refutadas
@@ -131,7 +144,7 @@ l_md[[5]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * k * MN + I(p.z^2) * k * MN +
 l_md[[6]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * d.z * MN + I(p.z^2) * d.z * MN + (1|SiteCode),
                    family = "binomial",data=df_resultados,
                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md[[7]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * d.z * MN + I(p.z^2) * d.z * MN + (MN|SiteCode),
+l_md[[7]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * d.z * MN + I(p.z^2)G * d.z * MN + (MN|SiteCode),
                    family = "binomial",data=df_resultados,
                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
 l_md[[8]] <- glmer(cbind(n_nRef,100-n_nRef) ~ p.z * d.z * MN + I(p.z^2) * d.z * MN + (d.z*MN|SiteCode),
@@ -1192,6 +1205,90 @@ df_plot1 %>% ggplot(aes(x=log(modulo_diffS),y=n_nRef)) +
   facet_wrap(~title,ncol=4,scales="free_y")
 ```
 
+## Visualização das SADs preditas e observadas
+
+
+png(file="C:/Datamentor/R-tutorial/saving_plot2.png",
+width=600, height=350)
+hist(Temperature, col="gold")
+dev.off()
+
+
+```{r}
+# dados brutos
+df_auditoria <- read.csv("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/df_raster_e_SAD_atualizados.csv",
+                         header = TRUE,as.is = TRUE)
+df_SAD.replicas <- read.csv("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/resultados/df_replicas.csv",
+                            header = TRUE,as.is = TRUE)
+df_SAD_e_paisagem <- left_join(x=df_SAD.replicas,y=select(df_auditoria,-c(SAD_obs.name,SiteCode)),by=c("ordem","refID"))
+# rank máximo
+registerDoMC(3)
+df_SAD_e_paisagem <- left_join(x=df_SAD_e_paisagem,
+                               y=ddply(df_SAD_e_paisagem,c("SiteCode","k","MN"),function(X) max(c(X$S_SAD.predita,X$S_SAD.obs)),.parallel = TRUE),
+                               by=c("SiteCode","k","MN"))
+df_SAD_e_paisagem %<>% rename(max_rank=V1)
+df_SAD_e_paisagem$SAD_MN.name <- gsub("./SADs_preditas/","/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/SADs_preditas/",df_SAD_e_paisagem$SAD_MN.name)
+# dados de congruência
+# level_k <- unique(as.character(df_SAD_e_paisagem$k))
+# levels(df_SAD_e_paisagem$k)[19] <- "0.1"
+df_SAD_e_paisagem$k <- as.character(df_SAD_e_paisagem$k)
+df_SAD_e_paisagem$k[df_SAD_e_paisagem$k=="0.0999999999999999"] <- 0.1
+df_SAD_e_paisagem$SiteCode <- factor(df_SAD_e_paisagem$SiteCode,levels=levels(df_resultados$SiteCode)) 
+df_SAD_e_paisagem$MN <- factor(df_SAD_e_paisagem$MN,levels=levels(df_resultados$MN)) 
+df_SAD_e_paisagem <- left_join(x=df_SAD_e_paisagem,
+                               y=select(df_resultados,SiteCode,k,MN,n_nRef,modulo_diffS),
+                               by=c("SiteCode","k","MN"))
+# auditoria valores de congruência
+registerDoMC(3)
+df_auditoria <- df_SAD_e_paisagem %>%  
+  mutate(diffS0 = (S_SAD.predita-S_SAD.obs)/S_SAD.obs,
+         mod_diffS.aud = abs(diffS0)) %>% 
+  inner_join(x=ddply(.,c("SiteCode","k","MN"),
+                     summarise, 
+                     KS.D_mean = mean(KS.D), KS.D_sd = sd(KS.D),KS.p_mean = mean(KS.p), KS.p_sd = sd(KS.p),
+                     S_MNmean = mean(S_SAD.predita),S_MNsd = sd(S_SAD.predita),S_obs=head(S_SAD.obs,1),
+                      mod_diffSmean=mean(mod_diffS.aud),mod_diffSsd=sd(mod_diffS.aud), diffS0mean=mean(diffS0),diffS0sd=sd(diffS0),
+                     .parallel = TRUE),
+             y=ddply(.,c("SiteCode","k","MN"),
+                     function(x) nrow(x[x$KS.p >= 0.05,]),
+                     .parallel = TRUE),
+             by=c("SiteCode","k","MN")) %>% 
+  rename(nRef = V1)
+df_auditoria <- left_join(x=df_SAD_e_paisagem,
+                          y=df_auditoria,
+                          by=c("SiteCode","k","MN"))
+
+# Figuras
+f_d_ply <- function(X){
+  # X <- df_SAD_e_paisagem %>% filter(SiteCode == levels(df_resultados$SiteCode)[1])
+  X %<>% mutate(string_main=paste0("MN=",MN,"; k=",k,"; n_nRef=",n_nRef,"; |diffS|=",round(modulo_diffS,3)))
+  X %>% ddply(c("MN","k"),summarise,)
+  # df_ <- X %>% filter(MN=="EI" & k==0.05)
+  v_SADobs <- read.csv(X[1,"SAD_obs.name"],header = TRUE)[,"N"]
+  f_plot <- function(df_,v_obs){
+   plot(rad(v_SADobs),main=head(df_$string_main,1),
+        xlim=c(1,head(df_$max_rank,1)))
+    for(j in 1:nrow(df_)){
+      v_SAD_MN <- read.table(df_[j,"SAD_MN.name"],header = TRUE,as.is = TRUE)$SAD_predita
+      lines(rad(v_SAD_MN),type="l",col=rgb(0.25, 0.25, 0.25, 0.25))
+    }
+    points(rad(v_SADobs),pch = 19, col="red",cex=1,bg="black",
+           main=head(df_$string_main,1))
+  }
+  par(mfrow=c(8,5))
+  d_ply(X,c("MN","k"),function(A) f_plot(df_=A,v_obs=v_SADobs))
+}
+
+
+
+
+
+for(i in 1:length(v_Site)){
+  df_plot <- filter(df_SAD_e_paisagem,SiteCode == v_Site[i])
+  df_plot %>% filter(MN=="EE" & k==0.05) %>% head
+}
+```
+
   
 __Estratégia__  
   
@@ -1203,7 +1300,53 @@ ii) expectativa:
   
 a) esperavamos que se o teste é adequado então deve existir um erro de estimativa da riqueza máximo no qual a probabilidade de não se refutar uma SAD se torna muito diminuta.  
 b) e uma vez que não é suficiente apresentar boa estimativa da riqueza para apresentar boa congruência, então esperava que a nuvem de pontos pudesse ser aproximada por um triangulo retangulo com angulo reto na origem. 
+  
+```{r nRef por modulo_diffS md cheio,cache=TRUE}
+# para usar a escala log:
+l_md <- vector("list",5)
+names(l_md) <- c("log(modulo_diffS) * d.z | SiteCode",
+                 "log(modulo_diffS) + d.z | SiteCode",
+                 "log(modulo_diffS) | SiteCode",
+                 "d.z | SiteCode",
+                 "1 | SiteCode")
+l_md[[1]] <- glmer(cbind(n_nRef,100-n_nRef) ~ log_modulo_diffS.z * (d.z + I(d.z^2)) + ( log_modulo_diffS.z * (d.z + I(d.z^2)) | SiteCode),
+                   family = "binomial", data=df_resultados.EI,
+                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[2]] <- glmer(cbind(n_nRef,100-n_nRef) ~ log_modulo_diffS.z * (d.z + I(d.z^2)) + ( log_modulo_diffS.z + (d.z + I(d.z^2)) | SiteCode),
+                   family = "binomial", data=df_resultados.EI,
+                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[3]] <- glmer(cbind(n_nRef,100-n_nRef) ~ log_modulo_diffS.z * (d.z + I(d.z^2)) + ( log_modulo_diffS.z| SiteCode),
+                   family = "binomial", data=df_resultados.EI,
+                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[4]] <- glmer(cbind(n_nRef,100-n_nRef) ~ log_modulo_diffS.z * (d.z + I(d.z^2)) + ( (d.z + I(d.z^2)) | SiteCode),
+                   family = "binomial", data=df_resultados.EI,
+                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[5]] <- glmer(cbind(n_nRef,100-n_nRef) ~ log_modulo_diffS.z * (d.z + I(d.z^2)) + ( 1 | SiteCode),
+                   family = "binomial", data=df_resultados.EI,
+                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+AICctab(l_md,weights=TRUE)
+```
 
+```{r figura 34 nRef por modulo_diffS diag,fig.height=25,fig.width=8}
+p_plot <- simulateResiduals(l_md[["log(modulo_diffS) * d.z | SiteCode"]],n = 1000)
+# plot(p_plot)
+df_plot <- df_resultados.EI %>% 
+  select(SiteCode,n_nRef,log_modulo_diffS.z,d.z) %>% 
+  mutate(quantile_res = p_plot$scaledResiduals,
+         pearson_res = resid(l_md[["log(modulo_diffS) * d.z | SiteCode"]],type="pearson"),
+         predict_ = predict(l_md[["log(modulo_diffS) * d.z | SiteCode"]]))
+df_plot %>% 
+  ggplot(aes(x=predict_,y = pearson_res)) +
+    geom_abline(intercept = 0,slope = 0,color="red") +
+    geom_smooth(method = "auto",color="blue",se=FALSE) +
+    geom_point(alpha=0.4) +
+    facet_wrap(~SiteCode,ncol=4,scales="free")
+# df_resultados %>% filter(SiteCode == "MGlavr3") %>% summary
+```
+
+```{r}
+lme4::(l_md[["log(modulo_diffS) * d.z | SiteCode"]])
+```
 
 
 
