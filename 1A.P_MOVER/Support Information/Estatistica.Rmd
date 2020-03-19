@@ -1107,283 +1107,7 @@ l_p[[2]] <- ggplot(df_pred,aes(x=p,y=d,fill=fit)) + geom_tile()
 ```
 
 
-
-# 3 Comparação n_nRef e diff_S
-
-__Figura 3.1__ Observado (pontos) e predito (linhas) para diffS e n_nRef (segunda linha no facet) em função de d*MN, por sítio de amostragem (primeira linha no facet).
-
-```{r comparacao n_nRef e diff_S,fig.height=65,fig.width=11}
-# dados
-## MN=="EI"
-### gamm diffS
-load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/md_diff_S_EI__GAMM_update.Rdata")
-df_EI <- cbind(filter(df_resultados,MN=="EI"),
-                 predict.gam(md_gam.diff_S.EI__update,type="response",se.fit=TRUE)) %>% 
-  mutate(fit_diffS0 = fit + min(df_resultados$diff_S0) - 0.01)
-### glmm nRef
-load(file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_nRefEI__MuMIn.Rdata")
-df_EI$Pr_nRef <- predict(mdAvg_nRefEI__MuMIn,type="response")*100
-## MN=="EI"
-### gamm diffS
-md_diffS_EE <- lm(diff_S0 ~ 1,data=filter(df_resultados,MN=="EE"))
-df_EE <- filter(df_resultados,MN=="EE") %>% 
-  mutate(fit_diffS0 = coef(md_diffS_EE))
-### glmm nRef
-load(file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_nRefEE__MuMIn.Rdata")
-df_EE$Pr_nRef <- predict(mdAvg_nRefEE__MuMIn,type="response")*100
-## conjunto completo
-df_plot <- rbind.fill(df_EE,df_EI) %>%
-  mutate(title = paste0(SiteCode, " p=",round(p,digits = 3))) %>% arrange(p)
-df_plot$title <- factor(df_plot$title,levels = unique(df_plot$title))
-df_plot <- rbind.fill(
-  select(df_plot,title,d,MN,n_nRef,Pr_nRef) %>% 
-    mutate(response_class = "nRef") %>% 
-    rename(response_obs=n_nRef,fit_value=Pr_nRef),
-  select(df_plot,title,d,MN,diff_S0,fit_diffS0) %>% 
-    mutate(response_class = "diff_S") %>% 
-    rename(response_obs=diff_S0,fit_value=fit_diffS0)
-)
-# gráficos
-df_plot %>% #filter(title %in% unique(df_plot$title)[1:10]) %>% 
-  ggplot(aes(x=d,y=response_obs,group=MN)) +
-  geom_point(aes(color=MN),alpha=0.3) +
-  geom_line(aes(y=fit_value,color=MN),alpha=0.3) +
-  scale_color_manual(values=c("#FF0000", "#000000")) +
-  facet_wrap(~title+response_class,ncol=6,scales="free") + labs(y="") +
-  theme_light() + theme(legend.position="top")
-```
-  
-
-    
-      
-__Figura 3.2__ |diffS| ~ n_nRef * k, subset=MNEI
-
-```{r figura 32,fig.height=10,fig.width=7}
-# dados  ,fig.height=10
-df_plot <- df_resultados %>% filter(MN=="EI") %>% 
-  mutate(modulo_diffS = abs(diff_S0))
-# graficos
-l_p <- list()
-l_p[[1]] <- ggplot(df_plot,aes(x=d,y=modulo_diffS)) + 
-  # geom_boxplot(col="blue") +
-  # geom_jitter(alpha=0.3)
-  geom_point(alpha=0.3) + geom_smooth(method = "auto",se=FALSE,color="blue")
-l_p[[2]] <- ggplot(df_plot,aes(x=d,y=n_nRef)) + 
-  # geom_boxplot(col="blue") +
-  # geom_jitter(alpha=0.3)
-  geom_point(alpha=0.3) + geom_smooth(method = "auto",se=FALSE,color="blue")
-l_p[[3]] <- df_plot %>% 
-  mutate(logito_nRef = logit(n_nRef/100)) %>% 
-  ggplot(aes(x=log(modulo_diffS),y=logito_nRef)) + 
-  geom_smooth(method="lm",se=FALSE) +
-  geom_point(alpha=0.3) + labs(title="logit( n_nRef/100 ) ~ log( |diffS| ) * k",
-                               y="logit( n_nRef/100 )",x="log( |diffS| )") +
-  facet_wrap(~k,ncol=4,scales="free")
-# do.call("grid.arrange",c(l_p,ncol=1))
-grid.arrange(l_p[[1]],l_p[[2]],l_p[[3]],
-             layout_matrix=rbind(c(1,2),
-                                 c(3,3),
-                                 c(3,3)) )
-```
-
-
-
-__Figura 3.3__ n_nRef ~ |diffS| (~SiteCode), subset=MNEI
-
-```{r figura 33,fig.width=8, fig.height=30}
-# dados
-df_plot1  <-  left_join(x=df_plot,
-                       y=ddply(df_plot,"SiteCode",summarise,max_mod_diffS=max(modulo_diffS)),
-                       by="SiteCode") %>% 
-  arrange(max_mod_diffS) %>%
-  mutate(title=paste0(SiteCode," max(|diffS|)=",round(max_mod_diffS,2) ) )
-df_plot1$title <- factor(df_plot1$title,levels = unique(df_plot1$title))
-# graficos
-df_plot1 %>% ggplot(aes(x=log(modulo_diffS),y=n_nRef)) +
-  geom_point(alpha=0.3) +
-  ylim(0,100) + theme_light() + labs(title="n_nRef ~ (log( |diffS| ) | SiteCode)") + 
-  facet_wrap(~title,ncol=4,scales="free_y")
-```
-
-## Visualização das SADs preditas e observadas
-
-
-```{r dados para auditoria , eval=FALSE}
-# dados brutos
-df_auditoria <- read.csv("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/df_raster_e_SAD_atualizados.csv",
-                         header = TRUE,as.is = TRUE)
-df_SAD.replicas <- read.csv("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/resultados/df_replicas.csv",
-                            header = TRUE,as.is = TRUE)
-df_SAD_e_paisagem <- left_join(x=df_SAD.replicas,y=select(df_auditoria,-c(SAD_obs.name,SiteCode)),by=c("ordem","refID"))
-# rank máximo
-registerDoMC(3)
-df_SAD_e_paisagem <- left_join(x=df_SAD_e_paisagem,
-                               y=ddply(df_SAD_e_paisagem,c("SiteCode","k","MN"),function(X) max(c(X$S_SAD.predita,X$S_SAD.obs)),.parallel = TRUE),
-                               by=c("SiteCode","k","MN"))
-df_SAD_e_paisagem %<>% rename(max_rank=V1)
-df_SAD_e_paisagem$SAD_MN.name <- gsub("./SADs_preditas/","/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/SADs_preditas/",df_SAD_e_paisagem$SAD_MN.name)
-# dados de congruência
-# level_k <- unique(as.character(df_SAD_e_paisagem$k))
-# levels(df_SAD_e_paisagem$k)[19] <- "0.1"
-df_SAD_e_paisagem$k <- as.character(df_SAD_e_paisagem$k)
-df_SAD_e_paisagem$k[df_SAD_e_paisagem$k=="0.0999999999999999"] <- 0.1
-df_SAD_e_paisagem$k <- factor(df_SAD_e_paisagem$k,levels=unique(df_SAD_e_paisagem$k)[c(19,20,18:1)])
-df_SAD_e_paisagem$SiteCode <- factor(df_SAD_e_paisagem$SiteCode,levels=levels(df_resultados$SiteCode)) 
-df_SAD_e_paisagem$MN <- factor(df_SAD_e_paisagem$MN,levels=levels(df_resultados$MN)) 
-df_SAD_e_paisagem <- left_join(x=df_SAD_e_paisagem,
-                               y=select(df_resultados,SiteCode,k,MN,n_nRef,modulo_diffS),
-                               by=c("SiteCode","k","MN"))
-# auditoria valores de congruência
-registerDoMC(3)
-df_auditoria <- df_SAD_e_paisagem %>%  
-  mutate(diffS0 = (S_SAD.predita-S_SAD.obs)/S_SAD.obs,
-         mod_diffS.aud = abs(diffS0)) %>% 
-  inner_join(x=ddply(.,c("SiteCode","k","MN"),
-                     summarise, 
-                     KS.D_mean = mean(KS.D), KS.D_sd = sd(KS.D),KS.p_mean = mean(KS.p), KS.p_sd = sd(KS.p),
-                     S_MNmean = mean(S_SAD.predita),S_MNsd = sd(S_SAD.predita),S_obs=head(S_SAD.obs,1),
-                      mod_diffSmean=mean(mod_diffS.aud),mod_diffSsd=sd(mod_diffS.aud), diffS0mean=mean(diffS0),diffS0sd=sd(diffS0),
-                     .parallel = TRUE),
-             y=ddply(.,c("SiteCode","k","MN"),
-                     function(x) nrow(x[x$KS.p >= 0.05,]),
-                     .parallel = TRUE),
-             by=c("SiteCode","k","MN")) %>% 
-  rename(nRef = V1)
-df_auditoria <- left_join(x=df_SAD_e_paisagem,
-                          y=df_auditoria,
-                          by=c("SiteCode","k","MN")) %>% 
-  left_join(x=.,
-            y=distinct(select(df_resultados,SiteCode,p,k,d)),
-            by=c("SiteCode","k")) %>% 
-  mutate(string_main=paste0("k=",k," d=",round(d,3),"\n nRef=",n_nRef,"; |diffS|=",round(mod_diffSmean,3),"; rankMax=",max_rank),
-         string_mtext=paste0(SiteCode," MN==",MN," p=",round(p,3)) )
-# 
-levels_k <- df_auditoria$k %>% unique %>% as.numeric %>% sort() %>% as.character()
-df_auditoria$k <- factor(df_auditoria$k,levels=levels_k[20:1])
-```
-
-
-```{r painel de SADs, eval=FALSE}
-for(s in 1:length(levels(df_auditoria$SiteCode))){
-  X <- df_auditoria %>% filter(SiteCode == levels(df_auditoria$SiteCode)[s])
-  v_SADobs <- read.csv(X[1,"SAD_obs.name"],header = TRUE)[,"N"]
-  # MNEE
-  df_ <- X %>% filter(MN=="EE")
-  png(paste0("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/figuras/",
-             levels(df_auditoria$SiteCode)[s],"_EE_SADs.png"),
-      width = 980, height = 600)
-  par(mfrow=c(4,5))
-  for(K in 1:length(levels(df_$k))){
-    df_k <- filter(df_,k==levels(df_$k)[K])
-    plot(rad(v_SADobs),main=head(df_k$string_main,1),cex=0.5,
-         xlim=c(1,head(df_$max_rank,1)))
-    for(p in 1:nrow(df_k)){
-      v_SAD_MN <- read.table(df_k[p,"SAD_MN.name"],header = TRUE,as.is = TRUE)$SAD_predita
-      lines(rad(v_SAD_MN),type="l",col=rgb(0.25, 0.25, 0.25, 0.25))
-    }
-    lines(rad(v_SADobs),pch = 19, col="red",cex=0.5,bg="black",type="b",
-           main=head(df_k$string_main,1))
-  }
-  dev.off()
-  # MNEI
-  df_ <- X %>% filter(MN=="EI")
-  png(paste0("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/figuras/",
-             levels(df_auditoria$SiteCode)[s],"_EI_SADs.png"),
-      width = 980, height = 600)
-  par(mfrow=c(4,5))
-  for(K in 1:length(levels(df_$k))){
-    df_k <- filter(df_,k==levels(df_$k)[K])
-    plot(rad(v_SADobs),main=head(df_k$string_main,1),cex=0.5,
-         xlim=c(1,head(df_$max_rank,1)))
-    for(p in 1:nrow(df_k)){
-      v_SAD_MN <- read.table(df_k[p,"SAD_MN.name"],header = TRUE,as.is = TRUE)$SAD_predita
-      lines(rad(v_SAD_MN),type="l",col=rgb(0.25, 0.25, 0.25, 0.25))
-    }
-    lines(rad(v_SADobs),pch = 19, col="red",cex=0.5,type="b",
-           main=head(df_k$string_main,1))
-  }
-  dev.off()
-}
-```
-
-
-
-
-Inspeção individual das SADs
-
-```{r}
-library(KSgeneral)
-df_auditoria %>% filter(SiteCode == "SCsjo1" & k==0.1 & MN=="EI") %>% head
-df_SAD0bs <- read.csv(filter(df_auditoria,SiteCode == "PRtiba1")$SAD_obs.name[1],header = TRUE,as.is = TRUE)
-df_SAD0bs$N %>% sum
-
-df_SAD_MN <- read.csv(filter(df_auditoria,SiteCode == "PRtiba1" & MN=="EI" & k==0.99)$SAD_MN.name[1],header = TRUE,as.is = TRUE)
-
-
-```
-
-  
-__Estratégia__  
-  
-i) estrutura do tipo:  
-  
-cbind(n_nRef,100-n_nRef) ~ log(modulo_diffS) * d + ( log(modulo_diffS) * d | SiteCode)  
-  
-ii) expectativa:  
-  
-a) esperavamos que se o teste é adequado então deve existir um erro de estimativa da riqueza máximo no qual a probabilidade de não se refutar uma SAD se torna muito diminuta.  
-b) e uma vez que não é suficiente apresentar boa estimativa da riqueza para apresentar boa congruência, então esperava que a nuvem de pontos pudesse ser aproximada por um triangulo retangulo com angulo reto na origem. 
-  
-```{r nRef por modulo_diffS md cheio,cache=TRUE}
-# para usar a escala log:
-l_md <- vector("list",5)
-names(l_md) <- c("log(modulo_diffS) * d.z | SiteCode",
-                 "log(modulo_diffS) + d.z | SiteCode",
-                 "log(modulo_diffS) | SiteCode",
-                 "d.z | SiteCode",
-                 "1 | SiteCode")
-l_md[[1]] <- glmer(cbind(n_nRef,100-n_nRef) ~ log_modulo_diffS.z * (d.z + I(d.z^2)) + ( log_modulo_diffS.z * (d.z + I(d.z^2)) | SiteCode),
-                   family = "binomial", data=df_resultados.EI,
-                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md[[2]] <- glmer(cbind(n_nRef,100-n_nRef) ~ log_modulo_diffS.z * (d.z + I(d.z^2)) + ( log_modulo_diffS.z + (d.z + I(d.z^2)) | SiteCode),
-                   family = "binomial", data=df_resultados.EI,
-                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md[[3]] <- glmer(cbind(n_nRef,100-n_nRef) ~ log_modulo_diffS.z * (d.z + I(d.z^2)) + ( log_modulo_diffS.z| SiteCode),
-                   family = "binomial", data=df_resultados.EI,
-                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md[[4]] <- glmer(cbind(n_nRef,100-n_nRef) ~ log_modulo_diffS.z * (d.z + I(d.z^2)) + ( (d.z + I(d.z^2)) | SiteCode),
-                   family = "binomial", data=df_resultados.EI,
-                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-l_md[[5]] <- glmer(cbind(n_nRef,100-n_nRef) ~ log_modulo_diffS.z * (d.z + I(d.z^2)) + ( 1 | SiteCode),
-                   family = "binomial", data=df_resultados.EI,
-                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-AICctab(l_md,weights=TRUE)
-```
-
-```{r figura 34 nRef por modulo_diffS diag,fig.height=25,fig.width=8}
-p_plot <- simulateResiduals(l_md[["log(modulo_diffS) * d.z | SiteCode"]],n = 1000)
-# plot(p_plot)
-df_plot <- df_resultados.EI %>% 
-  select(SiteCode,n_nRef,log_modulo_diffS.z,d.z) %>% 
-  mutate(quantile_res = p_plot$scaledResiduals,
-         pearson_res = resid(l_md[["log(modulo_diffS) * d.z | SiteCode"]],type="pearson"),
-         predict_ = predict(l_md[["log(modulo_diffS) * d.z | SiteCode"]]))
-df_plot %>% 
-  ggplot(aes(x=predict_,y = pearson_res)) +
-    geom_abline(intercept = 0,slope = 0,color="red") +
-    geom_smooth(method = "auto",color="blue",se=FALSE) +
-    geom_point(alpha=0.4) +
-    facet_wrap(~SiteCode,ncol=4,scales="free")
-# df_resultados %>% filter(SiteCode == "MGlavr3") %>% summary
-```
-
-```{r}
-lme4::(l_md[["log(modulo_diffS) * d.z | SiteCode"]])
-```
-
-
-
-# 4 U 
+# 3 U 
 
 ## Padrões Gerais  
   
@@ -1618,5 +1342,285 @@ __Figura 4.3__ Graf Diag Gamm cheio mais plausível
 ```{r gamm cheio U_med graf diag} 
 load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md_U_gammCheio.Rdata")
 gratia::appraise(l_md_U_gammCheio[["cr gamma d|Site"]])
+```
+
+
+
+
+# 4 Comparação n_nRef e diff_S
+
+__Figura 3.1__ Observado (pontos) e predito (linhas) para diffS e n_nRef (segunda linha no facet) em função de d*MN, por sítio de amostragem (primeira linha no facet).
+
+```{r comparacao n_nRef e diff_S,fig.height=65,fig.width=11}
+# dados
+## MN=="EI"
+### gamm diffS
+load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/md_diff_S_EI__GAMM_update.Rdata")
+df_EI <- cbind(filter(df_resultados,MN=="EI"),
+                 predict.gam(md_gam.diff_S.EI__update,type="response",se.fit=TRUE)) %>% 
+  mutate(fit_diffS0 = fit + min(df_resultados$diff_S0) - 0.01)
+### glmm nRef
+load(file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_nRefEI__MuMIn.Rdata")
+df_EI$Pr_nRef <- predict(mdAvg_nRefEI__MuMIn,type="response")*100
+## MN=="EI"
+### gamm diffS
+md_diffS_EE <- lm(diff_S0 ~ 1,data=filter(df_resultados,MN=="EE"))
+df_EE <- filter(df_resultados,MN=="EE") %>% 
+  mutate(fit_diffS0 = coef(md_diffS_EE))
+### glmm nRef
+load(file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_nRefEE__MuMIn.Rdata")
+df_EE$Pr_nRef <- predict(mdAvg_nRefEE__MuMIn,type="response")*100
+## conjunto completo
+df_plot <- rbind.fill(df_EE,df_EI) %>%
+  mutate(title = paste0(SiteCode, " p=",round(p,digits = 3))) %>% arrange(p)
+df_plot$title <- factor(df_plot$title,levels = unique(df_plot$title))
+df_plot <- rbind.fill(
+  select(df_plot,title,d,MN,n_nRef,Pr_nRef) %>% 
+    mutate(response_class = "nRef") %>% 
+    rename(response_obs=n_nRef,fit_value=Pr_nRef),
+  select(df_plot,title,d,MN,diff_S0,fit_diffS0) %>% 
+    mutate(response_class = "diff_S") %>% 
+    rename(response_obs=diff_S0,fit_value=fit_diffS0)
+)
+# gráficos
+df_plot %>% #filter(title %in% unique(df_plot$title)[1:10]) %>% 
+  ggplot(aes(x=d,y=response_obs,group=MN)) +
+  geom_point(aes(color=MN),alpha=0.3) +
+  geom_line(aes(y=fit_value,color=MN),alpha=0.3) +
+  scale_color_manual(values=c("#FF0000", "#000000")) +
+  facet_wrap(~title+response_class,ncol=6,scales="free") + labs(y="") +
+  theme_light() + theme(legend.position="top")
+```
+  
+
+    
+      
+__Figura 4.2__ |diffS| ~ n_nRef * k, subset=MNEI
+
+```{r figura 32,fig.height=10,fig.width=7}
+# dados  ,fig.height=10
+df_plot <- df_resultados %>% filter(MN=="EI") %>% 
+  mutate(modulo_diffS = abs(diff_S0))
+# graficos
+l_p <- list()
+l_p[[1]] <- ggplot(df_plot,aes(x=d,y=modulo_diffS)) + 
+  # geom_boxplot(col="blue") +
+  # geom_jitter(alpha=0.3)
+  geom_point(alpha=0.3) + geom_smooth(method = "auto",se=FALSE,color="blue")
+l_p[[2]] <- ggplot(df_plot,aes(x=d,y=n_nRef)) + 
+  # geom_boxplot(col="blue") +
+  # geom_jitter(alpha=0.3)
+  geom_point(alpha=0.3) + geom_smooth(method = "auto",se=FALSE,color="blue")
+l_p[[3]] <- df_plot %>% 
+  mutate(logito_nRef = logit(n_nRef/100)) %>% 
+  ggplot(aes(x=log(modulo_diffS),y=logito_nRef)) + 
+  geom_smooth(method="lm",se=FALSE) +
+  geom_point(alpha=0.3) + labs(title="logit( n_nRef/100 ) ~ log( |diffS| ) * k",
+                               y="logit( n_nRef/100 )",x="log( |diffS| )") +
+  facet_wrap(~k,ncol=4,scales="free")
+# do.call("grid.arrange",c(l_p,ncol=1))
+grid.arrange(l_p[[1]],l_p[[2]],l_p[[3]],
+             layout_matrix=rbind(c(1,2),
+                                 c(3,3),
+                                 c(3,3)) )
+```
+
+
+
+__Figura 3.3__ n_nRef ~ |diffS| (~SiteCode), subset=MNEI
+
+```{r figura 33,fig.width=8, fig.height=30}
+# dados
+df_plot1  <-  left_join(x=df_plot,
+                       y=ddply(df_plot,"SiteCode",summarise,max_mod_diffS=max(modulo_diffS)),
+                       by="SiteCode") %>% 
+  arrange(max_mod_diffS) %>%
+  mutate(title=paste0(SiteCode," max(|diffS|)=",round(max_mod_diffS,2) ) )
+df_plot1$title <- factor(df_plot1$title,levels = unique(df_plot1$title))
+# graficos
+df_plot1 %>% ggplot(aes(x=log(modulo_diffS),y=n_nRef)) +
+  geom_point(alpha=0.3) +
+  ylim(0,100) + theme_light() + labs(title="n_nRef ~ (log( |diffS| ) | SiteCode)") + 
+  facet_wrap(~title,ncol=4,scales="free_y")
+```
+
+
+## Comparação funções para o teste KS
+
+
+```{r dados para auditoria , eval=FALSE}
+# dados brutos
+df_auditoria <- read.csv("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/df_raster_e_SAD_atualizados.csv",
+                         header = TRUE,as.is = TRUE)
+df_SAD.replicas <- read.csv("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/resultados/df_replicas.csv",
+                            header = TRUE,as.is = TRUE)
+df_SAD_e_paisagem <- left_join(x=df_SAD.replicas,y=select(df_auditoria,-c(SAD_obs.name,SiteCode)),by=c("ordem","refID"))
+# rank máximo
+registerDoMC(3)
+df_SAD_e_paisagem <- left_join(x=df_SAD_e_paisagem,
+                               y=ddply(df_SAD_e_paisagem,c("SiteCode","k","MN"),function(X) max(c(X$S_SAD.predita,X$S_SAD.obs)),.parallel = TRUE),
+                               by=c("SiteCode","k","MN"))
+df_SAD_e_paisagem %<>% rename(max_rank=V1)
+df_SAD_e_paisagem$SAD_MN.name <- gsub("./SADs_preditas/","/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/SADs_preditas/",df_SAD_e_paisagem$SAD_MN.name)
+# dados de congruência
+# level_k <- unique(as.character(df_SAD_e_paisagem$k))
+# levels(df_SAD_e_paisagem$k)[19] <- "0.1"
+df_SAD_e_paisagem$k <- as.character(df_SAD_e_paisagem$k)
+df_SAD_e_paisagem$k[df_SAD_e_paisagem$k=="0.0999999999999999"] <- 0.1
+df_SAD_e_paisagem$k <- factor(df_SAD_e_paisagem$k,levels=unique(df_SAD_e_paisagem$k)[c(19,20,18:1)])
+df_SAD_e_paisagem$SiteCode <- factor(df_SAD_e_paisagem$SiteCode,levels=levels(df_resultados$SiteCode)) 
+df_SAD_e_paisagem$MN <- factor(df_SAD_e_paisagem$MN,levels=levels(df_resultados$MN)) 
+df_SAD_e_paisagem <- left_join(x=df_SAD_e_paisagem,
+                               y=select(df_resultados,SiteCode,k,MN,n_nRef,modulo_diffS),
+                               by=c("SiteCode","k","MN"))
+# auditoria valores de congruência
+registerDoMC(3)
+df_auditoria <- df_SAD_e_paisagem %>%  
+  mutate(diffS0 = (S_SAD.predita-S_SAD.obs)/S_SAD.obs,
+         mod_diffS.aud = abs(diffS0)) %>% 
+  inner_join(x=ddply(.,c("SiteCode","k","MN"),
+                     summarise, 
+                     KS.D_mean = mean(KS.D), KS.D_sd = sd(KS.D),KS.p_mean = mean(KS.p), KS.p_sd = sd(KS.p),
+                     S_MNmean = mean(S_SAD.predita),S_MNsd = sd(S_SAD.predita),S_obs=head(S_SAD.obs,1),
+                      mod_diffSmean=mean(mod_diffS.aud),mod_diffSsd=sd(mod_diffS.aud), diffS0mean=mean(diffS0),diffS0sd=sd(diffS0),
+                     .parallel = TRUE),
+             y=ddply(.,c("SiteCode","k","MN"),
+                     function(x) nrow(x[x$KS.p >= 0.05,]),
+                     .parallel = TRUE),
+             by=c("SiteCode","k","MN")) %>% 
+  rename(nRef = V1)
+df_auditoria <- left_join(x=df_SAD_e_paisagem,
+                          y=df_auditoria,
+                          by=c("SiteCode","k","MN")) %>% 
+  left_join(x=.,
+            y=distinct(select(df_resultados,SiteCode,p,k,d)),
+            by=c("SiteCode","k")) %>% 
+  mutate(string_main=paste0("k=",k," d=",round(d,3),"\n nRef=",n_nRef,"; |diffS|=",round(mod_diffSmean,3),"; rankMax=",max_rank),
+         string_mtext=paste0(SiteCode," MN==",MN," p=",round(p,3)) )
+# 
+levels_k <- df_auditoria$k %>% unique %>% as.numeric %>% sort() %>% as.character()
+df_auditoria$k <- factor(df_auditoria$k,levels=levels_k[20:1])
+```
+
+
+
+## Visualização das SADs preditas e observadas
+
+```{r painel de SADs, eval=FALSE}
+for(s in 1:length(levels(df_auditoria$SiteCode))){
+  X <- df_auditoria %>% filter(SiteCode == levels(df_auditoria$SiteCode)[s])
+  v_SADobs <- read.csv(X[1,"SAD_obs.name"],header = TRUE)[,"N"]
+  # MNEE
+  df_ <- X %>% filter(MN=="EE")
+  png(paste0("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/figuras/",
+             levels(df_auditoria$SiteCode)[s],"_EE_SADs.png"),
+      width = 980, height = 600)
+  par(mfrow=c(4,5))
+  for(K in 1:length(levels(df_$k))){
+    df_k <- filter(df_,k==levels(df_$k)[K])
+    plot(rad(v_SADobs),main=head(df_k$string_main,1),cex=0.5,
+         xlim=c(1,head(df_$max_rank,1)))
+    for(p in 1:nrow(df_k)){
+      v_SAD_MN <- read.table(df_k[p,"SAD_MN.name"],header = TRUE,as.is = TRUE)$SAD_predita
+      lines(rad(v_SAD_MN),type="l",col=rgb(0.25, 0.25, 0.25, 0.25))
+    }
+    lines(rad(v_SADobs),pch = 19, col="red",cex=0.5,bg="black",type="b",
+           main=head(df_k$string_main,1))
+  }
+  dev.off()
+  # MNEI
+  df_ <- X %>% filter(MN=="EI")
+  png(paste0("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/figuras/",
+             levels(df_auditoria$SiteCode)[s],"_EI_SADs.png"),
+      width = 980, height = 600)
+  par(mfrow=c(4,5))
+  for(K in 1:length(levels(df_$k))){
+    df_k <- filter(df_,k==levels(df_$k)[K])
+    plot(rad(v_SADobs),main=head(df_k$string_main,1),cex=0.5,
+         xlim=c(1,head(df_$max_rank,1)))
+    for(p in 1:nrow(df_k)){
+      v_SAD_MN <- read.table(df_k[p,"SAD_MN.name"],header = TRUE,as.is = TRUE)$SAD_predita
+      lines(rad(v_SAD_MN),type="l",col=rgb(0.25, 0.25, 0.25, 0.25))
+    }
+    lines(rad(v_SADobs),pch = 19, col="red",cex=0.5,type="b",
+           main=head(df_k$string_main,1))
+  }
+  dev.off()
+}
+```
+
+
+
+
+Inspeção individual das SADs
+
+```{r}
+library(KSgeneral)
+df_auditoria %>% filter(SiteCode == "SCsjo1" & k==0.1 & MN=="EI") %>% head
+df_SAD0bs <- read.csv(filter(df_auditoria,SiteCode == "PRtiba1")$SAD_obs.name[1],header = TRUE,as.is = TRUE)
+df_SAD0bs$N %>% sum
+
+df_SAD_MN <- read.csv(filter(df_auditoria,SiteCode == "PRtiba1" & MN=="EI" & k==0.99)$SAD_MN.name[1],header = TRUE,as.is = TRUE)
+
+
+```
+
+  
+__Estratégia__  
+  
+i) estrutura do tipo:  
+  
+cbind(n_nRef,100-n_nRef) ~ log(modulo_diffS) * d + ( log(modulo_diffS) * d | SiteCode)  
+  
+ii) expectativa:  
+  
+a) esperavamos que se o teste é adequado então deve existir um erro de estimativa da riqueza máximo no qual a probabilidade de não se refutar uma SAD se torna muito diminuta.  
+b) e uma vez que não é suficiente apresentar boa estimativa da riqueza para apresentar boa congruência, então esperava que a nuvem de pontos pudesse ser aproximada por um triangulo retangulo com angulo reto na origem. 
+  
+```{r nRef por modulo_diffS md cheio,cache=TRUE}
+# para usar a escala log:
+l_md <- vector("list",5)
+names(l_md) <- c("log(modulo_diffS) * d.z | SiteCode",
+                 "log(modulo_diffS) + d.z | SiteCode",
+                 "log(modulo_diffS) | SiteCode",
+                 "d.z | SiteCode",
+                 "1 | SiteCode")
+l_md[[1]] <- glmer(cbind(n_nRef,100-n_nRef) ~ log_modulo_diffS.z * (d.z + I(d.z^2)) + ( log_modulo_diffS.z * (d.z + I(d.z^2)) | SiteCode),
+                   family = "binomial", data=df_resultados.EI,
+                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[2]] <- glmer(cbind(n_nRef,100-n_nRef) ~ log_modulo_diffS.z * (d.z + I(d.z^2)) + ( log_modulo_diffS.z + (d.z + I(d.z^2)) | SiteCode),
+                   family = "binomial", data=df_resultados.EI,
+                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[3]] <- glmer(cbind(n_nRef,100-n_nRef) ~ log_modulo_diffS.z * (d.z + I(d.z^2)) + ( log_modulo_diffS.z| SiteCode),
+                   family = "binomial", data=df_resultados.EI,
+                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[4]] <- glmer(cbind(n_nRef,100-n_nRef) ~ log_modulo_diffS.z * (d.z + I(d.z^2)) + ( (d.z + I(d.z^2)) | SiteCode),
+                   family = "binomial", data=df_resultados.EI,
+                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+l_md[[5]] <- glmer(cbind(n_nRef,100-n_nRef) ~ log_modulo_diffS.z * (d.z + I(d.z^2)) + ( 1 | SiteCode),
+                   family = "binomial", data=df_resultados.EI,
+                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+AICctab(l_md,weights=TRUE)
+```
+
+```{r figura 34 nRef por modulo_diffS diag,fig.height=25,fig.width=8}
+p_plot <- simulateResiduals(l_md[["log(modulo_diffS) * d.z | SiteCode"]],n = 1000)
+# plot(p_plot)
+df_plot <- df_resultados.EI %>% 
+  select(SiteCode,n_nRef,log_modulo_diffS.z,d.z) %>% 
+  mutate(quantile_res = p_plot$scaledResiduals,
+         pearson_res = resid(l_md[["log(modulo_diffS) * d.z | SiteCode"]],type="pearson"),
+         predict_ = predict(l_md[["log(modulo_diffS) * d.z | SiteCode"]]))
+df_plot %>% 
+  ggplot(aes(x=predict_,y = pearson_res)) +
+    geom_abline(intercept = 0,slope = 0,color="red") +
+    geom_smooth(method = "auto",color="blue",se=FALSE) +
+    geom_point(alpha=0.4) +
+    facet_wrap(~SiteCode,ncol=4,scales="free")
+# df_resultados %>% filter(SiteCode == "MGlavr3") %>% summary
+```
+
+```{r}
+lme4::(l_md[["log(modulo_diffS) * d.z | SiteCode"]])
 ```
 
