@@ -1208,13 +1208,7 @@ df_plot1 %>% ggplot(aes(x=log(modulo_diffS),y=n_nRef)) +
 ## Visualização das SADs preditas e observadas
 
 
-png(file="C:/Datamentor/R-tutorial/saving_plot2.png",
-width=600, height=350)
-hist(Temperature, col="gold")
-dev.off()
-
-
-```{r}
+```{r dados para auditoria , eval=FALSE}
 # dados brutos
 df_auditoria <- read.csv("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/df_raster_e_SAD_atualizados.csv",
                          header = TRUE,as.is = TRUE)
@@ -1233,6 +1227,7 @@ df_SAD_e_paisagem$SAD_MN.name <- gsub("./SADs_preditas/","/home/danilo/Documento
 # levels(df_SAD_e_paisagem$k)[19] <- "0.1"
 df_SAD_e_paisagem$k <- as.character(df_SAD_e_paisagem$k)
 df_SAD_e_paisagem$k[df_SAD_e_paisagem$k=="0.0999999999999999"] <- 0.1
+df_SAD_e_paisagem$k <- factor(df_SAD_e_paisagem$k,levels=unique(df_SAD_e_paisagem$k)[c(19,20,18:1)])
 df_SAD_e_paisagem$SiteCode <- factor(df_SAD_e_paisagem$SiteCode,levels=levels(df_resultados$SiteCode)) 
 df_SAD_e_paisagem$MN <- factor(df_SAD_e_paisagem$MN,levels=levels(df_resultados$MN)) 
 df_SAD_e_paisagem <- left_join(x=df_SAD_e_paisagem,
@@ -1256,37 +1251,75 @@ df_auditoria <- df_SAD_e_paisagem %>%
   rename(nRef = V1)
 df_auditoria <- left_join(x=df_SAD_e_paisagem,
                           y=df_auditoria,
-                          by=c("SiteCode","k","MN"))
+                          by=c("SiteCode","k","MN")) %>% 
+  left_join(x=.,
+            y=distinct(select(df_resultados,SiteCode,p,k,d)),
+            by=c("SiteCode","k")) %>% 
+  mutate(string_main=paste0("k=",k," d=",round(d,3),"\n nRef=",n_nRef,"; |diffS|=",round(mod_diffSmean,3),"; rankMax=",max_rank),
+         string_mtext=paste0(SiteCode," MN==",MN," p=",round(p,3)) )
+# 
+levels_k <- df_auditoria$k %>% unique %>% as.numeric %>% sort() %>% as.character()
+df_auditoria$k <- factor(df_auditoria$k,levels=levels_k[20:1])
+```
 
-# Figuras
-f_d_ply <- function(X){
-  # X <- df_SAD_e_paisagem %>% filter(SiteCode == levels(df_resultados$SiteCode)[1])
-  X %<>% mutate(string_main=paste0("MN=",MN,"; k=",k,"; n_nRef=",n_nRef,"; |diffS|=",round(modulo_diffS,3)))
-  X %>% ddply(c("MN","k"),summarise,)
-  # df_ <- X %>% filter(MN=="EI" & k==0.05)
+
+```{r painel de SADs, eval=FALSE}
+for(s in 1:length(levels(df_auditoria$SiteCode))){
+  X <- df_auditoria %>% filter(SiteCode == levels(df_auditoria$SiteCode)[s])
   v_SADobs <- read.csv(X[1,"SAD_obs.name"],header = TRUE)[,"N"]
-  f_plot <- function(df_,v_obs){
-   plot(rad(v_SADobs),main=head(df_$string_main,1),
-        xlim=c(1,head(df_$max_rank,1)))
-    for(j in 1:nrow(df_)){
-      v_SAD_MN <- read.table(df_[j,"SAD_MN.name"],header = TRUE,as.is = TRUE)$SAD_predita
+  # MNEE
+  df_ <- X %>% filter(MN=="EE")
+  png(paste0("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/figuras/",
+             levels(df_auditoria$SiteCode)[s],"_EE_SADs.png"),
+      width = 980, height = 600)
+  par(mfrow=c(4,5))
+  for(K in 1:length(levels(df_$k))){
+    df_k <- filter(df_,k==levels(df_$k)[K])
+    plot(rad(v_SADobs),main=head(df_k$string_main,1),cex=0.5,
+         xlim=c(1,head(df_$max_rank,1)))
+    for(p in 1:nrow(df_k)){
+      v_SAD_MN <- read.table(df_k[p,"SAD_MN.name"],header = TRUE,as.is = TRUE)$SAD_predita
       lines(rad(v_SAD_MN),type="l",col=rgb(0.25, 0.25, 0.25, 0.25))
     }
-    points(rad(v_SADobs),pch = 19, col="red",cex=1,bg="black",
-           main=head(df_$string_main,1))
+    lines(rad(v_SADobs),pch = 19, col="red",cex=0.5,bg="black",type="b",
+           main=head(df_k$string_main,1))
   }
-  par(mfrow=c(8,5))
-  d_ply(X,c("MN","k"),function(A) f_plot(df_=A,v_obs=v_SADobs))
+  dev.off()
+  # MNEI
+  df_ <- X %>% filter(MN=="EI")
+  png(paste0("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/figuras/",
+             levels(df_auditoria$SiteCode)[s],"_EI_SADs.png"),
+      width = 980, height = 600)
+  par(mfrow=c(4,5))
+  for(K in 1:length(levels(df_$k))){
+    df_k <- filter(df_,k==levels(df_$k)[K])
+    plot(rad(v_SADobs),main=head(df_k$string_main,1),cex=0.5,
+         xlim=c(1,head(df_$max_rank,1)))
+    for(p in 1:nrow(df_k)){
+      v_SAD_MN <- read.table(df_k[p,"SAD_MN.name"],header = TRUE,as.is = TRUE)$SAD_predita
+      lines(rad(v_SAD_MN),type="l",col=rgb(0.25, 0.25, 0.25, 0.25))
+    }
+    lines(rad(v_SADobs),pch = 19, col="red",cex=0.5,type="b",
+           main=head(df_k$string_main,1))
+  }
+  dev.off()
 }
+```
 
 
 
 
+Inspeção individual das SADs
 
-for(i in 1:length(v_Site)){
-  df_plot <- filter(df_SAD_e_paisagem,SiteCode == v_Site[i])
-  df_plot %>% filter(MN=="EE" & k==0.05) %>% head
-}
+```{r}
+library(KSgeneral)
+df_auditoria %>% filter(SiteCode == "SCsjo1" & k==0.1 & MN=="EI") %>% head
+df_SAD0bs <- read.csv(filter(df_auditoria,SiteCode == "PRtiba1")$SAD_obs.name[1],header = TRUE,as.is = TRUE)
+df_SAD0bs$N %>% sum
+
+df_SAD_MN <- read.csv(filter(df_auditoria,SiteCode == "PRtiba1" & MN=="EI" & k==0.99)$SAD_MN.name[1],header = TRUE,as.is = TRUE)
+
+
 ```
 
   
