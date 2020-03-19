@@ -1,5 +1,5 @@
 ---
-title: "Estatistica"
+Ftitle: "Estatistica"
 author: "Mori, Danilo"
 date: "31/10/2019"
 output: 
@@ -29,6 +29,7 @@ library(GGally)
 library(doMC)
 library(DHARMa)
 library(broom.mixed)
+library(KSgeneral)
 library(MuMIn)
 library(mgcv)
 library(gratia)
@@ -1503,6 +1504,53 @@ df_auditoria$k <- factor(df_auditoria$k,levels=levels_k[20:1])
 ```
 
 
+```{r comparacao testes KS, echo=TRUE,eval=FALSE}
+df_testeKS <- df_auditoria %>% select(SAD_obs.name,SAD_MN.name,MN,k,rep,ordem,refID,SiteCode,txt.name,S_obs,p,d) %>% 
+  group_by(SAD_obs.name) %>% nest
+##### Resultados por Réplica #####
+df_testeKS$resultados <- vector("list",length = nrow(df_testeKS))
+for(i in 1:nrow(df_testeKS)){
+  # i <- 1
+  df_ <- df_testeKS[i,]
+  v_SAD.obs <- read.csv(df_$SAD_obs.name,header = TRUE,as.is = TRUE) %>% filter(species.correct != "Mortas") %>% 
+    .$N %>% sort()
+  df_predicao <- as.data.frame(df_$data[[1]])
+  f_KSeS <- function(v_OBS = v_SAD.obs, path_SAD.MN){
+    # path_SAD.MN <- df_predicao[1,"SAD_MN.name"]
+    v_SAD.predita <- as.integer(read.csv(path_SAD.MN,header = TRUE,as.is = TRUE)$SAD_predita)
+    a <- disc_ks_test(x=v_SAD.predita,
+                      y=ecdf(v_SAD.obs),exact = TRUE)
+    a <- data.frame(KS.D = a$statistic, KS.p = a$p.value)
+    a$S_SAD.predita <- length(v_SAD.predita)
+    a$S_SAD.obs <- length(v_SAD.obs) 
+    return(a)
+  }
+  # f_KSeS(path_SAD.MN = df_predicao$SAD_MN.name[3000])
+    l_ <- vector("list",length = nrow(df_predicao))
+  for(j in 1:nrow(df_predicao)){
+    l_[[j]] <- f_KSeS(path_SAD.MN = df_predicao$SAD_MN.name[j])
+  }
+  df_testeKS$resultados[[i]] <- rbind.fill(l_)
+}
+df_replicas <- df_testeKS %>% unnest(cols = c(data,resultados)) %>% as.data.frame() %>% 
+  rename(D_KSgeneral = KS.D, p.valor_KSgeneral=KS.p)
+df_replicas <- inner_join(x=df_replicas,
+                          y=select(df_auditoria,
+                                   SAD_obs.name,k,rep,SiteCode,KS.D,KS.p),
+                          by=c("SAD_obs.name","k","rep","SiteCode"))
+write.csv(df_replicas,file = "~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/resultados/df_replicas__KSgeneral.csv",row.names = FALSE)
+```
+
+```{r comparacao ks teste base e KSgeneral,eval=TRUE}
+df_replicas <- read.csv("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/resultados/df_replicas__KSgeneral.csv",
+                        header = TRUE,as.is = TRUE)
+l_p <- list()
+l_p[[1]] <- ggplot(df_replicas,aes(y=D_KSgeneral,x=KS.d)) + geom_point(alpha=0.3)
+l_p[[2]] <- ggplot(df_replicas,aes(y=p.valor_KSgeneral,x=KS.p)) + geom_point(alpha=0.3)
+do.call("grid.arrange",c(l_p,ncol=2))
+```
+
+
 
 ## Visualização das SADs preditas e observadas
 
@@ -1553,17 +1601,6 @@ for(s in 1:length(levels(df_auditoria$SiteCode))){
 
 
 Inspeção individual das SADs
-
-```{r}
-library(KSgeneral)
-df_auditoria %>% filter(SiteCode == "SCsjo1" & k==0.1 & MN=="EI") %>% head
-df_SAD0bs <- read.csv(filter(df_auditoria,SiteCode == "PRtiba1")$SAD_obs.name[1],header = TRUE,as.is = TRUE)
-df_SAD0bs$N %>% sum
-
-df_SAD_MN <- read.csv(filter(df_auditoria,SiteCode == "PRtiba1" & MN=="EI" & k==0.99)$SAD_MN.name[1],header = TRUE,as.is = TRUE)
-
-
-```
 
   
 __Estratégia__  
@@ -1621,6 +1658,6 @@ df_plot %>%
 ```
 
 ```{r}
-lme4::(l_md[["log(modulo_diffS) * d.z | SiteCode"]])
+# lme4::(l_md[["log(modulo_diffS) * d.z | SiteCode"]])
 ```
 
