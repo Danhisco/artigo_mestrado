@@ -1550,7 +1550,7 @@ l_p[[2]] <- ggplot(df_replicas,aes(y=p.valor_KSgeneral,x=KS.p)) + geom_point(alp
 do.call("grid.arrange",c(l_p,ncol=2))
 ```
 
-jsjs
+
 
 
 ## Visualização das SADs preditas e observadas
