@@ -1541,15 +1541,16 @@ df_replicas <- inner_join(x=df_replicas,
 write.csv(df_replicas,file = "~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/resultados/df_replicas__KSgeneral.csv",row.names = FALSE)
 ```
 
-```{r comparacao ks teste base e KSgeneral,eval=TRUE}
+```{r comparacao ks teste base e KSgeneral,eval=TRUE,cahce=TRUE}
 df_replicas <- read.csv("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/resultados/df_replicas__KSgeneral.csv",
                         header = TRUE,as.is = TRUE)
 l_p <- list()
-l_p[[1]] <- ggplot(df_replicas,aes(y=D_KSgeneral,x=KS.d)) + geom_point(alpha=0.3)
+l_p[[1]] <- ggplot(df_replicas,aes(y=D_KSgeneral,x=KS.D)) + geom_point(alpha=0.3)
 l_p[[2]] <- ggplot(df_replicas,aes(y=p.valor_KSgeneral,x=KS.p)) + geom_point(alpha=0.3)
 do.call("grid.arrange",c(l_p,ncol=2))
 ```
 
+jsjs
 
 
 ## Visualização das SADs preditas e observadas
