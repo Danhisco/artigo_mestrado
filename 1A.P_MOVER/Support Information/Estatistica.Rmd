@@ -27,6 +27,7 @@ knitr::opts_knit$set(root.dir = "~/Documentos/Doutorado/artigo_mestrado/1A.P_MOV
 library(gtools)
 library(GGally)
 library(doMC)
+library(parallel)
 library(DHARMa)
 library(broom.mixed)
 library(KSgeneral)
@@ -1505,13 +1506,14 @@ df_auditoria$k <- factor(df_auditoria$k,levels=levels_k[20:1])
 
 
 ```{r comparacao testes KS, echo=TRUE,eval=FALSE}
-df_testeKS <- df_auditoria %>% select(SAD_obs.name,SAD_MN.name,MN,k,rep,ordem,refID,SiteCode,txt.name,S_obs,p,d) %>% 
+df_testeKS <- df_auditoria %>% 
+  select(SAD_obs.name,SAD_MN.name,MN,k,rep,ordem,refID,SiteCode,txt.name,S_obs,p,d) %>%
   group_by(SAD_obs.name) %>% nest
 ##### Resultados por Réplica #####
 df_testeKS$resultados <- vector("list",length = nrow(df_testeKS))
-for(i in 1:nrow(df_testeKS)){
+for(row_label in 1:nrow(df_testeKS)){
   # i <- 1
-  df_ <- df_testeKS[i,]
+  df_ <- df_testeKS[row_label,]
   v_SAD.obs <- read.csv(df_$SAD_obs.name,header = TRUE,as.is = TRUE) %>% filter(species.correct != "Mortas") %>% 
     .$N %>% sort()
   df_predicao <- as.data.frame(df_$data[[1]])
@@ -1520,7 +1522,7 @@ for(i in 1:nrow(df_testeKS)){
     v_SAD.predita <- as.integer(read.csv(path_SAD.MN,header = TRUE,as.is = TRUE)$SAD_predita)
     a <- disc_ks_test(x=v_SAD.predita,
                       y=ecdf(v_SAD.obs),exact = TRUE)
-    a <- data.frame(KS.D = a$statistic, KS.p = a$p.value)
+    a <- data.frame(D_KSgeneral = a$statistic, p.valor_KSgeneral = a$p.value)
     a$S_SAD.predita <- length(v_SAD.predita)
     a$S_SAD.obs <- length(v_SAD.obs) 
     return(a)
@@ -1530,14 +1532,13 @@ for(i in 1:nrow(df_testeKS)){
   for(j in 1:nrow(df_predicao)){
     l_[[j]] <- f_KSeS(path_SAD.MN = df_predicao$SAD_MN.name[j])
   }
-  df_testeKS$resultados[[i]] <- rbind.fill(l_)
+  df_testeKS$resultados[[row_label]] <- rbind.fill(l_)
 }
-df_replicas <- df_testeKS %>% unnest(cols = c(data,resultados)) %>% as.data.frame() %>% 
-  rename(D_KSgeneral = KS.D, p.valor_KSgeneral=KS.p)
-df_replicas <- inner_join(x=df_replicas,
-                          y=select(df_auditoria,
-                                   SAD_obs.name,k,rep,SiteCode,KS.D,KS.p),
-                          by=c("SAD_obs.name","k","rep","SiteCode"))
+
+
+
+
+df_replicas <- df_testeKS %>% unnest(cols = c(data,resultados)) %>% as.data.frame()
 write.csv(df_replicas,file = "~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/resultados/df_replicas__KSgeneral.csv",row.names = FALSE)
 ```
 
@@ -1551,6 +1552,17 @@ do.call("grid.arrange",c(l_p,ncol=2))
 ```
 
 
+```{r nRef KSgeneral}
+df_replicas <- read.csv("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/resultados/df_replicas__KSgeneral.csv",
+                        header = TRUE,as.is = TRUE)
+registerDoMC(3)
+df_nRef.KSgeneral <- df_replicas %>% ddply(c("SiteCode","k","MN"),summarise,
+                                           D_mean = mean(D_KSgeneral),D_sd = sd(D_KSgeneral),
+                                           p.valor_mean = mean(p.valor_KSgeneral),p.valor_sd = sd(p.valor_KSgeneral),
+                                           n_nRef=sum(p.valor_KSgeneral>=0.05),
+                                           .parallel = TRUE)
+
+```
 
 
 ## Visualização das SADs preditas e observadas
@@ -1602,6 +1614,8 @@ for(s in 1:length(levels(df_auditoria$SiteCode))){
 
 
 Inspeção individual das SADs
+
+
 
   
 __Estratégia__  
