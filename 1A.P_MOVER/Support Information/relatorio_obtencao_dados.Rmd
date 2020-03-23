@@ -773,7 +773,6 @@ Para realizar o teste de Kolmogorov-Smirnov baseado em bootstrap e as subsequent
 ```{r codigos para os resultados}
 # package
 library(twosamples)
-   
 # dados
 df_testeKS <- df_auditoria %>% 
   select(SAD_obs.name,SAD_MN.name,MN,k,rep,ordem,refID,SiteCode,txt.name,S_obs,p,d) %>%
