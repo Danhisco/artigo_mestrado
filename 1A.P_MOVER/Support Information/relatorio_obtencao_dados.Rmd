@@ -25,6 +25,7 @@ setwd("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/")
 library(gtools)
 library(doMC)
 library(GUILDS)
+library(bbmle)
 library(lme4)
 library(merTools)
 library(magrittr)
@@ -696,25 +697,13 @@ do.call("grid.arrange",c(l_p,ncol=1))
 __Figura 5__ U_med estimado por k (% de prop até a vizinhança imediada) e d / L_plot (distância média de dispersão / largura da área amostral aproximada como um quadrado).
 
 
-### Estudo do padrão de U
-
-#### Diferença entre pontos consecutivos
-
-```{r dif entre pontos consecutivos, eval=FALSE}
-teste_acf <- df_resultados %>% filter(SiteCode==df_resultados$SiteCode[1] & MN == "EE") %>% .$U_med
-hist()
-
-```
-
-
-
 
 
 ## SAD predita
 
 ### MNEE  
 
-Para obter as SADs preditas por MNEE utilizei o seguinte código
+O código a seguir roda a simulação coalescente
 
 ```{r SADs MNEE}
 f_simulacao <- function(i,df_=df_simulacao){
@@ -744,7 +733,7 @@ l_ply(simulacao,f_simulacao,.parallel = TRUE)
 
 ### MNEI  
 
-Para MNEI:
+O código a seguir roda a formula de amostragem de Etienne 2005
 
 ```{r SADs MNEI}
 # preparação dos dados
@@ -779,35 +768,36 @@ l_ply(simulacao,f_simulacaoEI,.parallel = TRUE)
 
 ## Calculo dos resultados
 
-Para obter os resultados utilizei o seguinte código:
+Para realizar o teste de Kolmogorov-Smirnov baseado em bootstrap e as subsequentes métricas relacionados:
 
 ```{r codigos para os resultados}
-# agrupamento do df
-df_auditoria %<>% group_by(SAD_obs.name) %>% nest
-##### Resultados por Réplica #####
-### rotina da função
-df_auditoria$resultados <- vector("list",length = nrow(df_auditoria))
-registerDoMC(4)
-for(i in 1:nrow(df_auditoria)){
+# dados
+df_testeKS <- df_auditoria %>% 
+  select(SAD_obs.name,SAD_MN.name,MN,k,rep,ordem,refID,SiteCode,txt.name,S_obs,p,d) %>%
+  group_by(SAD_obs.name) %>% nest
+df_testeKS$resultados <- vector("list",length = nrow(df_testeKS))
+# rotina
+registerDoMC(3)
+for(row_label in 1:nrow(df_testeKS)){
   # i <- 1
-  df_ <- df_auditoria[i,]
-  v_SAD.obs <- read.csv(df_$SAD_obs.name,header = TRUE,as.is = TRUE) %>% filter(species.correct != "Mortas") %>% 
+  df_ <- df_testeKS[row_label,]
+  v_SAD.obs <- read.csv(df_$SAD_obs.name,header = TRUE,as.is = TRUE) %>% 
+    filter(species.correct != "Mortas") %>% 
     .$N %>% sort()
   df_predicao <- as.data.frame(df_$data[[1]])
-  f_KSeS <- function(v_OBS = v_SAD.obs, path_SAD.MN){
-    # path_SAD.MN <- df_predicao[1,"SAD_MN.name"]
-    v_SAD.predita <- as.integer(read.csv(path_SAD.MN,header = TRUE,as.is = TRUE)$SAD_predita)
-    a <- suppressWarnings(ks.test(x = v_OBS,
-                                  y = v_SAD.predita))
-    a <- data.frame(KS.D = a$statistic, KS.p = a$p.value)
+  f_KSeS <- function(v_obs = v_SAD.obs,path_MN){
+    v_SAD.MN <- read.csv(file=path_MN,header = TRUE,as.is = TRUE)$SAD_predita
+    teste <- ks_test(a=v_SAD.obs,b = v_SAD.MN,nboots = 3000)  
+    a <- data.frame(D_KSboot=teste[1],p.valor_KSboot=teste[2])
     a$S_SAD.predita <- length(v_SAD.predita)
     a$S_SAD.obs <- length(v_SAD.obs) 
     return(a)
-  }
-  # f_KSeS(path_SAD.MN = df_predicao$SAD_MN.name[10])
-  df_auditoria$resultados[[i]] <- adply(df_predicao,1, function(X) f_KSeS(path_SAD.MN = X$SAD_MN.name),.parallel = TRUE)
+   }
+  df_testeKS$resultados[[row_label]] <- adply(df_predicao,1,
+                                              function(X) f_testeParallel(path_MN = X$SAD_MN.name),
+                                              .parallel = TRUE)
 }
-df_replicas <- df_auditoria %>% select(-data) %>% unnest(cols = c(resultados)) %>% as.data.frame()
+df_replicas <- df_testeKS %>% select(-data) %>% unnest(cols = c(resultados)) %>% as.data.frame()
 ##### Resultados #####
 ### rotina da função
 alpha <- 0.05
