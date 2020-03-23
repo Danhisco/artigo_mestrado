@@ -771,7 +771,9 @@ l_ply(simulacao,f_simulacaoEI,.parallel = TRUE)
 Para realizar o teste de Kolmogorov-Smirnov baseado em bootstrap e as subsequentes métricas relacionados:
 
 ```{r codigos para os resultados}
-# dados
+# package
+library(twosamples)
+ # dados
 df_testeKS <- df_auditoria %>% 
   select(SAD_obs.name,SAD_MN.name,MN,k,rep,ordem,refID,SiteCode,txt.name,S_obs,p,d) %>%
   group_by(SAD_obs.name) %>% nest
