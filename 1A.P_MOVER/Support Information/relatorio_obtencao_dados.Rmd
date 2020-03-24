@@ -25,10 +25,7 @@ setwd("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/")
 library(gtools)
 library(doMC)
 library(GUILDS)
-<<<<<<< HEAD
 library(bbmle)
-=======
->>>>>>> 706b934187ce0f1f47de33cdb69d55dcff8343e1
 library(lme4)
 library(merTools)
 library(magrittr)
@@ -110,9 +107,75 @@ df_dados.disponiveis %<>% inner_join(x=.,
 
 ### Raster de Paisagem
 
-- Os rasters de paisagem atualizados são para áreas > 5km2.  
-- A resolução dos arquivos é de 30x30m e o lado da paisagem é de 800 pixels.  
-- Selecionei os 200 pixels centrais, assim obtive paisagens de 6x6km.  
+#### Prop. de cobertura vegetal para diferentes raios da paisagem local
+
+```{r dados para df Scale of Effect,echo=FALSE,eval=FALSE}
+# dados
+## paisagens selecionados e respectiva SAD_obs
+df_paisagem <- read.csv("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/df_raster_e_SAD_atualizados.csv",
+                         header = TRUE,as.is = TRUE)
+f_S <- function(path){
+  v_SAD.obs <- read.csv(path,header = TRUE,as.is = TRUE) %>% 
+    filter(species.correct != "Mortas") %>% .$N
+  df_ <- data.frame(S_obs = length(v_SAD.obs),Ntotal=sum(v_SAD.obs),N_integer = is.integer(sum(v_SAD.obs)))
+  return(df_)
+}
+df_paisagem <- cbind(df_paisagem,
+                     adply(df_paisagem$SAD_obs.name,1,f_S,.id = NULL))
+df_paisagem$SiteCode <- factor(df_paisagem$SiteCode)
+## paisagens disponíveis, Lado_landscape = 800 pixels;  1 pixel = 30x30m
+df_tif <- Sys.glob("/home/danilo/Documentos/Doutorado/artigo_mestrado/paisagens_atualizadas/*.tif") %>% # carregando
+  gsub("/home/danilo/Documentos/Doutorado/artigo_mestrado/paisagens_atualizadas/","",.) %>% #removendo estrutura de pastas
+  adply(.,1,function(x) unname( unlist( strsplit(x, "_NA_", fixed = TRUE) ) ),.id = NULL) %>% #dividindo a informação
+  mutate(refID = gsub("ref","",V1),ordem=gsub(".tif","",V2)) %>% dplyr::select(refID,ordem) 
+df_tif$tif.name <- Sys.glob("/home/danilo/Documentos/Doutorado/artigo_mestrado/paisagens_atualizadas/*.tif") #%>% #caminho dos .tif
+df_tif$refID <- as.numeric(df_tif$refID)
+df_tif$ordem <- as.numeric(df_tif$ordem)
+## merge e valores de raio
+df_se <- inner_join(x=df_paisagem,
+                    y=df_tif,
+                    by=c("refID","ordem"))
+```
+  
+  
+```{r codigo para determinar p para cada raio da paisagem local,echo=TRUE}
+# dados
+df_se <- left_join(y=df_se,
+                   x=expand.grid(SiteCode = df_se$SiteCode,
+                                 # 13 escalas espaciais
+                                 raio_km = c(0.3:12.0,12.0)),
+                   by="SiteCode") %>% 
+  group_by(tif.name) %>% nest()
+df_se$resultado <- vector("list",length = nrow(df_se))
+# rotina
+registerDoMC(2)
+for(i in 1:nrow(df_se)){
+  # raster de paisagem (landsat8 Hansen et al. 2013)
+  raster_ <- raster(df_se$tif.name[i])
+  mat_raster <- matrix(data = getValues(raster_)/100)
+  dim(mat_raster) <- dim(raster_)[1:2]
+  # função para o calculo da cobertura da paisagem local
+  f_p <- function(raio_KM){
+    # 1 pixel = 30x30m
+    raio_pixels <- round(raio_KM * 1000 / 30)
+    raio_max <- nrow(mat_raster)/2
+    local_land <- mat_raster[(raio_max+1-raio_pixels):(raio_max+raio_pixels),
+                             (raio_max+1-raio_pixels):(raio_max+raio_pixels)]
+    v_p <- sum(local_land,na.rm = NULL)/length(local_land)
+    df_ <- data.frame(p=v_p,raio_efetivo.KM=raio_pixels*30/1000)
+    return(df_)
+  }
+  # dados para a f_p
+  df_se$resultado[i][[1]] <- adply(df_se$data[i][[1]]$raio_km,1,f_p,.id = NULL,.parallel = TRUE)
+}
+#
+df_se %<>% unnest(cols = c(data,resultado)) %>% as.data.frame()
+```
+
+
+
+
+
 
 ```{r png to tif}
 func_tif.png <- function(file){
@@ -836,7 +899,7 @@ df_resultados <- ddply(df_replicas,c("MN","k","SiteCode"),summarise,
                        n_SAD.N.ref = sum(KS.p>=alpha), n_SAD.ref = sum(KS.p<alpha),
                        .parallel = TRUE)
 ```
-
+  
 ## Auditoria 1: auto coerrência dos dados
 
 ```{r avaliacao da auto coerrencia,, eval=TRUE,echo=FALSE}
