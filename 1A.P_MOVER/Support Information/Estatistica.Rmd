@@ -1,9 +1,5 @@
 ---
-<<<<<<< HEAD
 Ftitle: "Estatistica"
-=======
-title: "Estatistica"
->>>>>>> 706b934187ce0f1f47de33cdb69d55dcff8343e1
 author: "Mori, Danilo"
 date: "31/10/2019"
 output: 
@@ -31,15 +27,11 @@ knitr::opts_knit$set(root.dir = "~/Documentos/Doutorado/artigo_mestrado/1A.P_MOV
 library(gtools)
 library(GGally)
 library(doMC)
-<<<<<<< HEAD
 library(parallel)
 library(DHARMa)
 library(broom.mixed)
 library(KSgeneral)
-=======
-library(DHARMa)
-library(broom.mixed)
->>>>>>> 706b934187ce0f1f47de33cdb69d55dcff8343e1
+library(twosamples)
 library(MuMIn)
 library(mgcv)
 library(gratia)
@@ -1514,72 +1506,120 @@ df_auditoria$k <- factor(df_auditoria$k,levels=levels_k[20:1])
 ```
 
 
-<<<<<<< HEAD
-```{r comparacao testes KS, echo=TRUE,eval=FALSE}
+```{r teste KS bootstrap,eval=FALSE}
+# Dados
 df_testeKS <- df_auditoria %>% 
   select(SAD_obs.name,SAD_MN.name,MN,k,rep,ordem,refID,SiteCode,txt.name,S_obs,p,d) %>%
   group_by(SAD_obs.name) %>% nest
-##### Resultados por Réplica #####
 df_testeKS$resultados <- vector("list",length = nrow(df_testeKS))
+# rotina para a função
+registerDoMC(3)
 for(row_label in 1:nrow(df_testeKS)){
   # i <- 1
   df_ <- df_testeKS[row_label,]
-  v_SAD.obs <- read.csv(df_$SAD_obs.name,header = TRUE,as.is = TRUE) %>% filter(species.correct != "Mortas") %>% 
+  v_SAD.obs <- read.csv(df_$SAD_obs.name,header = TRUE,as.is = TRUE) %>% 
+    filter(species.correct != "Mortas") %>% 
     .$N %>% sort()
   df_predicao <- as.data.frame(df_$data[[1]])
-  f_KSeS <- function(v_OBS = v_SAD.obs, path_SAD.MN){
-    # path_SAD.MN <- df_predicao[1,"SAD_MN.name"]
-    v_SAD.predita <- as.integer(read.csv(path_SAD.MN,header = TRUE,as.is = TRUE)$SAD_predita)
-    a <- disc_ks_test(x=v_SAD.predita,
-                      y=ecdf(v_SAD.obs),exact = TRUE)
-    a <- data.frame(D_KSgeneral = a$statistic, p.valor_KSgeneral = a$p.value)
+  f_KSeS <- function(v_obs = v_SAD.obs,path_MN){
+    v_SAD.MN <- read.csv(file=path_MN,header = TRUE,as.is = TRUE)$SAD_predita
+    teste <- ks_test(a=v_SAD.obs,b = v_SAD.MN,nboots = 3000)  
+    a <- data.frame(D_KSboot=teste[1],p.valor_KSboot=teste[2])
     a$S_SAD.predita <- length(v_SAD.predita)
     a$S_SAD.obs <- length(v_SAD.obs) 
     return(a)
-  }
-  # f_KSeS(path_SAD.MN = df_predicao$SAD_MN.name[3000])
-    l_ <- vector("list",length = nrow(df_predicao))
-  for(j in 1:nrow(df_predicao)){
-    l_[[j]] <- f_KSeS(path_SAD.MN = df_predicao$SAD_MN.name[j])
-  }
-  df_testeKS$resultados[[row_label]] <- rbind.fill(l_)
+   }
+  df_testeKS$resultados[[row_label]] <- adply(df_predicao,1,
+                                              function(X) f_testeParallel(path_MN = X$SAD_MN.name),
+                                              .parallel = TRUE)
 }
 
-
-
-
-df_replicas <- df_testeKS %>% unnest(cols = c(data,resultados)) %>% as.data.frame()
-write.csv(df_replicas,file = "~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/resultados/df_replicas__KSgeneral.csv",row.names = FALSE)
+df_replicas <- df_testeKS %>% select(-data) %>% unnest(cols = c(resultados)) %>% as.data.frame()
+write.csv(df_replicas,file = "~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/resultados/df_replicas__2samples.csv",row.names = FALSE)
 ```
-
-```{r comparacao ks teste base e KSgeneral,eval=TRUE,cahce=TRUE}
-df_replicas <- read.csv("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/resultados/df_replicas__KSgeneral.csv",
-                        header = TRUE,as.is = TRUE)
-l_p <- list()
-l_p[[1]] <- ggplot(df_replicas,aes(y=D_KSgeneral,x=KS.D)) + geom_point(alpha=0.3)
-l_p[[2]] <- ggplot(df_replicas,aes(y=p.valor_KSgeneral,x=KS.p)) + geom_point(alpha=0.3)
-do.call("grid.arrange",c(l_p,ncol=2))
-```
-
-
-```{r nRef KSgeneral}
-df_replicas <- read.csv("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/resultados/df_replicas__KSgeneral.csv",
+  
+  
+  
+__Figura 3.4__ Comparação testes KS: pressupondo distribuição contínua (stats::ks.test) e por bootstrap (twosamples::ks_test)  
+    
+```{r figura 34 nRef KSboot, cache=TRUE}
+df_replicasBoot <- read.csv("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/resultados/df_replicas__2samples.csv",
                         header = TRUE,as.is = TRUE)
 registerDoMC(3)
-df_nRef.KSgeneral <- df_replicas %>% ddply(c("SiteCode","k","MN"),summarise,
-                                           D_mean = mean(D_KSgeneral),D_sd = sd(D_KSgeneral),
-                                           p.valor_mean = mean(p.valor_KSgeneral),p.valor_sd = sd(p.valor_KSgeneral),
-                                           n_nRef=sum(p.valor_KSgeneral>=0.05),
+df_nRef.KSboot <- df_replicasBoot %>% ddply(c("SiteCode","k","MN"),summarise,
+                                           D.boot_mean = mean(D_KSboot),D.boot_sd = sd(D_KSboot),
+                                           p.valor.boot_mean = mean(p.valor_KSboot),p.valor.boot_sd = sd(p.valor_KSboot),
+                                           n_nRef_boot=sum(p.valor_KSboot>=0.05),
                                            .parallel = TRUE)
-
+# comparação
+level_k <- unique(as.character(df_nRef.KSboot$k))
+df_nRef.KSboot$k <- factor(as.character(df_nRef.KSboot$k),levels = level_k[20:1])
+# levels(df_nRef.KSboot$k)[19] <- "0.1"
+df_ad <- inner_join(x=df_resultados,
+                    y=df_nRef.KSboot,
+                    by=c("SiteCode","k","MN"))
+# graficos diagnostico
+l_p <- list()
+l_p[[1]] <- df_ad %>% ggplot(aes(x=D_mean,y=D.boot_mean)) + 
+  geom_point() + 
+  labs(x="dist. cont.",y="bootstrap", title="Média Estatística D")
+l_p[[2]] <- df_ad %>% ggplot(aes(x=p.value_mean,y=p.valor.boot_mean)) + 
+  geom_point() + 
+  labs(x="dist. cont.",y="bootstrap", title="Média p-valor")
+l_p[[3]] <- df_ad %>% ggplot(aes(x=sqrt(D_var),y=D.boot_sd)) + 
+  geom_point() + 
+  labs(x="dist. cont.",y="bootstrap", title="sd Estatística D")
+l_p[[4]] <- df_ad %>% ggplot(aes(x=sqrt(p.value_var),y=p.valor.boot_sd)) + 
+  geom_point() + 
+  labs(x="dist. cont.",y="bootstrap", title="sd p-valor")
+do.call("grid.arrange",c(l_p,ncol=2))
 ```
-
-=======
->>>>>>> 706b934187ce0f1f47de33cdb69d55dcff8343e1
+  
+  
+__figura 3.5__ número de SADs não refutadas: ks.test X ks_test  
+  
+```{r figura 35 nRef ks.test e ks_test}
+df_ad %>% ggplot(aes(x=n_nRef,y=n_nRef_boot,col=MN)) + 
+  geom_abline(slope = 1,intercept = 0,col="blue") +
+  geom_point(alpha=0.3) + 
+  scale_color_manual(values=c("#FF0000", "#000000")) +
+  facet_wrap(~k,ncol=4)
+```
+  
 
 ## Visualização das SADs preditas e observadas
 
 ```{r painel de SADs, eval=FALSE}
+### dados
+# dados brutos
+df_auditoria <- read.csv("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/df_raster_e_SAD_atualizados.csv",
+                         header = TRUE,as.is = TRUE)
+df_SAD.replicas <- read.csv("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/resultados/df_replicas.csv",
+                            header = TRUE,as.is = TRUE)
+df_SAD_e_paisagem <- left_join(x=df_SAD.replicas,y=select(df_auditoria,-c(SAD_obs.name,SiteCode)),by=c("ordem","refID"))
+# rank máximo
+registerDoMC(3)
+df_SAD_e_paisagem <- left_join(x=df_SAD_e_paisagem,
+                               y=ddply(df_SAD_e_paisagem,c("SiteCode","k","MN"),function(X) max(c(X$S_SAD.predita,X$S_SAD.obs)),.parallel = TRUE),
+                               by=c("SiteCode","k","MN"))
+df_SAD_e_paisagem %<>% rename(max_rank=V1)
+df_SAD_e_paisagem$SAD_MN.name <- gsub("./SADs_preditas/","/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/SADs_preditas/",df_SAD_e_paisagem$SAD_MN.name)
+## 
+df_SAD_e_paisagem$SiteCode <- factor(df_SAD_e_paisagem$SiteCode) 
+df_SAD_e_paisagem$MN <- factor(df_SAD_e_paisagem$MN)
+levels_k <- unique(df_SAD_e_paisagem$k) %>% sort %>% as.character()
+df_SAD_e_paisagem$k <- factor(df_SAD_e_paisagem$k,levels = levels_k[20:1])
+levels(df_SAD_e_paisagem$k)[19] <- "0.1"
+#
+df_ad$SiteCode <- factor(df_ad$SiteCode)
+df_ad$MN <- factor(df_ad$MN)
+df_auditoria <- left_join(x=df_SAD_e_paisagem,
+                          y=select(df_ad,SiteCode,MN,k,d,p,n_nRef,n_nRef_boot),
+                          by=c("SiteCode","MN","k"))
+df_auditoria %<>%
+  mutate(string_main=paste0("k=",k," d=",round(d,3),"\n ks.test::nRef=",n_nRef," ks_test::nRef=",n_nRef_boot),
+         string_mtext=paste0(SiteCode," MN==",MN," p=",round(p,3)) )
+### graficos
 for(s in 1:length(levels(df_auditoria$SiteCode))){
   X <- df_auditoria %>% filter(SiteCode == levels(df_auditoria$SiteCode)[s])
   v_SADobs <- read.csv(X[1,"SAD_obs.name"],header = TRUE)[,"N"]
@@ -1627,20 +1667,7 @@ for(s in 1:length(levels(df_auditoria$SiteCode))){
 
 Inspeção individual das SADs
 
-<<<<<<< HEAD
 
-=======
-```{r}
-library(KSgeneral)
-df_auditoria %>% filter(SiteCode == "SCsjo1" & k==0.1 & MN=="EI") %>% head
-df_SAD0bs <- read.csv(filter(df_auditoria,SiteCode == "PRtiba1")$SAD_obs.name[1],header = TRUE,as.is = TRUE)
-df_SAD0bs$N %>% sum
-
-df_SAD_MN <- read.csv(filter(df_auditoria,SiteCode == "PRtiba1" & MN=="EI" & k==0.99)$SAD_MN.name[1],header = TRUE,as.is = TRUE)
-
-
-```
->>>>>>> 706b934187ce0f1f47de33cdb69d55dcff8343e1
 
   
 __Estratégia__  
@@ -1698,10 +1725,52 @@ df_plot %>%
 ```
 
 ```{r}
-<<<<<<< HEAD
 # lme4::(l_md[["log(modulo_diffS) * d.z | SiteCode"]])
-=======
-lme4::(l_md[["log(modulo_diffS) * d.z | SiteCode"]])
->>>>>>> 706b934187ce0f1f47de33cdb69d55dcff8343e1
 ```
+
+# 5 Determinação da escala espacial da paisagem local
+
+__Figura 5.1_ log(S_obs) ~ p + offset(Ntotal)  
+  
+```{r df_se figura 51}
+# dados
+df_se <- read.csv("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/df_ScaleEffect.csv",header = TRUE,as.is = TRUE)
+df_se$raio_km <- factor(df_se$raio_km,levels = unique(df_se$raio_km))
+# graficos exploratórios
+# l_p <- list()
+l_p[[1]] <- df_se %>% ggplot(aes(x=p,y=S_obs)) +
+  geom_point(alpha=0.3,aes(size=Ntotal)) +
+  facet_wrap(~raio_km,ncol=3) + theme(legend.position = "bottom")
+l_p[[1]]
+# l_p[[2]] <- df_se %>% select(Ntotal) %>% distinct %>% ggplot(aes(x="",y=Ntotal)) + 
+#   geom_boxplot() + 
+#   geom_jitter() + 
+#   labs(x="")
+# l_p[[3]] <- df_se %>% select(S_obs) %>% distinct %>% ggplot(aes(x="",y=S_obs)) + 
+#   geom_boxplot() + 
+#   geom_jitter() + 
+#   labs(x="")
+```
+
+A média e variância de S_obs não apresenta valores próximos `r mean(df_se$S_obs)/var(df_se$S_obs)`, mostrando que os dados apresentam over-dispersion. Assim irei utilizar a distribuição binomial negativa com Ntotal como offset.
+
+```{r ajuste de modelos aos dados}
+library(MASS)
+# data_ <- df_se %>% filter(raio_km == levels(df_se$raio_km)[1])
+f_glm.nb <- function(data_){
+  md_ <- glm.nb(S_obs ~ p + I(p^2) + offset(log(Ntotal)), data = data_)
+}
+registerDoMC(2)
+l_md <- dlply(df_se,"raio_km",f_glm.nb,.parallel = TRUE)
+names(l_md) <- paste0("raio = ",levels(df_se$raio_km),"km")
+AICctab(l_md,weights=TRUE)
+par(mfrow=c(2,2))
+p_plot <- simulateResiduals(l_md[["raio = 2.3km"]],n = 1000)
+plot(p_plot)
+plot(l_md[["raio = 2.3km"]])
+
+```
+
+Não há um único modelo mais plausível, então vou aumentar a resolução 
+
 
