@@ -40,22 +40,24 @@ library(dplyr)
 ```
 
 
-# Seleção e Preparo dos Sítios de Amostragem
+#### Janela de Código 1: 
+Aplicação de filtro nos dados disponíveis na base de dados TreeCo (Lima et al. 2015).  
 
-## Dados Disponíveis
+<!-- __Filtros gerais:__   -->
+<!-- i) effort >= 1ha; ii) DBH>=5cm; iii) ano dos dados >= 2000; -->
 
-### Seleção dos trabalhos fitossociológicos
+<!-- __Filtros condicionais:__   -->
+<!-- i) state %in% Rio de Janeira, Rio Grande do Sul -> ano dos dados >= 1990   -->
+<!-- ii) state %in% Bahia, Goiás, Mato Grosso do Sul -> ano dos dados >= 2000   -->
+<!-- iii) para as demais regiões ->  ano dos dados>= 1995   -->
+<!-- iv) Exceções a esse esquema ocorreram quando trabalhos foram feitos antes do ano de 2000 em grandes áreas de regiões protegidas (>1000ha) ou em antigos campi universitários.   -->
 
-__Filtros gerais:__  
-i) effort >= 1ha; ii) DBH>=5cm; iii) ano dos dados >= 2000;
 
-__Filtros condicionais:__  
-i) state %in% Rio de Janeira, Rio Grande do Sul -> ano dos dados >= 1990  
-ii) state %in% Bahia, Goiás, Mato Grosso do Sul -> ano dos dados >= 2000  
-iii) para as demais regiões ->  ano dos dados>= 1995  
-iv) Exceções a esse esquema ocorreram quando trabalhos foram feitos antes do ano de 2000 em grandes áreas de regiões protegidas (>1000ha) ou em antigos campi universitários.  
+<!-- COISAS PARA ORGANIZAR: -->
+<!-- i) preparar um df_references com as colunas de interesse e já considerando os dados disponíveis para ficar no zip do artigo -->
 
-```{r filtros references}
+
+```{r janela de codigo 1}
 ### dados
 df_references <- read.csv(file="/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/dados_brutos/references - TreeCo.csv",
                           as.is = TRUE,header =T, na.strings = c("","NA")) %>%
@@ -88,11 +90,10 @@ df_ref.S_UCprotecaoIntegral <- rbind(df_simulacao_s_UCprotecao.integral,df_simul
 ```
 
 
-### SAD_obs e Raster disponíveis
 
 - A SAD obs conta com a abundância dos indivíduos mortos em pé, que foram desconsiderados para a parametrização das simulações.  
 
-```{r SAD obs e raster disponivel}
+```{r SAD obs e raster disponivel, echo=FALSE,eval=FALSE}
 # SAD obs
 df_SAD.obs <- read.csv(file="/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/dados_brutos/abundances.csv",header = TRUE,as.is = TRUE)
 df_SAD.obs$SiteCode %<>% as.factor()
@@ -112,11 +113,12 @@ df_db <- inner_join(x = inner_join(x = df_ref.S_UCprotecaoIntegral,
                                    by = "SiteCode"),
                     y = df_tif, 
                     by = c("ordem","refID"))
+
 ```
 
-#### data frame para cada SAD obs
 
-```{r}
+
+```{r separar SADs por df,echo=FALSE,eval=FALSE}
 f_SADobs <- function(dados){
   data_ <- dados[[1]] %>% as.data.frame()
   path_SAD <- paste0("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/dados_brutos/SAD.obs__ref",
@@ -129,10 +131,12 @@ a_ply(df_db,1,function(X) f_SADobs(data_ = X$data),.parallel = TRUE)
 ```
 
 
+#### Janela de Código 2:
+Procedimento do efeito de escala:  
+a) calculo de p para cada valor de raio;  
+b) ajuste de glm.nb para cada conjunto de dados;  
+c) média ponderada pelo peso de evidência da comparação de todos os glm.nb ajustados.  
 
-### Raster de Paisagem
-
-#### Prop. de cobertura vegetal para diferentes raios da paisagem local
 
 ```{r dados para df Scale of Effect,echo=FALSE,eval=FALSE}
 # dados
@@ -163,8 +167,8 @@ df_se <- inner_join(x=df_paisagem,
 ```
   
   
-```{r codigo para determinar p para cada raio da paisagem local,echo=TRUE}
-# dados
+```{r janela de codigo 2 _ scale of effect, echo=TRUE}
+# dados brutos
 df_se <- left_join(y=df_se,
                    x=expand.grid(SiteCode = df_se$SiteCode,
                                  raio_km = seq(0.3,12,by = 0.1)),
@@ -192,9 +196,25 @@ for(i in 1:nrow(df_se)){
   # dados para a f_p
   df_se$resultado[i][[1]] <- adply(df_se$data[i][[1]]$raio_km,1,f_p,.id = NULL,.parallel = TRUE)
 }
-#
+# dados por raio
 df_se %<>% unnest(cols = c(data,resultado)) %>% as.data.frame()
+# ajuste de modelos aos dados
+library(MASS)
+f_glm.nb <- function(data_){
+  md_ <- glm.nb(S_obs ~ p + I(p^2) + offset(log(Ntotal)), data = data_)
+}
+registerDoMC(2)
+l_md <- dlply(df_se,"raio_km",f_glm.nb,.parallel = TRUE)
+# média ponderada dos raios pelo peso de evidência
+df_averageSE <- print(AICctab(l_md,weights=TRUE)) %>% 
+  as.data.frame()
+df_averageSE$raio_paisagem <- row.names(df_averageSE) %>% as.numeric()
+df_averageSE$weight <- as.numeric(as.character(df_averageSE$weight))
+df_averageSE$dAICc <- as.numeric(as.character(df_averageSE$dAICc))
+raio_medio <- weighted.mean(x = df_averageSE$raio_paisagem,w = df_averageSE$weight)
 ```
+
+
 
 
 
@@ -292,7 +312,10 @@ f_mat.tri <- function(png, abund){ #png.file, número de indivíduos presente
   mat <- matrix(getValues(raster)/255, ncol = ncol(raster), nrow = nrow(raster))
   raster_binario <- raster( matrix(nrow = nrow(mat), ncol = ncol(mat), sapply(mat, function(x) ifelse(x >= 0.7, 1, 0)) ) ) 
   func_focal <- function(x) ifelse(sum(x[x==1]) >= 5, 1, x[5])
-  binario.focal <- as.matrix( focal(raster_binario, janela, func_focal, pad=TRUE, padvalues = 0))
+  binario.focal <- as.matrix( focal(raster_binario, janela, func_focal, pad=TRUE, padvalues = 0))Distância média de dispersão por k
+
+Criamos funções no ambiente de programação R para estimar a distância média de dispersão necessária para que k propágulos permaneçam até a distância entre unidades adjacente de habitat (Apêndice X). A distância entre unidades adjacentes de habitat pode ser obtido por 100/sqrt(DA), onde DA = densidade observada (indivíduos/ha).
+
   mat_tri <- try(f_area.simulada(matriz = binario.focal, N = abund))
   if(class(mat_tri) == "matrix"){ 
     try(write.table(x = mat_tri, 
@@ -384,7 +407,16 @@ p_rm_ < rm_
  janela_observao[p_inicio[1]:p_final[1],p_inicio[2]:p_final[2]] <- 2
  rm_ <- rm_ - p_rm_
 # else 
- janela_observao[p_inicio[1]:p_final[1],p_inicio[2]:p_final[2]][1:rm_] <- 2
+ janela_observao[p_inicio[1]:p_final[1],p_inicio[2]:p_final[2]][1:rm_] <- 2Distância média de dispersão por k
+
+Criamos funções no ambiente de programação R para estimar a distância média de dispersão necessária para que k propágulos permaneçam até a distância entre unidades adjacente de habitat (Apêndice X). A distância entre unidades adjacentes de habitat pode ser obtido por 100/sqrt(DA), onde DA = densidade observada (indivíduos/ha).
+Distância média de dispersão por k
+
+Criamos funções no ambiente de programação R para estimar a distância média de dispersão necessária para que k propágulos permaneçam até a distância entre unidades adjacente de habitat (Apêndice X). A distância entre unidades adjacentes de habitat pode ser obtido por 100/sqrt(DA), onde DA = densidade observada (indivíduos/ha).
+Distância média de dispersão por k
+
+Criamos funções no ambiente de programação R para estimar a distância média de dispersão necessária para que k propágulos permaneçam até a distância entre unidades adjacente de habitat (Apêndice X). A distância entre unidades adjacentes de habitat pode ser obtido por 100/sqrt(DA), onde DA = densidade observada (indivíduos/ha).
+
 
 ## outro
 # pontos_p_marcar <- janela_observao[p_inicio[1]:p_final[1],p_inicio[2]:p_final[2]]
