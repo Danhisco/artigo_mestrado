@@ -7,7 +7,7 @@ output:
     toc: true
     toc_depth: 5
 editor_options: 
-  chunk_output_type: console
+  chunk_output_type: inline
 ---
 
 <style>
@@ -24,6 +24,7 @@ setwd("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/")
 ```{r pacotes,eval=TRUE}
 library(gtools)
 library(doMC)
+library(raster)
 library(GUILDS)
 library(bbmle)
 library(lme4)
@@ -57,7 +58,8 @@ iv) Exceções a esse esquema ocorreram quando trabalhos foram feitos antes do a
 ```{r filtros references}
 ### dados
 df_references <- read.csv(file="/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/dados_brutos/references - TreeCo.csv",
-                          as.is = TRUE,header =T, na.strings = c("","NA"))
+                          as.is = TRUE,header =T, na.strings = c("","NA")) %>%
+   dplyr::select(refID,status,method,arrangement,samples,effort_ha,dbh_cutoff,SiteCode,lat,long,lat_municipio,long_municipio,lat_correct,long_correct,confiabilidade, Unidade_de_conservacao,Unidade_de_conservacao1,UC_area_ha,year_data,year,state,status_diagnostico,S, N,ordem,frag_area,forest_size,frag_check,domain,forest_type,forest_subtype,forest_succession,Reference)
 ### filtro geral
 df_1ofiltro <- df_references %>% filter(method=="parcelas" &
                                          grepl("*contiguous*",arrangement) & 
@@ -86,23 +88,46 @@ df_ref.S_UCprotecaoIntegral <- rbind(df_simulacao_s_UCprotecao.integral,df_simul
 ```
 
 
-### SADs obs
+### SAD_obs e Raster disponíveis
 
 - A SAD obs conta com a abundância dos indivíduos mortos em pé, que foram desconsiderados para a parametrização das simulações.  
 
-```{r tratamento}
+```{r SAD obs e raster disponivel}
 # SAD obs
 df_SAD.obs <- read.csv(file="/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/dados_brutos/abundances.csv",header = TRUE,as.is = TRUE)
 df_SAD.obs$SiteCode %<>% as.factor()
-df_SAD.obs %<>% filter(species.correct != "Mortas") %>% select(SiteCode,RefID,ordem,species.correct,N) #%>% group_by(SiteCode,RefID,ordem) %>% nest
-names(df_SAD.obs)[2] <- "refID"
+df_SAD.obs %<>% filter(species.correct != "Mortas") %>% 
+  group_by(SiteCode) %>% nest()
+# raster
+df_tif <- Sys.glob("/home/danilo/Documentos/Doutorado/artigo_mestrado/paisagens_atualizadas/*.tif") %>% 
+  gsub("/home/danilo/Documentos/Doutorado/artigo_mestrado/paisagens_atualizadas/","",.) %>%
+  adply(.,1,function(x) unname( unlist( strsplit(x, "_NA_", fixed = TRUE) ) ),.id = NULL) %>% 
+  mutate(refID = gsub("ref","",V1),ordem=gsub(".tif","",V2)) %>% dplyr::select(refID,ordem) 
+df_tif$tif.name <- Sys.glob("/home/danilo/Documentos/Doutorado/artigo_mestrado/paisagens_atualizadas/*.tif") #%>% #caminho dos .tif
+class(df_tif$refID) <- class(df_ref.S_UCprotecaoIntegral$refID)
+class(df_tif$ordem) <- class(df_ref.S_UCprotecaoIntegral$ordem)
 # merge
-df_dados.disponiveis %<>% inner_join(x=.,
-                                     y=ddply(df_SAD.obs,"SiteCode",summarise,
-                                            Ntotal=sum(N), Stotal=length(species.correct)),
-                                     by="SiteCode")
-
+df_db <- inner_join(x = inner_join(x = df_ref.S_UCprotecaoIntegral,
+                                   y = df_SAD.obs,
+                                   by = "SiteCode"),
+                    y = df_tif, 
+                    by = c("ordem","refID"))
 ```
+
+#### data frame para cada SAD obs
+
+```{r}
+f_SADobs <- function(dados){
+  data_ <- dados[[1]] %>% as.data.frame()
+  path_SAD <- paste0("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/dados_brutos/SAD.obs__ref",
+                     head(data_$RefID,1),"_NA_",head(data_$ordem,1))
+  df_ <- data_ %>% dplyr::select(species.correct,N)
+  write.csv(df_, file = path_SAD, row.names = FALSE)
+}
+registerDoMC(2)
+a_ply(df_db,1,function(X) f_SADobs(data_ = X$data),.parallel = TRUE)
+```
+
 
 
 ### Raster de Paisagem
@@ -142,8 +167,7 @@ df_se <- inner_join(x=df_paisagem,
 # dados
 df_se <- left_join(y=df_se,
                    x=expand.grid(SiteCode = df_se$SiteCode,
-                                 # 13 escalas espaciais
-                                 raio_km = c(0.3:12.0,12.0)),
+                                 raio_km = seq(0.3,12,by = 0.1)),
                    by="SiteCode") %>% 
   group_by(tif.name) %>% nest()
 df_se$resultado <- vector("list",length = nrow(df_se))
