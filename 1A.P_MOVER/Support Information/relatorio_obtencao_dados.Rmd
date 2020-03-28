@@ -7,7 +7,7 @@ output:
     toc: true
     toc_depth: 5
 editor_options: 
-  chunk_output_type: inline
+  chunk_output_type: console
 ---
 
 <style>
@@ -39,31 +39,56 @@ library(purrr)
 library(dplyr)
 ```
 
+  
+
+```{r preparacao dos dados, echo=FALSE,eval=FALSE}
+## SAD obs
+df_SAD.obs <- read.csv(file="/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/dados_brutos/abundances.csv",
+                       header = TRUE,as.is = TRUE)
+df_SAD.obs$SiteCode %<>% as.factor() 
+f_summarise <- function(v_){
+  length(table(v_%%1==0))==1
+}
+df_SAD.obs %<>% 
+  filter(species.correct != "Mortas") %>% 
+  select(SiteCode,species.correct,N) %>% 
+  ddply("SiteCode",summarise,
+        Ntotal = sum(N), S_obs = length(species.correct), SAD_integer = f_summarise(N) )
+
+## tif
+df_tif <- Sys.glob("/home/danilo/Documentos/Doutorado/artigo_mestrado/paisagens_atualizadas/*.tif") %>% 
+  gsub("/home/danilo/Documentos/Doutorado/artigo_mestrado/paisagens_atualizadas/","",.) %>%
+  adply(.,1,function(x) unname( unlist( strsplit(x, "_NA_", fixed = TRUE) ) ),.id = NULL) %>% 
+  mutate(refID = gsub("ref","",V1),ordem=gsub(".tif","",V2)) %>% dplyr::select(refID,ordem) 
+df_tif$tif.name <- Sys.glob("/home/danilo/Documentos/Doutorado/artigo_mestrado/paisagens_atualizadas/*.tif") #%>% #caminho dos .tif
+## references
+# df_references %>% names
+df_references <- read.csv(file="/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/dados_brutos/references - TreeCo.csv",
+                          as.is = TRUE,header =T, na.strings = c("","NA")) %>%
+   dplyr::select(SiteCode,refID,status,ordem,status_diagnostico,confiabilidade,method,state,arrangement,samples,effort_ha,dbh_cutoff,UC_area_ha, Unidade_de_conservacao,frag_area,forest_size,domain,forest_type,forest_subtype,forest_succession,forest_age,year_data,year)
+## merge
+### columns class
+df_references$ordem <- as.character(df_references$ordem)
+df_dados <- inner_join(x = inner_join(x = df_references,
+                                      y = df_SAD.obs,
+                                      by = "SiteCode"),
+                       y = df_tif, 
+                       by = c("ordem","refID"))
+write.csv(df_dados,
+          "/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/dados_brutos/df_dados_disponiveis.csv",
+          row.names = FALSE)
+```
+
 
 #### Janela de Código 1: 
 Aplicação de filtro nos dados disponíveis na base de dados TreeCo (Lima et al. 2015).  
 
-<!-- __Filtros gerais:__   -->
-<!-- i) effort >= 1ha; ii) DBH>=5cm; iii) ano dos dados >= 2000; -->
-
-<!-- __Filtros condicionais:__   -->
-<!-- i) state %in% Rio de Janeira, Rio Grande do Sul -> ano dos dados >= 1990   -->
-<!-- ii) state %in% Bahia, Goiás, Mato Grosso do Sul -> ano dos dados >= 2000   -->
-<!-- iii) para as demais regiões ->  ano dos dados>= 1995   -->
-<!-- iv) Exceções a esse esquema ocorreram quando trabalhos foram feitos antes do ano de 2000 em grandes áreas de regiões protegidas (>1000ha) ou em antigos campi universitários.   -->
-
-
-<!-- COISAS PARA ORGANIZAR: -->
-<!-- i) preparar um df_references com as colunas de interesse e já considerando os dados disponíveis para ficar no zip do artigo -->
-
-
-```{r janela de codigo 1}
+```{r janela de codigo 1,eval=TRUE,echo=TRUE}
 ### dados
-df_references <- read.csv(file="/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/dados_brutos/references - TreeCo.csv",
-                          as.is = TRUE,header =T, na.strings = c("","NA")) %>%
-   dplyr::select(refID,status,method,arrangement,samples,effort_ha,dbh_cutoff,SiteCode,lat,long,lat_municipio,long_municipio,lat_correct,long_correct,confiabilidade, Unidade_de_conservacao,Unidade_de_conservacao1,UC_area_ha,year_data,year,state,status_diagnostico,S, N,ordem,frag_area,forest_size,frag_check,domain,forest_type,forest_subtype,forest_succession,Reference)
+df_dados.brutos <- read.csv("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/dados_brutos/df_dados_disponiveis.csv",
+                     header = TRUE,as.is = TRUE)
 ### filtro geral
-df_1ofiltro <- df_references %>% filter(method=="parcelas" &
+df_1ofiltro <- df_dados.brutos %>% filter(method=="parcelas" &
                                          grepl("*contiguous*",arrangement) & 
                                         effort_ha>=1 &
                                          grepl("*yes*",status) & 
@@ -75,60 +100,21 @@ df_1ofiltro <- df_references %>% filter(method=="parcelas" &
                                                           "DBH>=5.0cm&H>300cm","DBH>=5.0cm&H>500cm", 
                                                           "DGH30>=5.0cm") )
 ### filtro universidades e campi
-df_simulacao_s_UCprotecao.integral <- df_1ofiltro %>% 
+df_filtro.UC1 <- df_1ofiltro %>% 
   filter(UC_area_ha >= 1000 & 
-         Unidade_de_conservacao == "universities and research centers")
+         Unidade_de_conservacao %in% c("UC Protecao Integral","universities and research centers"))
 ### filtro estados
-df_simulacao_filtro.estate <- filter(df_1ofiltro,state %in% c("RJ","RS") & year >= 1990)
-df_simulacao_filtro.estate %<>% rbind(.,filter(df_1ofiltro,state %in% c("BA","GO","MS") & year >= 2000)) %>% 
+df_filtro.estate <- filter(df_1ofiltro,state %in% c("RJ","RS") & year >= 1990)
+df_filtro.estate %<>% rbind(.,filter(df_1ofiltro,state %in% c("BA","GO","MS") & year >= 2000)) %>% 
   unique
-df_simulacao_filtro.estate %<>% rbind(.,filter(df_1ofiltro,!(state %in% c("BA","GO","MS","RJ","RS")) & year >= 1995)) %>% 
+df_filtro.estate %<>% rbind(.,filter(df_1ofiltro,!(state %in% c("BA","GO","MS","RJ","RS")) & year >= 1995)) %>% 
   unique
 ### unindo e salvando
-df_ref.S_UCprotecaoIntegral <- rbind(df_simulacao_s_UCprotecao.integral,df_simulacao_filtro.estate) %>% 
+df_dados <- rbind(df_filtro.UC,df_filtro.estate) %>% 
   distinct()
+df_dados <- df_dados[df_dados$SAD_integer,]
 ```
 
-
-
-- A SAD obs conta com a abundância dos indivíduos mortos em pé, que foram desconsiderados para a parametrização das simulações.  
-
-```{r SAD obs e raster disponivel, echo=FALSE,eval=FALSE}
-# SAD obs
-df_SAD.obs <- read.csv(file="/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/dados_brutos/abundances.csv",header = TRUE,as.is = TRUE)
-df_SAD.obs$SiteCode %<>% as.factor()
-df_SAD.obs %<>% filter(species.correct != "Mortas") %>% 
-  group_by(SiteCode) %>% nest()
-# raster
-df_tif <- Sys.glob("/home/danilo/Documentos/Doutorado/artigo_mestrado/paisagens_atualizadas/*.tif") %>% 
-  gsub("/home/danilo/Documentos/Doutorado/artigo_mestrado/paisagens_atualizadas/","",.) %>%
-  adply(.,1,function(x) unname( unlist( strsplit(x, "_NA_", fixed = TRUE) ) ),.id = NULL) %>% 
-  mutate(refID = gsub("ref","",V1),ordem=gsub(".tif","",V2)) %>% dplyr::select(refID,ordem) 
-df_tif$tif.name <- Sys.glob("/home/danilo/Documentos/Doutorado/artigo_mestrado/paisagens_atualizadas/*.tif") #%>% #caminho dos .tif
-class(df_tif$refID) <- class(df_ref.S_UCprotecaoIntegral$refID)
-class(df_tif$ordem) <- class(df_ref.S_UCprotecaoIntegral$ordem)
-# merge
-df_db <- inner_join(x = inner_join(x = df_ref.S_UCprotecaoIntegral,
-                                   y = df_SAD.obs,
-                                   by = "SiteCode"),
-                    y = df_tif, 
-                    by = c("ordem","refID"))
-
-```
-
-
-
-```{r separar SADs por df,echo=FALSE,eval=FALSE}
-f_SADobs <- function(dados){
-  data_ <- dados[[1]] %>% as.data.frame()
-  path_SAD <- paste0("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/dados_brutos/SAD.obs__ref",
-                     head(data_$RefID,1),"_NA_",head(data_$ordem,1))
-  df_ <- data_ %>% dplyr::select(species.correct,N)
-  write.csv(df_, file = path_SAD, row.names = FALSE)
-}
-registerDoMC(2)
-a_ply(df_db,1,function(X) f_SADobs(data_ = X$data),.parallel = TRUE)
-```
 
 
 #### Janela de Código 2:
@@ -136,47 +122,19 @@ Procedimento do efeito de escala:
 a) calculo de p para cada valor de raio;  
 b) ajuste de glm.nb para cada conjunto de dados;  
 c) média ponderada pelo peso de evidência da comparação de todos os glm.nb ajustados.  
-
-
-```{r dados para df Scale of Effect,echo=FALSE,eval=FALSE}
-# dados
-## paisagens selecionados e respectiva SAD_obs
-df_paisagem <- read.csv("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/df_raster_e_SAD_atualizados.csv",
-                         header = TRUE,as.is = TRUE)
-f_S <- function(path){
-  v_SAD.obs <- read.csv(path,header = TRUE,as.is = TRUE) %>% 
-    filter(species.correct != "Mortas") %>% .$N
-  df_ <- data.frame(S_obs = length(v_SAD.obs),Ntotal=sum(v_SAD.obs),N_integer = is.integer(sum(v_SAD.obs)))
-  return(df_)
-}
-df_paisagem <- cbind(df_paisagem,
-                     adply(df_paisagem$SAD_obs.name,1,f_S,.id = NULL))
-df_paisagem$SiteCode <- factor(df_paisagem$SiteCode)
-## paisagens disponíveis, Lado_landscape = 800 pixels;  1 pixel = 30x30m
-df_tif <- Sys.glob("/home/danilo/Documentos/Doutorado/artigo_mestrado/paisagens_atualizadas/*.tif") %>% # carregando
-  gsub("/home/danilo/Documentos/Doutorado/artigo_mestrado/paisagens_atualizadas/","",.) %>% #removendo estrutura de pastas
-  adply(.,1,function(x) unname( unlist( strsplit(x, "_NA_", fixed = TRUE) ) ),.id = NULL) %>% #dividindo a informação
-  mutate(refID = gsub("ref","",V1),ordem=gsub(".tif","",V2)) %>% dplyr::select(refID,ordem) 
-df_tif$tif.name <- Sys.glob("/home/danilo/Documentos/Doutorado/artigo_mestrado/paisagens_atualizadas/*.tif") #%>% #caminho dos .tif
-df_tif$refID <- as.numeric(df_tif$refID)
-df_tif$ordem <- as.numeric(df_tif$ordem)
-## merge e valores de raio
-df_se <- inner_join(x=df_paisagem,
-                    y=df_tif,
-                    by=c("refID","ordem"))
-```
   
   
-```{r janela de codigo 2 _ scale of effect, echo=TRUE}
+```{r janela de codigo 2 _ scale of effect, echo=TRUE,results="hide"}
 # dados brutos
-df_se <- left_join(y=df_se,
-                   x=expand.grid(SiteCode = df_se$SiteCode,
-                                 raio_km = seq(0.3,12,by = 0.1)),
+df_se <- left_join(y=df_dados,
+                   x=expand.grid(SiteCode = df_dados$SiteCode,
+                                 raio_km = c(seq(sqrt(max(df_dados$effort_ha)*0.01)+0.1,
+                                               12,by = 0.1),12) ),
                    by="SiteCode") %>% 
   group_by(tif.name) %>% nest()
 df_se$resultado <- vector("list",length = nrow(df_se))
 # rotina
-registerDoMC(2)
+registerDoMC(3)
 for(i in 1:nrow(df_se)){
   # raster de paisagem (landsat8 Hansen et al. 2013)
   raster_ <- raster(df_se$tif.name[i])
@@ -203,7 +161,7 @@ library(MASS)
 f_glm.nb <- function(data_){
   md_ <- glm.nb(S_obs ~ p + I(p^2) + offset(log(Ntotal)), data = data_)
 }
-registerDoMC(2)
+registerDoMC(3)
 l_md <- dlply(df_se,"raio_km",f_glm.nb,.parallel = TRUE)
 # média ponderada dos raios pelo peso de evidência
 df_averageSE <- print(AICctab(l_md,weights=TRUE)) %>% 
@@ -211,7 +169,7 @@ df_averageSE <- print(AICctab(l_md,weights=TRUE)) %>%
 df_averageSE$raio_paisagem <- row.names(df_averageSE) %>% as.numeric()
 df_averageSE$weight <- as.numeric(as.character(df_averageSE$weight))
 df_averageSE$dAICc <- as.numeric(as.character(df_averageSE$dAICc))
-raio_medio <- weighted.mean(x = df_averageSE$raio_paisagem,w = df_averageSE$weight)
+raio_medio <- round(weighted.mean(x = df_averageSE$raio_paisagem,w = df_averageSE$weight),2)
 ```
 
 
@@ -312,10 +270,7 @@ f_mat.tri <- function(png, abund){ #png.file, número de indivíduos presente
   mat <- matrix(getValues(raster)/255, ncol = ncol(raster), nrow = nrow(raster))
   raster_binario <- raster( matrix(nrow = nrow(mat), ncol = ncol(mat), sapply(mat, function(x) ifelse(x >= 0.7, 1, 0)) ) ) 
   func_focal <- function(x) ifelse(sum(x[x==1]) >= 5, 1, x[5])
-  binario.focal <- as.matrix( focal(raster_binario, janela, func_focal, pad=TRUE, padvalues = 0))Distância média de dispersão por k
-
-Criamos funções no ambiente de programação R para estimar a distância média de dispersão necessária para que k propágulos permaneçam até a distância entre unidades adjacente de habitat (Apêndice X). A distância entre unidades adjacentes de habitat pode ser obtido por 100/sqrt(DA), onde DA = densidade observada (indivíduos/ha).
-
+  binario.focal <- as.matrix( focal(raster_binario, janela, func_focal, pad=TRUE, padvalues = 0))
   mat_tri <- try(f_area.simulada(matriz = binario.focal, N = abund))
   if(class(mat_tri) == "matrix"){ 
     try(write.table(x = mat_tri, 
@@ -407,17 +362,7 @@ p_rm_ < rm_
  janela_observao[p_inicio[1]:p_final[1],p_inicio[2]:p_final[2]] <- 2
  rm_ <- rm_ - p_rm_
 # else 
- janela_observao[p_inicio[1]:p_final[1],p_inicio[2]:p_final[2]][1:rm_] <- 2Distância média de dispersão por k
-
-Criamos funções no ambiente de programação R para estimar a distância média de dispersão necessária para que k propágulos permaneçam até a distância entre unidades adjacente de habitat (Apêndice X). A distância entre unidades adjacentes de habitat pode ser obtido por 100/sqrt(DA), onde DA = densidade observada (indivíduos/ha).
-Distância média de dispersão por k
-
-Criamos funções no ambiente de programação R para estimar a distância média de dispersão necessária para que k propágulos permaneçam até a distância entre unidades adjacente de habitat (Apêndice X). A distância entre unidades adjacentes de habitat pode ser obtido por 100/sqrt(DA), onde DA = densidade observada (indivíduos/ha).
-Distância média de dispersão por k
-
-Criamos funções no ambiente de programação R para estimar a distância média de dispersão necessária para que k propágulos permaneçam até a distância entre unidades adjacente de habitat (Apêndice X). A distância entre unidades adjacentes de habitat pode ser obtido por 100/sqrt(DA), onde DA = densidade observada (indivíduos/ha).
-
-
+ janela_observao[p_inicio[1]:p_final[1],p_inicio[2]:p_final[2]][1:rm_] <- 2
 ## outro
 # pontos_p_marcar <- janela_observao[p_inicio[1]:p_final[1],p_inicio[2]:p_final[2]]
 # pontos_p_marcar[pontos_p_marcar==1][1:length(rm_)] <- 2
@@ -819,8 +764,6 @@ do.call("grid.arrange",c(l_p,ncol=1))
 __Figura 5__ U_med estimado por k (% de prop até a vizinhança imediada) e d / L_plot (distância média de dispersão / largura da área amostral aproximada como um quadrado).
 
 
-<<<<<<< HEAD
-=======
 ### Estudo do padrão de U
 
 #### Diferença entre pontos consecutivos
@@ -832,19 +775,11 @@ hist()
 ```
 
 
-
->>>>>>> 706b934187ce0f1f47de33cdb69d55dcff8343e1
-
-
 ## SAD predita
 
 ### MNEE  
 
-<<<<<<< HEAD
-O código a seguir roda a simulação coalescente
-=======
-Para obter as SADs preditas por MNEE utilizei o seguinte código
->>>>>>> 706b934187ce0f1f47de33cdb69d55dcff8343e1
+O código a seguir roda a simulação coalescente Para obter as SADs preditas por MNEE utilizei o seguinte código
 
 ```{r SADs MNEE}
 f_simulacao <- function(i,df_=df_simulacao){
@@ -874,11 +809,7 @@ l_ply(simulacao,f_simulacao,.parallel = TRUE)
 
 ### MNEI  
 
-<<<<<<< HEAD
-O código a seguir roda a formula de amostragem de Etienne 2005
-=======
-Para MNEI:
->>>>>>> 706b934187ce0f1f47de33cdb69d55dcff8343e1
+O código a seguir roda a formula de amostragem de Etienne 2005 Para MNEI:
 
 ```{r SADs MNEI}
 # preparação dos dados
@@ -1041,339 +972,4 @@ ggplot(df_resultados,aes(x=S.obs_mean,y=S.MN_mean,color=MN)) +
 ```
 
 __Figura 8__ S_predita ~ S_obs. Linha vermelha: slope=1,intercept=0
-
-
-## Auditoria 2: Comparação com o conjunto de dados antigos
-
-```{r diff resultados antigo1s, eval=TRUE,echo=FALSE}
-# dados antigos
-df_resultados.antigos <- read.csv("/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/df_resultados.csv",header = TRUE,as.is = TRUE)
-# dados novos
-df_resultados <- read.table(file="./resultados/df_resultados.csv",header = TRUE,sep = ";",dec = ".",as.is=TRUE)
-file.info("./resultados/df_resultados.csv")
-# merge
-# df_resultados %>% str
-# df_resultados.antigos %>% str
-df_auditoria <- inner_join(x=df_resultados.antigos,y=df_resultados,
-                           by=c("SiteCode","MN","k"))
-# df_auditoria %>% names
-# padronizacao
-level_k <- unique(as.character(df_auditoria$k))
-df_auditoria$k <- factor(as.character(df_auditoria$k),levels = level_k)
-# df_auditoria %>% str
-# variáveis de auditoria
-## diff = novo - antigo
-df_auditoria %<>% mutate(diff_GOF = n_SAD.N.ref - GOF,
-                         diff_S.mean = S.MN_mean - S_m,
-                         diff_U = U_med - U,
-                         diff_p = p.y-p.x,
-                         diff_Ntotal = Ntotal - J,
-                         diff_Stotal = Stotal - S,
-                         diff_d = d.y - d.x,
-                         diff_m_ = m_.y - m_.x,
-                         J_M.x = DA.x * p.x * 2500, # ta errado, se fiz certo no passado então é 2500 (5x5km2 = 2500ha)
-                         theta.x = (U*(J_M.x-1))/(1-U),
-                         diff_theta = theta - theta.x) 
-## Graficos
-df_plot <- df_auditoria %>% select(SiteCode, MN, k,
-                                   diff_GOF, diff_S.mean,
-                                   diff_d, diff_m_, diff_U, diff_theta,
-                                   diff_p, diff_Ntotal, diff_Stotal)
-l_p <- vector("list",9)
-## parâmetros comuns
-l_p[[1]] <- ggplot(df_plot, aes(x=diff_p)) + geom_histogram(bins=40) + labs(y="contagem")
-l_p[[2]] <- ggplot(df_plot, aes(x=diff_Ntotal)) + geom_histogram(bins=40) + theme(axis.title.y = element_blank())
-l_p[[3]] <- ggplot(df_plot, aes(x=diff_Stotal)) + geom_histogram(bins=40) + theme(axis.title.y = element_blank())
-# do.call("grid.arrange",c(l_p,ncol=3,top="diff_ = novo - antigo"))
-## parametros de cada MN 
-l_p[[4]] <- ggplot(df_plot, aes(x=diff_d)) + geom_histogram(bins=40) + labs(y="contagem")
-l_p[[5]] <- ggplot(df_plot, aes(x=diff_m_)) + geom_histogram(bins=40) + theme(axis.title.y = element_blank())
-l_p[[6]] <- ggplot(df_plot, aes(x=diff_U)) + geom_histogram(bins=40) + theme(axis.title.y = element_blank())
-l_p[[7]] <- ggplot(df_plot, aes(x=diff_theta)) + geom_histogram(bins=40) + theme(axis.title.y = element_blank())
-## variávis resposta da congruência com o observado
-l_p[[8]] <- ggplot(df_plot,aes(x=MN,y=diff_GOF,group=MN)) + geom_jitter() + geom_boxplot()
-l_p[[9]] <- ggplot(df_plot,aes(x=MN,y=diff_S.mean,group=MN)) + geom_jitter() + geom_boxplot()
-# arranjo dos plots
-mat_lay <- rbind(c(1,2,3,NA),
-                 c(4,5,6,7),
-                 c(8,8,9,9))
-grid.arrange(l_p[[1]],l_p[[2]],l_p[[3]],l_p[[4]],l_p[[5]],l_p[[6]],l_p[[7]],l_p[[8]],l_p[[9]],
-             layout_matrix=mat_lay,top="diff_ = novo - antigo")
-```
-
-__Figura 9__ Diferença entre os parâmetros do novo conjunto de dados e do antigo.
-
-__Considerações__  
-- o calculo de alguns parâmeros de MNEI foram modificado de 2017/2018 para o de 2019;  
-- os raster de paisagem e SAD observado foram atualizados;  
-- assim espera-se que: 
-i) Ntotal_novo <= Ntotal_antigo & Stotal_novo <= Stotal_antigo & p_novo == | != p_antigo
-ii) d (distância média de dispersão para um determinado k), U e GOF_{MN:EE} sejam robustos;  
-__Observado__  
-__*parametros base*__    
-- Ntotal_novo >= Ntotal_antigo; Stotal_ e p_ idem;  
-__*parametros dos modelos*__    
-- d apresentou diff > 0, onde esperava que fosse uma distribuição simetrica centrada em zero (similar ao apresentado para U)  
-__*congruencia com o observado*__  
-- GOF_{EE}: a maior parte dos valores esta próximo de zero (50% dos dados) está próximo de 0, contudo há exemplos de valores onde houve total inversão nos valores (100 e -100)  
-- GOF_{EI}: a variância é superior a de EE, mas ainda a maior parte dos valores esta próximo de zero  
-- S.mean_{EE}:variância muito superior do que o esperado, uma vez que a regra é que EE ajuste corretamente S_observado  
-__**Perguntas**__  
-a) Quais os sítios que apresentam alteração em p, Ntotal e Stotal?  
-a.1) O erro encontrado nestes sítios pode ser avaliado para os 28 sítios adicionados?  
-b) Por que d apresentou diferença positiva?  
-c) Quais os sítios onde a congruência com o observado teve variação máxima? A hipótese de mudança de rotulos é plausível?
-
-# Auditoria dos dados
-
-## Sítios que apresentam alteração em p, Ntotal e Stotal
-
-```{r sitios que diferem em p Ntotal e Stotal, eval=TRUE,echo=FALSE,fig.height=10}
-############## comparação conjunto de dados: novo - antigo
-################# conjunto de dados 
-# dados antigos
-df_resultados.antigos <- read.csv("/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/df_resultados.csv",header = TRUE,as.is = TRUE)
-# dados novos
-df_resultados <- read.table(file="./resultados/df_resultados.csv",header = TRUE,sep = ";",dec = ".",as.is=TRUE)
-# merge
-# df_resultados %>% str
-# df_resultados.antigos %>% str
-df_auditoria <- inner_join(x=df_resultados.antigos,y=df_resultados,
-                           by=c("SiteCode","MN","k"))
-# df_auditoria %>% names
-# padronizacao
-level_k <- unique(as.character(df_auditoria$k))
-df_auditoria$k <- factor(as.character(df_auditoria$k),levels = level_k)
-# df_auditoria %>% str
-# variáveis de auditoria
-## diff = novo - antigo
-df_auditoria %<>% mutate(diff_p = p.y-p.x,
-                         diff_Ntotal = Ntotal - J,
-                         diff_Stotal = Stotal - S)
-## diff_p
-df_diff.p <- df_auditoria %>% filter(diff_p > 0) %>%
-  select(SiteCode,p.y,diff_p,Ntotal,Stotal,diff_Ntotal,diff_Stotal) %>% distinct()
-################# merge com df com a SAD_{obs} e raster paisagem atualizados
-#### Dados
-### SAD obs
-df_SAD.obs <- data.frame(SAD_obs.name = Sys.glob("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/dados_brutos/SAD.obs__ref*.csv"))
-df_SAD.obs$SAD_obs.name %<>% as.character()
-df_SAD.obs %<>% mutate(ordem=str_match(SAD_obs.name,"NA_(.*?).csv")[,2],
-                       refID=str_match(SAD_obs.name,"ref(.*?)_NA")[,2])
-### references 
-df_references <- read.csv(file="/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/dados_brutos/references - TreeCo.csv",
-                          as.is = TRUE,header =T, na.strings = c("","NA")) %>%
-  select(SiteCode,refID,ordem)
-df_SAD.obs$refID %<>% as.character()
-df_SAD.obs$ordem %<>% as.integer()
-df_SAD.obs %<>% inner_join(x=.,y=df_references,by=c("refID","ordem"))
-### txt file
-df_txt <- read.csv("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/df_simulacao_EEeEI.csv",header = TRUE, as.is = TRUE) %>% select(SiteCode,txt.name) %>% distinct()
-df_p.write <- inner_join(x=df_SAD.obs,y=df_txt,by="SiteCode")
-write.csv(df_p.write,file = "~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/df_raster_e_SAD_atualizados.csv",row.names = FALSE)
-### merge
-df_auditoria <-  inner_join(x=df_diff.p,
-                            y=df_p.write,
-                            by="SiteCode")
-############## Avaliação Visual dos Sitios
-par(mfrow=c(6,2))
-for(i in 1:nrow(df_auditoria)){
-  paisagem <- as.matrix(read.table(df_auditoria$txt.name[i],
-                                   header = TRUE,sep = " ",as.is = FALSE))
-  par(mar=c(0,0,2,0))
-  image(paisagem,
-        main=paste0(df_auditoria$SiteCode[i]," p=",round(df_auditoria$p.y[i],5)," diff_p=",round(df_auditoria$diff_p[i],5) ),
-        col=terrain.colors(12,rev = TRUE),
-        xaxt='n',yaxt='n')
-
-}
-```
-
-__Figura 10__ Paisagens onde houve diferença em p.   
-
-- Sitios que podem corresponder a troca de rótulos por conta da diferença  na proporção de habitat entre novo e antigo:
-MGuberl3, MGuberl5, MGuberl7, PEalia, PEmata2;
-- Esses sítios apresentam alta proporção de habitat remanescente na paisagem e alta diff_p
-- porém em alguns casos uma alteração na coordenada central pode levar à mudança de habitat observado:
-MGUberl1, BAlenc4, BAjuss e todos com diff_p -> 0  
-- pela minha avaliação visual a estimativa de p está correta, como havia avaliado anteriormente
-
-__SAD obs__
-
-```{r continuacao para SAD obs,eval=TRUE,echo=FALSE,message=FALSE}
-#### função
-f_sp.indet <- function(SAD_path){
-  t_SAD.obs <- read.csv(SAD_path,header = TRUE,as.is = TRUE) %>% select(species.correct,N)
-  df_return <- data.frame(
-    n_sp.indet = length(t_SAD.obs[grep(" sp\\.",t_SAD.obs$species.correct),"species.correct"]),
-    abund_sp.indet = sum(t_SAD.obs[grep(" sp\\.",t_SAD.obs$species.correct),"N"]
-    ))
-  df_return %<>% mutate(prop_S.indet = n_sp.indet/nrow(t_SAD.obs),
-                        prop_Abund.indet = abund_sp.indet/sum(t_SAD.obs$N))
-  return(df_return)
-}
-## leitura
-## dados
-df_auditoria <- read.csv("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/df_raster_e_SAD_atualizados.csv",
-                         header = TRUE,as.is = TRUE)
-# 
-registerDoMC(3)
-df_auditoria %<>% adply(.,1,function(X)f_sp.indet(SAD_path=X$SAD_obs.name),.parallel = TRUE)
-# merge
-## dados
-df_resultados.antigos <- read.csv("/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/df_resultados.csv",header = TRUE,as.is = TRUE)
-df_resultados <- read.table(file="./resultados/df_resultados.csv",header = TRUE,sep = ";",dec = ".",as.is=TRUE)
-df_merge <- inner_join(x=df_resultados.antigos,y=df_resultados,
-                       by=c("SiteCode","MN","k")) %>% distinct()
-level_k <- unique(as.character(df_merge$k))
-df_merge$k <- factor(as.character(df_merge$k),levels = level_k)
-df_merge %<>% mutate(diff_p = p.y-p.x,
-                     diff_GOF = n_SAD.N.ref - GOF,
-                     diff_S.mean = S.MN_mean - S_m,
-                     diff_Ntotal = Ntotal - J,
-                     diff_Stotal = Stotal - S) %>%
-  select(SiteCode,k,MN,p.y,diff_p,Ntotal,Stotal,diff_Ntotal,diff_Stotal,diff_GOF,diff_S.mean)
-## merge
-df_plot2 <- df_auditoria %>% inner_join(x=.,y=df_merge,by="SiteCode")
-############# Gráficos
-l_p <- vector("list",3)
-l_p[[1]] <- ggplot(df_plot2, aes(x=diff_Ntotal,y=prop_Abund.indet)) + 
-  geom_point() + 
-  labs(y="prop Ntotal indeterminadas",x="diferença Ntotal (novo - antigo)")
-l_p[[2]] <- ggplot(df_plot2, aes(x=diff_Stotal,y=prop_S.indet,)) + 
-  geom_point() + 
-  labs(x="diferença Stotal (novo - antigo)",y="prop Stotal indeterminadas")
-l_p[[3]] <- ggplot(df_auditoria, aes(x=prop_Abund.indet,y=prop_S.indet,)) + 
-  geom_point() + 
-  labs(x="prop Ntotal indeterminadas",y="prop Stotal indeterminadas")
-do.call("grid.arrange",c(l_p,ncol=2,top="proporção de abundância e riqueza de indeterminadas"))
-```
-
-__Figura 11__ Trabalhos que diferem em Ntotal e Stotal e proporção da abundância e riqueza das espécies indeterminadas (grep(" sp\\.",species.correct)). Na primeira linha há os 75 pontos em comum (novo - antigo); na segunda linha há os 103 pontos do conjunto de dados novo. Novo: 2019; Antigo: 2017/2018
-
-
-## Sítios que apresentam alteração em GOF e S_mean
-
-```{r Sitios diff GOF e S_mean, eval=TRUE,echo=FALSE,fig.height=10,fig.width=6}
-# dados antigos
-df_resultados.antigos <- read.csv("/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/df_resultados.csv",header = TRUE,as.is = TRUE)
-# dados novos
-df_resultados <- read.table(file="./resultados/df_resultados.csv",header = TRUE,sep = ";",dec = ".",as.is=TRUE)
-# merge
-# df_resultados %>% str
-# df_resultados.antigos %>% str
-df_auditoria <- inner_join(x=df_resultados.antigos,y=df_resultados,
-                           by=c("SiteCode","MN","k"))
-# df_auditoria %>% names
-# padronizacao
-level_k <- unique(as.character(df_auditoria$k))
-df_auditoria$k <- factor(as.character(df_auditoria$k),levels = level_k)
-# df_auditoria %>% str
-# variáveis de auditoria
-## diff = novo - antigo
-df_auditoria %<>% mutate(diff_GOF = n_SAD.N.ref - GOF,
-                         diff_S.mean = S.MN_mean - S_m,
-                         diff_U = U_med - U,
-                         diff_p = p.y-p.x,
-                         diff_Ntotal = Ntotal - J,
-                         diff_Stotal = Stotal - S,
-                         diff_d = d.y - d.x,
-                         diff_m_ = m_.y - m_.x,
-                         J_M.x = DA.x * p.x * 2500, # ta errado, se fiz certo no passado então é 2500 (5x5km2 = 2500ha)
-                         theta.x = (U*(J_M.x-1))/(1-U),
-                         diff_theta = theta - theta.x) 
-## Graficos
-df_auditoria %<>% select(SiteCode, MN, k,
-                         diff_GOF, diff_S.mean,
-                         diff_d, diff_m_, diff_U, diff_theta,
-                         diff_p, diff_Ntotal, diff_Stotal) %>% distinct()
-# df_auditoria %>% filter(between(df_auditoria$diff_GOF,quantile(df_auditoria$diff_GOF,probs = 0.25),quantile(df_auditoria$diff_GOF,probs = 0.75))) %>% dim
-  # .$SiteCode %>% unique
-l_p <- vector("list",6)
-l_p[[1]] <- ggplot(filter(df_auditoria,MN=="EE"),aes(x=k,y=diff_GOF)) + 
-  geom_point() +
-  geom_line(aes(group=SiteCode)) +
-  geom_boxplot() +
-  ggtitle("EE")
-l_p[[2]] <- ggplot(filter(df_auditoria,MN=="EI"),aes(x=k,y=diff_GOF)) + 
-  geom_point() +
-  geom_line(aes(group=SiteCode)) +
-  geom_boxplot() +
-  ggtitle("EI")
-l_p[[3]] <- ggplot(filter(df_auditoria,MN=="EE"),aes(x=k,y=diff_S.mean)) + 
-  geom_point() +
-  geom_line(aes(group=SiteCode)) +
-  geom_boxplot()
-l_p[[4]] <- ggplot(filter(df_auditoria,MN=="EI"),aes(x=k,y=diff_S.mean)) + 
-  geom_point() +
-  geom_line(aes(group=SiteCode)) +
-  geom_boxplot()
-l_p[[5]] <- ggplot(filter(df_auditoria,MN=="EE"),aes(x=k,y=diff_d)) + 
-  geom_point() +
-  geom_line(aes(group=SiteCode)) +
-  geom_boxplot()
-l_p[[6]] <- ggplot(filter(df_auditoria,MN=="EI"),aes(x=k,y=diff_m_)) + 
-  geom_point() +
-  geom_line(aes(group=SiteCode)) +
-  geom_boxplot()
-# x11()
-do.call("grid.arrange",c(l_p,ncol=2))
-```
-
-__Figura 12__ Comparação entre MN para as variáveis resposta (linhas 1 e 2) e para os parâmetros de dispersão (linha 3) por cenário de limitação de dispersão.  
-
-__**Congruência com o observado:GOF**__  
-- para alguns sítios independe o cenário de limitação à dispersão; porém para alguns há grande variação na resposta  
-- a maior parte dos sítios está próximo de zero para ambos os modelos, porém a variação de EI é superior.  
-__**Congruência com o observado:S.mean**__  
-- a riqueza média apresentou grande variação, inclusive em alguns sítios houve diminuição de 1000 spp do antigo para o novo
-- a diferença na riqueza média muda em função de k, o que não deveria ser observado em MNEE uma vez que independente de k ele estima corretamente a riqueza observada. Esse resultado é comum entre os dois conjuntos de dados (é intrinseco ao método). Assim essa mudança corrobora a hipótese de que pode existir uma troca de rótulos entre sítios.
-__**Parâmetros de Dispersão**__
-- a diferença em d pode ser explicada pelas mudanças aplicadas no conjunto de dados
-
-
-__Quais os sítios que devem ser avaliados__  
-
-- Priorizar a avaliação da congruência para MNEE que deveria ser mais robusto
-- Existe relação entre a diferença da congruência entre os conjuntos de dados e a proporção de espécies indeterminadas? Algum rótulo foi trocado?
-
-```{r sitios que diferem,eval=TRUE,echo=FALSE }
-l_p <- vector("list",4)
-l_p[[1]] <- ggplot(df_plot2,aes(x=diff_Ntotal,y=diff_GOF,group=SiteCode)) +
-  geom_point() + geom_line()
-l_p[[2]] <- ggplot(df_plot,aes(x=diff_Stotal,y=diff_GOF,group=SiteCode)) +
-  geom_point() + geom_line()
-
-```
-
-
-## Sítios para Avaliação Renato Lima
-
-```{r diff resultados antigos, eval=TRUE,echo=FALSE}
-# dados antigos
-df_resultados.antigos <- read.csv("/home/danilo/Documentos/Doutorado/artigo_mestrado/Rmd_e_dados/df_resultados.csv",header = TRUE,as.is = TRUE)
-# dados novos
-# file.info("./resultados/df_resultados.csv")
-df_resultados <- read.table(file="./resultados/df_resultados.csv",header = TRUE,sep = ";",dec = ".",as.is=TRUE)
-# merge
-# df_resultados %>% str
-# df_resultados.antigos %>% str
-df_auditoria <- inner_join(x=df_resultados.antigos,y=df_resultados,
-                           by=c("SiteCode","MN","k"))
-# df_auditoria %>% names
-# padronizacao
-level_k <- unique(as.character(df_auditoria$k))
-df_auditoria$k <- factor(as.character(df_auditoria$k),levels = level_k)
-# df_auditoria %>% str
-# variáveis de auditoria
-## diff = novo - antigo
-df_auditoria %<>% mutate(diff_p = p.y-p.x,
-                         diff_Ntotal = Ntotal - J,
-                         diff_Stotal = Stotal - S) 
-## seleção de sítios
-# df_auditoria %>% select(diff_p,diff_Ntotal,diff_Stotal) %>% summary
-# df_auditoria %>% filter(diff_Ntotal > 30) %>% .$
-```
-
-
 
