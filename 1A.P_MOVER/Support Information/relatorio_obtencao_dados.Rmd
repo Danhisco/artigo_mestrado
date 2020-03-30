@@ -45,15 +45,16 @@ library(dplyr)
 ## SAD obs
 df_SAD.obs <- read.csv(file="/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/dados_brutos/abundances.csv",
                        header = TRUE,as.is = TRUE)
-df_SAD.obs$SiteCode %<>% as.factor() 
-f_summarise <- function(v_){
-  length(table(v_%%1==0))==1
-}
+# df_SAD.obs$SiteCode %<>% as.factor() 
+v_Sites <- df_SAD.obs %>% filter(N == 0.5) %>% .$SiteCode %>% unique
+# f_summarise <- function(v_){ # falsos positivos e falsos nefativos, não funcionou
+#   length(table(v_%%1==0))==1
+# }
 df_SAD.obs %<>% 
-  filter(species.correct != "Mortas") %>% 
+  filter(species.correct != "Mortas" & !(SiteCode %in% v_Sites)) %>% 
   select(SiteCode,species.correct,N) %>% 
   ddply("SiteCode",summarise,
-        Ntotal = sum(N), S_obs = length(species.correct), SAD_integer = f_summarise(N) )
+        Ntotal = sum(N), S_obs = length(species.correct))
 
 ## tif
 df_tif <- Sys.glob("/home/danilo/Documentos/Doutorado/artigo_mestrado/paisagens_atualizadas/*.tif") %>% 
@@ -95,24 +96,27 @@ df_1ofiltro <- df_dados.brutos %>% filter(method=="parcelas" &
                                          grepl("ok*",status_diagnostico) &
                                          grepl("Atlantic_Forest*",domain) &
                                         dbh_cutoff %in% c("PBH>=15.0cm","PBH>=15.7cm",
-                                                          "DBH>=5.0cm","DGH>=5.0cm",
+                                                          "DBH>=5.0cm","DGH>=5.0cm","DBH>5.0cm",
                                                           "DBH>=4.8cm",
                                                           "DBH>=5.0cm&H>300cm","DBH>=5.0cm&H>500cm", 
-                                                          "DGH30>=5.0cm") )
+                                                          "DGH30>=5.0cm"))
 ### filtro universidades e campi
-df_filtro.UC1 <- df_1ofiltro %>% 
-  filter(UC_area_ha >= 1000 & 
+df_filtro.UC <- df_1ofiltro %>% 
+  filter(UC_area_ha >= 1000 | 
          Unidade_de_conservacao %in% c("UC Protecao Integral","universities and research centers"))
 ### filtro estados
 df_filtro.estate <- filter(df_1ofiltro,state %in% c("RJ","RS") & year >= 1990)
-df_filtro.estate %<>% rbind(.,filter(df_1ofiltro,state %in% c("BA","GO","MS") & year >= 2000)) %>% 
-  unique
-df_filtro.estate %<>% rbind(.,filter(df_1ofiltro,!(state %in% c("BA","GO","MS","RJ","RS")) & year >= 1995)) %>% 
-  unique
+df_filtro.estate %<>% rbind(.,filter(df_1ofiltro,state %in% c("BA","GO","MS") & year >= 2000))
+df_filtro.estate %<>% rbind(.,filter(df_1ofiltro,!(state %in% c("BA","GO","MS","RJ","RS")) & year >= 1995))
 ### unindo e salvando
 df_dados <- rbind(df_filtro.UC,df_filtro.estate) %>% 
   distinct()
-df_dados <- df_dados[df_dados$SAD_integer,]
+```
+
+
+
+```{r auditoria janela de código 1,eval=FALSE,echo=FALSE}
+df_dados %>% summary
 ```
 
 
@@ -124,7 +128,7 @@ b) ajuste de glm.nb para cada conjunto de dados;
 c) média ponderada pelo peso de evidência da comparação de todos os glm.nb ajustados.  
   
   
-```{r janela de codigo 2 _ scale of effect, echo=TRUE,results="hide"}
+```{r janela de codigo 2 _ scale of effect, echo=TRUE,results="hide",eval=FALSE}
 # dados brutos
 df_se <- left_join(y=df_dados,
                    x=expand.grid(SiteCode = df_dados$SiteCode,
@@ -134,7 +138,7 @@ df_se <- left_join(y=df_dados,
   group_by(tif.name) %>% nest()
 df_se$resultado <- vector("list",length = nrow(df_se))
 # rotina
-registerDoMC(3)
+registerDoMC(2)
 for(i in 1:nrow(df_se)){
   # raster de paisagem (landsat8 Hansen et al. 2013)
   raster_ <- raster(df_se$tif.name[i])
@@ -169,62 +173,59 @@ df_averageSE <- print(AICctab(l_md,weights=TRUE)) %>%
 df_averageSE$raio_paisagem <- row.names(df_averageSE) %>% as.numeric()
 df_averageSE$weight <- as.numeric(as.character(df_averageSE$weight))
 df_averageSE$dAICc <- as.numeric(as.character(df_averageSE$dAICc))
-raio_medio <- round(weighted.mean(x = df_averageSE$raio_paisagem,w = df_averageSE$weight),2)
+raio_medio <- round(weighted.mean(x = df_averageSE$raio_paisagem,w = df_averageSE$weight),1)
 ```
 
 
+#### Janela de Código 3:
+Tratamento do Raster de Paisagem:  
+a) recorte de paisagem: raio_medio
+b) ajuste da resolução
+c) conversão pixel c [0,100] -> ifelse(pixel>=0.7 habitat, matrix)
+d) paisagem local + comunidade local quadrada
 
 
-
-
-
-
-```{r png to tif}
+```{r janela de codigo 3 - tratamento do raster,echo=TRUE,eval=FALSE}
+####################################
+### a) recorte da paisagem: raio = 4.3km
+####################################
 func_tif.png <- function(file){
-  raster <- raster(file) #leitura do raster
-  # raster <- raster(df_dados.disponiveis$tif.name[df_dados.disponiveis$SiteCode=="MGuberl3"])
-  mat_raster <- matrix(data = getValues(raster)/100) #convertendo para matrix
+  raster <- raster(file)
+  mat_raster <- matrix(data = getValues(raster)/100)
   dim(mat_raster) <- dim(raster)[1:2]
-  #recorte de 6x6km: os 200x200 pixeis centrais
-  mat_raster <- mat_raster[301:500,301:500]
-  squash::savemat(x = mat_raster, filename = gsub(".tif",".png", file)) #salvando como png
+  raio_max <- nrow(mat_raster)/2
+  raio_pixels <- round(raio_medio * 1000 / 30)
+  local_land <- mat_raster[(raio_max+1-raio_pixels):(raio_max+raio_pixels),
+                           (raio_max+1-raio_pixels):(raio_max+raio_pixels)]
+  file_path <- gsub(".tif",".png", file) 
+  file_path <- gsub("paisagens_atualizadas","1A.P_MOVER/dados_brutos", file_path) 
+  squash::savemat(x = mat_raster, filename = file_path) # png
 }
 registerDoMC(3)
-# df_dados.disponiveis %>% filter(is.na(tif.name))
-a_ply(df_dados.disponiveis$tif.name,1,func_tif.png,.parallel = TRUE) #gera 113 .png, oriundos dos .tif
-```
-
-- Ajustei a resolução das imagens de tal modo que o total de pixels na paisagem = DA_{obs} * Area_{paisagem}
-
-```{r ajuste resolucao}
-func_png.ajust <- function(file, densidade, A_landscape=3600){ # atualizar para o pacote 'magick'
+a_ply(df_dados$tif.name,1,func_tif.png,.parallel = TRUE)
+####################################
+### b) ajuste de resolução
+####################################
+df_dados %<>% mutate(png.name = gsub("paisagens_atualizadas","1A.P_MOVER/dados_brutos",gsub(".tif",".png",tif.name)),
+                     DA=Ntotal/effort_ha)
+v_A.paisagem <- 100 * ( (raio_medio * 2) ^ 2 ) # raio efetivo = 4.29
+func_png.ajust <- function(file, densidade, A_landscape=v_A.paisagem){ # atualizar para o pacote 'magick'
   system(paste(
     "convert ",file, " -resize ", densidade*A_landscape,"@ ", file,  
     sep = ""
   ))
 }
-df_dados.disponiveis %<>% mutate(DA=Ntotal/effort_ha) # portanto exclui os indivíduos mortos
 registerDoMC(3)
-a_ply(df_dados.disponiveis,1,function(x) func_png.ajust(file = x$png.name, densidade = x$DA), .parallel = TRUE) # ajuste da resolucao em funcao da densidade
-
-```
-
-- então aplico o seguinte tratamento nas imagens:
-
-i) pixels com cobertura vegetal >= 70% em unidades de habitat e abaixo unidades de não-habitat  
-ii) função focal para tapar buracos e apagar fragmentos com apenas 1 unidade de habitat   
-iii) função 'area simulada', que marca unidades de habitat que serão seguidas na simulação coalescente:  
-  a) define-se uma janela de observação; A_{janela de observação} ~ 2.25 A_{sitio de amostragem} ;  
-  b) esta janela é posicionada na região central da paisagem ;  
-  c) a função marca as unidades de habitat pressupondo uma espiral quadrada divergente que se inicia no pixel central da paisagem ;  
-  d) unidades de não-habitat não são marcadas.  
-
-```{r f_mat_tri}
-f_area.simulada <- function(matriz, N){
+a_ply(df_dados,1,function(x) func_png.ajust(file = x$png.name, densidade = x$DA), .parallel = TRUE) # ajuste da resolucao em funcao da densidade
+####################################
+### c) e d) pixel -> ifelse(p>=0.7,"habitat","matrix"); comunidade local
+####################################
+## função para criar área quadrada central: comunidade local
+f_area.simulada <- function(matriz, N, index_janela=3/4){
 #@ matriz :: objeto matriz que representa
 #@ N:: tamanho da amostra de indivíduos
   # Janela de observação
-  d <- ceiling(sqrt(N)*(3/4)) # metade do lado do janela de observação
+  d <- ceiling(sqrt(N)*index_janela) # metade do lado do janela de observação *(5/4)
   l <- ceiling(dim(matriz)[1]/2) # linha central da paisagem
   c <- ceiling(dim(matriz)[2]/2) # coluna central da paisagem
   # define uma janela central na paisagem onde o for sera aplicado
@@ -263,8 +264,8 @@ f_area.simulada <- function(matriz, N){
     return(matriz)
   }
 }
-
-f_mat.tri <- function(png, abund){ #png.file, número de indivíduos presente 
+## habitat/matrix
+f_mat.tri <- function(png, abund){
   janela <- matrix(1,3,3) 
   raster <- raster(png)
   mat <- matrix(getValues(raster)/255, ncol = ncol(raster), nrow = nrow(raster))
@@ -278,28 +279,79 @@ f_mat.tri <- function(png, abund){ #png.file, número de indivíduos presente
                     sep = " ", row.names = FALSE, col.names = FALSE))
   }
 }
-df_dados.disponiveis$png.name %<>% as.character
+df_dados$png.name %<>% as.character
 registerDoMC(3)
-a_ply(df_dados.disponiveis,1,function(X) f_mat.tri(png = X$png.name,abund = X$Ntotal),.parallel = TRUE)
+a_ply(df_dados,1,function(X) f_mat.tri(png = X$png.name,abund = X$Ntotal),.parallel = TRUE)
 ```
 
 
-- Essa rotina gera paisagens onde a comunidade local é representada exatamente por um quadrado (figura 1).  
-- Em outros casos a particular configuração espacial não permite construir a comunidade local como uma região quadrada (figura 1).
+```{r auditoria 1 janela de codigo 3,eval=FALSE}
+# df_ da pasta
+df_txt <- Sys.glob("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/dados_brutos/*.txt") %>% 
+  gsub("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/dados_brutos/","",.) %>%
+  adply(.,1,function(x) unname( unlist( strsplit(x, "_NA_", fixed = TRUE) ) ),.id = NULL) %>% 
+  mutate(refID = gsub("ref","",V1),ordem=gsub(".txt","",V2)) %>% dplyr::select(refID,ordem) 
+df_txt$txt.name <- Sys.glob("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/dados_brutos/*.txt") #%>% #caminho dos .tif
+# df_ input
+# df_dados %>% names
+df_dados$ordem <- as.character(df_dados$ordem)
+df_dados$refID <- as.character(df_dados$refID)
+# merge
+df_auditoria <- inner_join(x=df_txt,
+                           y=df_dados,
+                           by=c("ordem","refID"))
+# summarise
+v_A.paisagem <- 100 * ( (4.3 * 2) ^ 2 ) # raio efetivo = 4.29
+df_auditoria %<>% mutate(DA=Ntotal/effort_ha, 
+                         res_esp = v_A.paisagem * DA)
+f_adply <- function(path){
+  # path <- df_auditoria$txt.name[1]
+  paisagem <- as.matrix(read.table(path,header = TRUE,sep = " ",as.is = FALSE))
+  res_ <- length(paisagem)
+  return(res_)
+}
+registerDoMC(3)
+df_auditoria %>% adply(.,1,function(X) f_adply(path=X$txt.name),.parallel = TRUE) %>% head
 
-![fig1 A](/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/figuras/conserto_paisagens/comunidade_local_quadrada.png){ width=37.5% }
-![fig1 B](/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/figuras/conserto_paisagens/comunidade_loca_aproximada_ok.png){ width=37.5% }
 
-__Figura 1__ Na esquerda consideramos a comunidade local como quadrada; na direita consideramos a comunidade local aproximadamente como um quadrado 
+func_png.ajust <- function(file, densidade, A_landscape=v_A.paisagem){ # atualizar para o pacote 'magick'
+  system(paste(
+    "convert ",file, " -resize ", densidade*A_landscape,"@ ", file,  
+    sep = ""
+  ))
+}
+registerDoMC(3)
+a_ply(df_dados,1,function(x) func_png.ajust(file = x$png.name, densidade = x$DA), .parallel = TRUE) # ajuste da resolucao em funcao da densidade
 
-- Consideramos que os métodos são uma boa aproximação quando todo o habitat da comunidade local esta conectado.
-- Para as paisagens onde o habitat da comunidade local esta fragmentado em fragmentos florestais vizinhos, eu removi o habitat isolado e marquei quantidade equivalante de habitat adjacente à comunidade local:
 
-```{r rotina de conserto das paisagens}
+# df_dados %>% filter(!(SiteCode %in% df_auditoria$SiteCode)) %>% .$SiteCode %>% length() == 0
+# rotina final Janela de Código 3
+# f_mat.tri <- function(png, abund){
+for(i in 1:nrow(df_auditoria)){
+i <- 1 #nrow = 9
+par(mar=c(0.2,0.2,1.2,0.2))
+N <- df_auditoria$Ntotal[i]
+paisagem <- as.matrix(read.table(df_auditoria$txt.name[i],header = TRUE,sep = " ",as.is = FALSE))
+# janela de observação:
+d <- ceiling(sqrt(N)*(3/4))  # metade do lado do janela de observação
+l <- ceiling(dim(paisagem)[1]/2) # linha central da paisagem
+c <- ceiling(dim(paisagem)[2]/2) # coluna central da paisagem
+# janela de observação:
+janela_observao <- paisagem[(l-d):(l+d),(c-d):(c+d)]
+#visualização
+image(janela_observao,main=paste0(df_auditoria$SiteCode[i]," N=",df_auditoria$Ntotal[i]),col=terrain.colors(12,rev = TRUE))
+}
+```
+
+
+
+
+```{r auditoria 2 janela de codigo 3, eval=FALSE}
+
 par(mar=c(0.2,0.2,1.2,0.2))
 i <- 1 #nrow = 9
-N <- df_conserto.land$N[i]
-paisagem <- as.matrix(read.table(df_conserto.land$txt.name[i],header = TRUE,sep = " ",as.is = FALSE))
+N <- df_auditoria$Ntotal[i]
+paisagem <- as.matrix(read.table(df_auditoria$txt.name[i],header = TRUE,sep = " ",as.is = FALSE))
 # janela de observação:
 d <- ceiling(sqrt(N)*(3/4))  # metade do lado do janela de observação
 l <- ceiling(dim(paisagem)[1]/2) # linha central da paisagem
@@ -311,7 +363,7 @@ janela_observao <- paisagem[(l-d):(l+d),(c-d):(c+d)]
 ###############################
 ## objetos
 #visualização
-image(janela_observao,main=df_conserto.land$SiteCode[i],col=terrain.colors(12,rev = TRUE))
+image(janela_observao,main=df_auditoria$SiteCode[i],col=terrain.colors(12,rev = TRUE))
 coordenada_ <- locator(1) %>% unlist()
 l_ <- round(coordenada_[1]*nrow(janela_observao))
 c_ <- round(coordenada_[2]*ncol(janela_observao))
