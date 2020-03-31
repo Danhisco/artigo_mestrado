@@ -1,5 +1,5 @@
 ---
-title: "Relatorio de obtenção dos resultados"
+title: "Apêndice 1: obtenção dos dados"
 author: "Mori, Danilo"
 date: "29/10/2019"
 output: 
@@ -128,7 +128,7 @@ b) ajuste de glm.nb para cada conjunto de dados;
 c) média ponderada pelo peso de evidência da comparação de todos os glm.nb ajustados.  
   
   
-```{r janela de codigo 2 _ scale of effect, echo=TRUE,results="hide",eval=FALSE}
+```{r janela de codigo 2 _ scale of effect, echo=TRUE,results="hide",eval=TRUE,cache=TRUE}
 # dados brutos
 df_se <- left_join(y=df_dados,
                    x=expand.grid(SiteCode = df_dados$SiteCode,
@@ -173,21 +173,23 @@ df_averageSE <- print(AICctab(l_md,weights=TRUE)) %>%
 df_averageSE$raio_paisagem <- row.names(df_averageSE) %>% as.numeric()
 df_averageSE$weight <- as.numeric(as.character(df_averageSE$weight))
 df_averageSE$dAICc <- as.numeric(as.character(df_averageSE$dAICc))
-raio_medio <- round(weighted.mean(x = df_averageSE$raio_paisagem,w = df_averageSE$weight),1)
+(raio_medio <- round(weighted.mean(x = df_averageSE$raio_paisagem,w = df_averageSE$weight),1))
 ```
-
-
+  
+  O raio médio = `r raio_medio`  
+  
 #### Janela de Código 3:
-Tratamento do Raster de Paisagem:  
-a) recorte de paisagem: raio_medio
-b) ajuste da resolução
-c) conversão pixel c [0,100] -> ifelse(pixel>=0.7 habitat, matrix)
-d) paisagem local + comunidade local quadrada
+Tratamento do Raster de Paisagem:   
+a) recorte de paisagem: raio_medio  
+b) ajuste da resolução  
+c) conversão pixel c [0,100] -> ifelse(pixel>=0.7 habitat, matrix)  
+d) paisagem local + comunidade local quadrada  
+  
 
 
 ```{r janela de codigo 3 - tratamento do raster,echo=TRUE,eval=FALSE}
 ####################################
-### a) recorte da paisagem: raio = 4.3km
+### a) recorte da paisagem
 ####################################
 func_tif.png <- function(file){
   raster <- raster(file)
@@ -216,51 +218,41 @@ func_png.ajust <- function(file, densidade, A_landscape=v_A.paisagem){ # atualiz
   ))
 }
 registerDoMC(3)
-a_ply(df_dados,1,function(x) func_png.ajust(file = x$png.name, densidade = x$DA), .parallel = TRUE) # ajuste da resolucao em funcao da densidade
+a_ply(df_dados,1,function(x) func_png.ajust(file = x$png.name, densidade = x$DA), .parallel = TRUE)
 ####################################
 ### c) e d) pixel -> ifelse(p>=0.7,"habitat","matrix"); comunidade local
 ####################################
 ## função para criar área quadrada central: comunidade local
 f_area.simulada <- function(matriz, N, index_janela=3/4){
-#@ matriz :: objeto matriz que representa
-#@ N:: tamanho da amostra de indivíduos
   # Janela de observação
-  d <- ceiling(sqrt(N)*index_janela) # metade do lado do janela de observação *(5/4)
-  l <- ceiling(dim(matriz)[1]/2) # linha central da paisagem
-  c <- ceiling(dim(matriz)[2]/2) # coluna central da paisagem
-  # define uma janela central na paisagem onde o for sera aplicado
+  d <- ceiling(sqrt(N)*index_janela)
+  l <- ceiling(dim(matriz)[1]/2)
+  c <- ceiling(dim(matriz)[2]/2)
   m_temp <- matriz[(l-d):(l+d),(c-d):(c+d)]
   if(length(m_temp[m_temp==1]) < N) { 
     stop("habitat insuficiente na janela de observação")
-  # tambem deve estar errado, pois janela de observacao ~ 2.25A_sitio
   } else if (length(m_temp[m_temp==1]) == N) { 
     stop("area amostral igual janela de observacao")
-  # paisagens que devem estar adequadas para os métodos:
   } else { 
-    # posição de cada elemento da janela de observação, por coluna em ordem crescente
     col_cresc <- which(m_temp==m_temp, arr.ind = T)
-    # idem na ordem contrária
     col_decre <- col_cresc[dim(col_cresc)[1]:1,]
-    # posicao de cada elemento, por linha em ordem crescente
     row_cresc <- col_cresc[order(col_cresc[,1],decreasing = FALSE),] 
-    # idem ao controario
     row_decre <- row_cresc[dim(col_cresc)[1]:1,] 
-    # (nrow - 1)/2; exclui a posição dos elementos da coluna central da janela de observação
-    ciclo <- (dim(m_temp)[1]-1)/2 # 
-    l_mat_index <- list() #lista que vou usar dentro do for
+    ciclo <- (dim(m_temp)[1]-1)/2
+    l_mat_index <- list()
     dim_temp <- dim(m_temp)[1]
     for(i in 1:ciclo){
-      a1 <- col_cresc[col_cresc[,"col"]==i,] #considerando o primeiro ciclo: 1a coluna em ordem crescente
-      b1 <- row_cresc[row_cresc[,"row"]==dim_temp+1-i,] #última linha em ordem crescente 
-      c1 <- col_decre[col_decre[,"col"]==dim_temp+1-i,] #última coluna em ordem reversa
-      d1 <- row_decre[row_decre[,"row"]==i,] #primeira linha em ordem reversa; os demais ciclos são com a segunda coluna, penúltima linha, penúltima coluna e segunda linha, etc  
-      l_mat_index[[i]] <- do.call(rbind,list(a1,b1,c1,d1)) #ao final de cada ciclo eu concateno tudo em uma única matriz
+      a1 <- col_cresc[col_cresc[,"col"]==i,]
+      b1 <- row_cresc[row_cresc[,"row"]==dim_temp+1-i,]
+      c1 <- col_decre[col_decre[,"col"]==dim_temp+1-i,]
+      d1 <- row_decre[row_decre[,"row"]==i,]
+      l_mat_index[[i]] <- do.call(rbind,list(a1,b1,c1,d1))
     }
-    l_mat_index[[(dim_temp+1)/2]] <- col_cresc[col_cresc[,"col"]==(dim_temp+1)/2,] #a coluna central deve ser a última
-    mat_ref <- unique(do.call(rbind, l_mat_index)) #remocao de repeticao. Obtenho uma sequência de elementos que descreve uma espiral quadrada convergente
-    length_ref <- length(m_temp[mat_ref][m_temp[mat_ref]==1]) #variável para indexação:
-    m_temp[mat_ref][m_temp[mat_ref]==1][(1+length_ref-N):length_ref] <- 2 #os N últimos elementos que são iguais a 1 e troco por 2
-    matriz[(l-d):(l+d),(c-d):(c+d)] <- m_temp #substituo a matriz de volta
+    l_mat_index[[(dim_temp+1)/2]] <- col_cresc[col_cresc[,"col"]==(dim_temp+1)/2,]
+    mat_ref <- unique(do.call(rbind, l_mat_index))
+    length_ref <- length(m_temp[mat_ref][m_temp[mat_ref]==1])
+    m_temp[mat_ref][m_temp[mat_ref]==1][(1+length_ref-N):length_ref] <- 2
+    matriz[(l-d):(l+d),(c-d):(c+d)] <- m_temp
     return(matriz)
   }
 }
@@ -283,9 +275,17 @@ df_dados$png.name %<>% as.character
 registerDoMC(3)
 a_ply(df_dados,1,function(X) f_mat.tri(png = X$png.name,abund = X$Ntotal),.parallel = TRUE)
 ```
+  
+    
+      
+        
+#### Figura 1     
 
-
-```{r auditoria 1 janela de codigo 3,eval=FALSE}
+ __Legenda:__ Janela de observação da comunidade local. Branco = matriz; Laranja = habitat disponível na paisagem; Verde = habitat disponível na comunidade local.  
+    
+    
+    
+```{r auditoria 1 janela de codigo 3,eval=TRUE,echo=FALSE,fig.width=8,fig.height=40,fig.align='center',cache=TRUE}
 # df_ da pasta
 df_txt <- Sys.glob("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/dados_brutos/*.txt") %>% 
   gsub("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/dados_brutos/","",.) %>%
@@ -300,728 +300,751 @@ df_dados$refID <- as.character(df_dados$refID)
 df_auditoria <- inner_join(x=df_txt,
                            y=df_dados,
                            by=c("ordem","refID"))
-# summarise
-v_A.paisagem <- 100 * ( (4.3 * 2) ^ 2 ) # raio efetivo = 4.29
-df_auditoria %<>% mutate(DA=Ntotal/effort_ha, 
-                         res_esp = v_A.paisagem * DA)
-f_adply <- function(path){
-  # path <- df_auditoria$txt.name[1]
-  paisagem <- as.matrix(read.table(path,header = TRUE,sep = " ",as.is = FALSE))
-  res_ <- length(paisagem)
-  return(res_)
-}
-registerDoMC(3)
-df_auditoria %>% adply(.,1,function(X) f_adply(path=X$txt.name),.parallel = TRUE) %>% head
+# df_auditoria %>% dim 
+# 91/105 raster tratados 
+# Os raster tratados estão com a resolução ajustada corretamente?
+# v_A.paisagem <- 100 * ( (raio_medio * 2) ^ 2 ) 
+# df_auditoria %<>% mutate(DA=Ntotal/effort_ha, 
+#                          res_esp = v_A.paisagem * DA)
+# f_adply <- function(path){
+#   # path <- df_auditoria$txt.name[1]
+#   paisagem <- as.matrix(read.table(path,header = TRUE,sep = " ",as.is = FALSE))
+#   res_ <- length(paisagem)
+#   return(res_)
+# }
+# registerDoMC(3)
+# df_auditoria %<>% 
+#   adply(.,1,function(X) f_adply(path=X$txt.name),.parallel = TRUE,.id = NULL) %>% 
+#   rename(res_obs = V1) %>% 
+#   mutate(diff_res = (res_esp-res_obs)/res_esp)
+# x11()
+# ggplot(df_auditoria,aes(x=res_esp,y=diff_res)) +
+#   geom_point()
+# resolução esta adequada
+
+## Pq alguns sítios não tiveram o raster tratado?
+df_auditoria2 <- df_dados %>% 
+  mutate(png.name = gsub("paisagens_atualizadas","1A.P_MOVER/dados_brutos",gsub(".tif",".png",tif.name)) ) %>% 
+  filter(!(SiteCode %in% df_auditoria$SiteCode))
+
+# for(i in 2:nrow(df_auditoria2)){
+# i <- 6 #6
+# png <- df_auditoria2$png.name[i]
+# abund <- df_auditoria2$Ntotal[i]
+# janela <- matrix(1,3,3) 
+# raster <- raster(png)
+# mat <- matrix(getValues(raster)/255, ncol = ncol(raster), nrow = nrow(raster))
+# raster_binario <- raster( matrix(nrow = nrow(mat), ncol = ncol(mat), sapply(mat, function(x) ifelse(x >= 0.7, 1, 0)) ) ) 
+# func_focal <- function(x) ifelse(sum(x[x==1]) >= 5, 1, x[5])
+# binario.focal <- as.matrix( focal(raster_binario, janela, func_focal, pad=TRUE, padvalues = 0))
+# mat_tri <- try(f_area.simulada(matriz = binario.focal, N = abund,index_janela = 8/4))
+# if(class(mat_tri) == "matrix"){ 
+#   try(write.table(x = mat_tri, 
+#                   file = gsub(".png",".txt", png),
+#                   sep = " ", row.names = FALSE, col.names = FALSE))
+# }
 
 
-func_png.ajust <- function(file, densidade, A_landscape=v_A.paisagem){ # atualizar para o pacote 'magick'
-  system(paste(
-    "convert ",file, " -resize ", densidade*A_landscape,"@ ", file,  
-    sep = ""
-  ))
-}
-registerDoMC(3)
-a_ply(df_dados,1,function(x) func_png.ajust(file = x$png.name, densidade = x$DA), .parallel = TRUE) # ajuste da resolucao em funcao da densidade
 
 
-# df_dados %>% filter(!(SiteCode %in% df_auditoria$SiteCode)) %>% .$SiteCode %>% length() == 0
 # rotina final Janela de Código 3
 # f_mat.tri <- function(png, abund){
+par(mfrow=c(21,5))
 for(i in 1:nrow(df_auditoria)){
-i <- 1 #nrow = 9
+# i <- 1 #nrow = 9
 par(mar=c(0.2,0.2,1.2,0.2))
 N <- df_auditoria$Ntotal[i]
 paisagem <- as.matrix(read.table(df_auditoria$txt.name[i],header = TRUE,sep = " ",as.is = FALSE))
 # janela de observação:
-d <- ceiling(sqrt(N)*(3/4))  # metade do lado do janela de observação
+d <- ceiling(sqrt(N)*(6/4))  # metade do lado do janela de observação
 l <- ceiling(dim(paisagem)[1]/2) # linha central da paisagem
 c <- ceiling(dim(paisagem)[2]/2) # coluna central da paisagem
 # janela de observação:
 janela_observao <- paisagem[(l-d):(l+d),(c-d):(c+d)]
 #visualização
-image(janela_observao,main=paste0(df_auditoria$SiteCode[i]," N=",df_auditoria$Ntotal[i]),col=terrain.colors(12,rev = TRUE))
+image(janela_observao,main=paste0(df_auditoria$SiteCode[i]," N=",df_auditoria$Ntotal[i]),col=terrain.colors(12,rev = TRUE),axes=FALSE)
 }
 ```
 
 
 
 
-```{r auditoria 2 janela de codigo 3, eval=FALSE}
-
-par(mar=c(0.2,0.2,1.2,0.2))
-i <- 1 #nrow = 9
-N <- df_auditoria$Ntotal[i]
-paisagem <- as.matrix(read.table(df_auditoria$txt.name[i],header = TRUE,sep = " ",as.is = FALSE))
-# janela de observação:
-d <- ceiling(sqrt(N)*(3/4))  # metade do lado do janela de observação
-l <- ceiling(dim(paisagem)[1]/2) # linha central da paisagem
-c <- ceiling(dim(paisagem)[2]/2) # coluna central da paisagem
-# janela de observação:
-janela_observao <- paisagem[(l-d):(l+d),(c-d):(c+d)]
-###############################
-########### região para remover
-###############################
-## objetos
-#visualização
-image(janela_observao,main=df_auditoria$SiteCode[i],col=terrain.colors(12,rev = TRUE))
-coordenada_ <- locator(1) %>% unlist()
-l_ <- round(coordenada_[1]*nrow(janela_observao))
-c_ <- round(coordenada_[2]*ncol(janela_observao))
-n_ <- 5
-## auditoria visual
-image(janela_observao[(l_-n_):(l_+n_),(c_-n_):(c_+n_)],
-      main=df_conserto.land$SiteCode[i],col=terrain.colors(12,rev = TRUE))
-## para aqueles sem o habitat central como 1:
-# janela_observao[(l_-n_):(l_+n_),(c_-n_):(c_+n_)] <- 2
-## janela de conversao de 2->1
-#1
-p_arrumar <- janela_observao[(l_-n_):(l_+n_),(c_-n_):(c_+n_)]
-rm_ <- p_arrumar[p_arrumar==2] %>% length()
-p_arrumar[p_arrumar==2] <- 1
-janela_observao[(l_-n_):(l_+n_),(c_-n_):(c_+n_)] <- p_arrumar
-#2
-# p_arrumar <- janela_observao[(l_-n_):(l_+n_+2),(c_-n_):(c_+n_)]
-# rm_ <- length(p_arrumar[p_arrumar==2]) + rm_
-# p_arrumar[p_arrumar==2] <- 1
-# janela_observao[(l_-n_):(l_+n_+2),(c_-n_):(c_+n_)] <- p_arrumar
-######################################
-########### região para incluir 1 -> 2
-######################################
-# length(rm_)
-## 
-image(janela_observao)
-coordenada_ <- locator(1) %>% unlist()
-l_ <- round(coordenada_[1]*nrow(janela_observao))
-c_ <- round(coordenada_[2]*ncol(janela_observao))
-n_ <- 2
-janela_observao[(l_-n_):(l_+n_),(c_-n_):(c_+n_)] # %>% image
-# para aqules com ponto central = 1
-# janela_observao[l_+1,c_+1] <- 1
-# exemplo: o ponto de inicío é [4,3] e o ponto l_,c_ é [3,3] portanto em termos de l_,c_: 
-p_inicio <- c(l_+1,c_+1)
-# correr pela ___ até o ponto:
-image(janela_observao)
-coordenada_ <- locator(1) %>% unlist()
-l_ <- round(coordenada_[1]*nrow(janela_observao))
-c_ <- round(coordenada_[2]*ncol(janela_observao))
-n_ <- 2
-janela_observao[(l_-n_):(l_+n_),(c_-n_):(c_+n_)] # %>% image
-p_final <- c(l_+1,c_)
-# trocando 1 -> 2
-p_rm_ <- janela_observao[p_inicio[1]:p_final[1],p_inicio[2]:p_final[2]] %>% length()
-# if
-p_rm_ < rm_
- janela_observao[p_inicio[1]:p_final[1],p_inicio[2]:p_final[2]] <- 2
- rm_ <- rm_ - p_rm_
-# else 
- janela_observao[p_inicio[1]:p_final[1],p_inicio[2]:p_final[2]][1:rm_] <- 2
-## outro
-# pontos_p_marcar <- janela_observao[p_inicio[1]:p_final[1],p_inicio[2]:p_final[2]]
-# pontos_p_marcar[pontos_p_marcar==1][1:length(rm_)] <- 2
-# janela_observao[p_inicio[1]:p_final[1],p_inicio[2]:p_final[2]] <- pontos_p_marcar 
-# image(janela_observao)
-# auditoria e gravar
-image(paisagem[(l-d):(l+d),(c-d):(c+d)],
-      main=paste(df_conserto.land$SiteCode[i], "antes"),
-      col=terrain.colors(12,rev = TRUE))
-image(janela_observao,
-      main=paste(df_conserto.land$SiteCode[i], "consertada"),
-      col=terrain.colors(12,rev = TRUE))
-paisagem[(l-d):(l+d),(c-d):(c+d)] <- janela_observao
-image(paisagem,main=df_conserto.land$SiteCode[i],col=terrain.colors(12,rev = TRUE))
-write.table(paisagem,
-            file=df_conserto.land$txt.name[i],
-            row.names = FALSE,col.names = FALSE)
-
-```
-
-Um exemplo de paisagem modificada esta na figura 2.
-
-![](/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/figuras/conserto_paisagens/MGuberl7_antes.png){ width=37.5% }
-![](/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/figuras/conserto_paisagens/MGuberl7_consertada.png){ width=37.5% }
-
-__Figura 2__ Exemplo de modificação realizada para poder aproximar a paisagem pelos métodos utilizados.
-
-Por conta da função focal a paisagem esta cercada por NAs (linhas e colunas marginais), então removo-as utilizando:
-
-```{r remocao de NAs}
-f_NA_zero <- function(path_){
-  mat_paisagem <- read.table(file=path_,header = FALSE)
-  mat_paisagem[is.na(mat_paisagem)] <- 0
-  write.table(x = mat_paisagem,file = path_,sep = " ", row.names = FALSE, col.names = FALSE)
-}
-```
-
-
-## Parametrização 
-
-A relação entre os parâmetros de diversidade pode ser obtida a partir da igualdade proposta por por Vallade & Houchmandzadeh (2003) $\theta = \frac{U  (J_M - 1)}{1-U}$. Para isso aproximamos o número de indivíduos na metacomunidade como $J_M = A_{landscape}  DA_{obs} p$.  
-  
-  
-  O parâmetro m é a probabilidade de um evento de colonização na comunidade local ser por um propágulo da metacomunidade (Hubbel 2001). Uma vez que toda unidade de habitat apresenta igual probabilidade de colonização, podemos definir m como a média das probabilidades de cada sítio na comunidade local ser colonizada por um imigrante (eq 1; Chisholm & Lichstein 2009).
-
-$$ eq 1: m = \frac{1}{A} \int \int_A m_{x,y} dxdy $$  
-
- Aproximamos as comunidades locais como áreas quadradas com lado L, que pode ser obtido por $L = \sqrt{10000\frac{J}{DA}}$. Assim podemos reescrever a equação 1 como:
-
-$$ eq 2.a :   m = \left(\frac{1}{L} \int\limits_{-L/2}^{L/2} m_{x}(x)\mathrm{d}x \right)^2 $$
-
-$$ eq 2.b :m_{x} = 1 - \int\limits_{-L/2}^{L/2} K(x-y) \mathrm{d}y $$ 
-
-  Onde K é a função de dispersão. Na simulação coalescente a dispersão resulta do sorteio indepentende de duas distribuições de Laplace em eixos ortogonais centradas no sítio vago (figura X). Se consideramos a distribuição de Laplace como $K(x) = \frac{\alpha}{2} e^{-|\alpha x|}$ (idem para o eixo y), então:
-
-$$eq3:m = (\frac{1-e^{-\alpha L}}{\alpha L})^2$$ 
-
-Onde $\alpha = 1/b$, b é o parâmetro escalar da distribuição de Laplace que pode ser escrito em função do desvio-padrão da distribuição de Laplace (d) $b = d/ \sqrt{2}$. O desvio padrão corresponden à distância média de dispersão (Clark et al. 1999). Podemos reescrever a equação de m em funçao de d:
-
-$$ eq4: m = d \frac{1 - e^{-\frac{\sqrt{2} L}{d}} }{\sqrt{2} L} $$ 
-
-Com a equação 4 podemos calcular m a partir do desvio padrão da função de dispersão. Essa equação é válida para o processo de dispersão em paisagens homogêneas. Na simulação coalescente, uma vez que sorteamos um progenitor e este estaria presente em uma unidade de não habitat, o sorteio é refeito até que o progenitor esteja em uma unidade de habitat. Uma aproximação do efeito da fragmentação na simulação no m calculado a partir da equação 4 pode ser obtido por:
-
-$$eq.5: m' = \frac{mp}{1 - (1-p)m} $$
-
-Onde _p_ é a porcentagem de cobertura vegetal na paisagem. Caso seja necessário calcular d a partir de m, utilizamos o ramo principal da função W de Lambert ($W_{0}$):
-
-$$ eq6 : d = \frac{\sqrt{2} L m}{m W_{0}(- \frac{e^{-1/m}}{m} ) + 1} $$ 
-
-
-### Proporção de cobertura vegetal 
-
-Para calcular a proporção de cobertura vegetal utilizei a função:
-
-```{r tree cover}
-f_tree.cover <- function(file_path){
-  mat_paisagem <- read.table(file=file_path,sep=" ",header=TRUE)
-  tree.cover <- as.vector(mat_paisagem)
-  tree.cover <- tree.cover[!is.na(tree.cover)]
-  p <- 1 - length(tree.cover[tree.cover==0])/length(tree.cover)
-  return(p)
-}
-registerDoMC(4)
-df_simulacao$p <- aaply(df_simulacao$txt.name,1,f_tree.cover,.parallel = TRUE)
-# 
-```
-
-
-A relação entre proporção de habitat (p) e riqueza observada (S) esta na figura 3.
-
-```{r relacao p e S,eval=TRUE,echo=FALSE,fig.width=8,fig.height=3}
-### dados
-df_resultados <- read.table(file="./resultados/df_resultados.csv",header = TRUE,sep = ";",dec = ".",as.is=FALSE)
-level_k <- unique(as.character(df_resultados$k))
-df_resultados$k <- factor(as.character(df_resultados$k),levels = level_k)
-levels(df_resultados$k)[19] <- "0.1"
-### graficos
-df_plot <- df_resultados %>% dplyr::filter(k=="0.99" & MN=="EE") %>% dplyr::select(SiteCode, p, Stotal) %>% unique
-l_p <- vector("list",3)
-l_p[[1]] <- ggplot(df_plot, aes(x=p)) +
-  geom_histogram(bins=30) +
-  geom_vline(xintercept = c(quantile(df_plot$p,probs = c(0.25,0.50,0.75))),color="red")
-l_p[[2]] <- ggplot(df_plot, aes(x=Stotal)) +
-  geom_histogram(bins=30) +
-  geom_vline(xintercept = quantile(df_plot$Stotal,probs = c(0.25,0.50,0.75)),color="red")
-l_p[[3]] <- ggplot(df_plot, aes(x=p,y=Stotal)) +
-  # geom_hline(yintercept = quantile(df_plot$Stotal,probs = c(0.25,0.50,0.75)),color="red") +
-  # geom_vline(xintercept = quantile(df_plot$p,probs = c(0.25,0.50,0.75)),color="red") +
-  geom_point() # + 
-  # geom_smooth(method="lm")
-do.call("grid.arrange",c(l_p,ncol=3))
-```
-
-__Figura 3__ Distribuição de p, s e relação entre as duas variáveis. As linhas verticais em vermelho marcam respectivamente o quantil de 25, 50 e 75% da distribuição.
-
-### Parâmetro de dispersão
-
-Parametrizamos por k, a proporção de propágulos que permanecem até a vizinhança imediata da planta progenitora. A estimativa da distância média de dispersão para o respectivo k para cada paisagem foi obtida pelas funções:
-
-```{r funcoes para estimar d necessario para respectivo k}
-library(rmutil)
-library(lamW)
-qkernel<- function(sigma, kernel, p, density=20852/50, npoints = 1e5){
-    kernel <- match.arg(kernel, choices=c("normal","gaussian","laplace","uniform"))
-    d_ind_MA  <- 100/sqrt(density)
-    if(kernel=="laplace"){
-        b_laplace <- sigma / sqrt(2)
-        X_laplace <- d_ind_MA * round(rlaplace(npoints, s=b_laplace) / d_ind_MA) 
-        Y_laplace <- d_ind_MA * round(rlaplace(npoints, s=b_laplace) / d_ind_MA)
-        dist_laplace <- sqrt(X_laplace^2+Y_laplace^2)
-        result <- quantile(dist_laplace, p)
-    }
-    if(kernel=="normal"|kernel=="gaussian"){
-        b_norm <- sigma 
-        X_norm <- d_ind_MA * round(rnorm(npoints, sd=b_norm) / d_ind_MA)
-        Y_norm <- d_ind_MA * round(rnorm(npoints, sd=b_norm) / d_ind_MA)
-        dist_norm <- sqrt(X_norm^2+Y_norm^2)
-        result <- quantile(dist_norm, p)
-    }
-    if(kernel=="uniform"){
-        b_unif <- sigma/2
-        X_unif <- d_ind_MA * round(runif(npoints, min = -b_unif, max = b_unif) / d_ind_MA)
-        Y_unif <- d_ind_MA * round(runif(npoints, min = -b_unif, max = b_unif) / d_ind_MA)
-        dist_unif <- sqrt(X_unif^2+Y_unif^2)
-        result <- quantile(dist_unif, p)
-    }
-    return(unname(result))
-}
-
-sigkernel <- function(kernel, p, distance, density=20852/50,
-                      npoints =1e5, sigma.min = 1, sigma.max= 100){
-    f1 <- function(x) distance - qkernel(x, kernel, p, density, npoints)
-    uniroot( f1 , lower = sigma.min, upper = sigma.max)
-}
-```
-
-Utilizamos os percentis: c(0.99,seq(0.95,0.05,-0.05)) (figura 4). Obtenção dos percentis:
-
-```{r estimativa de d necessario para gerar k}
-# dados
-percentil <- c(0.99,seq(0.95,0.05,-0.05))
-df_simulacao %<>% left_join(x=.,
-                            y=expand.grid(SiteCode = df_simulacao$SiteCode, k = percentil),
-                            by="SiteCode")
-
-df_simulacao$kernel_type <- "laplace"
-df_simulacao$kernel_code <- "2"
-df_simulacao %<>% mutate(DA=Ntotal/effort_ha, # densidade desconsiderando as espécies mortas
-                         dist_0 = 100/sqrt(DA)) # distância entre indivíduos vizinhos
-df_simulacao$d <- NA
-df_simulacao$kernel_type <- as.character(df_simulacao$kernel_type)
-# funcao para paralelizar
-func_llply <- function(i,data_frame=df_simulacao){
-  df_temp <- data_frame
-  sigma <- sigkernel(kernel = df_temp[i,"kernel_type"], 
-                     p = df_temp[i,"k"], 
-                     distance = df_temp[i,"dist_0"], 
-                     density = df_temp[i,"DA"],
-                     sigma.min=1e-6, 
-                     sigma.max=1e6)$root  
-}
-registerDoMC(4)
-replica.sim <- as.list(1:dim(df_simulacao)[1])
-resultados <- llply(.data = replica.sim, .fun = func_llply, .parallel = TRUE)
-df_simulacao$d <- unlist(resultados)
-# padronização
-df_simulacao %<>% mutate(k_perc = factor(k))
-levels(df_simulacao$k_perc)[2] <- "0.10"
-df_simulacao %>% names
-df_simulacao %<>% select(SiteCode,p,k,DA,Ntotal,Stotal,txt.name,kernel_code,d,)
-df_simulacao$txt.name <- gsub("dados_brutos","simulacao",df_simulacao$txt.name)
-```
-
-
-```{r figura 4 relacao k e d, fig.width=5,fig.height=4,eval=TRUE,echo=FALSE}
-### pacotes
-library(gtools)
-### dados
-df_resultados <- read.table(file="./resultados/df_resultados.csv",header = TRUE,sep = ";",dec = ".",as.is=FALSE)
-level_k <- unique(as.character(df_resultados$k))
-df_resultados$k <- factor(as.character(df_resultados$k),levels = level_k)
-levels(df_resultados$k)[19] <- "0.1"
-### graficos
-l_p <- vector("list",2)
-l_p[[1]] <- ggplot(df_resultados,aes(x=k,y=d)) +
-  geom_jitter() +
-  geom_boxplot() +
-  labs(x="% de propágulos na vizinhança imediata",y="Distância média de dispersão (metros)")
-df_resultados %<>% mutate(L_plot = 100*sqrt(Ntotal/DA),d_L.plot = d / L_plot,S_class = quantcut(Stotal,q=20),p_class = quantcut(p,q=20))
-l_p[[2]] <- ggplot(df_resultados,aes(x=k,y=d_L.plot)) +
-  geom_jitter() +
-  geom_boxplot() +
-  labs(x="% de propágulos na vizinhança imediata",y="d / Lado_plot")
-# l_p[[3]] <- ggplot(df_resultados,aes(x=d_L.plot,y=U_med)) +
-#   geom_point() + geom_line(aes(group=SiteCode)) + facet_wrap(~S_class, ncol=4,scales="free")
-# grid.arrange(l_p[[1]],l_p[[2]],l_p[[3]],
-#              layout_matrix = rbind(c(1,NA),
-#                                    c(2,3))
-#              )
-do.call("grid.arrange",c(l_p,ncol=2))
-```
-
-__Figura 4__ Distância média de dispersão em metros (d) ~ porcentagem de propagulos até a vizinhança imediata (k)
-
-
-
-
-
-# Simulação
-
-A simulação coalescente foi construida em C++ e uma função em R foi utilizada para alimentar a simulação:
-
-```{r dinamica coalescente beta}
-dinamica_coalescente <- function(U, S=0, N_simul, seed, disp_range, disp_kernel, landscape){
-  # Runs coalescent simulations for a given heterogeneous landscape
-  #
-  # Parameters:
-  # U: speciation rate
-  # S: observed richness (integer) - used to fit the value of U, or set to
-  #       0 (default) if that is not desired
-  # N_simul: number of simulations
-  # seed: seed of the RNG (an integer)
-  # disp_range: width of the dispersal kernel
-  # disp_kernel: an integer corresponding to the type of dispersal kernel. One of
-  #               0: uniform
-  #               1: normal
-  #               2: Laplacian
-  # landscape: either a filename containing the landscape data, or a
-  #   bidimensional R array or matrix.
-  #   TODO: describe the format of the input - trinary matrix)
-  #
-  # Returns:
-  # r: an array of dimension N_simul x landscape dimensions, that is, each
-  #   r[i.,] is a bidimensional array of the same shape as the landscape.
-  #   Each site is labeled according to the identity of the species occupying
-  #   that site.
-  # U_est: estimated speciation rate. This is returned only if input parameter S > 0
-  if (is.character(landscape)){
-    l <- as.matrix(read.table(landscape))
-    infile <- landscape
-    land_dims <- dim(l)
-  } else {
-    land_dims <- dim(landscape)
-    infile <- tempfile()
-    # input file *must* be clean: no comments, headers or anything
-    write.table(landscape, infile, col.names=F, row.names=F)
-  }
-  outfile <- tempfile()
-  repeat {
-    system(paste('./dinamica_coalescente', land_dims[1], land_dims[2], U, S, N_simul,
-                 seed, disp_range, disp_kernel, infile, outfile))
-    if (file.exists(outfile) || S == 0)
-      break
-    U <- U/10.
-    print(paste("Decreasing value of U to", U))
-    # set some lowest boundary here so simulations don't take forever
-    if (U < 1e-20){
-      print("Richness value too low, giving up...")
-      return(NULL)
-    }
-  }
-  r <- as.matrix(read.table(outfile))
-  # transpose each grid, as output is written along lines but R reads it along columns
-  # TODO: I thought I got it right, but it was wrong... please DO re-check
-  #r <- aperm(r, c(1,3,2))
-  
-  # recover estimated speciation rate
-  if (S > 0){
-    out_con <- file(outfile)
-    U_line <- strsplit(readLines(out_con, 2)[2], ' ')[[1]]
-    close(out_con)
-    U_est <- as.double(U_line[length(U_line)])
-    return(list(r = r, U_est = U_est))
-  }
-  return(r)
-}
-
-```
-
-
-
-## Estimativa de U
-
-Foram utilizadas 10 réplicas para estimar U:
-
-```{r estimativa de U}
-# replicas
-n_rep.U <- 10
-func1 <- function(x,replicas=n_rep.U) {
-  x$U <- NA
-  x <- x[rep(1:dim(x)[1],each=replicas),]
-}
-df_referencia %<>% func1()
-# simulacao
-# valores de k
-k_factor <- unique(df_referencia$k)
-registerDoMC(n_cores)
-for(a in 1:length(k_factor)){
-  df_simU <- df_referencia %>% dplyr::filter(k == k_factor[a])
-  op <- options(digits.secs=6)
-  funcao_imigracao <- function(i,df_temp=df_simU){
-    aviao <- list()
-    aviao <- dinamica_coalescente(U = 1.25e-06, 
-                                  S = df_temp[i,"Stotal"], 
-                                  N_simul = 1, 
-                                  seed = as.numeric(Sys.time()), 
-                                  disp_range = df_temp[i,"d"], 
-                                  disp_kernel = df_temp[i,"kernel_code"], 
-                                  landscape = df_temp[i,"txt.name"])
-    return(aviao$U_est)
-  }
-  replica.sim <- as.list(1:dim(df_simU)[1])
-  sim.coal_U <- llply(.data = replica.sim, .fun = funcao_imigracao, .parallel = TRUE)
-  df_simU[,"U"] <- unlist(sim.coal_U)
-  write.csv(df_simU, 
-            file=paste0("./U/","df_simU__k",k_factor[a],".csv"),row.names = FALSE)
-}
-```
-
-Então calculou-se a média e variância por SiteCode e k (a maior variância foi na casa dos e-06). O U médio foi utilizado para parametrizar as predições de MNEE e MNEI (figura 6).
-
-```{r U padroes gerais, eval=TRUE,echo=FALSE,fig.height=40,fig.width=9}
-# dados
-df_resultados <- read.table(file="./resultados/df_resultados.csv",header = TRUE,sep = ";",dec = ".",as.is=FALSE)
-level_k <- unique(as.character(df_resultados$k))
-df_resultados$k <- factor(as.character(df_resultados$k),levels = level_k)
-levels(df_resultados$k)[19] <- "0.1"
-df_resultados %<>% mutate(L_plot = 100*sqrt(Ntotal/DA),
-                          d_L.plot = d / L_plot,
-                          S_class = quantcut(Stotal,q=20),
-                          p_class = quantcut(p,q=20),
-                          logito_U_med=log( U_med/(1-U_med) ) )
-# graficos
-l_p <- vector("list",4)
-# l_p[[1]] <- ggplot(df_resultados,aes(x=log(Stotal),y=U_med)) + 
-#   geom_point() +
-#   geom_smooth() +
-#   theme(axis.title.y = element_blank(),
-#         axis.ticks.y = element_blank())
-# 
-# l_p[[1]] <- ggplot(df_resultados,aes(x=log(Stotal),y=U_med)) + 
-#   geom_point() +
-#   geom_smooth() +
-#   theme(axis.title.y = element_blank(),
-#         axis.ticks.y = element_blank()) +
-#   facet_wrap(~k,ncol=4)
-
-l_p[[1]] <- ggplot(df_resultados,aes(x=k,y=U_med)) + 
-  geom_point() +
-  geom_line(aes(group=SiteCode)) + 
-  facet_wrap(~p_class, ncol=4,scales="free") + # 
-  ggtitle(label="eixo x = k (% de prop até vizinhança imediata")
-l_p[[2]] <- ggplot(df_resultados,aes(x=d_L.plot,y=U_med)) +
-  geom_point() + 
-  geom_line(aes(group=SiteCode)) + 
-  facet_wrap(~p_class, ncol=4,scales="free") + #,scales="free"
-  labs(x="d / L_plot") + 
-  ggtitle(label="eixo x = d / L_pĺot")
-l_p[[3]] <- ggplot(df_resultados,aes(x=k,y=logito_U_med)) + 
-  geom_point() +
-  geom_line(aes(group=SiteCode)) + 
-  facet_wrap(~p_class, ncol=4,scales="free") + #,scales="free" 
-  ggtitle(label="eixo x = k (% de prop até vizinhança imediata")
-l_p[[4]] <- ggplot(df_resultados,aes(x=d_L.plot,y=logito_U_med)) +
-  geom_point() + 
-  geom_line(aes(group=SiteCode)) + 
-  facet_wrap(~p_class, ncol=4,scales="free") + #,scales="free"
-  labs(x="d / L_plot") + 
-  ggtitle(label="eixo x = d / L_pĺot")
-# grid.arrange(l_p[[1]],l_p[[2]],
-             # layout_matrix = rbind(c(NA,rep(1,2),NA),
-                                   # rep(2,4),
-                                   # rep(2,4),
-                                   # rep(2,4))
-             # )
-do.call("grid.arrange",c(l_p,ncol=1))
-```
-
-__Figura 5__ U_med estimado por k (% de prop até a vizinhança imediada) e d / L_plot (distância média de dispersão / largura da área amostral aproximada como um quadrado).
-
-
-### Estudo do padrão de U
-
-#### Diferença entre pontos consecutivos
-
-```{r dif entre pontos consecutivos, eval=FALSE}
-teste_acf <- df_resultados %>% filter(SiteCode==df_resultados$SiteCode[1] & MN == "EE") %>% .$U_med
-hist()
-
-```
-
-
-## SAD predita
-
-### MNEE  
-
-O código a seguir roda a simulação coalescente Para obter as SADs preditas por MNEE utilizei o seguinte código
-
-```{r SADs MNEE}
-f_simulacao <- function(i,df_=df_simulacao){
-  X <- df_[i,]
-  mat_sim <- dinamica_coalescente(U = X[,"U_med"], 
-                                  S = 0, 
-                                  N_simul = n_rep.SAD, 
-                                  seed = as.numeric(Sys.time()), 
-                                  disp_range = X[,"d"], 
-                                  disp_kernel = X[,"kernel_code"], 
-                                  landscape = X[,"txt.name"])
-  l_SADs.preditas <- alply(mat_sim,1,function(Y) sort(as.integer(table(Y))) )
-  file_name <- gsub("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/","",
-                    X[,"txt.name"])
-  file_name <- gsub(".txt","",file_name)
-  path.file <- paste0(getwd(),"/SADs_preditas/",file_name,"__k",X[,"k"],".EE.", "rep_",1:length(l_SADs.preditas),".csv")
-  for(j in 1:length(l_SADs.preditas)){
-    write.csv(data.frame(SAD_predita = l_SADs.preditas[[j]]),
-              file=path.file[j],
-              row.names = FALSE)
-  }
-}
-registerDoMC(4)
-simulacao <- as.list(1:dim(df_simulacao)[1])
-l_ply(simulacao,f_simulacao,.parallel = TRUE)
-```
-
-### MNEI  
-
-O código a seguir roda a formula de amostragem de Etienne 2005 Para MNEI:
-
-```{r SADs MNEI}
-# preparação dos dados
-df_simulacao %<>% mutate(L_plot = 100*sqrt(Ntotal/DA),
-                         m = d * ( 1 - exp(-L_plot*sqrt(2)/d) ) / (L_plot*sqrt(2)), 
-                         m_ = m * p / (1 - (1-p) * m),
-                         I = m_ * (Ntotal-1)/(1-m_),
-                         J_M=p*DA*3600,
-                         theta=(U_med*(J_M-1))/(1-U_med))
-# simulação
-f_simulacaoEI <- function(i,df_=df_simulacao){
-  # i <- 1
-  # n_rep.SAD <- 100
-  df_name <- df_[i,]
-  l_SADs <- replicate(n_rep.SAD,generate.ESF(theta = df_name$theta, I = df_name$I, J = df_name$Ntotal))
-  file_name <- gsub("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/","",
-                    df_name[,"txt.name"])
-  file_name <- gsub(".txt","",file_name)
-  path.file <- paste0(getwd(),"/SADs_preditas/",file_name,"__k",df_name[,"k"],".EI.", "rep_",1:length(l_SADs),".csv")
-  for(j in 1:length(l_SADs)){
-    write.csv(data.frame(SAD_predita = l_SADs[[j]]),
-              file=path.file[j],
-              row.names = FALSE)
-  }
-}
-registerDoMC(4)
-simulacao <- as.list(1:dim(df_simulacao)[1])
-l_ply(simulacao,f_simulacaoEI,.parallel = TRUE)
-```
-
-# Prévia Resultados
-
-## Calculo dos resultados
-
-Para realizar o teste de Kolmogorov-Smirnov baseado em bootstrap e as subsequentes métricas relacionados:
-
-```{r codigos para os resultados KSboot}
-# package
-library(twosamples)
-# dados
-df_testeKS <- df_auditoria %>% 
-  select(SAD_obs.name,SAD_MN.name,MN,k,rep,ordem,refID,SiteCode,txt.name,S_obs,p,d) %>%
-  group_by(SAD_obs.name) %>% nest
-df_testeKS$resultados <- vector("list",length = nrow(df_testeKS))
-# rotina
-registerDoMC(3)
-for(row_label in 1:nrow(df_testeKS)){
-  # i <- 1
-  df_ <- df_testeKS[row_label,]
-  v_SAD.obs <- read.csv(df_$SAD_obs.name,header = TRUE,as.is = TRUE) %>% 
-    filter(species.correct != "Mortas") %>% 
-    .$N %>% sort()
-  df_predicao <- as.data.frame(df_$data[[1]])
-  f_KSeS <- function(v_obs = v_SAD.obs,path_MN){
-    v_SAD.MN <- read.csv(file=path_MN,header = TRUE,as.is = TRUE)$SAD_predita
-    teste <- ks_test(a=v_SAD.obs,b = v_SAD.MN,nboots = 3000)  
-    a <- data.frame(D_KSboot=teste[1],p.valor_KSboot=teste[2])
-    a$S_SAD.predita <- length(v_SAD.predita)
-    a$S_SAD.obs <- length(v_SAD.obs) 
-    return(a)
-   }
-  df_testeKS$resultados[[row_label]] <- adply(df_predicao,1,
-                                              function(X) f_testeParallel(path_MN = X$SAD_MN.name),
-                                              .parallel = TRUE)
-}
-df_replicas <- df_testeKS %>% select(-data) %>% unnest(cols = c(resultados)) %>% as.data.frame()
-# summarise
-alpha <- 0.05
-df_resultados <- ddply(df_replicas,c("MN","k","SiteCode"),summarise,
-                       D_mean = mean(KS.D), D_var = var(KS.D),
-                       p.value_mean = mean(KS.p),p.value_var = var(KS.p),
-                       S.MN_mean = mean(S_SAD.predita), S.MN_var = var(S_SAD.predita),
-                       S.obs_mean=mean(S_SAD.obs),S.obs_var=var(S_SAD.obs),
-                       n_SAD.N.ref = sum(KS.p>=alpha), n_SAD.ref = sum(KS.p<alpha),
-                       .parallel = TRUE)
-```
-  
-## Auditoria 1: auto coerrência dos dados
-
-```{r avaliacao da auto coerrencia,, eval=TRUE,echo=FALSE}
-df_resultados <- read.table(file="./resultados/df_resultados.csv",header = TRUE,sep = ";",dec = ".",as.is=FALSE)
-level_k <- unique(as.character(df_resultados$k))
-df_resultados$k <- factor(as.character(df_resultados$k),levels = level_k)
-levels(df_resultados$k)[19] <- "0.1"
-# contrasts(df_resultados$k)
-# graficos
-l_p <- vector("list",4)
-l_p[[1]] <- ggplot(df_resultados,aes(x=p.value_mean,y=n_SAD.N.ref)) + geom_point() + 
-  geom_smooth() + labs(y="número de SADs não refutadas",x="p-valor médio")
-l_p[[2]] <- ggplot(df_resultados,aes(x=D_mean,y=p.value_mean)) + geom_point() + 
-  geom_smooth() + labs(x="estatística D média",y="p-valor médio")
-l_p[[3]] <- ggplot(df_resultados,aes(x=p.value_mean,y=p.value_var)) + geom_point() + geom_smooth() + labs(y="variância p-valor",x="p-valor médio")
-l_p[[4]] <- ggplot(df_resultados,aes(x=D_mean,y=D_var)) + geom_point() + geom_smooth() +
-   labs(x="estatística D média",y="variância estatística D")
-# l_p[[5]] <- ggplot(df_resultados,aes(x=Stotal,y=S.obs_mean)) + geom_point() + geom_abline(intercept = 0,slope = 1,color="red")
-# df_resultados %<>% mutate(diff_S.obs = Stotal-S.obs_mean)
-# l_p[[6]] <- ggplot(df_resultados, aes(x=df_resultados$diff_S.obs)) + 
-#   geom_histogram(breaks=seq(0, max(df_resultados$diff_S.obs), length.out = 40)) + 
-#   labs(title="", x="S_{parametro U} - S_{do vetor KS}", y="Count")
-grid.arrange(l_p[[1]], l_p[[2]], l_p[[3]], l_p[[4]], # l_p[[5]],# l_p[[6]],
-             layout_matrix = rbind(c(rep(1,3),rep(2,3)),
-                                   c(rep(3,3),rep(4,3))) #,
-                                   # c(rep(5,3),rep(NA,3)))
-             )
-```
-
-__Figura 6__ Avaliação da autocoerrência dos métodos. geom_smooth(method="loess") 
-
-## Padrões Gerais da congruência entre predito e observado
-
-```{r SAD preditas padroes gerais, eval=TRUE,echo=FALSE,fig.height=10}
-# dados
-df_resultados <- read.table(file="./resultados/df_resultados.csv",header = TRUE,sep = ";",dec = ".",as.is=FALSE)
-level_k <- unique(as.character(df_resultados$k))
-df_resultados$k <- factor(as.character(df_resultados$k),levels = level_k)
-levels(df_resultados$k)[19] <- "0.1"
-# graficos
-l_p <- vector("list",4)
-l_p[[1]] <- ggplot(df_resultados,aes(x=MN,y=n_SAD.N.ref)) +
-  geom_jitter() +
-  geom_boxplot()
-l_p[[2]] <- ggplot(df_resultados,aes(x=k,y=n_SAD.N.ref,group=k)) +
-  geom_jitter() +
-  geom_boxplot()
-l_p[[3]] <- ggplot(filter(df_resultados,
-                          k %in% levels(df_resultados$k)[1:10]),
-                   aes(x=p,y=n_SAD.N.ref)) +
-  geom_point() + 
-  geom_smooth(method="loess") + 
-  facet_grid(k~MN)
-l_p[[4]] <- ggplot(filter(df_resultados,
-                          k %in% levels(df_resultados$k)[11:20]),
-                   aes(x=p,y=n_SAD.N.ref)) +
-  geom_point() + 
-  geom_smooth(method="loess") + 
-  facet_grid(k~MN)
-grid.arrange(l_p[[1]],l_p[[2]],l_p[[3]],l_p[[4]],
-             layout_matrix = rbind(c(1,2,2,2),
-                                   c(3,3,4,4),
-                                   c(3,3,4,4),
-                                   c(3,3,4,4))
-             )
-
-```
-
-__Figura 7__ Padrões gerais para o número de SADs não refutadas (n_SAD.N.ref). geom_smooth(method="loess")
-
-
-```{r S predita e obs, eval=TRUE,echo=FALSE}
-# dados
-df_resultados <- read.table(file="./resultados/df_resultados.csv",header = TRUE,sep = ";",dec = ".",as.is=FALSE)
-level_k <- unique(as.character(df_resultados$k))
-df_resultados$k <- factor(as.character(df_resultados$k),levels = level_k)
-levels(df_resultados$k)[19] <- "0.1"
-# graficos
-ggplot(df_resultados,aes(x=S.obs_mean,y=S.MN_mean,color=MN)) +
-  geom_abline(intercept = 0,slope = 1,color="red") +
-  geom_point() +
-  facet_wrap(~k,ncol=4,scales="free")
-```
-
-__Figura 8__ S_predita ~ S_obs. Linha vermelha: slope=1,intercept=0
+<!-- ```{r auditoria 2 janela de codigo 3, eval=FALSE} -->
+
+<!-- par(mar=c(0.2,0.2,1.2,0.2)) -->
+<!-- i <- 1 #nrow = 9 -->
+<!-- N <- df_auditoria$Ntotal[i] -->
+<!-- paisagem <- as.matrix(read.table(df_auditoria$txt.name[i],header = TRUE,sep = " ",as.is = FALSE)) -->
+<!-- # janela de observação: -->
+<!-- d <- ceiling(sqrt(N)*(3/4))  # metade do lado do janela de observação -->
+<!-- l <- ceiling(dim(paisagem)[1]/2) # linha central da paisagem -->
+<!-- c <- ceiling(dim(paisagem)[2]/2) # coluna central da paisagem -->
+<!-- # janela de observação: -->
+<!-- janela_observao <- paisagem[(l-d):(l+d),(c-d):(c+d)] -->
+<!-- ############################### -->
+<!-- ########### região para remover -->
+<!-- ############################### -->
+<!-- ## objetos -->
+<!-- #visualização -->
+<!-- image(janela_observao,main=df_auditoria$SiteCode[i],col=terrain.colors(12,rev = TRUE)) -->
+<!-- coordenada_ <- locator(1) %>% unlist() -->
+<!-- l_ <- round(coordenada_[1]*nrow(janela_observao)) -->
+<!-- c_ <- round(coordenada_[2]*ncol(janela_observao)) -->
+<!-- n_ <- 5 -->
+<!-- ## auditoria visual -->
+<!-- image(janela_observao[(l_-n_):(l_+n_),(c_-n_):(c_+n_)], -->
+<!--       main=df_conserto.land$SiteCode[i],col=terrain.colors(12,rev = TRUE)) -->
+<!-- ## para aqueles sem o habitat central como 1: -->
+<!-- # janela_observao[(l_-n_):(l_+n_),(c_-n_):(c_+n_)] <- 2 -->
+<!-- ## janela de conversao de 2->1 -->
+<!-- #1 -->
+<!-- p_arrumar <- janela_observao[(l_-n_):(l_+n_),(c_-n_):(c_+n_)] -->
+<!-- rm_ <- p_arrumar[p_arrumar==2] %>% length() -->
+<!-- p_arrumar[p_arrumar==2] <- 1 -->
+<!-- janela_observao[(l_-n_):(l_+n_),(c_-n_):(c_+n_)] <- p_arrumar -->
+<!-- #2 -->
+<!-- # p_arrumar <- janela_observao[(l_-n_):(l_+n_+2),(c_-n_):(c_+n_)] -->
+<!-- # rm_ <- length(p_arrumar[p_arrumar==2]) + rm_ -->
+<!-- # p_arrumar[p_arrumar==2] <- 1 -->
+<!-- # janela_observao[(l_-n_):(l_+n_+2),(c_-n_):(c_+n_)] <- p_arrumar -->
+<!-- ###################################### -->
+<!-- ########### região para incluir 1 -> 2 -->
+<!-- ###################################### -->
+<!-- # length(rm_) -->
+<!-- ##  -->
+<!-- image(janela_observao) -->
+<!-- coordenada_ <- locator(1) %>% unlist() -->
+<!-- l_ <- round(coordenada_[1]*nrow(janela_observao)) -->
+<!-- c_ <- round(coordenada_[2]*ncol(janela_observao)) -->
+<!-- n_ <- 2 -->
+<!-- janela_observao[(l_-n_):(l_+n_),(c_-n_):(c_+n_)] # %>% image -->
+<!-- # para aqules com ponto central = 1 -->
+<!-- # janela_observao[l_+1,c_+1] <- 1 -->
+<!-- # exemplo: o ponto de inicío é [4,3] e o ponto l_,c_ é [3,3] portanto em termos de l_,c_:  -->
+<!-- p_inicio <- c(l_+1,c_+1) -->
+<!-- # correr pela ___ até o ponto: -->
+<!-- image(janela_observao) -->
+<!-- coordenada_ <- locator(1) %>% unlist() -->
+<!-- l_ <- round(coordenada_[1]*nrow(janela_observao)) -->
+<!-- c_ <- round(coordenada_[2]*ncol(janela_observao)) -->
+<!-- n_ <- 2 -->
+<!-- janela_observao[(l_-n_):(l_+n_),(c_-n_):(c_+n_)] # %>% image -->
+<!-- p_final <- c(l_+1,c_) -->
+<!-- # trocando 1 -> 2 -->
+<!-- p_rm_ <- janela_observao[p_inicio[1]:p_final[1],p_inicio[2]:p_final[2]] %>% length() -->
+<!-- # if -->
+<!-- p_rm_ < rm_ -->
+<!--  janela_observao[p_inicio[1]:p_final[1],p_inicio[2]:p_final[2]] <- 2 -->
+<!--  rm_ <- rm_ - p_rm_ -->
+<!-- # else  -->
+<!--  janela_observao[p_inicio[1]:p_final[1],p_inicio[2]:p_final[2]][1:rm_] <- 2 -->
+<!-- ## outro -->
+<!-- # pontos_p_marcar <- janela_observao[p_inicio[1]:p_final[1],p_inicio[2]:p_final[2]] -->
+<!-- # pontos_p_marcar[pontos_p_marcar==1][1:length(rm_)] <- 2 -->
+<!-- # janela_observao[p_inicio[1]:p_final[1],p_inicio[2]:p_final[2]] <- pontos_p_marcar  -->
+<!-- # image(janela_observao) -->
+<!-- # auditoria e gravar -->
+<!-- image(paisagem[(l-d):(l+d),(c-d):(c+d)], -->
+<!--       main=paste(df_conserto.land$SiteCode[i], "antes"), -->
+<!--       col=terrain.colors(12,rev = TRUE)) -->
+<!-- image(janela_observao, -->
+<!--       main=paste(df_conserto.land$SiteCode[i], "consertada"), -->
+<!--       col=terrain.colors(12,rev = TRUE)) -->
+<!-- paisagem[(l-d):(l+d),(c-d):(c+d)] <- janela_observao -->
+<!-- image(paisagem,main=df_conserto.land$SiteCode[i],col=terrain.colors(12,rev = TRUE)) -->
+<!-- write.table(paisagem, -->
+<!--             file=df_conserto.land$txt.name[i], -->
+<!--             row.names = FALSE,col.names = FALSE) -->
+
+<!-- ``` -->
+
+<!-- Um exemplo de paisagem modificada esta na figura 2. -->
+
+<!-- ![](/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/figuras/conserto_paisagens/MGuberl7_antes.png){ width=37.5% } -->
+<!-- ![](/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/figuras/conserto_paisagens/MGuberl7_consertada.png){ width=37.5% } -->
+
+<!-- __Figura 2__ Exemplo de modificação realizada para poder aproximar a paisagem pelos métodos utilizados. -->
+
+<!-- Por conta da função focal a paisagem esta cercada por NAs (linhas e colunas marginais), então removo-as utilizando: -->
+
+<!-- ```{r remocao de NAs} -->
+<!-- f_NA_zero <- function(path_){ -->
+<!--   mat_paisagem <- read.table(file=path_,header = FALSE) -->
+<!--   mat_paisagem[is.na(mat_paisagem)] <- 0 -->
+<!--   write.table(x = mat_paisagem,file = path_,sep = " ", row.names = FALSE, col.names = FALSE) -->
+<!-- } -->
+<!-- ``` -->
+
+
+<!-- ## Parametrização  -->
+
+<!-- A relação entre os parâmetros de diversidade pode ser obtida a partir da igualdade proposta por por Vallade & Houchmandzadeh (2003) $\theta = \frac{U  (J_M - 1)}{1-U}$. Para isso aproximamos o número de indivíduos na metacomunidade como $J_M = A_{landscape}  DA_{obs} p$.   -->
+
+
+<!--   O parâmetro m é a probabilidade de um evento de colonização na comunidade local ser por um propágulo da metacomunidade (Hubbel 2001). Uma vez que toda unidade de habitat apresenta igual probabilidade de colonização, podemos definir m como a média das probabilidades de cada sítio na comunidade local ser colonizada por um imigrante (eq 1; Chisholm & Lichstein 2009). -->
+
+<!-- $$ eq 1: m = \frac{1}{A} \int \int_A m_{x,y} dxdy $$   -->
+
+<!--  Aproximamos as comunidades locais como áreas quadradas com lado L, que pode ser obtido por $L = \sqrt{10000\frac{J}{DA}}$. Assim podemos reescrever a equação 1 como: -->
+
+<!-- $$ eq 2.a :   m = \left(\frac{1}{L} \int\limits_{-L/2}^{L/2} m_{x}(x)\mathrm{d}x \right)^2 $$ -->
+
+<!-- $$ eq 2.b :m_{x} = 1 - \int\limits_{-L/2}^{L/2} K(x-y) \mathrm{d}y $$  -->
+
+<!--   Onde K é a função de dispersão. Na simulação coalescente a dispersão resulta do sorteio indepentende de duas distribuições de Laplace em eixos ortogonais centradas no sítio vago (figura X). Se consideramos a distribuição de Laplace como $K(x) = \frac{\alpha}{2} e^{-|\alpha x|}$ (idem para o eixo y), então: -->
+
+<!-- $$eq3:m = (\frac{1-e^{-\alpha L}}{\alpha L})^2$$  -->
+
+<!-- Onde $\alpha = 1/b$, b é o parâmetro escalar da distribuição de Laplace que pode ser escrito em função do desvio-padrão da distribuição de Laplace (d) $b = d/ \sqrt{2}$. O desvio padrão corresponden à distância média de dispersão (Clark et al. 1999). Podemos reescrever a equação de m em funçao de d: -->
+
+<!-- $$ eq4: m = d \frac{1 - e^{-\frac{\sqrt{2} L}{d}} }{\sqrt{2} L} $$  -->
+
+<!-- Com a equação 4 podemos calcular m a partir do desvio padrão da função de dispersão. Essa equação é válida para o processo de dispersão em paisagens homogêneas. Na simulação coalescente, uma vez que sorteamos um progenitor e este estaria presente em uma unidade de não habitat, o sorteio é refeito até que o progenitor esteja em uma unidade de habitat. Uma aproximação do efeito da fragmentação na simulação no m calculado a partir da equação 4 pode ser obtido por: -->
+
+<!-- $$eq.5: m' = \frac{mp}{1 - (1-p)m} $$ -->
+
+<!-- Onde _p_ é a porcentagem de cobertura vegetal na paisagem. Caso seja necessário calcular d a partir de m, utilizamos o ramo principal da função W de Lambert ($W_{0}$): -->
+
+<!-- $$ eq6 : d = \frac{\sqrt{2} L m}{m W_{0}(- \frac{e^{-1/m}}{m} ) + 1} $$  -->
+
+
+<!-- ### Proporção de cobertura vegetal  -->
+
+<!-- Para calcular a proporção de cobertura vegetal utilizei a função: -->
+
+<!-- ```{r tree cover} -->
+<!-- f_tree.cover <- function(file_path){ -->
+<!--   mat_paisagem <- read.table(file=file_path,sep=" ",header=TRUE) -->
+<!--   tree.cover <- as.vector(mat_paisagem) -->
+<!--   tree.cover <- tree.cover[!is.na(tree.cover)] -->
+<!--   p <- 1 - length(tree.cover[tree.cover==0])/length(tree.cover) -->
+<!--   return(p) -->
+<!-- } -->
+<!-- registerDoMC(4) -->
+<!-- df_simulacao$p <- aaply(df_simulacao$txt.name,1,f_tree.cover,.parallel = TRUE) -->
+<!-- #  -->
+<!-- ``` -->
+
+
+<!-- A relação entre proporção de habitat (p) e riqueza observada (S) esta na figura 3. -->
+
+<!-- ```{r relacao p e S,eval=TRUE,echo=FALSE,fig.width=8,fig.height=3} -->
+<!-- ### dados -->
+<!-- df_resultados <- read.table(file="./resultados/df_resultados.csv",header = TRUE,sep = ";",dec = ".",as.is=FALSE) -->
+<!-- level_k <- unique(as.character(df_resultados$k)) -->
+<!-- df_resultados$k <- factor(as.character(df_resultados$k),levels = level_k) -->
+<!-- levels(df_resultados$k)[19] <- "0.1" -->
+<!-- ### graficos -->
+<!-- df_plot <- df_resultados %>% dplyr::filter(k=="0.99" & MN=="EE") %>% dplyr::select(SiteCode, p, Stotal) %>% unique -->
+<!-- l_p <- vector("list",3) -->
+<!-- l_p[[1]] <- ggplot(df_plot, aes(x=p)) + -->
+<!--   geom_histogram(bins=30) + -->
+<!--   geom_vline(xintercept = c(quantile(df_plot$p,probs = c(0.25,0.50,0.75))),color="red") -->
+<!-- l_p[[2]] <- ggplot(df_plot, aes(x=Stotal)) + -->
+<!--   geom_histogram(bins=30) + -->
+<!--   geom_vline(xintercept = quantile(df_plot$Stotal,probs = c(0.25,0.50,0.75)),color="red") -->
+<!-- l_p[[3]] <- ggplot(df_plot, aes(x=p,y=Stotal)) + -->
+<!--   # geom_hline(yintercept = quantile(df_plot$Stotal,probs = c(0.25,0.50,0.75)),color="red") + -->
+<!--   # geom_vline(xintercept = quantile(df_plot$p,probs = c(0.25,0.50,0.75)),color="red") + -->
+<!--   geom_point() # +  -->
+<!--   # geom_smooth(method="lm") -->
+<!-- do.call("grid.arrange",c(l_p,ncol=3)) -->
+<!-- ``` -->
+
+<!-- __Figura 3__ Distribuição de p, s e relação entre as duas variáveis. As linhas verticais em vermelho marcam respectivamente o quantil de 25, 50 e 75% da distribuição. -->
+
+<!-- ### Parâmetro de dispersão -->
+
+<!-- Parametrizamos por k, a proporção de propágulos que permanecem até a vizinhança imediata da planta progenitora. A estimativa da distância média de dispersão para o respectivo k para cada paisagem foi obtida pelas funções: -->
+
+<!-- ```{r funcoes para estimar d necessario para respectivo k} -->
+<!-- library(rmutil) -->
+<!-- library(lamW) -->
+<!-- qkernel<- function(sigma, kernel, p, density=20852/50, npoints = 1e5){ -->
+<!--     kernel <- match.arg(kernel, choices=c("normal","gaussian","laplace","uniform")) -->
+<!--     d_ind_MA  <- 100/sqrt(density) -->
+<!--     if(kernel=="laplace"){ -->
+<!--         b_laplace <- sigma / sqrt(2) -->
+<!--         X_laplace <- d_ind_MA * round(rlaplace(npoints, s=b_laplace) / d_ind_MA)  -->
+<!--         Y_laplace <- d_ind_MA * round(rlaplace(npoints, s=b_laplace) / d_ind_MA) -->
+<!--         dist_laplace <- sqrt(X_laplace^2+Y_laplace^2) -->
+<!--         result <- quantile(dist_laplace, p) -->
+<!--     } -->
+<!--     if(kernel=="normal"|kernel=="gaussian"){ -->
+<!--         b_norm <- sigma  -->
+<!--         X_norm <- d_ind_MA * round(rnorm(npoints, sd=b_norm) / d_ind_MA) -->
+<!--         Y_norm <- d_ind_MA * round(rnorm(npoints, sd=b_norm) / d_ind_MA) -->
+<!--         dist_norm <- sqrt(X_norm^2+Y_norm^2) -->
+<!--         result <- quantile(dist_norm, p) -->
+<!--     } -->
+<!--     if(kernel=="uniform"){ -->
+<!--         b_unif <- sigma/2 -->
+<!--         X_unif <- d_ind_MA * round(runif(npoints, min = -b_unif, max = b_unif) / d_ind_MA) -->
+<!--         Y_unif <- d_ind_MA * round(runif(npoints, min = -b_unif, max = b_unif) / d_ind_MA) -->
+<!--         dist_unif <- sqrt(X_unif^2+Y_unif^2) -->
+<!--         result <- quantile(dist_unif, p) -->
+<!--     } -->
+<!--     return(unname(result)) -->
+<!-- } -->
+
+<!-- sigkernel <- function(kernel, p, distance, density=20852/50, -->
+<!--                       npoints =1e5, sigma.min = 1, sigma.max= 100){ -->
+<!--     f1 <- function(x) distance - qkernel(x, kernel, p, density, npoints) -->
+<!--     uniroot( f1 , lower = sigma.min, upper = sigma.max) -->
+<!-- } -->
+<!-- ``` -->
+
+<!-- Utilizamos os percentis: c(0.99,seq(0.95,0.05,-0.05)) (figura 4). Obtenção dos percentis: -->
+
+<!-- ```{r estimativa de d necessario para gerar k} -->
+<!-- # dados -->
+<!-- percentil <- c(0.99,seq(0.95,0.05,-0.05)) -->
+<!-- df_simulacao %<>% left_join(x=., -->
+<!--                             y=expand.grid(SiteCode = df_simulacao$SiteCode, k = percentil), -->
+<!--                             by="SiteCode") -->
+
+<!-- df_simulacao$kernel_type <- "laplace" -->
+<!-- df_simulacao$kernel_code <- "2" -->
+<!-- df_simulacao %<>% mutate(DA=Ntotal/effort_ha, # densidade desconsiderando as espécies mortas -->
+<!--                          dist_0 = 100/sqrt(DA)) # distância entre indivíduos vizinhos -->
+<!-- df_simulacao$d <- NA -->
+<!-- df_simulacao$kernel_type <- as.character(df_simulacao$kernel_type) -->
+<!-- # funcao para paralelizar -->
+<!-- func_llply <- function(i,data_frame=df_simulacao){ -->
+<!--   df_temp <- data_frame -->
+<!--   sigma <- sigkernel(kernel = df_temp[i,"kernel_type"],  -->
+<!--                      p = df_temp[i,"k"],  -->
+<!--                      distance = df_temp[i,"dist_0"],  -->
+<!--                      density = df_temp[i,"DA"], -->
+<!--                      sigma.min=1e-6,  -->
+<!--                      sigma.max=1e6)$root   -->
+<!-- } -->
+<!-- registerDoMC(4) -->
+<!-- replica.sim <- as.list(1:dim(df_simulacao)[1]) -->
+<!-- resultados <- llply(.data = replica.sim, .fun = func_llply, .parallel = TRUE) -->
+<!-- df_simulacao$d <- unlist(resultados) -->
+<!-- # padronização -->
+<!-- df_simulacao %<>% mutate(k_perc = factor(k)) -->
+<!-- levels(df_simulacao$k_perc)[2] <- "0.10" -->
+<!-- df_simulacao %>% names -->
+<!-- df_simulacao %<>% select(SiteCode,p,k,DA,Ntotal,Stotal,txt.name,kernel_code,d,) -->
+<!-- df_simulacao$txt.name <- gsub("dados_brutos","simulacao",df_simulacao$txt.name) -->
+<!-- ``` -->
+
+
+<!-- ```{r figura 4 relacao k e d, fig.width=5,fig.height=4,eval=TRUE,echo=FALSE} -->
+<!-- ### pacotes -->
+<!-- library(gtools) -->
+<!-- ### dados -->
+<!-- df_resultados <- read.table(file="./resultados/df_resultados.csv",header = TRUE,sep = ";",dec = ".",as.is=FALSE) -->
+<!-- level_k <- unique(as.character(df_resultados$k)) -->
+<!-- df_resultados$k <- factor(as.character(df_resultados$k),levels = level_k) -->
+<!-- levels(df_resultados$k)[19] <- "0.1" -->
+<!-- ### graficos -->
+<!-- l_p <- vector("list",2) -->
+<!-- l_p[[1]] <- ggplot(df_resultados,aes(x=k,y=d)) + -->
+<!--   geom_jitter() + -->
+<!--   geom_boxplot() + -->
+<!--   labs(x="% de propágulos na vizinhança imediata",y="Distância média de dispersão (metros)") -->
+<!-- df_resultados %<>% mutate(L_plot = 100*sqrt(Ntotal/DA),d_L.plot = d / L_plot,S_class = quantcut(Stotal,q=20),p_class = quantcut(p,q=20)) -->
+<!-- l_p[[2]] <- ggplot(df_resultados,aes(x=k,y=d_L.plot)) + -->
+<!--   geom_jitter() + -->
+<!--   geom_boxplot() + -->
+<!--   labs(x="% de propágulos na vizinhança imediata",y="d / Lado_plot") -->
+<!-- # l_p[[3]] <- ggplot(df_resultados,aes(x=d_L.plot,y=U_med)) + -->
+<!-- #   geom_point() + geom_line(aes(group=SiteCode)) + facet_wrap(~S_class, ncol=4,scales="free") -->
+<!-- # grid.arrange(l_p[[1]],l_p[[2]],l_p[[3]], -->
+<!-- #              layout_matrix = rbind(c(1,NA), -->
+<!-- #                                    c(2,3)) -->
+<!-- #              ) -->
+<!-- do.call("grid.arrange",c(l_p,ncol=2)) -->
+<!-- ``` -->
+
+<!-- __Figura 4__ Distância média de dispersão em metros (d) ~ porcentagem de propagulos até a vizinhança imediata (k) -->
+
+
+
+
+
+<!-- # Simulação -->
+
+<!-- A simulação coalescente foi construida em C++ e uma função em R foi utilizada para alimentar a simulação: -->
+
+<!-- ```{r dinamica coalescente beta} -->
+<!-- dinamica_coalescente <- function(U, S=0, N_simul, seed, disp_range, disp_kernel, landscape){ -->
+<!--   # Runs coalescent simulations for a given heterogeneous landscape -->
+<!--   # -->
+<!--   # Parameters: -->
+<!--   # U: speciation rate -->
+<!--   # S: observed richness (integer) - used to fit the value of U, or set to -->
+<!--   #       0 (default) if that is not desired -->
+<!--   # N_simul: number of simulations -->
+<!--   # seed: seed of the RNG (an integer) -->
+<!--   # disp_range: width of the dispersal kernel -->
+<!--   # disp_kernel: an integer corresponding to the type of dispersal kernel. One of -->
+<!--   #               0: uniform -->
+<!--   #               1: normal -->
+<!--   #               2: Laplacian -->
+<!--   # landscape: either a filename containing the landscape data, or a -->
+<!--   #   bidimensional R array or matrix. -->
+<!--   #   TODO: describe the format of the input - trinary matrix) -->
+<!--   # -->
+<!--   # Returns: -->
+<!--   # r: an array of dimension N_simul x landscape dimensions, that is, each -->
+<!--   #   r[i.,] is a bidimensional array of the same shape as the landscape. -->
+<!--   #   Each site is labeled according to the identity of the species occupying -->
+<!--   #   that site. -->
+<!--   # U_est: estimated speciation rate. This is returned only if input parameter S > 0 -->
+<!--   if (is.character(landscape)){ -->
+<!--     l <- as.matrix(read.table(landscape)) -->
+<!--     infile <- landscape -->
+<!--     land_dims <- dim(l) -->
+<!--   } else { -->
+<!--     land_dims <- dim(landscape) -->
+<!--     infile <- tempfile() -->
+<!--     # input file *must* be clean: no comments, headers or anything -->
+<!--     write.table(landscape, infile, col.names=F, row.names=F) -->
+<!--   } -->
+<!--   outfile <- tempfile() -->
+<!--   repeat { -->
+<!--     system(paste('./dinamica_coalescente', land_dims[1], land_dims[2], U, S, N_simul, -->
+<!--                  seed, disp_range, disp_kernel, infile, outfile)) -->
+<!--     if (file.exists(outfile) || S == 0) -->
+<!--       break -->
+<!--     U <- U/10. -->
+<!--     print(paste("Decreasing value of U to", U)) -->
+<!--     # set some lowest boundary here so simulations don't take forever -->
+<!--     if (U < 1e-20){ -->
+<!--       print("Richness value too low, giving up...") -->
+<!--       return(NULL) -->
+<!--     } -->
+<!--   } -->
+<!--   r <- as.matrix(read.table(outfile)) -->
+<!--   # transpose each grid, as output is written along lines but R reads it along columns -->
+<!--   # TODO: I thought I got it right, but it was wrong... please DO re-check -->
+<!--   #r <- aperm(r, c(1,3,2)) -->
+
+<!--   # recover estimated speciation rate -->
+<!--   if (S > 0){ -->
+<!--     out_con <- file(outfile) -->
+<!--     U_line <- strsplit(readLines(out_con, 2)[2], ' ')[[1]] -->
+<!--     close(out_con) -->
+<!--     U_est <- as.double(U_line[length(U_line)]) -->
+<!--     return(list(r = r, U_est = U_est)) -->
+<!--   } -->
+<!--   return(r) -->
+<!-- } -->
+
+<!-- ``` -->
+
+
+
+<!-- ## Estimativa de U -->
+
+<!-- Foram utilizadas 10 réplicas para estimar U: -->
+
+<!-- ```{r estimativa de U} -->
+<!-- # replicas -->
+<!-- n_rep.U <- 10 -->
+<!-- func1 <- function(x,replicas=n_rep.U) { -->
+<!--   x$U <- NA -->
+<!--   x <- x[rep(1:dim(x)[1],each=replicas),] -->
+<!-- } -->
+<!-- df_referencia %<>% func1() -->
+<!-- # simulacao -->
+<!-- # valores de k -->
+<!-- k_factor <- unique(df_referencia$k) -->
+<!-- registerDoMC(n_cores) -->
+<!-- for(a in 1:length(k_factor)){ -->
+<!--   df_simU <- df_referencia %>% dplyr::filter(k == k_factor[a]) -->
+<!--   op <- options(digits.secs=6) -->
+<!--   funcao_imigracao <- function(i,df_temp=df_simU){ -->
+<!--     aviao <- list() -->
+<!--     aviao <- dinamica_coalescente(U = 1.25e-06,  -->
+<!--                                   S = df_temp[i,"Stotal"],  -->
+<!--                                   N_simul = 1,  -->
+<!--                                   seed = as.numeric(Sys.time()),  -->
+<!--                                   disp_range = df_temp[i,"d"],  -->
+<!--                                   disp_kernel = df_temp[i,"kernel_code"],  -->
+<!--                                   landscape = df_temp[i,"txt.name"]) -->
+<!--     return(aviao$U_est) -->
+<!--   } -->
+<!--   replica.sim <- as.list(1:dim(df_simU)[1]) -->
+<!--   sim.coal_U <- llply(.data = replica.sim, .fun = funcao_imigracao, .parallel = TRUE) -->
+<!--   df_simU[,"U"] <- unlist(sim.coal_U) -->
+<!--   write.csv(df_simU,  -->
+<!--             file=paste0("./U/","df_simU__k",k_factor[a],".csv"),row.names = FALSE) -->
+<!-- } -->
+<!-- ``` -->
+
+<!-- Então calculou-se a média e variância por SiteCode e k (a maior variância foi na casa dos e-06). O U médio foi utilizado para parametrizar as predições de MNEE e MNEI (figura 6). -->
+
+<!-- ```{r U padroes gerais, eval=TRUE,echo=FALSE,fig.height=40,fig.width=9} -->
+<!-- # dados -->
+<!-- df_resultados <- read.table(file="./resultados/df_resultados.csv",header = TRUE,sep = ";",dec = ".",as.is=FALSE) -->
+<!-- level_k <- unique(as.character(df_resultados$k)) -->
+<!-- df_resultados$k <- factor(as.character(df_resultados$k),levels = level_k) -->
+<!-- levels(df_resultados$k)[19] <- "0.1" -->
+<!-- df_resultados %<>% mutate(L_plot = 100*sqrt(Ntotal/DA), -->
+<!--                           d_L.plot = d / L_plot, -->
+<!--                           S_class = quantcut(Stotal,q=20), -->
+<!--                           p_class = quantcut(p,q=20), -->
+<!--                           logito_U_med=log( U_med/(1-U_med) ) ) -->
+<!-- # graficos -->
+<!-- l_p <- vector("list",4) -->
+<!-- # l_p[[1]] <- ggplot(df_resultados,aes(x=log(Stotal),y=U_med)) +  -->
+<!-- #   geom_point() + -->
+<!-- #   geom_smooth() + -->
+<!-- #   theme(axis.title.y = element_blank(), -->
+<!-- #         axis.ticks.y = element_blank()) -->
+<!-- #  -->
+<!-- # l_p[[1]] <- ggplot(df_resultados,aes(x=log(Stotal),y=U_med)) +  -->
+<!-- #   geom_point() + -->
+<!-- #   geom_smooth() + -->
+<!-- #   theme(axis.title.y = element_blank(), -->
+<!-- #         axis.ticks.y = element_blank()) + -->
+<!-- #   facet_wrap(~k,ncol=4) -->
+
+<!-- l_p[[1]] <- ggplot(df_resultados,aes(x=k,y=U_med)) +  -->
+<!--   geom_point() + -->
+<!--   geom_line(aes(group=SiteCode)) +  -->
+<!--   facet_wrap(~p_class, ncol=4,scales="free") + #  -->
+<!--   ggtitle(label="eixo x = k (% de prop até vizinhança imediata") -->
+<!-- l_p[[2]] <- ggplot(df_resultados,aes(x=d_L.plot,y=U_med)) + -->
+<!--   geom_point() +  -->
+<!--   geom_line(aes(group=SiteCode)) +  -->
+<!--   facet_wrap(~p_class, ncol=4,scales="free") + #,scales="free" -->
+<!--   labs(x="d / L_plot") +  -->
+<!--   ggtitle(label="eixo x = d / L_pĺot") -->
+<!-- l_p[[3]] <- ggplot(df_resultados,aes(x=k,y=logito_U_med)) +  -->
+<!--   geom_point() + -->
+<!--   geom_line(aes(group=SiteCode)) +  -->
+<!--   facet_wrap(~p_class, ncol=4,scales="free") + #,scales="free"  -->
+<!--   ggtitle(label="eixo x = k (% de prop até vizinhança imediata") -->
+<!-- l_p[[4]] <- ggplot(df_resultados,aes(x=d_L.plot,y=logito_U_med)) + -->
+<!--   geom_point() +  -->
+<!--   geom_line(aes(group=SiteCode)) +  -->
+<!--   facet_wrap(~p_class, ncol=4,scales="free") + #,scales="free" -->
+<!--   labs(x="d / L_plot") +  -->
+<!--   ggtitle(label="eixo x = d / L_pĺot") -->
+<!-- # grid.arrange(l_p[[1]],l_p[[2]], -->
+<!--              # layout_matrix = rbind(c(NA,rep(1,2),NA), -->
+<!--                                    # rep(2,4), -->
+<!--                                    # rep(2,4), -->
+<!--                                    # rep(2,4)) -->
+<!--              # ) -->
+<!-- do.call("grid.arrange",c(l_p,ncol=1)) -->
+<!-- ``` -->
+
+<!-- __Figura 5__ U_med estimado por k (% de prop até a vizinhança imediada) e d / L_plot (distância média de dispersão / largura da área amostral aproximada como um quadrado). -->
+
+
+<!-- ### Estudo do padrão de U -->
+
+<!-- #### Diferença entre pontos consecutivos -->
+
+<!-- ```{r dif entre pontos consecutivos, eval=FALSE} -->
+<!-- teste_acf <- df_resultados %>% filter(SiteCode==df_resultados$SiteCode[1] & MN == "EE") %>% .$U_med -->
+<!-- hist() -->
+
+<!-- ``` -->
+
+
+<!-- ## SAD predita -->
+
+<!-- ### MNEE   -->
+
+<!-- O código a seguir roda a simulação coalescente Para obter as SADs preditas por MNEE utilizei o seguinte código -->
+
+<!-- ```{r SADs MNEE} -->
+<!-- f_simulacao <- function(i,df_=df_simulacao){ -->
+<!--   X <- df_[i,] -->
+<!--   mat_sim <- dinamica_coalescente(U = X[,"U_med"],  -->
+<!--                                   S = 0,  -->
+<!--                                   N_simul = n_rep.SAD,  -->
+<!--                                   seed = as.numeric(Sys.time()),  -->
+<!--                                   disp_range = X[,"d"],  -->
+<!--                                   disp_kernel = X[,"kernel_code"],  -->
+<!--                                   landscape = X[,"txt.name"]) -->
+<!--   l_SADs.preditas <- alply(mat_sim,1,function(Y) sort(as.integer(table(Y))) ) -->
+<!--   file_name <- gsub("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/","", -->
+<!--                     X[,"txt.name"]) -->
+<!--   file_name <- gsub(".txt","",file_name) -->
+<!--   path.file <- paste0(getwd(),"/SADs_preditas/",file_name,"__k",X[,"k"],".EE.", "rep_",1:length(l_SADs.preditas),".csv") -->
+<!--   for(j in 1:length(l_SADs.preditas)){ -->
+<!--     write.csv(data.frame(SAD_predita = l_SADs.preditas[[j]]), -->
+<!--               file=path.file[j], -->
+<!--               row.names = FALSE) -->
+<!--   } -->
+<!-- } -->
+<!-- registerDoMC(4) -->
+<!-- simulacao <- as.list(1:dim(df_simulacao)[1]) -->
+<!-- l_ply(simulacao,f_simulacao,.parallel = TRUE) -->
+<!-- ``` -->
+
+<!-- ### MNEI   -->
+
+<!-- O código a seguir roda a formula de amostragem de Etienne 2005 Para MNEI: -->
+
+<!-- ```{r SADs MNEI} -->
+<!-- # preparação dos dados -->
+<!-- df_simulacao %<>% mutate(L_plot = 100*sqrt(Ntotal/DA), -->
+<!--                          m = d * ( 1 - exp(-L_plot*sqrt(2)/d) ) / (L_plot*sqrt(2)),  -->
+<!--                          m_ = m * p / (1 - (1-p) * m), -->
+<!--                          I = m_ * (Ntotal-1)/(1-m_), -->
+<!--                          J_M=p*DA*3600, -->
+<!--                          theta=(U_med*(J_M-1))/(1-U_med)) -->
+<!-- # simulação -->
+<!-- f_simulacaoEI <- function(i,df_=df_simulacao){ -->
+<!--   # i <- 1 -->
+<!--   # n_rep.SAD <- 100 -->
+<!--   df_name <- df_[i,] -->
+<!--   l_SADs <- replicate(n_rep.SAD,generate.ESF(theta = df_name$theta, I = df_name$I, J = df_name$Ntotal)) -->
+<!--   file_name <- gsub("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/","", -->
+<!--                     df_name[,"txt.name"]) -->
+<!--   file_name <- gsub(".txt","",file_name) -->
+<!--   path.file <- paste0(getwd(),"/SADs_preditas/",file_name,"__k",df_name[,"k"],".EI.", "rep_",1:length(l_SADs),".csv") -->
+<!--   for(j in 1:length(l_SADs)){ -->
+<!--     write.csv(data.frame(SAD_predita = l_SADs[[j]]), -->
+<!--               file=path.file[j], -->
+<!--               row.names = FALSE) -->
+<!--   } -->
+<!-- } -->
+<!-- registerDoMC(4) -->
+<!-- simulacao <- as.list(1:dim(df_simulacao)[1]) -->
+<!-- l_ply(simulacao,f_simulacaoEI,.parallel = TRUE) -->
+<!-- ``` -->
+
+<!-- # Prévia Resultados -->
+
+<!-- ## Calculo dos resultados -->
+
+<!-- Para realizar o teste de Kolmogorov-Smirnov baseado em bootstrap e as subsequentes métricas relacionados: -->
+
+<!-- ```{r codigos para os resultados KSboot} -->
+<!-- # package -->
+<!-- library(twosamples) -->
+<!-- # dados -->
+<!-- df_testeKS <- df_auditoria %>%  -->
+<!--   select(SAD_obs.name,SAD_MN.name,MN,k,rep,ordem,refID,SiteCode,txt.name,S_obs,p,d) %>% -->
+<!--   group_by(SAD_obs.name) %>% nest -->
+<!-- df_testeKS$resultados <- vector("list",length = nrow(df_testeKS)) -->
+<!-- # rotina -->
+<!-- registerDoMC(3) -->
+<!-- for(row_label in 1:nrow(df_testeKS)){ -->
+<!--   # i <- 1 -->
+<!--   df_ <- df_testeKS[row_label,] -->
+<!--   v_SAD.obs <- read.csv(df_$SAD_obs.name,header = TRUE,as.is = TRUE) %>%  -->
+<!--     filter(species.correct != "Mortas") %>%  -->
+<!--     .$N %>% sort() -->
+<!--   df_predicao <- as.data.frame(df_$data[[1]]) -->
+<!--   f_KSeS <- function(v_obs = v_SAD.obs,path_MN){ -->
+<!--     v_SAD.MN <- read.csv(file=path_MN,header = TRUE,as.is = TRUE)$SAD_predita -->
+<!--     teste <- ks_test(a=v_SAD.obs,b = v_SAD.MN,nboots = 3000)   -->
+<!--     a <- data.frame(D_KSboot=teste[1],p.valor_KSboot=teste[2]) -->
+<!--     a$S_SAD.predita <- length(v_SAD.predita) -->
+<!--     a$S_SAD.obs <- length(v_SAD.obs)  -->
+<!--     return(a) -->
+<!--    } -->
+<!--   df_testeKS$resultados[[row_label]] <- adply(df_predicao,1, -->
+<!--                                               function(X) f_testeParallel(path_MN = X$SAD_MN.name), -->
+<!--                                               .parallel = TRUE) -->
+<!-- } -->
+<!-- df_replicas <- df_testeKS %>% select(-data) %>% unnest(cols = c(resultados)) %>% as.data.frame() -->
+<!-- # summarise -->
+<!-- alpha <- 0.05 -->
+<!-- df_resultados <- ddply(df_replicas,c("MN","k","SiteCode"),summarise, -->
+<!--                        D_mean = mean(KS.D), D_var = var(KS.D), -->
+<!--                        p.value_mean = mean(KS.p),p.value_var = var(KS.p), -->
+<!--                        S.MN_mean = mean(S_SAD.predita), S.MN_var = var(S_SAD.predita), -->
+<!--                        S.obs_mean=mean(S_SAD.obs),S.obs_var=var(S_SAD.obs), -->
+<!--                        n_SAD.N.ref = sum(KS.p>=alpha), n_SAD.ref = sum(KS.p<alpha), -->
+<!--                        .parallel = TRUE) -->
+<!-- ``` -->
+
+<!-- ## Auditoria 1: auto coerrência dos dados -->
+
+<!-- ```{r avaliacao da auto coerrencia,, eval=TRUE,echo=FALSE} -->
+<!-- df_resultados <- read.table(file="./resultados/df_resultados.csv",header = TRUE,sep = ";",dec = ".",as.is=FALSE) -->
+<!-- level_k <- unique(as.character(df_resultados$k)) -->
+<!-- df_resultados$k <- factor(as.character(df_resultados$k),levels = level_k) -->
+<!-- levels(df_resultados$k)[19] <- "0.1" -->
+<!-- # contrasts(df_resultados$k) -->
+<!-- # graficos -->
+<!-- l_p <- vector("list",4) -->
+<!-- l_p[[1]] <- ggplot(df_resultados,aes(x=p.value_mean,y=n_SAD.N.ref)) + geom_point() +  -->
+<!--   geom_smooth() + labs(y="número de SADs não refutadas",x="p-valor médio") -->
+<!-- l_p[[2]] <- ggplot(df_resultados,aes(x=D_mean,y=p.value_mean)) + geom_point() +  -->
+<!--   geom_smooth() + labs(x="estatística D média",y="p-valor médio") -->
+<!-- l_p[[3]] <- ggplot(df_resultados,aes(x=p.value_mean,y=p.value_var)) + geom_point() + geom_smooth() + labs(y="variância p-valor",x="p-valor médio") -->
+<!-- l_p[[4]] <- ggplot(df_resultados,aes(x=D_mean,y=D_var)) + geom_point() + geom_smooth() + -->
+<!--    labs(x="estatística D média",y="variância estatística D") -->
+<!-- # l_p[[5]] <- ggplot(df_resultados,aes(x=Stotal,y=S.obs_mean)) + geom_point() + geom_abline(intercept = 0,slope = 1,color="red") -->
+<!-- # df_resultados %<>% mutate(diff_S.obs = Stotal-S.obs_mean) -->
+<!-- # l_p[[6]] <- ggplot(df_resultados, aes(x=df_resultados$diff_S.obs)) +  -->
+<!-- #   geom_histogram(breaks=seq(0, max(df_resultados$diff_S.obs), length.out = 40)) +  -->
+<!-- #   labs(title="", x="S_{parametro U} - S_{do vetor KS}", y="Count") -->
+<!-- grid.arrange(l_p[[1]], l_p[[2]], l_p[[3]], l_p[[4]], # l_p[[5]],# l_p[[6]], -->
+<!--              layout_matrix = rbind(c(rep(1,3),rep(2,3)), -->
+<!--                                    c(rep(3,3),rep(4,3))) #, -->
+<!--                                    # c(rep(5,3),rep(NA,3))) -->
+<!--              ) -->
+<!-- ``` -->
+
+<!-- __Figura 6__ Avaliação da autocoerrência dos métodos. geom_smooth(method="loess")  -->
+
+<!-- ## Padrões Gerais da congruência entre predito e observado -->
+
+<!-- ```{r SAD preditas padroes gerais, eval=TRUE,echo=FALSE,fig.height=10} -->
+<!-- # dados -->
+<!-- df_resultados <- read.table(file="./resultados/df_resultados.csv",header = TRUE,sep = ";",dec = ".",as.is=FALSE) -->
+<!-- level_k <- unique(as.character(df_resultados$k)) -->
+<!-- df_resultados$k <- factor(as.character(df_resultados$k),levels = level_k) -->
+<!-- levels(df_resultados$k)[19] <- "0.1" -->
+<!-- # graficos -->
+<!-- l_p <- vector("list",4) -->
+<!-- l_p[[1]] <- ggplot(df_resultados,aes(x=MN,y=n_SAD.N.ref)) + -->
+<!--   geom_jitter() + -->
+<!--   geom_boxplot() -->
+<!-- l_p[[2]] <- ggplot(df_resultados,aes(x=k,y=n_SAD.N.ref,group=k)) + -->
+<!--   geom_jitter() + -->
+<!--   geom_boxplot() -->
+<!-- l_p[[3]] <- ggplot(filter(df_resultados, -->
+<!--                           k %in% levels(df_resultados$k)[1:10]), -->
+<!--                    aes(x=p,y=n_SAD.N.ref)) + -->
+<!--   geom_point() +  -->
+<!--   geom_smooth(method="loess") +  -->
+<!--   facet_grid(k~MN) -->
+<!-- l_p[[4]] <- ggplot(filter(df_resultados, -->
+<!--                           k %in% levels(df_resultados$k)[11:20]), -->
+<!--                    aes(x=p,y=n_SAD.N.ref)) + -->
+<!--   geom_point() +  -->
+<!--   geom_smooth(method="loess") +  -->
+<!--   facet_grid(k~MN) -->
+<!-- grid.arrange(l_p[[1]],l_p[[2]],l_p[[3]],l_p[[4]], -->
+<!--              layout_matrix = rbind(c(1,2,2,2), -->
+<!--                                    c(3,3,4,4), -->
+<!--                                    c(3,3,4,4), -->
+<!--                                    c(3,3,4,4)) -->
+<!--              ) -->
+
+<!-- ``` -->
+
+<!-- __Figura 7__ Padrões gerais para o número de SADs não refutadas (n_SAD.N.ref). geom_smooth(method="loess") -->
+
+
+<!-- ```{r S predita e obs, eval=TRUE,echo=FALSE} -->
+<!-- # dados -->
+<!-- df_resultados <- read.table(file="./resultados/df_resultados.csv",header = TRUE,sep = ";",dec = ".",as.is=FALSE) -->
+<!-- level_k <- unique(as.character(df_resultados$k)) -->
+<!-- df_resultados$k <- factor(as.character(df_resultados$k),levels = level_k) -->
+<!-- levels(df_resultados$k)[19] <- "0.1" -->
+<!-- # graficos -->
+<!-- ggplot(df_resultados,aes(x=S.obs_mean,y=S.MN_mean,color=MN)) + -->
+<!--   geom_abline(intercept = 0,slope = 1,color="red") + -->
+<!--   geom_point() + -->
+<!--   facet_wrap(~k,ncol=4,scales="free") -->
+<!-- ``` -->
+
+<!-- __Figura 8__ S_predita ~ S_obs. Linha vermelha: slope=1,intercept=0 -->
 
