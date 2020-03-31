@@ -7,7 +7,7 @@ output:
     toc: true
     toc_depth: 5
 editor_options: 
-  chunk_output_type: console
+  chunk_output_type: inline
 ---
 
 <style>
@@ -368,95 +368,137 @@ image(janela_observao,main=paste0(df_auditoria$SiteCode[i]," N=",df_auditoria$Nt
 
 
 
+#### Janela de Código 4:  
+__Adequação do Raster__
+Códigos usados para aglomerar o habitat da comunidade local:  
 
-<!-- ```{r auditoria 2 janela de codigo 3, eval=FALSE} -->
 
-<!-- par(mar=c(0.2,0.2,1.2,0.2)) -->
-<!-- i <- 1 #nrow = 9 -->
-<!-- N <- df_auditoria$Ntotal[i] -->
-<!-- paisagem <- as.matrix(read.table(df_auditoria$txt.name[i],header = TRUE,sep = " ",as.is = FALSE)) -->
-<!-- # janela de observação: -->
-<!-- d <- ceiling(sqrt(N)*(3/4))  # metade do lado do janela de observação -->
-<!-- l <- ceiling(dim(paisagem)[1]/2) # linha central da paisagem -->
-<!-- c <- ceiling(dim(paisagem)[2]/2) # coluna central da paisagem -->
-<!-- # janela de observação: -->
-<!-- janela_observao <- paisagem[(l-d):(l+d),(c-d):(c+d)] -->
-<!-- ############################### -->
-<!-- ########### região para remover -->
-<!-- ############################### -->
-<!-- ## objetos -->
-<!-- #visualização -->
-<!-- image(janela_observao,main=df_auditoria$SiteCode[i],col=terrain.colors(12,rev = TRUE)) -->
-<!-- coordenada_ <- locator(1) %>% unlist() -->
-<!-- l_ <- round(coordenada_[1]*nrow(janela_observao)) -->
-<!-- c_ <- round(coordenada_[2]*ncol(janela_observao)) -->
-<!-- n_ <- 5 -->
-<!-- ## auditoria visual -->
-<!-- image(janela_observao[(l_-n_):(l_+n_),(c_-n_):(c_+n_)], -->
-<!--       main=df_conserto.land$SiteCode[i],col=terrain.colors(12,rev = TRUE)) -->
-<!-- ## para aqueles sem o habitat central como 1: -->
-<!-- # janela_observao[(l_-n_):(l_+n_),(c_-n_):(c_+n_)] <- 2 -->
-<!-- ## janela de conversao de 2->1 -->
-<!-- #1 -->
-<!-- p_arrumar <- janela_observao[(l_-n_):(l_+n_),(c_-n_):(c_+n_)] -->
-<!-- rm_ <- p_arrumar[p_arrumar==2] %>% length() -->
-<!-- p_arrumar[p_arrumar==2] <- 1 -->
-<!-- janela_observao[(l_-n_):(l_+n_),(c_-n_):(c_+n_)] <- p_arrumar -->
-<!-- #2 -->
-<!-- # p_arrumar <- janela_observao[(l_-n_):(l_+n_+2),(c_-n_):(c_+n_)] -->
-<!-- # rm_ <- length(p_arrumar[p_arrumar==2]) + rm_ -->
-<!-- # p_arrumar[p_arrumar==2] <- 1 -->
-<!-- # janela_observao[(l_-n_):(l_+n_+2),(c_-n_):(c_+n_)] <- p_arrumar -->
-<!-- ###################################### -->
-<!-- ########### região para incluir 1 -> 2 -->
-<!-- ###################################### -->
-<!-- # length(rm_) -->
-<!-- ##  -->
-<!-- image(janela_observao) -->
-<!-- coordenada_ <- locator(1) %>% unlist() -->
-<!-- l_ <- round(coordenada_[1]*nrow(janela_observao)) -->
-<!-- c_ <- round(coordenada_[2]*ncol(janela_observao)) -->
-<!-- n_ <- 2 -->
-<!-- janela_observao[(l_-n_):(l_+n_),(c_-n_):(c_+n_)] # %>% image -->
-<!-- # para aqules com ponto central = 1 -->
-<!-- # janela_observao[l_+1,c_+1] <- 1 -->
-<!-- # exemplo: o ponto de inicío é [4,3] e o ponto l_,c_ é [3,3] portanto em termos de l_,c_:  -->
-<!-- p_inicio <- c(l_+1,c_+1) -->
-<!-- # correr pela ___ até o ponto: -->
-<!-- image(janela_observao) -->
-<!-- coordenada_ <- locator(1) %>% unlist() -->
-<!-- l_ <- round(coordenada_[1]*nrow(janela_observao)) -->
-<!-- c_ <- round(coordenada_[2]*ncol(janela_observao)) -->
-<!-- n_ <- 2 -->
-<!-- janela_observao[(l_-n_):(l_+n_),(c_-n_):(c_+n_)] # %>% image -->
-<!-- p_final <- c(l_+1,c_) -->
-<!-- # trocando 1 -> 2 -->
-<!-- p_rm_ <- janela_observao[p_inicio[1]:p_final[1],p_inicio[2]:p_final[2]] %>% length() -->
-<!-- # if -->
-<!-- p_rm_ < rm_ -->
-<!--  janela_observao[p_inicio[1]:p_final[1],p_inicio[2]:p_final[2]] <- 2 -->
-<!--  rm_ <- rm_ - p_rm_ -->
-<!-- # else  -->
-<!--  janela_observao[p_inicio[1]:p_final[1],p_inicio[2]:p_final[2]][1:rm_] <- 2 -->
-<!-- ## outro -->
-<!-- # pontos_p_marcar <- janela_observao[p_inicio[1]:p_final[1],p_inicio[2]:p_final[2]] -->
-<!-- # pontos_p_marcar[pontos_p_marcar==1][1:length(rm_)] <- 2 -->
-<!-- # janela_observao[p_inicio[1]:p_final[1],p_inicio[2]:p_final[2]] <- pontos_p_marcar  -->
-<!-- # image(janela_observao) -->
-<!-- # auditoria e gravar -->
-<!-- image(paisagem[(l-d):(l+d),(c-d):(c+d)], -->
-<!--       main=paste(df_conserto.land$SiteCode[i], "antes"), -->
-<!--       col=terrain.colors(12,rev = TRUE)) -->
-<!-- image(janela_observao, -->
-<!--       main=paste(df_conserto.land$SiteCode[i], "consertada"), -->
-<!--       col=terrain.colors(12,rev = TRUE)) -->
-<!-- paisagem[(l-d):(l+d),(c-d):(c+d)] <- janela_observao -->
-<!-- image(paisagem,main=df_conserto.land$SiteCode[i],col=terrain.colors(12,rev = TRUE)) -->
-<!-- write.table(paisagem, -->
-<!--             file=df_conserto.land$txt.name[i], -->
-<!--             row.names = FALSE,col.names = FALSE) -->
+```{r conserto e descarte de rasters, eval=FALSE,echo=TRUE}
+v_Sites__conserto <- c("MGuberl7","BAlenc4","MGlavr6","SCarar","SPcamp1")
+df_auditoria2 <- df_auditoria %>% filter(SiteCode %in% v_Sites__conserto)
+#########
+par(mar=c(0.2,0.2,1.2,0.2))
+i <- 5 #nrow = 5
+N <- df_auditoria2$Ntotal[i]
+paisagem <- as.matrix(read.table(df_auditoria2$txt.name[i],header = TRUE,sep = " ",as.is = FALSE))
+# janela de observação:
+d <- ceiling(sqrt(N)*(3/4))  # metade do lado do janela de observação
+l <- ceiling(dim(paisagem)[1]/2) # linha central da paisagem
+c <- ceiling(dim(paisagem)[2]/2) # coluna central da paisagem
+# janela de observação:
+janela_observao <- paisagem[(l-d):(l+d),(c-d):(c+d)]
+###############################
+########### região para remover
+###############################
+## objetos
+#visualização
+image(janela_observao,main=df_auditoria2$SiteCode[i],col=terrain.colors(12,rev = TRUE))
+coordenada_ <- locator(1) %>% unlist()
+l_ <- round(coordenada_[1]*nrow(janela_observao))
+c_ <- round(coordenada_[2]*ncol(janela_observao))
+n_ <- 3
+## auditoria visual
+image(janela_observao[(l_-n_):(l_+n_),(c_-n_):(c_+n_)],
+      main=df_auditoria2$SiteCode[i],col=terrain.colors(12,rev = TRUE))
+## para aqueles sem o habitat central como 1:
+# janela_observao[(l_-n_):(l_+n_),(c_-n_):(c_+n_)] <- 2
+## janela de conversao de 2->1
+# Primeira vez
+p_arrumar <- janela_observao[(l_-n_):(l_+n_),(c_-n_):(c_+n_)]
+rm_ <- p_arrumar[p_arrumar==2] %>% length()
+p_arrumar[p_arrumar==2] <- 1
+janela_observao[(l_-n_):(l_+n_),(c_-n_):(c_+n_)] <- p_arrumar
+# Outras vezes
+p_arrumar <- janela_observao[(l_-n_):(l_+n_),(c_-n_):(c_+n_)]
+rm_ <- rm_ + length(p_arrumar[p_arrumar==2]) 
+p_arrumar[p_arrumar==2] <- 1
+janela_observao[(l_-n_):(l_+n_),(c_-n_):(c_+n_)] <- p_arrumar
+######################################
+########### região para incluir 1 -> 2
+######################################
+##
+image(janela_observao)
+coordenada_ <- locator(1) %>% unlist()
+l_ <- round(coordenada_[1]*nrow(janela_observao))
+c_ <- round(coordenada_[2]*ncol(janela_observao))
+n_ <- 2
+janela_observao[(l_-n_):(l_+n_),(c_-n_):(c_+n_)] #  %>% image # habitat_local <- 
+# habitat_local[habitat_local==1] %>% length() > rm_
+# para aqules com ponto central = 1
+janela_observao[l_+1,c_] <- 1
+# exemplo: o ponto de inicío é [4,4] e o ponto l_,c_ é [3,3], portanto em termos de l_,c_:
+p_inicio <- c(l_,c_)
+# correr pela ___ até o ponto:
+image(janela_observao)
+coordenada_ <- locator(1) %>% unlist()
+l_ <- round(coordenada_[1]*nrow(janela_observao))
+c_ <- round(coordenada_[2]*ncol(janela_observao))
+n_ <- 2
+janela_observao[(l_-n_):(l_+n_),(c_-n_):(c_+n_)] # %>% image
+p_final <- c(l_+1,c_)
+# trocando 1 -> 2
+p_rm_ <- janela_observao[p_inicio[1]:p_final[1],p_inicio[2]:p_final[2]] %>% length()
+# if
+p_rm_ < rm_
+ janela_observao[p_inicio[1]:p_final[1],p_inicio[2]:p_final[2]] <- 2
+ rm_ <- rm_ - p_rm_
+# else
+ janela_observao[p_inicio[1]:p_final[1],p_inicio[2]:p_final[2]][1:rm_] <- 2
+## outro
+# pontos_p_marcar <- janela_observao[p_inicio[1]:p_final[1],pwrite.table(paisagem,
+            file=df_auditoria2$txt.name[i],
+_inicio[2]:p_final[2]]
+# pontos_p_marcar[pontos_p_marcar==1][1:length(rm_)] <- 2
+# janela_observao[p_inicio[1]:p_final[1],p_inicio[2]:p_final[2]] <- pontos_p_marcar
+# image(janela_observao)
+# auditoria e gravar
+par(mfrow=c(1,2))
+image(paisagem[(l-d):(l+d),(c-d):(c+d)],
+      main=paste(df_auditoria2$SiteCode[i], "before"),
+      col=terrain.colors(12,rev = TRUE),axes=FALSE)
+image(janela_observao,
+      main=paste(df_auditoria2$SiteCode[i], "after"),
+      col=terrain.colors(12,rev = TRUE),axes=FALSE)
+paisagem[(l-d):(l+d),(c-d):(c+d)] <- janela_observao
+par(mfrow=c(1,1))
+image(paisagem,main=df_auditoria2$SiteCode[i],col=terrain.colors(12,rev = TRUE),axes=TRUE)
+write.table(paisagem,
+            file=df_auditoria2$txt.name[i],
+            row.names = FALSE,col.names = FALSE)
 
-<!-- ``` -->
+```
+  
+    
+      
+      
+#### Figura 2:
+
+__Legenda :__ Sítios consertados
+
+```{r figura 2 sitios consertados,eval=TRUE,echo=FALSE,fig.align='center',fig.height=2,cache=TRUE}
+v_Sites__conserto <- c("MGuberl7","BAlenc4","MGlavr6","SCarar","SPcamp1")
+df_auditoria2 <- df_auditoria %>% filter(SiteCode %in% v_Sites__conserto)
+par(mfrow=c(1,5))
+for(i in 1:nrow(df_auditoria2)){
+# i <- 1 #nrow = 9
+par(mar=c(0.2,0.2,1.2,0.2))
+N <- df_auditoria2$Ntotal[i]
+paisagem <- as.matrix(read.table(df_auditoria2$txt.name[i],header = TRUE,sep = " ",as.is = FALSE))
+# janela de observação:
+d <- ceiling(sqrt(N)*(6/4))  # metade do lado do janela de observação
+l <- ceiling(dim(paisagem)[1]/2) # linha central da paisagem
+c <- ceiling(dim(paisagem)[2]/2) # coluna central da paisagem
+# janela de observação:
+janela_observao <- paisagem[(l-d):(l+d),(c-d):(c+d)]
+#visualização
+image(janela_observao,main=paste0(df_auditoria2$SiteCode[i]," N=",df_auditoria2$Ntotal[i]),col=terrain.colors(12,rev = TRUE),axes=FALSE)
+}
+```
+
+
+
+
+
 
 <!-- Um exemplo de paisagem modificada esta na figura 2. -->
 
