@@ -7,7 +7,7 @@ output:
     toc: true
     toc_depth: 5
 editor_options: 
-  chunk_output_type: inline
+  chunk_output_type: console
 ---
 
 <style>
@@ -21,21 +21,17 @@ knitr::opts_knit$set(root.dir = "~/Documentos/Doutorado/artigo_mestrado/1A.P_MOV
 setwd("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/")
 ```
 
-```{r pacotes,eval=TRUE}
-library(gtools)
+```{r pacotes,eval=TRUE,include=TRUE}
 library(doMC)
 library(raster)
 library(GUILDS)
 library(bbmle)
-library(lme4)
-library(merTools)
 library(magrittr)
 library(gridExtra)
 library(ggplot2)
 library(stringr)
 library(tidyr)
 library(plyr)
-library(purrr)
 library(dplyr)
 ```
 
@@ -46,7 +42,8 @@ library(dplyr)
 df_SAD.obs <- read.csv(file="/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/dados_brutos/abundances.csv",
                        header = TRUE,as.is = TRUE)
 # df_SAD.obs$SiteCode %<>% as.factor() 
-v_Sites <- df_SAD.obs %>% filter(N == 0.5) %>% .$SiteCode %>% unique
+df_SAD.obs %>% filter(SiteCode == "SPcamp1")
+v_Sites <- df_SAD.obs %>% filter(N == 0.5 | N == 0.05) %>% .$SiteCode %>% unique
 # f_summarise <- function(v_){ # falsos positivos e falsos nefativos, não funcionou
 #   length(table(v_%%1==0))==1
 # }
@@ -210,7 +207,7 @@ a_ply(df_dados$tif.name,1,func_tif.png,.parallel = TRUE)
 ####################################
 df_dados %<>% mutate(png.name = gsub("paisagens_atualizadas","1A.P_MOVER/dados_brutos",gsub(".tif",".png",tif.name)),
                      DA=Ntotal/effort_ha)
-v_A.paisagem <- 100 * ( (raio_medio * 2) ^ 2 ) # raio efetivo = 4.29
+v_A.paisagem <- 100 * ( (raio_medio * 2) ^ 2 ) 
 func_png.ajust <- function(file, densidade, A_landscape=v_A.paisagem){ # atualizar para o pacote 'magick'
   system(paste(
     "convert ",file, " -resize ", densidade*A_landscape,"@ ", file,  
@@ -223,7 +220,7 @@ a_ply(df_dados,1,function(x) func_png.ajust(file = x$png.name, densidade = x$DA)
 ### c) e d) pixel -> ifelse(p>=0.7,"habitat","matrix"); comunidade local
 ####################################
 ## função para criar área quadrada central: comunidade local
-f_area.simulada <- function(matriz, N, index_janela=3/4){
+f_area.simulada <- function(matriz, N, index_janela=8/4){
   # Janela de observação
   d <- ceiling(sqrt(N)*index_janela)
   l <- ceiling(dim(matriz)[1]/2)
@@ -275,22 +272,32 @@ df_dados$png.name %<>% as.character
 registerDoMC(3)
 a_ply(df_dados,1,function(X) f_mat.tri(png = X$png.name,abund = X$Ntotal),.parallel = TRUE)
 ```
-  
-    
-      
+
         
 #### Figura 1     
 
  __Legenda:__ Janela de observação da comunidade local. Branco = matriz; Laranja = habitat disponível na paisagem; Verde = habitat disponível na comunidade local.  
     
-    
-    
-```{r auditoria 1 janela de codigo 3,eval=TRUE,echo=FALSE,fig.width=8,fig.height=40,fig.align='center',cache=TRUE}
+
+```{r auditoria 1 janela de codigo 3,eval=TRUE,echo=FALSE,fig.align='center',cache=FALSE,fig.width=8,fig.height=40}
 # df_ da pasta
-df_txt <- Sys.glob("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/dados_brutos/*.txt") %>% 
+df_txt <- Sys.glob("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/dados_brutos/*.txt") %>%
   gsub("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/dados_brutos/","",.) %>%
-  adply(.,1,function(x) unname( unlist( strsplit(x, "_NA_", fixed = TRUE) ) ),.id = NULL) %>% 
-  mutate(refID = gsub("ref","",V1),ordem=gsub(".txt","",V2)) %>% dplyr::select(refID,ordem) 
+  adply(.,1,function(x) unname( unlist( strsplit(x, "_NA_", fixed = TRUE) ) ),.id = NULL) %>%
+  mutate(refID = gsub("ref","",V1),ordem=gsub(".txt","",V2)) %>%
+  dplyr::select(refID,ordem)
+#   
+# 
+# 
+# df_txt <- dplyr::select(dplyr::mutate(plyr::adply(gsub("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/dados_brutos/","",
+#      Sys.glob("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/dados_brutos/*.txt")),
+#      1,function(x) unname( unlist( strsplit(x, "_NA_", fixed = TRUE) ) ),.id = NULL),
+#      refID = gsub("ref","",V1),ordem=gsub(".txt","",V2)),refID,ordem)
+# 
+# gsub("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/dados_brutos/","",
+#      Sys.glob("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/dados_brutos/*.txt"))
+
+
 df_txt$txt.name <- Sys.glob("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/dados_brutos/*.txt") #%>% #caminho dos .tif
 # df_ input
 # df_dados %>% names
@@ -350,6 +357,7 @@ df_auditoria2 <- df_dados %>%
 # rotina final Janela de Código 3
 # f_mat.tri <- function(png, abund){
 par(mfrow=c(21,5))
+# par(mfrow=c(1,1))
 for(i in 1:nrow(df_auditoria)){
 # i <- 1 #nrow = 9
 par(mar=c(0.2,0.2,1.2,0.2))
@@ -373,16 +381,17 @@ __Adequação do Raster__
 Códigos usados para aglomerar o habitat da comunidade local:  
 
 
-```{r conserto e descarte de rasters, eval=FALSE,echo=TRUE}
-v_Sites__conserto <- c("MGuberl7","BAlenc4","MGlavr6","SCarar","SPcamp1")
+
+```{r Janela de Código 4 _ conserto e descarte de rasters, eval=FALSE,echo=TRUE}
+v_Sites__conserto <- c("MGlavr6","MGlavr3")
 df_auditoria2 <- df_auditoria %>% filter(SiteCode %in% v_Sites__conserto)
 #########
 par(mar=c(0.2,0.2,1.2,0.2))
-i <- 5 #nrow = 5
+i <- 2 #nrow = 5
 N <- df_auditoria2$Ntotal[i]
 paisagem <- as.matrix(read.table(df_auditoria2$txt.name[i],header = TRUE,sep = " ",as.is = FALSE))
 # janela de observação:
-d <- ceiling(sqrt(N)*(3/4))  # metade do lado do janela de observação
+d <- ceiling(sqrt(N)*(4/4))  # metade do lado do janela de observação
 l <- ceiling(dim(paisagem)[1]/2) # linha central da paisagem
 c <- ceiling(dim(paisagem)[2]/2) # coluna central da paisagem
 # janela de observação:
@@ -396,7 +405,7 @@ image(janela_observao,main=df_auditoria2$SiteCode[i],col=terrain.colors(12,rev =
 coordenada_ <- locator(1) %>% unlist()
 l_ <- round(coordenada_[1]*nrow(janela_observao))
 c_ <- round(coordenada_[2]*ncol(janela_observao))
-n_ <- 3
+n_ <- 10
 ## auditoria visual
 image(janela_observao[(l_-n_):(l_+n_),(c_-n_):(c_+n_)],
       main=df_auditoria2$SiteCode[i],col=terrain.colors(12,rev = TRUE))
@@ -425,9 +434,9 @@ n_ <- 2
 janela_observao[(l_-n_):(l_+n_),(c_-n_):(c_+n_)] #  %>% image # habitat_local <- 
 # habitat_local[habitat_local==1] %>% length() > rm_
 # para aqules com ponto central = 1
-janela_observao[l_+1,c_] <- 1
-# exemplo: o ponto de inicío é [4,4] e o ponto l_,c_ é [3,3], portanto em termos de l_,c_:
-p_inicio <- c(l_,c_)
+# janela_observao[l_+1,c_] <- 1
+# exemplo: o ponto de inicío é [4,4] e o ponto l_,c_ é [3,3], portanto em termos de l_+1,c_+1:
+p_inicio <- c(l_+1,c_+1)
 # correr pela ___ até o ponto:
 image(janela_observao)
 coordenada_ <- locator(1) %>% unlist()
@@ -446,8 +455,8 @@ p_rm_ < rm_
  janela_observao[p_inicio[1]:p_final[1],p_inicio[2]:p_final[2]][1:rm_] <- 2
 ## outro
 # pontos_p_marcar <- janela_observao[p_inicio[1]:p_final[1],pwrite.table(paisagem,
-            file=df_auditoria2$txt.name[i],
-_inicio[2]:p_final[2]]
+            # file=df_auditoria2$txt.name[i],
+# _inicio[2]:p_final[2]]
 # pontos_p_marcar[pontos_p_marcar==1][1:length(rm_)] <- 2
 # janela_observao[p_inicio[1]:p_final[1],p_inicio[2]:p_final[2]] <- pontos_p_marcar
 # image(janela_observao)
@@ -465,18 +474,19 @@ image(paisagem,main=df_auditoria2$SiteCode[i],col=terrain.colors(12,rev = TRUE),
 write.table(paisagem,
             file=df_auditoria2$txt.name[i],
             row.names = FALSE,col.names = FALSE)
-
 ```
   
     
-      
+     
       
 #### Figura 2:
 
 __Legenda :__ Sítios consertados
 
-```{r figura 2 sitios consertados,eval=TRUE,echo=FALSE,fig.align='center',fig.height=2,cache=TRUE}
-v_Sites__conserto <- c("MGuberl7","BAlenc4","MGlavr6","SCarar","SPcamp1")
+```{r figura 2 sitios consertados,eval=TRUE,echo=FALSE,fig.align='center',fig.height=2,cache=FALSE,eval=FALSE}
+v_Sites__conserto <- c("MGlavr6","MGlavr3")
+v_Sites__remocao <- c("MGlavr4")
+
 df_auditoria2 <- df_auditoria %>% filter(SiteCode %in% v_Sites__conserto)
 par(mfrow=c(1,5))
 for(i in 1:nrow(df_auditoria2)){
@@ -496,6 +506,94 @@ image(janela_observao,main=paste0(df_auditoria2$SiteCode[i]," N=",df_auditoria2$
 ```
 
 
+#### Janela de Código 5:
+Distância média de dispersão por k:
+
+```{r janela de codigo 5,eval=FALSE,echo=TRUE}
+## funções
+library(rmutil)
+library(lamW)
+qkernel<- function(sigma, kernel, p, density=20852/50, npoints = 1e5){
+    kernel <- match.arg(kernel, choices=c("normal","gaussian","laplace","uniform"))
+    d_ind_MA  <- 100/sqrt(density)
+    if(kernel=="laplace"){
+        b_laplace <- sigma / sqrt(2)
+        X_laplace <- d_ind_MA * round(rlaplace(npoints, s=b_laplace) / d_ind_MA)
+        Y_laplace <- d_ind_MA * round(rlaplace(npoints, s=b_laplace) / d_ind_MA)
+        dist_laplace <- sqrt(X_laplace^2+Y_laplace^2)
+        result <- quantile(dist_laplace, p)
+    }
+    if(kernel=="normal"|kernel=="gaussian"){
+        b_norm <- sigma
+        X_norm <- d_ind_MA * round(rnorm(npoints, sd=b_norm) / d_ind_MA)
+        Y_norm <- d_ind_MA * round(rnorm(npoints, sd=b_norm) / d_ind_MA)
+        dist_norm <- sqrt(X_norm^2+Y_norm^2)
+        result <- quantile(dist_norm, p)
+    }
+    if(kernel=="uniform"){
+        b_unif <- sigma/2
+        X_unif <- d_ind_MA * round(runif(npoints, min = -b_unif, max = b_unif) / d_ind_MA)
+        Y_unif <- d_ind_MA * round(runif(npoints, min = -b_unif, max = b_unif) / d_ind_MA)
+        dist_unif <- sqrt(X_unif^2+Y_unif^2)
+        result <- quantile(dist_unif, p)
+    }
+    return(unname(result))
+}
+sigkernel <- function(kernel, p, distance, density=20852/50,
+                      npoints =1e5, sigma.min = 1, sigma.max= 100){
+    f1 <- function(x) distance - qkernel(x, kernel, p, density, npoints)
+    uniroot( f1 , lower = sigma.min, upper = sigma.max)
+}
+## estimativa
+# dados
+df_auditoria %<>% filter(SiteCode != "MGlavr4")
+percentil <- c(0.99,seq(0.95,0.05,-0.05))
+df_simulacao <- left_join(x=df_auditoria,
+                          y=expand.grid(SiteCode = df_auditoria$SiteCode, k = percentil),
+                          by="SiteCode")
+
+df_simulacao$kernel_type <- "laplace"
+df_simulacao$kernel_code <- "2"
+df_simulacao %<>% mutate(DA=Ntotal/effort_ha, # densidade desconsiderando as espécies mortas
+                         dist_0 = 100/sqrt(DA)) # distância entre indivíduos vizinhos
+df_simulacao$d <- NA
+df_simulacao$kernel_type <- as.character(df_simulacao$kernel_type)
+# funcao para paralelizar
+func_llply <- function(i,data_frame=df_simulacao){
+  df_temp <- data_frame
+  sigma <- sigkernel(kernel = df_temp[i,"kernel_type"],
+                     p = df_temp[i,"k"],
+                     distance = df_temp[i,"dist_0"],
+                     density = df_temp[i,"DA"],
+                     sigma.min=1e-6,
+                     sigma.max=1e6)$root
+}
+registerDoMC(3)
+replica.sim <- as.list(1:dim(df_simulacao)[1])
+resultados <- llply(.data = replica.sim, .fun = func_llply, .parallel = TRUE)
+df_simulacao$d <- unlist(resultados)
+```
+  
+    
+#### Janela de Código 6:
+Cálculo da proporção de habitat na paisagem (p):
+
+```{r janela de codigo 6}
+f_tree.cover <- function(file_path){
+  mat_paisagem <- read.table(file=file_path,sep=" ",header=TRUE)
+  tree.cover <- as.vector(mat_paisagem)
+  tree.cover <- tree.cover[!is.na(tree.cover)]
+  p <- 1 - length(tree.cover[tree.cover==0])/length(tree.cover)
+  return(p)
+}
+df_ <- df_simulacao %>% select(SiteCode,txt.name) %>% distinct()
+registerDoMC(3)
+df_$p <- aaply(df_$txt.name,1,f_tree.cover,.parallel = TRUE)
+df_simulacao <- left_join(x = df_simulacao,
+                          y = select(df_,-txt.name),
+                          by="SiteCode")
+
+```
 
 
 
@@ -518,54 +616,54 @@ image(janela_observao,main=paste0(df_auditoria2$SiteCode[i]," N=",df_auditoria2$
 <!-- ``` -->
 
 
-<!-- ## Parametrização  -->
+## Parametrização
 
-<!-- A relação entre os parâmetros de diversidade pode ser obtida a partir da igualdade proposta por por Vallade & Houchmandzadeh (2003) $\theta = \frac{U  (J_M - 1)}{1-U}$. Para isso aproximamos o número de indivíduos na metacomunidade como $J_M = A_{landscape}  DA_{obs} p$.   -->
+A relação entre os parâmetros de diversidade pode ser obtida a partir da igualdade proposta por por Vallade & Houchmandzadeh (2003) $\theta = \frac{U  (J_M - 1)}{1-U}$. Para isso aproximamos o número de indivíduos na metacomunidade como $J_M = A_{landscape}  DA_{obs} p$.
 
 
-<!--   O parâmetro m é a probabilidade de um evento de colonização na comunidade local ser por um propágulo da metacomunidade (Hubbel 2001). Uma vez que toda unidade de habitat apresenta igual probabilidade de colonização, podemos definir m como a média das probabilidades de cada sítio na comunidade local ser colonizada por um imigrante (eq 1; Chisholm & Lichstein 2009). -->
+  O parâmetro m é a probabilidade de um evento de colonização na comunidade local ser por um propágulo da metacomunidade (Hubbel 2001). Uma vez que toda unidade de habitat apresenta igual probabilidade de colonização, podemos definir m como a média das probabilidades de cada sítio na comunidade local ser colonizada por um imigrante (eq 1; Chisholm & Lichstein 2009).
 
-<!-- $$ eq 1: m = \frac{1}{A} \int \int_A m_{x,y} dxdy $$   -->
+$$ eq 1: m = \frac{1}{A} \int \int_A m_{x,y} dxdy $$
 
-<!--  Aproximamos as comunidades locais como áreas quadradas com lado L, que pode ser obtido por $L = \sqrt{10000\frac{J}{DA}}$. Assim podemos reescrever a equação 1 como: -->
+ Aproximamos as comunidades locais como áreas quadradas com lado L, que pode ser obtido por $L = \sqrt{10000\frac{J}{DA}}$. Assim podemos reescrever a equação 1 como:
 
-<!-- $$ eq 2.a :   m = \left(\frac{1}{L} \int\limits_{-L/2}^{L/2} m_{x}(x)\mathrm{d}x \right)^2 $$ -->
+$$ eq 2.a :   m = \left(\frac{1}{L} \int\limits_{-L/2}^{L/2} m_{x}(x)\mathrm{d}x \right)^2 $$
 
-<!-- $$ eq 2.b :m_{x} = 1 - \int\limits_{-L/2}^{L/2} K(x-y) \mathrm{d}y $$  -->
+$$ eq 2.b :m_{x} = 1 - \int\limits_{-L/2}^{L/2} K(x-y) \mathrm{d}y $$
 
-<!--   Onde K é a função de dispersão. Na simulação coalescente a dispersão resulta do sorteio indepentende de duas distribuições de Laplace em eixos ortogonais centradas no sítio vago (figura X). Se consideramos a distribuição de Laplace como $K(x) = \frac{\alpha}{2} e^{-|\alpha x|}$ (idem para o eixo y), então: -->
+  Onde K é a função de dispersão. Na simulação coalescente a dispersão resulta do sorteio indepentende de duas distribuições de Laplace em eixos ortogonais centradas no sítio vago (figura X). Se consideramos a distribuição de Laplace como $K(x) = \frac{\alpha}{2} e^{-|\alpha x|}$ (idem para o eixo y), então:
 
-<!-- $$eq3:m = (\frac{1-e^{-\alpha L}}{\alpha L})^2$$  -->
+$$eq3:m = (\frac{1-e^{-\alpha L}}{\alpha L})^2$$
 
-<!-- Onde $\alpha = 1/b$, b é o parâmetro escalar da distribuição de Laplace que pode ser escrito em função do desvio-padrão da distribuição de Laplace (d) $b = d/ \sqrt{2}$. O desvio padrão corresponden à distância média de dispersão (Clark et al. 1999). Podemos reescrever a equação de m em funçao de d: -->
+Onde $\alpha = 1/b$, b é o parâmetro escalar da distribuição de Laplace que pode ser escrito em função do desvio-padrão da distribuição de Laplace (d) $b = d/ \sqrt{2}$. O desvio padrão corresponden à distância média de dispersão (Clark et al. 1999). Podemos reescrever a equação de m em funçao de d:
 
-<!-- $$ eq4: m = d \frac{1 - e^{-\frac{\sqrt{2} L}{d}} }{\sqrt{2} L} $$  -->
+$$ eq4: m = d \frac{1 - e^{-\frac{\sqrt{2} L}{d}} }{\sqrt{2} L} $$
 
-<!-- Com a equação 4 podemos calcular m a partir do desvio padrão da função de dispersão. Essa equação é válida para o processo de dispersão em paisagens homogêneas. Na simulação coalescente, uma vez que sorteamos um progenitor e este estaria presente em uma unidade de não habitat, o sorteio é refeito até que o progenitor esteja em uma unidade de habitat. Uma aproximação do efeito da fragmentação na simulação no m calculado a partir da equação 4 pode ser obtido por: -->
+Com a equação 4 podemos calcular m a partir do desvio padrão da função de dispersão. Essa equação é válida para o processo de dispersão em paisagens homogêneas. Na simulação coalescente, uma vez que sorteamos um progenitor e este estaria presente em uma unidade de não habitat, o sorteio é refeito até que o progenitor esteja em uma unidade de habitat. Uma aproximação do efeito da fragmentação na simulação no m calculado a partir da equação 4 pode ser obtido por:
 
-<!-- $$eq.5: m' = \frac{mp}{1 - (1-p)m} $$ -->
+$$eq.5: m' = \frac{mp}{1 - (1-p)m} $$
 
-<!-- Onde _p_ é a porcentagem de cobertura vegetal na paisagem. Caso seja necessário calcular d a partir de m, utilizamos o ramo principal da função W de Lambert ($W_{0}$): -->
+Onde _p_ é a porcentagem de cobertura vegetal na paisagem. Caso seja necessário calcular d a partir de m, utilizamos o ramo principal da função W de Lambert ($W_{0}$):
 
-<!-- $$ eq6 : d = \frac{\sqrt{2} L m}{m W_{0}(- \frac{e^{-1/m}}{m} ) + 1} $$  -->
+$$ eq6 : d = \frac{\sqrt{2} L m}{m W_{0}(- \frac{e^{-1/m}}{m} ) + 1} $$
 
 
 <!-- ### Proporção de cobertura vegetal  -->
 
 <!-- Para calcular a proporção de cobertura vegetal utilizei a função: -->
 
-<!-- ```{r tree cover} -->
-<!-- f_tree.cover <- function(file_path){ -->
-<!--   mat_paisagem <- read.table(file=file_path,sep=" ",header=TRUE) -->
-<!--   tree.cover <- as.vector(mat_paisagem) -->
-<!--   tree.cover <- tree.cover[!is.na(tree.cover)] -->
-<!--   p <- 1 - length(tree.cover[tree.cover==0])/length(tree.cover) -->
-<!--   return(p) -->
-<!-- } -->
-<!-- registerDoMC(4) -->
-<!-- df_simulacao$p <- aaply(df_simulacao$txt.name,1,f_tree.cover,.parallel = TRUE) -->
-<!-- #  -->
-<!-- ``` -->
+```{r tree cover}
+f_tree.cover <- function(file_path){
+  mat_paisagem <- read.table(file=file_path,sep=" ",header=TRUE)
+  tree.cover <- as.vector(mat_paisagem)
+  tree.cover <- tree.cover[!is.na(tree.cover)]
+  p <- 1 - length(tree.cover[tree.cover==0])/length(tree.cover)
+  return(p)
+}
+registerDoMC(4)
+df_simulacao$p <- aaply(df_simulacao$txt.name,1,f_tree.cover,.parallel = TRUE)
+#
+```
 
 
 <!-- A relação entre proporção de habitat (p) e riqueza observada (S) esta na figura 3. -->
@@ -599,79 +697,79 @@ image(janela_observao,main=paste0(df_auditoria2$SiteCode[i]," N=",df_auditoria2$
 
 <!-- Parametrizamos por k, a proporção de propágulos que permanecem até a vizinhança imediata da planta progenitora. A estimativa da distância média de dispersão para o respectivo k para cada paisagem foi obtida pelas funções: -->
 
-<!-- ```{r funcoes para estimar d necessario para respectivo k} -->
-<!-- library(rmutil) -->
-<!-- library(lamW) -->
-<!-- qkernel<- function(sigma, kernel, p, density=20852/50, npoints = 1e5){ -->
-<!--     kernel <- match.arg(kernel, choices=c("normal","gaussian","laplace","uniform")) -->
-<!--     d_ind_MA  <- 100/sqrt(density) -->
-<!--     if(kernel=="laplace"){ -->
-<!--         b_laplace <- sigma / sqrt(2) -->
-<!--         X_laplace <- d_ind_MA * round(rlaplace(npoints, s=b_laplace) / d_ind_MA)  -->
-<!--         Y_laplace <- d_ind_MA * round(rlaplace(npoints, s=b_laplace) / d_ind_MA) -->
-<!--         dist_laplace <- sqrt(X_laplace^2+Y_laplace^2) -->
-<!--         result <- quantile(dist_laplace, p) -->
-<!--     } -->
-<!--     if(kernel=="normal"|kernel=="gaussian"){ -->
-<!--         b_norm <- sigma  -->
-<!--         X_norm <- d_ind_MA * round(rnorm(npoints, sd=b_norm) / d_ind_MA) -->
-<!--         Y_norm <- d_ind_MA * round(rnorm(npoints, sd=b_norm) / d_ind_MA) -->
-<!--         dist_norm <- sqrt(X_norm^2+Y_norm^2) -->
-<!--         result <- quantile(dist_norm, p) -->
-<!--     } -->
-<!--     if(kernel=="uniform"){ -->
-<!--         b_unif <- sigma/2 -->
-<!--         X_unif <- d_ind_MA * round(runif(npoints, min = -b_unif, max = b_unif) / d_ind_MA) -->
-<!--         Y_unif <- d_ind_MA * round(runif(npoints, min = -b_unif, max = b_unif) / d_ind_MA) -->
-<!--         dist_unif <- sqrt(X_unif^2+Y_unif^2) -->
-<!--         result <- quantile(dist_unif, p) -->
-<!--     } -->
-<!--     return(unname(result)) -->
-<!-- } -->
+```{r funcoes para estimar d necessario para respectivo k}
+library(rmutil)
+library(lamW)
+qkernel<- function(sigma, kernel, p, density=20852/50, npoints = 1e5){
+    kernel <- match.arg(kernel, choices=c("normal","gaussian","laplace","uniform"))
+    d_ind_MA  <- 100/sqrt(density)
+    if(kernel=="laplace"){
+        b_laplace <- sigma / sqrt(2)
+        X_laplace <- d_ind_MA * round(rlaplace(npoints, s=b_laplace) / d_ind_MA)
+        Y_laplace <- d_ind_MA * round(rlaplace(npoints, s=b_laplace) / d_ind_MA)
+        dist_laplace <- sqrt(X_laplace^2+Y_laplace^2)
+        result <- quantile(dist_laplace, p)
+    }
+    if(kernel=="normal"|kernel=="gaussian"){
+        b_norm <- sigma
+        X_norm <- d_ind_MA * round(rnorm(npoints, sd=b_norm) / d_ind_MA)
+        Y_norm <- d_ind_MA * round(rnorm(npoints, sd=b_norm) / d_ind_MA)
+        dist_norm <- sqrt(X_norm^2+Y_norm^2)
+        result <- quantile(dist_norm, p)
+    }
+    if(kernel=="uniform"){
+        b_unif <- sigma/2
+        X_unif <- d_ind_MA * round(runif(npoints, min = -b_unif, max = b_unif) / d_ind_MA)
+        Y_unif <- d_ind_MA * round(runif(npoints, min = -b_unif, max = b_unif) / d_ind_MA)
+        dist_unif <- sqrt(X_unif^2+Y_unif^2)
+        result <- quantile(dist_unif, p)
+    }
+    return(unname(result))
+}
 
-<!-- sigkernel <- function(kernel, p, distance, density=20852/50, -->
-<!--                       npoints =1e5, sigma.min = 1, sigma.max= 100){ -->
-<!--     f1 <- function(x) distance - qkernel(x, kernel, p, density, npoints) -->
-<!--     uniroot( f1 , lower = sigma.min, upper = sigma.max) -->
-<!-- } -->
-<!-- ``` -->
+sigkernel <- function(kernel, p, distance, density=20852/50,
+                      npoints =1e5, sigma.min = 1, sigma.max= 100){
+    f1 <- function(x) distance - qkernel(x, kernel, p, density, npoints)
+    uniroot( f1 , lower = sigma.min, upper = sigma.max)
+}
+```
 
-<!-- Utilizamos os percentis: c(0.99,seq(0.95,0.05,-0.05)) (figura 4). Obtenção dos percentis: -->
+Utilizamos os percentis: c(0.99,seq(0.95,0.05,-0.05)) (figura 4). Obtenção dos percentis:
 
-<!-- ```{r estimativa de d necessario para gerar k} -->
-<!-- # dados -->
-<!-- percentil <- c(0.99,seq(0.95,0.05,-0.05)) -->
-<!-- df_simulacao %<>% left_join(x=., -->
-<!--                             y=expand.grid(SiteCode = df_simulacao$SiteCode, k = percentil), -->
-<!--                             by="SiteCode") -->
+```{r estimativa de d necessario para gerar k}
+# dados
+percentil <- c(0.99,seq(0.95,0.05,-0.05))
+df_simulacao %<>% left_join(x=.,
+                            y=expand.grid(SiteCode = df_simulacao$SiteCode, k = percentil),
+                            by="SiteCode")
 
-<!-- df_simulacao$kernel_type <- "laplace" -->
-<!-- df_simulacao$kernel_code <- "2" -->
-<!-- df_simulacao %<>% mutate(DA=Ntotal/effort_ha, # densidade desconsiderando as espécies mortas -->
-<!--                          dist_0 = 100/sqrt(DA)) # distância entre indivíduos vizinhos -->
-<!-- df_simulacao$d <- NA -->
-<!-- df_simulacao$kernel_type <- as.character(df_simulacao$kernel_type) -->
-<!-- # funcao para paralelizar -->
-<!-- func_llply <- function(i,data_frame=df_simulacao){ -->
-<!--   df_temp <- data_frame -->
-<!--   sigma <- sigkernel(kernel = df_temp[i,"kernel_type"],  -->
-<!--                      p = df_temp[i,"k"],  -->
-<!--                      distance = df_temp[i,"dist_0"],  -->
-<!--                      density = df_temp[i,"DA"], -->
-<!--                      sigma.min=1e-6,  -->
-<!--                      sigma.max=1e6)$root   -->
-<!-- } -->
-<!-- registerDoMC(4) -->
-<!-- replica.sim <- as.list(1:dim(df_simulacao)[1]) -->
-<!-- resultados <- llply(.data = replica.sim, .fun = func_llply, .parallel = TRUE) -->
-<!-- df_simulacao$d <- unlist(resultados) -->
-<!-- # padronização -->
-<!-- df_simulacao %<>% mutate(k_perc = factor(k)) -->
-<!-- levels(df_simulacao$k_perc)[2] <- "0.10" -->
-<!-- df_simulacao %>% names -->
-<!-- df_simulacao %<>% select(SiteCode,p,k,DA,Ntotal,Stotal,txt.name,kernel_code,d,) -->
-<!-- df_simulacao$txt.name <- gsub("dados_brutos","simulacao",df_simulacao$txt.name) -->
-<!-- ``` -->
+df_simulacao$kernel_type <- "laplace"
+df_simulacao$kernel_code <- "2"
+df_simulacao %<>% mutate(DA=Ntotal/effort_ha, # densidade desconsiderando as espécies mortas
+                         dist_0 = 100/sqrt(DA)) # distância entre indivíduos vizinhos
+df_simulacao$d <- NA
+df_simulacao$kernel_type <- as.character(df_simulacao$kernel_type)
+# funcao para paralelizar
+func_llply <- function(i,data_frame=df_simulacao){
+  df_temp <- data_frame
+  sigma <- sigkernel(kernel = df_temp[i,"kernel_type"],
+                     p = df_temp[i,"k"],
+                     distance = df_temp[i,"dist_0"],
+                     density = df_temp[i,"DA"],
+                     sigma.min=1e-6,
+                     sigma.max=1e6)$root
+}
+registerDoMC(4)
+replica.sim <- as.list(1:dim(df_simulacao)[1])
+resultados <- llply(.data = replica.sim, .fun = func_llply, .parallel = TRUE)
+df_simulacao$d <- unlist(resultados)
+# padronização
+df_simulacao %<>% mutate(k_perc = factor(k))
+levels(df_simulacao$k_perc)[2] <- "0.10"
+df_simulacao %>% names
+df_simulacao %<>% select(SiteCode,p,k,DA,Ntotal,Stotal,txt.name,kernel_code,d,)
+df_simulacao$txt.name <- gsub("dados_brutos","simulacao",df_simulacao$txt.name)
+```
 
 
 <!-- ```{r figura 4 relacao k e d, fig.width=5,fig.height=4,eval=TRUE,echo=FALSE} -->
