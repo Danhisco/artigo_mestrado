@@ -690,7 +690,7 @@ dinamica_coalescente <- function(U, S=0, N_simul, seed, disp_range, disp_kernel,
   return(r)
 }
 ```
-  
+
 
 #### Janela de Código 8:
 Estimativa de U
@@ -731,80 +731,197 @@ for(a in 1:length(k_factor)){
             file=paste0("./U/","df_simU__k",k_factor[a],".csv"),row.names = FALSE)
 }
 ```
+  
+  
+  
+#### Janela de Código 9:
+Conversão de Parâmetros:
 
 
-
-
-```{r leitura e sintese janela de codigo 8}
+```{r janela de codigo 9}
+# Síntese dos dados para U
 df_U <- map_df(Sys.glob("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/U/*.csv"), read_csv)
+df_simulacao <-  inner_join(x=distinct(select(df_U, SiteCode, k, Ntotal, S_obs, kernel_code, DA, d, p, txt.name)),
+                            y=ddply(df_U,c("SiteCode","k"),summarise,U_med = mean(U), U_sd = sd(U)),
+                            by=c("SiteCode","k"))
+# conversão de parâmetros
+df_simulacao %<>% 
+  mutate(J_M = 10404 * DA * p,
+         L_plot = sqrt( 10000 * (Ntotal/DA) ),
+         m = d * (1 - exp( -sqrt(2) * (L_plot/d) ) ) / ( sqrt(2) * L_plot ), #eq 4
+         m_ = m * p / ( 1 - (1-p)*m ),#eq 5
+         I =  m_ * (Ntotal-1)/(1-m_), #Etienne 2005
+         theta = U_med * ( J_M - 1 ) / (1-U_med) ) #Vallade & Houshmandzadeh (2003) 
+n_rep.SAD <- 100
+```
+
+
+#### Figura 3:
+Gráficos Exploratórios dos parâmetros dos modelos neutros:
+
+```{r}
+
+```
+
+
+#### Janela de Código 10:
+SAD predita MNEE:
+
+
+```{r janela de codigo 10}
+f_simulacao <- function(i,df_=df_simulacao){
+  X <- df_[i,] %>% as.data.frame()
+  mat_sim <- dinamica_coalescente(U = X[,"U_med"],
+                                  S = 0,
+                                  N_simul = n_rep.SAD,
+                                  seed = as.numeric(Sys.time()),
+                                  disp_range = X[,"d"],
+                                  disp_kernel = X[,"kernel_code"],
+                                  landscape = X[,"txt.name"])
+  df_SAD.replica <- bind_rows(alply(mat_sim,1,function(Y) data.frame(N = sort(as.integer(table(Y))) ) ),
+                              .id = "replica")
+  df_SAD.replica %<>% 
+    mutate(SiteCode = X$SiteCode, MN = "EE", k = X$k)
+  path.file <- paste0("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/SADs_preditas/",
+                      X[,"SiteCode"],
+                      "_k",X[,"k"],
+                      "_EE.csv")
+  write.csv(df_SAD.replica,
+            file = path.file,
+            row.names = FALSE)
+}
+registerDoMC(3)
+simulacao <- as.list(1:dim(df_simulacao)[1])
+l_ply(simulacao,f_simulacao,.parallel = TRUE)
+```
+  
+
+```{r para compensar a falta de espaco durante a simulacao, eval=FALSE,echo=FALSE}
+df_SADreplicas <- Sys.glob("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/SADs_preditas/*.csv") %>% 
+  gsub("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/SADs_preditas/","",.) %>% 
+  gsub("_EE.csv","",.) %>% 
+  adply(.,1,function(x) unname( unlist( strsplit(x,"_k",fixed = TRUE))),.id = NULL) %>% 
+  rename(SiteCode = V1,k = V2)
+
+df_simulacao %>% dim
+df_simulacao$k %>% class
+df_simulacao$SiteCode %>% class
+df_SADreplicas$SiteCode %>% class
+
+df_SADreplicas$k <- as.numeric(df_SADreplicas$k)
+# df_SADreplicas$k %>% unique
+
+df_simulacaoDenovo <- anti_join(x=df_simulacao,
+                                y=df_SADreplicas,
+                                by=c("SiteCode","k"))
+
+###
+
+f_simulacao <- function(i,df_=df_simulacaoDenovo){
+  X <- df_[i,] %>% as.data.frame()
+  mat_sim <- dinamica_coalescente(U = X[,"U_med"],
+                                  S = 0,
+                                  N_simul = n_rep.SAD,
+                                  seed = as.numeric(Sys.time()),
+                                  disp_range = X[,"d"],
+                                  disp_kernel = X[,"kernel_code"],
+                                  landscape = X[,"txt.name"])
+  df_SAD.replica <- bind_rows(alply(mat_sim,1,function(Y) data.frame(N = sort(as.integer(table(Y))) ) ),
+                              .id = "replica")
+  df_SAD.replica %<>% 
+    mutate(SiteCode = X$SiteCode, MN = "EE", k = X$k)
+  path.file <- paste0("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/SADs_preditas/",
+                      X[,"SiteCode"],
+                      "_k",X[,"k"],
+                      "_EE.csv")
+  write.csv(df_SAD.replica,
+            file = path.file,
+            row.names = FALSE)
+}
+registerDoMC(3)
+simulacao <- as.list(1:dim(df_simulacaoDenovo)[1])
+l_ply(simulacao,f_simulacao,.parallel = TRUE)
+```
+
+    
+  
+#### Janela de Código 11:
+SAD predita MNEI:
+    
+```{r janela de codigo 11}
+# simulação
+f_Etienne <- function(theta_,I_,J_){
+  df_ <- data.frame(N=generate.ESF(theta=theta_,I=I_,J=J_))
+}
+f_simulacaoEI <- function(i,df_=df_simulacao){
+  # i <- 1
+  # n_rep.SAD <- 100
+  df_name <- df_[i,] %>% as.data.frame
+  df_SAD.replica <- bind_rows(rerun(.n=n_rep.SAD,f_Etienne(theta_ = df_name$theta, I_ = df_name$I, J_ = df_name$Ntotal)),
+                      .id="replica")
+  df_SAD.replica %<>% 
+    mutate(SiteCode = df_name$SiteCode, MN = "EI", k = df_name$k)
+  path.file <- paste0("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/SADs_preditas/",
+                      df_name[,"SiteCode"],
+                      "_k",df_name[,"k"],
+                      "_EI.csv")
+  write.csv(df_SAD.replica,
+            file = path.file,
+            row.names = FALSE)
+  }
+registerDoMC(3)
+simulacao <- as.list(1:dim(df_simulacao)[1])
+l_ply(simulacao,f_simulacaoEI,.parallel = TRUE)
+```
+
+
+#### Janela de Código 12:
+Comparação das SAD pelo teste KS bootstrap:
+
+
+```{r janela de codigo 12}
+### pacotes
+library(twosamples)
+### dados
+## SAD obs
+df_SAD.obs <- read.csv(file="/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/dados_brutos/abundances.csv",
+                       header = TRUE,as.is = TRUE)
+df_SAD.obs %<>% group_by(SiteCode) %>% nest %>% rename(SAD_obs=data)
+## SAD replica
+df_EI <- map_df(Sys.glob("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/SADs_preditas/*EI*"), read_csv)
+df_EE <- map_df(Sys.glob("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/SADs_preditas/*EE*"), read_csv)
+names(df_EI)[1] <- "replica"
+df_SADreplica <- bind_rows(df_EE,df_EI)
+# df_SADreplica <- map_df(Sys.glob("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/SADs_preditas/*.csv"), read_csv)
+df_SADreplica %<>% group_by(SiteCode) %>% nest %>% rename(SAD_MN=data)
+## merge
+df_resultados <- inner_join(x=df_SADreplica,
+                            y=df_SAD.obs,
+                            by="SiteCode")
+f_resultados <- function(X){
+  # X <- df_resultados[1,]
+  v_SADobs <- X$SAD_obs[[1]]$N
+  f_KS <- function(v_obs=v_SADobs,v_MN){
+    testeKS <- ks_test(a=v_obs,b = v_MN,nboots = 1000)
+    a <- data.frame(D_KSboot=teste[1],p.valor_KSboot=teste[2])
+    a$S_SAD.predita <- length(v_MN)
+    a$S_SAD.obs <- length(v_obs)
+    return(a)
+  }
+  registerDoMC(3)
+  df_return <- ddply(X$SAD_MN[[1]],c("replica","MN","k"),function(Y) f_KS(v_MN=Y$N),.parallel = TRUE)
+}
+
+
 ```
 
 
 
-<!-- ## SAD predita -->
 
-<!-- ### MNEE   -->
 
-<!-- O código a seguir roda a simulação coalescente Para obter as SADs preditas por MNEE utilizei o seguinte código -->
 
-<!-- ```{r SADs MNEE} -->
-<!-- f_simulacao <- function(i,df_=df_simulacao){ -->
-<!--   X <- df_[i,] -->
-<!--   mat_sim <- dinamica_coalescente(U = X[,"U_med"],  -->
-<!--                                   S = 0,  -->
-<!--                                   N_simul = n_rep.SAD,  -->
-<!--                                   seed = as.numeric(Sys.time()),  -->
-<!--                                   disp_range = X[,"d"],  -->
-<!--                                   disp_kernel = X[,"kernel_code"],  -->
-<!--                                   landscape = X[,"txt.name"]) -->
-<!--   l_SADs.preditas <- alply(mat_sim,1,function(Y) sort(as.integer(table(Y))) ) -->
-<!--   file_name <- gsub("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/","", -->
-<!--                     X[,"txt.name"]) -->
-<!--   file_name <- gsub(".txt","",file_name) -->
-<!--   path.file <- paste0(getwd(),"/SADs_preditas/",file_name,"__k",X[,"k"],".EE.", "rep_",1:length(l_SADs.preditas),".csv") -->
-<!--   for(j in 1:length(l_SADs.preditas)){ -->
-<!--     write.csv(data.frame(SAD_predita = l_SADs.preditas[[j]]), -->
-<!--               file=path.file[j], -->
-<!--               row.names = FALSE) -->
-<!--   } -->
-<!-- } -->
-<!-- registerDoMC(4) -->
-<!-- simulacao <- as.list(1:dim(df_simulacao)[1]) -->
-<!-- l_ply(simulacao,f_simulacao,.parallel = TRUE) -->
-<!-- ``` -->
 
-<!-- ### MNEI   -->
 
-<!-- O código a seguir roda a formula de amostragem de Etienne 2005 Para MNEI: -->
-
-<!-- ```{r SADs MNEI} -->
-<!-- # preparação dos dados -->
-<!-- df_simulacao %<>% mutate(L_plot = 100*sqrt(Ntotal/DA), -->
-<!--                          m = d * ( 1 - exp(-L_plot*sqrt(2)/d) ) / (L_plot*sqrt(2)),  -->
-<!--                          m_ = m * p / (1 - (1-p) * m), -->
-<!--                          I = m_ * (Ntotal-1)/(1-m_), -->
-<!--                          J_M=p*DA*3600, -->
-<!--                          theta=(U_med*(J_M-1))/(1-U_med)) -->
-<!-- # simulação -->
-<!-- f_simulacaoEI <- function(i,df_=df_simulacao){ -->
-<!--   # i <- 1 -->
-<!--   # n_rep.SAD <- 100 -->
-<!--   df_name <- df_[i,] -->
-<!--   l_SADs <- replicate(n_rep.SAD,generate.ESF(theta = df_name$theta, I = df_name$I, J = df_name$Ntotal)) -->
-<!--   file_name <- gsub("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/","", -->
-<!--                     df_name[,"txt.name"]) -->
-<!--   file_name <- gsub(".txt","",file_name) -->
-<!--   path.file <- paste0(getwd(),"/SADs_preditas/",file_name,"__k",df_name[,"k"],".EI.", "rep_",1:length(l_SADs),".csv") -->
-<!--   for(j in 1:length(l_SADs)){ -->
-<!--     write.csv(data.frame(SAD_predita = l_SADs[[j]]), -->
-<!--               file=path.file[j], -->
-<!--               row.names = FALSE) -->
-<!--   } -->
-<!-- } -->
-<!-- registerDoMC(4) -->
-<!-- simulacao <- as.list(1:dim(df_simulacao)[1]) -->
-<!-- l_ply(simulacao,f_simulacaoEI,.parallel = TRUE) -->
-<!-- ``` -->
 
 <!-- # Prévia Resultados -->
 
@@ -812,46 +929,46 @@ df_U <- map_df(Sys.glob("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simul
 
 <!-- Para realizar o teste de Kolmogorov-Smirnov baseado em bootstrap e as subsequentes métricas relacionados: -->
 
-<!-- ```{r codigos para os resultados KSboot} -->
-<!-- # package -->
-<!-- library(twosamples) -->
-<!-- # dados -->
-<!-- df_testeKS <- df_auditoria %>%  -->
-<!--   select(SAD_obs.name,SAD_MN.name,MN,k,rep,ordem,refID,SiteCode,txt.name,S_obs,p,d) %>% -->
-<!--   group_by(SAD_obs.name) %>% nest -->
-<!-- df_testeKS$resultados <- vector("list",length = nrow(df_testeKS)) -->
-<!-- # rotina -->
-<!-- registerDoMC(3) -->
-<!-- for(row_label in 1:nrow(df_testeKS)){ -->
-<!--   # i <- 1 -->
-<!--   df_ <- df_testeKS[row_label,] -->
-<!--   v_SAD.obs <- read.csv(df_$SAD_obs.name,header = TRUE,as.is = TRUE) %>%  -->
-<!--     filter(species.correct != "Mortas") %>%  -->
-<!--     .$N %>% sort() -->
-<!--   df_predicao <- as.data.frame(df_$data[[1]]) -->
-<!--   f_KSeS <- function(v_obs = v_SAD.obs,path_MN){ -->
-<!--     v_SAD.MN <- read.csv(file=path_MN,header = TRUE,as.is = TRUE)$SAD_predita -->
-<!--     teste <- ks_test(a=v_SAD.obs,b = v_SAD.MN,nboots = 3000)   -->
-<!--     a <- data.frame(D_KSboot=teste[1],p.valor_KSboot=teste[2]) -->
-<!--     a$S_SAD.predita <- length(v_SAD.predita) -->
-<!--     a$S_SAD.obs <- length(v_SAD.obs)  -->
-<!--     return(a) -->
-<!--    } -->
-<!--   df_testeKS$resultados[[row_label]] <- adply(df_predicao,1, -->
-<!--                                               function(X) f_testeParallel(path_MN = X$SAD_MN.name), -->
-<!--                                               .parallel = TRUE) -->
-<!-- } -->
-<!-- df_replicas <- df_testeKS %>% select(-data) %>% unnest(cols = c(resultados)) %>% as.data.frame() -->
-<!-- # summarise -->
-<!-- alpha <- 0.05 -->
-<!-- df_resultados <- ddply(df_replicas,c("MN","k","SiteCode"),summarise, -->
-<!--                        D_mean = mean(KS.D), D_var = var(KS.D), -->
-<!--                        p.value_mean = mean(KS.p),p.value_var = var(KS.p), -->
-<!--                        S.MN_mean = mean(S_SAD.predita), S.MN_var = var(S_SAD.predita), -->
-<!--                        S.obs_mean=mean(S_SAD.obs),S.obs_var=var(S_SAD.obs), -->
-<!--                        n_SAD.N.ref = sum(KS.p>=alpha), n_SAD.ref = sum(KS.p<alpha), -->
-<!--                        .parallel = TRUE) -->
-<!-- ``` -->
+```{r codigos para os resultados KSboot}
+# package
+library(twosamples)
+# dados
+df_testeKS <- df_auditoria %>%
+  select(SAD_obs.name,SAD_MN.name,MN,k,rep,ordem,refID,SiteCode,txt.name,S_obs,p,d) %>%
+  group_by(SAD_obs.name) %>% nest
+df_testeKS$resultados <- vector("list",length = nrow(df_testeKS))
+# rotina
+registerDoMC(3)
+for(row_label in 1:nrow(df_testeKS)){
+  # i <- 1
+  df_ <- df_testeKS[row_label,]
+  v_SAD.obs <- read.csv(df_$SAD_obs.name,header = TRUE,as.is = TRUE) %>%
+    filter(species.correct != "Mortas") %>%
+    .$N %>% sort()
+  df_predicao <- as.data.frame(df_$data[[1]])
+  f_KSeS <- function(v_obs = v_SAD.obs,path_MN){
+    v_SAD.MN <- read.csv(file=path_MN,header = TRUE,as.is = TRUE)$SAD_predita
+    teste <- ks_test(a=v_SAD.obs,b = v_SAD.MN,nboots = 3000)
+    a <- data.frame(D_KSboot=teste[1],p.valor_KSboot=teste[2])
+    a$S_SAD.predita <- length(v_SAD.predita)
+    a$S_SAD.obs <- length(v_SAD.obs)
+    return(a)
+   }
+  df_testeKS$resultados[[row_label]] <- adply(df_predicao,1,
+                                              function(X) f_testeParallel(path_MN = X$SAD_MN.name),
+                                              .parallel = TRUE)
+}
+df_replicas <- df_testeKS %>% select(-data) %>% unnest(cols = c(resultados)) %>% as.data.frame()
+# summarise
+alpha <- 0.05
+df_resultados <- ddply(df_replicas,c("MN","k","SiteCode"),summarise,
+                       D_mean = mean(KS.D), D_var = var(KS.D),
+                       p.value_mean = mean(KS.p),p.value_var = var(KS.p),
+                       S.MN_mean = mean(S_SAD.predita), S.MN_var = var(S_SAD.predita),
+                       S.obs_mean=mean(S_SAD.obs),S.obs_var=var(S_SAD.obs),
+                       n_SAD.N.ref = sum(KS.p>=alpha), n_SAD.ref = sum(KS.p<alpha),
+                       .parallel = TRUE)
+```
 
 <!-- ## Auditoria 1: auto coerrência dos dados -->
 
