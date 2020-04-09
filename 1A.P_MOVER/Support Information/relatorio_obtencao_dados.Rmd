@@ -818,7 +818,8 @@ df_simulacaoDenovo <- anti_join(x=df_simulacao,
 ###
 
 f_simulacao <- function(i,df_=df_simulacaoDenovo){
-  X <- df_[i,] %>% as.data.frame()
+  X <- df_simulacao %>% as.data.frame() %>% filter(SiteCode == "MGvico16" & k == 0.75)
+  X <- df_[i,]
   mat_sim <- dinamica_coalescente(U = X[,"U_med"],
                                   S = 0,
                                   N_simul = n_rep.SAD,
@@ -888,29 +889,54 @@ df_SAD.obs <- read.csv(file="/home/danilo/Documentos/Doutorado/artigo_mestrado/1
                        header = TRUE,as.is = TRUE)
 df_SAD.obs %<>% group_by(SiteCode) %>% nest %>% rename(SAD_obs=data)
 ## SAD replica
-df_EI <- map_df(Sys.glob("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/SADs_preditas/*EI*"), read_csv)
-df_EE <- map_df(Sys.glob("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/SADs_preditas/*EE*"), read_csv)
-names(df_EI)[1] <- "replica"
-df_SADreplica <- bind_rows(df_EE,df_EI)
-# df_SADreplica <- map_df(Sys.glob("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/SADs_preditas/*.csv"), read_csv)
+df_SADreplica <- Sys.glob("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/SADs_preditas/*.csv") %>% 
+  gsub("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/SADs_preditas/","",.) %>% 
+  gsub("_EE.csv","",.) %>% gsub("_EI.csv","",.) %>% 
+  adply(.,1,function(x) unname( unlist( strsplit(x,"_k",fixed = TRUE))),.id = NULL) %>% 
+  rename(SiteCode = V1,k = V2)
+df_SADreplica$file_path <- Sys.glob("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/SADs_preditas/*.csv")
 df_SADreplica %<>% group_by(SiteCode) %>% nest %>% rename(SAD_MN=data)
 ## merge
-df_resultados <- inner_join(x=df_SADreplica,
-                            y=df_SAD.obs,
+df_resultados <- inner_join(y=df_SADreplica,
+                            x=df_SAD.obs,
                             by="SiteCode")
-f_resultados <- function(X){
-  # X <- df_resultados[1,]
+### rotina
+df_resultados$resultados <- vector("list",length = nrow(df_resultados))
+registerDoMC(3)
+for(i in 75:nrow(df_resultados)){
+  # i <- 13
+  X <- df_resultados[i,]
   v_SADobs <- X$SAD_obs[[1]]$N
   f_KS <- function(v_obs=v_SADobs,v_MN){
-    testeKS <- ks_test(a=v_obs,b = v_MN,nboots = 1000)
-    a <- data.frame(D_KSboot=teste[1],p.valor_KSboot=teste[2])
+    testeKS <- ks_test(a=v_obs,b = v_MN, nboots = 1000)
+    a <- data.frame(D_KSboot=testeKS[1],p.valor_KSboot=testeKS[2])
     a$S_SAD.predita <- length(v_MN)
     a$S_SAD.obs <- length(v_obs)
     return(a)
   }
-  registerDoMC(3)
-  df_return <- ddply(X$SAD_MN[[1]],c("replica","MN","k"),function(Y) f_KS(v_MN=Y$N),.parallel = TRUE)
+  df_predicao <- X$SAD_MN[[1]] %>% as.data.frame()
+  f_resultados <- function(path_df,parallel_=FALSE){
+    # path_df <- df_predicao$file_path[27]
+    df_SAD.MN <- read.csv(path_df,header = TRUE,as.is = TRUE)
+    df_return <- ddply(df_SAD.replica,"replica",function(Y) f_KS(v_MN=Y$N),.parallel = parallel_)
+    df_return %<>% mutate(SiteCode = df_SAD.replica$SiteCode[1], 
+                          MN = df_SAD.replica$MN[1], 
+                          k = df_SAD.replica$k[1])
+    return(df_return)
+  }
+  df_resultados$resultados[[i]] <- adply(df_predicao,1,
+                       function(line) f_resultados(path_df = line$file_path),.parallel = TRUE)
 }
+
+for(i in 1:nrow(df_resultados)){
+  df_resultados$resultados[[i]]$replica <- as.character(df_resultados$resultados[[i]]$replica)
+}
+df_replicas <- df_resultados %>% rename(Site = SiteCode) %>% 
+  select(resultados) %>% unnest(cols=c(resultados)) %>% as.data.frame() %>% 
+  select(SiteCode,MN,k,replica,D_KSboot,p.valor_KSboot,S_SAD.predita,S_SAD.obs)
+write.csv(df_replicas,
+          file="/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/resultados/df_replicas.csv",
+          row.names = FALSE)
 
 
 ```
@@ -929,59 +955,59 @@ f_resultados <- function(X){
 
 <!-- Para realizar o teste de Kolmogorov-Smirnov baseado em bootstrap e as subsequentes métricas relacionados: -->
 
-```{r codigos para os resultados KSboot}
-# package
-library(twosamples)
-# dados
-df_testeKS <- df_auditoria %>%
-  select(SAD_obs.name,SAD_MN.name,MN,k,rep,ordem,refID,SiteCode,txt.name,S_obs,p,d) %>%
-  group_by(SAD_obs.name) %>% nest
-df_testeKS$resultados <- vector("list",length = nrow(df_testeKS))
-# rotina
-registerDoMC(3)
-for(row_label in 1:nrow(df_testeKS)){
-  # i <- 1
-  df_ <- df_testeKS[row_label,]
-  v_SAD.obs <- read.csv(df_$SAD_obs.name,header = TRUE,as.is = TRUE) %>%
-    filter(species.correct != "Mortas") %>%
-    .$N %>% sort()
-  df_predicao <- as.data.frame(df_$data[[1]])
-  f_KSeS <- function(v_obs = v_SAD.obs,path_MN){
-    v_SAD.MN <- read.csv(file=path_MN,header = TRUE,as.is = TRUE)$SAD_predita
-    teste <- ks_test(a=v_SAD.obs,b = v_SAD.MN,nboots = 3000)
-    a <- data.frame(D_KSboot=teste[1],p.valor_KSboot=teste[2])
-    a$S_SAD.predita <- length(v_SAD.predita)
-    a$S_SAD.obs <- length(v_SAD.obs)
-    return(a)
-   }
-  df_testeKS$resultados[[row_label]] <- adply(df_predicao,1,
-                                              function(X) f_testeParallel(path_MN = X$SAD_MN.name),
-                                              .parallel = TRUE)
-}
-df_replicas <- df_testeKS %>% select(-data) %>% unnest(cols = c(resultados)) %>% as.data.frame()
-# summarise
-alpha <- 0.05
-df_resultados <- ddply(df_replicas,c("MN","k","SiteCode"),summarise,
-                       D_mean = mean(KS.D), D_var = var(KS.D),
-                       p.value_mean = mean(KS.p),p.value_var = var(KS.p),
-                       S.MN_mean = mean(S_SAD.predita), S.MN_var = var(S_SAD.predita),
-                       S.obs_mean=mean(S_SAD.obs),S.obs_var=var(S_SAD.obs),
-                       n_SAD.N.ref = sum(KS.p>=alpha), n_SAD.ref = sum(KS.p<alpha),
-                       .parallel = TRUE)
-```
+<!-- ```{r codigos para os resultados KSboot} -->
+<!-- # package -->
+<!-- library(twosamples) -->
+<!-- # dados -->
+<!-- df_testeKS <- df_auditoria %>% -->
+<!--   select(SAD_obs.name,SAD_MN.name,MN,k,rep,ordem,refID,SiteCode,txt.name,S_obs,p,d) %>% -->
+<!--   group_by(SAD_obs.name) %>% nest -->
+<!-- df_testeKS$resultados <- vector("list",length = nrow(df_testeKS)) -->
+<!-- # rotina -->
+<!-- registerDoMC(3) -->
+<!-- for(row_label in 1:nrow(df_testeKS)){ -->
+<!--   # i <- 1 -->
+<!--   df_ <- df_testeKS[row_label,] -->
+<!--   v_SAD.obs <- read.csv(df_$SAD_obs.name,header = TRUE,as.is = TRUE) %>% -->
+<!--     filter(species.correct != "Mortas") %>% -->
+<!--     .$N %>% sort() -->
+<!--   df_predicao <- as.data.frame(df_$data[[1]]) -->
+<!--   f_KSeS <- function(v_obs = v_SAD.obs,path_MN){ -->
+<!--     v_SAD.MN <- read.csv(file=path_MN,header = TRUE,as.is = TRUE)$SAD_predita -->
+<!--     teste <- ks_test(a=v_SAD.obs,b = v_SAD.MN,nboots = 3000) -->
+<!--     a <- data.frame(D_KSboot=teste[1],p.valor_KSboot=teste[2]) -->
+<!--     a$S_SAD.predita <- length(v_SAD.predita) -->
+<!--     a$S_SAD.obs <- length(v_SAD.obs) -->
+<!--     return(a) -->
+<!--    } -->
+<!--   df_testeKS$resultados[[row_label]] <- adply(df_predicao,1, -->
+<!--                                               function(X) f_testeParallel(path_MN = X$SAD_MN.name), -->
+<!--                                               .parallel = TRUE) -->
+<!-- } -->
+<!-- df_replicas <- df_testeKS %>% select(-data) %>% unnest(cols = c(resultados)) %>% as.data.frame() -->
+<!-- # summarise -->
+<!-- alpha <- 0.05 -->
+<!-- df_resultados <- ddply(df_replicas,c("MN","k","SiteCode"),summarise, -->
+<!--                        D_mean = mean(KS.D), D_var = var(KS.D), -->
+<!--                        p.value_mean = mean(KS.p),p.value_var = var(KS.p), -->
+<!--                        S.MN_mean = mean(S_SAD.predita), S.MN_var = var(S_SAD.predita), -->
+<!--                        S.obs_mean=mean(S_SAD.obs),S.obs_var=var(S_SAD.obs), -->
+<!--                        n_SAD.N.ref = sum(KS.p>=alpha), n_SAD.ref = sum(KS.p<alpha), -->
+<!--                        .parallel = TRUE) -->
+<!-- ``` -->
 
-<!-- ## Auditoria 1: auto coerrência dos dados -->
+<!-- <!-- ## Auditoria 1: auto coerrência dos dados --> -->
 
-<!-- ```{r avaliacao da auto coerrencia,, eval=TRUE,echo=FALSE} -->
-<!-- df_resultados <- read.table(file="./resultados/df_resultados.csv",header = TRUE,sep = ";",dec = ".",as.is=FALSE) -->
-<!-- level_k <- unique(as.character(df_resultados$k)) -->
-<!-- df_resultados$k <- factor(as.character(df_resultados$k),levels = level_k) -->
-<!-- levels(df_resultados$k)[19] <- "0.1" -->
-<!-- # contrasts(df_resultados$k) -->
-<!-- # graficos -->
-<!-- l_p <- vector("list",4) -->
-<!-- l_p[[1]] <- ggplot(df_resultados,aes(x=p.value_mean,y=n_SAD.N.ref)) + geom_point() +  -->
-<!--   geom_smooth() + labs(y="número de SADs não refutadas",x="p-valor médio") -->
+<!-- <!-- ```{r avaliacao da auto coerrencia,, eval=TRUE,echo=FALSE} --> -->
+<!-- <!-- df_resultados <- read.table(file="./resultados/df_resultados.csv",header = TRUE,sep = ";",dec = ".",as.is=FALSE) --> -->
+<!-- <!-- level_k <- unique(as.character(df_resultados$k)) --> -->
+<!-- <!-- df_resultados$k <- factor(as.character(df_resultados$k),levels = level_k) --> -->
+<!-- <!-- levels(df_resultados$k)[19] <- "0.1" --> -->
+<!-- <!-- # contrasts(df_resultados$k) --> -->
+<!-- <!-- # graficos --> -->
+<!-- <!-- l_p <- vector("list",4) --> -->
+<!-- <!-- l_p[[1]] <- ggplot(df_resultados,aes(x=p.value_mean,y=n_SAD.N.ref)) + geom_point() +  --> -->
+<!-- <!--   geom_smooth() + labs(y="número de SADs não refutadas",x="p-valor médio") --> -->
 <!-- l_p[[2]] <- ggplot(df_resultados,aes(x=D_mean,y=p.value_mean)) + geom_point() +  -->
 <!--   geom_smooth() + labs(x="estatística D média",y="p-valor médio") -->
 <!-- l_p[[3]] <- ggplot(df_resultados,aes(x=p.value_mean,y=p.value_var)) + geom_point() + geom_smooth() + labs(y="variância p-valor",x="p-valor médio") -->
