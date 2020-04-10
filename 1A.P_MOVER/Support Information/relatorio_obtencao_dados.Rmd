@@ -742,7 +742,7 @@ Conversão de Parâmetros:
 # Síntese dos dados para U
 df_U <- map_df(Sys.glob("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/U/*.csv"), read_csv)
 df_simulacao <-  inner_join(x=distinct(select(df_U, SiteCode, k, Ntotal, S_obs, kernel_code, DA, d, p, txt.name)),
-                            y=ddply(df_U,c("SiteCode","k"),summarise,U_med = mean(U), U_sd = sd(U)),
+                            y=ddply(df_U,c("SiteCode","k"),summarise,U_med = mean(U), U_var = var(U)),
                             by=c("SiteCode","k"))
 # conversão de parâmetros
 df_simulacao %<>% 
@@ -759,7 +759,35 @@ n_rep.SAD <- 100
 #### Figura 3:
 Gráficos Exploratórios dos parâmetros dos modelos neutros:
 
-```{r}
+
+```{r figura 3 - relacao dos parametros,echo=FALSE,eval=TRUE,fig.width=10}
+#
+df_simulacao$k_factor <- factor(df_simulacao$k,levels=as.character(sort(unique(df_simulacao$k)))[20:1])
+levels(df_simulacao$k_factor)[19] <- "0.10"
+#
+l_p <- list()
+l_p[[1]] <- ggplot(df_simulacao,aes(x=k_factor,y=d)) +
+  geom_point(alpha=0.3) + 
+  geom_jitter(alpha=0.3) + 
+  geom_boxplot(alpha=0.6) +
+  labs(x="k (proportion)",y="d (meters)")
+l_p[[2]] <- ggplot(df_simulacao,aes(x=k_factor,y=U_med)) +
+  geom_point(alpha=0.3) + 
+  geom_line(alpha=0.3,aes(group=SiteCode)) +
+  geom_boxplot(alpha=0.6) +
+  labs(x="k (proportion)",y="U (prob./colonization event)")
+l_p[[3]] <- ggplot(df_simulacao,aes(x=d,y=m)) + 
+  geom_point(alpha=0.3) + labs(x="d (meters)",y="m (probability)")
+l_p[[4]] <- ggplot(df_simulacao,aes(x=p,y=m_)) + 
+  geom_point(alpha=0.3) + labs(x="proportion tree cover",y="m' (probability)")
+l_p[[5]] <- ggplot(df_simulacao,aes(x=U_med,y=theta)) + 
+  geom_point(alpha=0.3) + labs(x="U (prob./colonization event)",y="theta")
+mat_layout <- rbind(c(1,1,1,2,2,2),
+                    c(1,1,1,2,2,2),
+                    c(3,3,4,4,5,5),
+                    c(3,3,4,4,5,5))
+grid.arrange(l_p[[1]],l_p[[2]],l_p[[3]],l_p[[4]],l_p[[5]],
+             layout_matrix=mat_layout)
 
 ```
 
@@ -879,36 +907,50 @@ l_ply(simulacao,f_simulacaoEI,.parallel = TRUE)
 #### Janela de Código 12:
 Comparação das SAD pelo teste KS bootstrap:
 
-
-```{r janela de codigo 12}
-### pacotes
-library(twosamples)
+```{r dados para janela de codigo 12,echo=FALSE,eval=FALSE}
 ### dados
 ## SAD obs
 df_SAD.obs <- read.csv(file="/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/dados_brutos/abundances.csv",
                        header = TRUE,as.is = TRUE)
+df_SAD.obs %<>% filter(SiteCode %in% unique(df_resultados_final$SiteCode))
+# f_write <- function(df_){
+#   df_tWrite <- df_[,c("SiteCode","species.correct","N")]
+#   path_ <- paste0("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/SAD_observada/SADobs_",
+#                   df_tWrite$SiteCode[1],".csv")
+#   write.csv(df_tWrite,path_,row.names = FALSE)
+# }
+# registerDoMC(3)
+# d_ply(df_SAD.obs,"SiteCode",f_write,.parallel = TRUE)
 df_SAD.obs %<>% group_by(SiteCode) %>% nest %>% rename(SAD_obs=data)
 ## SAD replica
 df_SADreplica <- Sys.glob("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/SADs_preditas/*.csv") %>% 
   gsub("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/SADs_preditas/","",.) %>% 
-  gsub("_EE.csv","",.) %>% gsub("_EI.csv","",.) %>% 
+  gsub(".csv","",.) %>%  #gsub("_EI.csv","",.) %>%
   adply(.,1,function(x) unname( unlist( strsplit(x,"_k",fixed = TRUE))),.id = NULL) %>% 
   rename(SiteCode = V1,k = V2)
+df_SADreplica$MN <- adply(df_SADreplica$k,1,function(x) unname( unlist( strsplit(x,"_",fixed = TRUE))),.id = NULL)$V2
+df_SADreplica$k <- adply(df_SADreplica$k,1,function(x) unname( unlist( strsplit(x,"_",fixed = TRUE))),.id = NULL)$V1
 df_SADreplica$file_path <- Sys.glob("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/SADs_preditas/*.csv")
 df_SADreplica %<>% group_by(SiteCode) %>% nest %>% rename(SAD_MN=data)
 ## merge
 df_resultados <- inner_join(y=df_SADreplica,
                             x=df_SAD.obs,
                             by="SiteCode")
+```
+
+
+
+```{r janela de codigo 12}
+### pacotes
+library(twosamples)
 ### rotina
 df_resultados$resultados <- vector("list",length = nrow(df_resultados))
 registerDoMC(3)
-for(i in 75:nrow(df_resultados)){
-  # i <- 13
+for(i in 1:nrow(df_resultados)){
   X <- df_resultados[i,]
   v_SADobs <- X$SAD_obs[[1]]$N
-  f_KS <- function(v_obs=v_SADobs,v_MN){
-    testeKS <- ks_test(a=v_obs,b = v_MN, nboots = 1000)
+  f_KS <- function(v_obs=v_SADobs,v_MN,boots=300){
+    testeKS <- ks_test(a=v_obs,b = v_MN, nboots = boots)
     a <- data.frame(D_KSboot=testeKS[1],p.valor_KSboot=testeKS[2])
     a$S_SAD.predita <- length(v_MN)
     a$S_SAD.obs <- length(v_obs)
@@ -918,16 +960,15 @@ for(i in 75:nrow(df_resultados)){
   f_resultados <- function(path_df,parallel_=FALSE){
     # path_df <- df_predicao$file_path[27]
     df_SAD.MN <- read.csv(path_df,header = TRUE,as.is = TRUE)
-    df_return <- ddply(df_SAD.replica,"replica",function(Y) f_KS(v_MN=Y$N),.parallel = parallel_)
-    df_return %<>% mutate(SiteCode = df_SAD.replica$SiteCode[1], 
-                          MN = df_SAD.replica$MN[1], 
-                          k = df_SAD.replica$k[1])
+    df_return <- ddply(df_SAD.MN,"replica",function(Y) f_KS(v_MN=Y$N),.parallel = parallel_)
+    df_return %<>% mutate(SiteCode = df_SAD.MN$SiteCode[1], 
+                          MN = df_SAD.MN$MN[1], 
+                          k = df_SAD.MN$k[1])
     return(df_return)
   }
   df_resultados$resultados[[i]] <- adply(df_predicao,1,
                        function(line) f_resultados(path_df = line$file_path),.parallel = TRUE)
 }
-
 for(i in 1:nrow(df_resultados)){
   df_resultados$resultados[[i]]$replica <- as.character(df_resultados$resultados[[i]]$replica)
 }
@@ -937,148 +978,103 @@ df_replicas <- df_resultados %>% rename(Site = SiteCode) %>%
 write.csv(df_replicas,
           file="/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/resultados/df_replicas.csv",
           row.names = FALSE)
+```
 
 
+#### Figura 4:  
+Avaliação da auto-coerência do teste KS bootstrap por replica:  
+
+    
+```{r figura 4,echo=FALSE,eval=TRUE}
+#
+df_replicas <- read.csv("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/resultados/df_replicas.csv",
+                        header = TRUE,as.is = TRUE)
+df_replicas %<>% mutate(diff_S = (S_SAD.predita - S_SAD.obs)/S_SAD.obs)
+#
+l_p <- list()
+l_p[[1]] <- ggplot(df_replicas,aes(x=D_KSboot,y=p.valor_KSboot)) +
+  geom_point(alpha=0.3) +
+  labs(x="statistic D",y="p-valor",title = "by replica")
+l_p[[2]] <- ggplot(df_replicas,aes(x=diff_S,y=p.valor_KSboot)) +
+  geom_point(alpha=0.3) +
+  labs(x="diffS = (S_MN - S_obs) / S_obs",y="p-valor")
+#
+alpha <- 0.05
+registerDoMC(3)
+df_resultados <- ddply(df_replicas,c("MN","k","SiteCode"),summarise,
+                       D_mean = mean(D_KSboot), D_var = var(D_KSboot),
+                       p.value_mean = mean(p.valor_KSboot),p.value_var = var(p.valor_KSboot),
+                       S.MN_mean = mean(S_SAD.predita), S.MN_var = var(S_SAD.predita),
+                       S.obs_mean = mean(S_SAD.obs),S.obs_var = var(S_SAD.obs),
+                       diffS_mean = mean(diff_S),diffS_var = var(diff_S),
+                       n_nRef = sum(p.valor_KSboot>=alpha), n_Ref = sum(p.valor_KSboot<alpha),
+                       .parallel = TRUE)
+#
+l_p[[3]] <- ggplot(df_resultados,aes(y=n_nRef,x=p.value_mean)) +
+  geom_point(alpha=0.3) +
+  labs(x="mean p-value",y="number of non-refuted SADs",title = "by simulation battery")
+l_p[[4]] <- ggplot(df_resultados,aes(y=n_nRef,x=diffS_mean)) +
+  geom_point(alpha=0.3) +
+  labs(x="mean diffS",y="number of non-refuted SADs")
+l_p[[5]] <- ggplot(df_resultados,aes(x=p.value_mean,y=p.value_var)) +
+  geom_point(alpha=0.3) +
+  labs(x="mean p-value",y="var p-value")
+l_p[[6]] <- ggplot(df_resultados,aes(x=diffS_mean,y=diffS_var)) +
+  geom_point(alpha=0.3) +
+  labs(x="mean diffS",y="var diffS")
+#
+grid.arrange(l_p[[1]],l_p[[2]],l_p[[3]],l_p[[4]],l_p[[5]],l_p[[6]],
+             layout_matrix=matrix(1:6,byrow=FALSE,nrow=2))
+```
+    
+```{r write df resultados final,echo=FALSE,eval=FALSE}
+#
+df_SADobs <- data.frame(SiteCode = Sys.glob("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/SAD_observada/SADs_obs/*.csv") %>% 
+  gsub("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/SAD_observada/SADs_obs/","",.) %>% 
+  gsub(".csv","",.) %>% gsub("SADobs_","",.),
+                        path_SADobs = Sys.glob("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/SAD_observada/SADs_obs/*.csv"))
+df_SADobs$SiteCode <- as.character(df_SADobs$SiteCode)
+df_SADobs$path_SADobs <- as.character(df_SADobs$path_SADobs)
+#
+df_simulacao$SiteCode %>% class == df_resultados$SiteCode %>% class
+df_simulacao$k %>% class == df_resultados$k %>% class
+df_resultados_final <- left_join(x=df_resultados,
+                                 y=df_simulacao,
+                                 by=c("SiteCode","k"))
+df_SADreplica$k %>% class == df_resultados_final$k %>% class
+df_SADreplica$k <- as.numeric(df_SADreplica$k)
+df_SADreplica$MN %>% class == df_resultados_final$MN %>% class
+df_resultados_final <- inner_join(x=df_resultados_final,
+                                  y=df_SADreplica,
+                                  by=c("SiteCode","k","MN"))
+df_resultados_final <- left_join(x=df_resultados_final,
+                                 y=df_SADobs,
+                                 by="SiteCode")
+#
+df_resultados_final %<>% 
+  mutate(d_Lplot = d/L_plot,
+         k_1 = 1-k) %>% 
+  rename(path_SADrep = file_path) %>% 
+  select(SiteCode, MN, k, k_1, d, d_Lplot, p, 
+         n_nRef, diffS_mean, U_med, 
+         Ntotal, S_obs, DA,
+         m, m_, I, theta, 
+         diffS_var, U_var,
+         txt.name, path_SADrep, path_SADobs)
+df_resultados_final$k <- as.character(df_resultados_final$k)
+df_resultados_final %>% str
+#
+write.csv(df_resultados_final,
+          "/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/resultados/df_resultados.csv",
+          row.names = FALSE)
 ```
 
 
 
+#### Anexo 1:  
+Configuração Espacial utilizada na simulação de MNEE e para estimar a proporção de habitat na paisagem:
 
 
-
-
-
-
-<!-- # Prévia Resultados -->
-
-<!-- ## Calculo dos resultados -->
-
-<!-- Para realizar o teste de Kolmogorov-Smirnov baseado em bootstrap e as subsequentes métricas relacionados: -->
-
-<!-- ```{r codigos para os resultados KSboot} -->
-<!-- # package -->
-<!-- library(twosamples) -->
-<!-- # dados -->
-<!-- df_testeKS <- df_auditoria %>% -->
-<!--   select(SAD_obs.name,SAD_MN.name,MN,k,rep,ordem,refID,SiteCode,txt.name,S_obs,p,d) %>% -->
-<!--   group_by(SAD_obs.name) %>% nest -->
-<!-- df_testeKS$resultados <- vector("list",length = nrow(df_testeKS)) -->
-<!-- # rotina -->
-<!-- registerDoMC(3) -->
-<!-- for(row_label in 1:nrow(df_testeKS)){ -->
-<!--   # i <- 1 -->
-<!--   df_ <- df_testeKS[row_label,] -->
-<!--   v_SAD.obs <- read.csv(df_$SAD_obs.name,header = TRUE,as.is = TRUE) %>% -->
-<!--     filter(species.correct != "Mortas") %>% -->
-<!--     .$N %>% sort() -->
-<!--   df_predicao <- as.data.frame(df_$data[[1]]) -->
-<!--   f_KSeS <- function(v_obs = v_SAD.obs,path_MN){ -->
-<!--     v_SAD.MN <- read.csv(file=path_MN,header = TRUE,as.is = TRUE)$SAD_predita -->
-<!--     teste <- ks_test(a=v_SAD.obs,b = v_SAD.MN,nboots = 3000) -->
-<!--     a <- data.frame(D_KSboot=teste[1],p.valor_KSboot=teste[2]) -->
-<!--     a$S_SAD.predita <- length(v_SAD.predita) -->
-<!--     a$S_SAD.obs <- length(v_SAD.obs) -->
-<!--     return(a) -->
-<!--    } -->
-<!--   df_testeKS$resultados[[row_label]] <- adply(df_predicao,1, -->
-<!--                                               function(X) f_testeParallel(path_MN = X$SAD_MN.name), -->
-<!--                                               .parallel = TRUE) -->
-<!-- } -->
-<!-- df_replicas <- df_testeKS %>% select(-data) %>% unnest(cols = c(resultados)) %>% as.data.frame() -->
-<!-- # summarise -->
-<!-- alpha <- 0.05 -->
-<!-- df_resultados <- ddply(df_replicas,c("MN","k","SiteCode"),summarise, -->
-<!--                        D_mean = mean(KS.D), D_var = var(KS.D), -->
-<!--                        p.value_mean = mean(KS.p),p.value_var = var(KS.p), -->
-<!--                        S.MN_mean = mean(S_SAD.predita), S.MN_var = var(S_SAD.predita), -->
-<!--                        S.obs_mean=mean(S_SAD.obs),S.obs_var=var(S_SAD.obs), -->
-<!--                        n_SAD.N.ref = sum(KS.p>=alpha), n_SAD.ref = sum(KS.p<alpha), -->
-<!--                        .parallel = TRUE) -->
-<!-- ``` -->
-
-<!-- <!-- ## Auditoria 1: auto coerrência dos dados --> -->
-
-<!-- <!-- ```{r avaliacao da auto coerrencia,, eval=TRUE,echo=FALSE} --> -->
-<!-- <!-- df_resultados <- read.table(file="./resultados/df_resultados.csv",header = TRUE,sep = ";",dec = ".",as.is=FALSE) --> -->
-<!-- <!-- level_k <- unique(as.character(df_resultados$k)) --> -->
-<!-- <!-- df_resultados$k <- factor(as.character(df_resultados$k),levels = level_k) --> -->
-<!-- <!-- levels(df_resultados$k)[19] <- "0.1" --> -->
-<!-- <!-- # contrasts(df_resultados$k) --> -->
-<!-- <!-- # graficos --> -->
-<!-- <!-- l_p <- vector("list",4) --> -->
-<!-- <!-- l_p[[1]] <- ggplot(df_resultados,aes(x=p.value_mean,y=n_SAD.N.ref)) + geom_point() +  --> -->
-<!-- <!--   geom_smooth() + labs(y="número de SADs não refutadas",x="p-valor médio") --> -->
-<!-- l_p[[2]] <- ggplot(df_resultados,aes(x=D_mean,y=p.value_mean)) + geom_point() +  -->
-<!--   geom_smooth() + labs(x="estatística D média",y="p-valor médio") -->
-<!-- l_p[[3]] <- ggplot(df_resultados,aes(x=p.value_mean,y=p.value_var)) + geom_point() + geom_smooth() + labs(y="variância p-valor",x="p-valor médio") -->
-<!-- l_p[[4]] <- ggplot(df_resultados,aes(x=D_mean,y=D_var)) + geom_point() + geom_smooth() + -->
-<!--    labs(x="estatística D média",y="variância estatística D") -->
-<!-- # l_p[[5]] <- ggplot(df_resultados,aes(x=Stotal,y=S.obs_mean)) + geom_point() + geom_abline(intercept = 0,slope = 1,color="red") -->
-<!-- # df_resultados %<>% mutate(diff_S.obs = Stotal-S.obs_mean) -->
-<!-- # l_p[[6]] <- ggplot(df_resultados, aes(x=df_resultados$diff_S.obs)) +  -->
-<!-- #   geom_histogram(breaks=seq(0, max(df_resultados$diff_S.obs), length.out = 40)) +  -->
-<!-- #   labs(title="", x="S_{parametro U} - S_{do vetor KS}", y="Count") -->
-<!-- grid.arrange(l_p[[1]], l_p[[2]], l_p[[3]], l_p[[4]], # l_p[[5]],# l_p[[6]], -->
-<!--              layout_matrix = rbind(c(rep(1,3),rep(2,3)), -->
-<!--                                    c(rep(3,3),rep(4,3))) #, -->
-<!--                                    # c(rep(5,3),rep(NA,3))) -->
-<!--              ) -->
-<!-- ``` -->
-
-<!-- __Figura 6__ Avaliação da autocoerrência dos métodos. geom_smooth(method="loess")  -->
-
-<!-- ## Padrões Gerais da congruência entre predito e observado -->
-
-<!-- ```{r SAD preditas padroes gerais, eval=TRUE,echo=FALSE,fig.height=10} -->
-<!-- # dados -->
-<!-- df_resultados <- read.table(file="./resultados/df_resultados.csv",header = TRUE,sep = ";",dec = ".",as.is=FALSE) -->
-<!-- level_k <- unique(as.character(df_resultados$k)) -->
-<!-- df_resultados$k <- factor(as.character(df_resultados$k),levels = level_k) -->
-<!-- levels(df_resultados$k)[19] <- "0.1" -->
-<!-- # graficos -->
-<!-- l_p <- vector("list",4) -->
-<!-- l_p[[1]] <- ggplot(df_resultados,aes(x=MN,y=n_SAD.N.ref)) + -->
-<!--   geom_jitter() + -->
-<!--   geom_boxplot() -->
-<!-- l_p[[2]] <- ggplot(df_resultados,aes(x=k,y=n_SAD.N.ref,group=k)) + -->
-<!--   geom_jitter() + -->
-<!--   geom_boxplot() -->
-<!-- l_p[[3]] <- ggplot(filter(df_resultados, -->
-<!--                           k %in% levels(df_resultados$k)[1:10]), -->
-<!--                    aes(x=p,y=n_SAD.N.ref)) + -->
-<!--   geom_point() +  -->
-<!--   geom_smooth(method="loess") +  -->
-<!--   facet_grid(k~MN) -->
-<!-- l_p[[4]] <- ggplot(filter(df_resultados, -->
-<!--                           k %in% levels(df_resultados$k)[11:20]), -->
-<!--                    aes(x=p,y=n_SAD.N.ref)) + -->
-<!--   geom_point() +  -->
-<!--   geom_smooth(method="loess") +  -->
-<!--   facet_grid(k~MN) -->
-<!-- grid.arrange(l_p[[1]],l_p[[2]],l_p[[3]],l_p[[4]], -->
-<!--              layout_matrix = rbind(c(1,2,2,2), -->
-<!--                                    c(3,3,4,4), -->
-<!--                                    c(3,3,4,4), -->
-<!--                                    c(3,3,4,4)) -->
-<!--              ) -->
-
-<!-- ``` -->
-
-<!-- __Figura 7__ Padrões gerais para o número de SADs não refutadas (n_SAD.N.ref). geom_smooth(method="loess") -->
-
-
-<!-- ```{r S predita e obs, eval=TRUE,echo=FALSE} -->
-<!-- # dados -->
-<!-- df_resultados <- read.table(file="./resultados/df_resultados.csv",header = TRUE,sep = ";",dec = ".",as.is=FALSE) -->
-<!-- level_k <- unique(as.character(df_resultados$k)) -->
-<!-- df_resultados$k <- factor(as.character(df_resultados$k),levels = level_k) -->
-<!-- levels(df_resultados$k)[19] <- "0.1" -->
-<!-- # graficos -->
-<!-- ggplot(df_resultados,aes(x=S.obs_mean,y=S.MN_mean,color=MN)) + -->
-<!--   geom_abline(intercept = 0,slope = 1,color="red") + -->
-<!--   geom_point() + -->
-<!--   facet_wrap(~k,ncol=4,scales="free") -->
-<!-- ``` -->
-
-<!-- __Figura 8__ S_predita ~ S_obs. Linha vermelha: slope=1,intercept=0 -->
+#### Anexo 2:
+Distribuição de Abundância observada e predita para cada modelo neutro e proporção de propágulos até a vizinhança imediata da árvore progenitora:
 
