@@ -22,6 +22,7 @@ setwd("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/")
 ```
 
 ```{r pacotes,eval=TRUE,include=TRUE}
+library(sads)
 library(doMC)
 library(raster)
 library(GUILDS)
@@ -305,7 +306,7 @@ a_ply(df_auditoria$txt.name,1,f_NA_zero,.parallel = TRUE)
  __Legenda:__ Janela de observação da comunidade local. Branco = matriz; Laranja = habitat disponível na paisagem; Verde = habitat disponível na comunidade local.  
     
 
-```{r auditoria 1 janela de codigo 3,eval=TRUE,echo=FALSE,fig.align='center',cache=FALSE,fig.width=8,fig.height=40}
+```{r figura 1 auditoria janela de codigo 3,eval=TRUE,echo=FALSE,fig.align='center',cache=TRUE,fig.width=8,fig.height=40}
 # df_ da pasta
 df_txt <- Sys.glob("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/dados_brutos/*.txt") %>%
   gsub("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/dados_brutos/","",.) %>%
@@ -510,9 +511,6 @@ write.table(paisagem,
 __Legenda :__ Sítios consertados
 
 ```{r figura 2 sitios consertados,eval=TRUE,echo=FALSE,fig.align='center',fig.height=2,cache=FALSE,eval=FALSE}
-v_Sites__conserto <- c("MGlavr6","MGlavr3")
-v_Sites__remocao <- c("MGlavr4")
-
 df_auditoria2 <- df_auditoria %>% filter(SiteCode %in% v_Sites__conserto)
 par(mfrow=c(1,5))
 for(i in 1:nrow(df_auditoria2)){
@@ -529,6 +527,8 @@ janela_observao <- paisagem[(l-d):(l+d),(c-d):(c+d)]
 #visualização
 image(janela_observao,main=paste0(df_auditoria2$SiteCode[i]," N=",df_auditoria2$Ntotal[i]),col=terrain.colors(12,rev = TRUE),axes=FALSE)
 }
+#
+
 ```
 
 
@@ -738,10 +738,10 @@ for(a in 1:length(k_factor)){
 Conversão de Parâmetros:
 
 
-```{r janela de codigo 9}
+```{r janela de codigo 9,echo=TRUE,eval=TRUE}
 # Síntese dos dados para U
 df_U <- map_df(Sys.glob("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/U/*.csv"), read_csv)
-df_simulacao <-  inner_join(x=distinct(select(df_U, SiteCode, k, Ntotal, S_obs, kernel_code, DA, d, p, txt.name)),
+df_simulacao <-  inner_join(x=distinct(dplyr::select(df_U, SiteCode, k, Ntotal, S_obs, kernel_code, DA, d, p, txt.name)),
                             y=ddply(df_U,c("SiteCode","k"),summarise,U_med = mean(U), U_var = var(U)),
                             by=c("SiteCode","k"))
 # conversão de parâmetros
@@ -760,7 +760,7 @@ n_rep.SAD <- 100
 Gráficos Exploratórios dos parâmetros dos modelos neutros:
 
 
-```{r figura 3 - relacao dos parametros,echo=FALSE,eval=TRUE,fig.width=10}
+```{r figura 3 - relacao dos parametros,echo=FALSE,eval=TRUE,fig.width=10,cache=TRUE}
 #
 df_simulacao$k_factor <- factor(df_simulacao$k,levels=as.character(sort(unique(df_simulacao$k)))[20:1])
 levels(df_simulacao$k_factor)[19] <- "0.10"
@@ -985,7 +985,7 @@ write.csv(df_replicas,
 Avaliação da auto-coerência do teste KS bootstrap por replica:  
 
     
-```{r figura 4,echo=FALSE,eval=TRUE}
+```{r figura 4,echo=FALSE,eval=TRUE,cache=TRUE}
 #
 df_replicas <- read.csv("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/resultados/df_replicas.csv",
                         header = TRUE,as.is = TRUE)
@@ -1000,6 +1000,10 @@ l_p[[2]] <- ggplot(df_replicas,aes(x=diff_S,y=p.valor_KSboot)) +
   labs(x="diffS = (S_MN - S_obs) / S_obs",y="p-valor")
 #
 alpha <- 0.05
+f_maxRank <- function(obs,predito){
+  max_rank <- max(c(obs,predito))
+  return(max_rank)
+}
 registerDoMC(3)
 df_resultados <- ddply(df_replicas,c("MN","k","SiteCode"),summarise,
                        D_mean = mean(D_KSboot), D_var = var(D_KSboot),
@@ -1008,6 +1012,7 @@ df_resultados <- ddply(df_replicas,c("MN","k","SiteCode"),summarise,
                        S.obs_mean = mean(S_SAD.obs),S.obs_var = var(S_SAD.obs),
                        diffS_mean = mean(diff_S),diffS_var = var(diff_S),
                        n_nRef = sum(p.valor_KSboot>=alpha), n_Ref = sum(p.valor_KSboot<alpha),
+                       max_rank = f_maxRank(obs=S_SAD.obs,predito=S_SAD.predita),
                        .parallel = TRUE)
 #
 l_p[[3]] <- ggplot(df_resultados,aes(y=n_nRef,x=p.value_mean)) +
@@ -1029,12 +1034,22 @@ grid.arrange(l_p[[1]],l_p[[2]],l_p[[3]],l_p[[4]],l_p[[5]],l_p[[6]],
     
 ```{r write df resultados final,echo=FALSE,eval=FALSE}
 #
+##
 df_SADobs <- data.frame(SiteCode = Sys.glob("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/SAD_observada/SADs_obs/*.csv") %>% 
   gsub("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/SAD_observada/SADs_obs/","",.) %>% 
   gsub(".csv","",.) %>% gsub("SADobs_","",.),
                         path_SADobs = Sys.glob("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/SAD_observada/SADs_obs/*.csv"))
 df_SADobs$SiteCode <- as.character(df_SADobs$SiteCode)
 df_SADobs$path_SADobs <- as.character(df_SADobs$path_SADobs)
+##
+df_SADreplica <- Sys.glob("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/SADs_preditas/*.csv") %>% 
+  gsub("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/SADs_preditas/","",.) %>% 
+  gsub(".csv","",.) %>%  #gsub("_EI.csv","",.) %>%
+  adply(.,1,function(x) unname( unlist( strsplit(x,"_k",fixed = TRUE))),.id = NULL) %>% 
+  rename(SiteCode = V1,k = V2)
+df_SADreplica$MN <- adply(df_SADreplica$k,1,function(x) unname( unlist( strsplit(x,"_",fixed = TRUE))),.id = NULL)$V2
+df_SADreplica$k <- adply(df_SADreplica$k,1,function(x) unname( unlist( strsplit(x,"_",fixed = TRUE))),.id = NULL)$V1
+df_SADreplica$file_path <- Sys.glob("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/SADs_preditas/*.csv")
 #
 df_simulacao$SiteCode %>% class == df_resultados$SiteCode %>% class
 df_simulacao$k %>% class == df_resultados$k %>% class
@@ -1057,7 +1072,7 @@ df_resultados_final %<>%
   rename(path_SADrep = file_path) %>% 
   select(SiteCode, MN, k, k_1, d, d_Lplot, p, 
          n_nRef, diffS_mean, U_med, 
-         Ntotal, S_obs, DA,
+         Ntotal, S_obs, DA, max_rank,
          m, m_, I, theta, 
          diffS_var, U_var,
          txt.name, path_SADrep, path_SADobs)
@@ -1075,6 +1090,71 @@ write.csv(df_resultados_final,
 Configuração Espacial utilizada na simulação de MNEE e para estimar a proporção de habitat na paisagem:
 
 
+
+
 #### Anexo 2:
 Distribuição de Abundância observada e predita para cada modelo neutro e proporção de propágulos até a vizinhança imediata da árvore progenitora:
+
+```{r anexo 2 - criacao figuras,echo=FALSE,eval=FALSE}
+# dados
+df_resultados <- read.csv("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/resultados/df_resultados.csv",
+                          header = TRUE,as.is = TRUE)
+df_resultados$k <- factor(df_resultados$k,levels = unique(as.character(df_resultados$k))[20:1])
+levels(df_resultados$k)[19] <- "0.10"
+df_resultados %<>% mutate(title_quadriculo = paste0("MN=",MN," k=",k,"\n nRef=",n_nRef," diffS_mean=",round(diffS_mean,3)))
+#
+
+# versão antiga
+for(s in 1:length(unique(df_resultados$SiteCode))){
+  # s <- 1
+  X <- df_resultados %>% filter(SiteCode == unique(df_resultados$SiteCode)[s])
+  #
+  v_SADobs <- rad(read.csv(X[1,"path_SADobs"],header = TRUE)[,"N"])
+  f_function <- function(df_predito){
+    # dados
+    # df_predito <- df_[1,]
+    df_SADpredita <- read.csv(df_predito$path_SADrep,header = TRUE,as.is = TRUE)
+    # plot base
+    plot(v_SADobs,main=df_predito$title_quadriculo,cex=0.5,
+         xlim=c(1,head(df_$max_rank,1)))
+    # abundância por replica
+    d_ply(df_SADpredita,"replica",function(df) lines(rad(df$N),type="l",col=rgb(0.25, 0.25, 0.25, 0.25) ) )
+    # abundância observada + titulo
+    lines(v_SADobs,pch = 19, col="red",cex=0.5,bg="black",type="b")
+  }
+  # MNEE
+  df_ <- X %>% filter(MN=="EE")
+  png(paste0("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/figuras/",
+             unique(df_resultados$SiteCode)[s],"_",df_$MN[1],"_SADs.png"),
+      width = 980, height = 600)
+  par(mfrow=c(4,5))
+  a_ply(df_,1,f_function)
+  dev.off()
+  # MNEI
+  df_ <- X %>% filter(MN=="EI")
+  png(paste0("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/figuras/",
+             unique(df_resultados$SiteCode)[s],"_",df_$MN[1],"_SADs.png"),
+      width = 980, height = 600)
+  par(mfrow=c(4,5))
+  a_ply(df_,1,f_function)
+  dev.off()
+}
+```
+
+```{r anexo 2 plot das figuras,echo=FALSE,eval=TRUE}
+#
+library(imager)
+#
+df_plot <- Sys.glob("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/figuras/*SADs.png") %>% 
+  gsub("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/figuras/","",.) %>% gsub("_SADs.png","",.) %>% 
+  adply(.,1,function(x) unname( unlist( strsplit(x,"_",fixed = TRUE))),.id = NULL) %>% 
+  rename(SiteCode = V1,MN = V2)
+df_plot$png_path <- Sys.glob("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/figuras/*SADs.png")
+#
+for(i in 1:nrow(df_plot)){
+  print(paste0(df_plot$SiteCode[i]," MN=",df_plot$MN[i]))
+  png_file <- load.image(df_plot$png_path[i])
+  plot(png_file,axes=FALSE)
+}
+```
 
