@@ -395,7 +395,13 @@ summary {
 body {
 text-align: justify}
 </style>
-<pre class="r"><code>library(doMC)
+<pre class="r"><code>library(sads)
+library(ggpubr)
+library(imager)
+library(OpenImageR)
+library(cowplot)
+library(twosamples)
+library(doMC)
 library(raster)
 library(GUILDS)
 library(bbmle)
@@ -407,7 +413,8 @@ library(purrr)
 library(stringr)
 library(tidyr)
 library(plyr)
-library(dplyr)</code></pre>
+library(dplyr)
+select &lt;- dplyr::select</code></pre>
 <div id="janela-de-código-1" class="section level4">
 <h4>Janela de Código 1:</h4>
 <p>Aplicação de filtro nos dados disponíveis na base de dados TreeCo (Lima et al. 2015).</p>
@@ -980,9 +987,7 @@ l_ply(simulacao,f_simulacaoEI,.parallel = TRUE)</code></pre>
 <div id="janela-de-código-12" class="section level4">
 <h4>Janela de Código 12:</h4>
 <p>Comparação das SAD pelo teste KS bootstrap:</p>
-<pre class="r"><code>### pacotes
-library(twosamples)
-### rotina
+<pre class="r"><code>### rotina
 df_resultados$resultados &lt;- vector(&quot;list&quot;,length = nrow(df_resultados))
 registerDoMC(3)
 for(i in 1:nrow(df_resultados)){
