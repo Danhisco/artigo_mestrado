@@ -23,6 +23,11 @@ setwd("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/")
 
 ```{r pacotes,eval=TRUE,include=TRUE}
 library(sads)
+library(ggpubr)
+library(imager)
+library(OpenImageR)
+library(cowplot)
+library(twosamples)
 library(doMC)
 library(raster)
 library(GUILDS)
@@ -36,6 +41,7 @@ library(stringr)
 library(tidyr)
 library(plyr)
 library(dplyr)
+select <- dplyr::select
 ```
 
   
@@ -941,8 +947,6 @@ df_resultados <- inner_join(y=df_SADreplica,
 
 
 ```{r janela de codigo 12}
-### pacotes
-library(twosamples)
 ### rotina
 df_resultados$resultados <- vector("list",length = nrow(df_resultados))
 registerDoMC(3)
@@ -1095,66 +1099,124 @@ Configuração Espacial utilizada na simulação de MNEE e para estimar a propor
 #### Anexo 2:
 Distribuição de Abundância observada e predita para cada modelo neutro e proporção de propágulos até a vizinhança imediata da árvore progenitora:
 
-```{r anexo 2 - criacao figuras,echo=FALSE,eval=FALSE}
+```{r anexo 2 - criacao figuras,echo=FALSE,eval=FALSE,cache=TRUE}
 # dados
 df_resultados <- read.csv("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/resultados/df_resultados.csv",
-                          header = TRUE,as.is = TRUE)
-df_resultados$k <- factor(df_resultados$k,levels = unique(as.character(df_resultados$k))[20:1])
-levels(df_resultados$k)[19] <- "0.10"
-df_resultados %<>% mutate(title_quadriculo = paste0("MN=",MN," k=",k,"\n nRef=",n_nRef," diffS_mean=",round(diffS_mean,3)))
+                          header = TRUE,as.is = TRUE) %>% 
+  arrange(desc(k))
+df_resultados$k_f <- as.character(df_resultados$k)
+df_resultados$k_f[df_resultados$k_f=="0.0999999999999999"] <- "0.10"
+# levels(df_resultados$k)[19] <- "0.10"
+df_resultados %<>% 
+  mutate(title_quadriculo = paste0("k=",k_f," nRef=",n_nRef," diffS_mean=",round(diffS_mean,3)))
 #
 
 # versão antiga
-for(s in 1:length(unique(df_resultados$SiteCode))){
-  # s <- 1
-  X <- df_resultados %>% filter(SiteCode == unique(df_resultados$SiteCode)[s])
-  #
-  v_SADobs <- rad(read.csv(X[1,"path_SADobs"],header = TRUE)[,"N"])
-  f_function <- function(df_predito){
-    # dados
-    # df_predito <- df_[1,]
-    df_SADpredita <- read.csv(df_predito$path_SADrep,header = TRUE,as.is = TRUE)
-    # plot base
-    plot(v_SADobs,main=df_predito$title_quadriculo,cex=0.5,
-         xlim=c(1,head(df_$max_rank,1)))
-    # abundância por replica
-    d_ply(df_SADpredita,"replica",function(df) lines(rad(df$N),type="l",col=rgb(0.25, 0.25, 0.25, 0.25) ) )
-    # abundância observada + titulo
-    lines(v_SADobs,pch = 19, col="red",cex=0.5,bg="black",type="b")
-  }
+# for(s in 9){
+s <- 103
+f_pngSAD <- function(df_dados){
+  X <- df_dados
+  # SAD observada
+  df_SADobs <- rad(read.csv(X[1,"path_SADobs"],header = TRUE)[,"N"])
+  df_SADobs <- data.frame(rank = df_SADobs$rank, abund = df_SADobs$abund)
   # MNEE
   df_ <- X %>% filter(MN=="EE")
-  png(paste0("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/figuras/",
-             unique(df_resultados$SiteCode)[s],"_",df_$MN[1],"_SADs.png"),
-      width = 980, height = 600)
-  par(mfrow=c(4,5))
-  a_ply(df_,1,f_function)
-  dev.off()
+  df_SAD_MN <- map_df(df_$path_SADrep,read_csv) %>% 
+    as.data.frame() %>% ddply(.,.(replica,SiteCode,MN,k),function(X) rad(X$N)) %>% 
+    arrange(desc(k))
+  df_SAD_MN <- left_join(x=df_SAD_MN,
+                         y=select(df_,SiteCode,MN,k,title_quadriculo),
+                         by=c("SiteCode","MN","k"))
+p_EE <- ggplot( df_SAD_MN, aes(x = rank, y = abund) ) + 
+      geom_line(alpha=0.3,aes(group=replica)) +
+      geom_line(data = df_SADobs,aes(y=abund,x=rank),color="red",size=0.7) +
+      theme_light() + 
+      labs(title = paste0(df_SAD_MN$SiteCode[1]," MN=",df_SAD_MN$MN[1])) +
+      scale_y_continuous(trans="log10") +
+      facet_wrap(~title_quadriculo,ncol=5,scales="free")
   # MNEI
   df_ <- X %>% filter(MN=="EI")
-  png(paste0("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/figuras/",
-             unique(df_resultados$SiteCode)[s],"_",df_$MN[1],"_SADs.png"),
-      width = 980, height = 600)
-  par(mfrow=c(4,5))
-  a_ply(df_,1,f_function)
-  dev.off()
+  df_SAD_MN <- map_df(df_$path_SADrep,read_csv) %>% 
+    as.data.frame() %>% ddply(.,.(replica,SiteCode,MN,k),function(X) rad(X$N)) %>% 
+    arrange(desc(k))
+  df_SAD_MN <- left_join(x=df_SAD_MN,
+                         y=select(df_,SiteCode,MN,k,title_quadriculo),
+                         by=c("SiteCode","MN","k"))
+p_EI <- ggplot( df_SAD_MN, aes(x = rank, y = abund) ) + 
+      geom_line(alpha=0.3,aes(group=replica)) +
+      geom_line(data = df_SADobs,aes(y=abund,x=rank),color="red",size=0.7) +
+      theme_light() + 
+      labs(title = paste0(df_SAD_MN$SiteCode[1]," MN=",df_SAD_MN$MN[1])) +
+      scale_y_continuous(trans="log10") +
+      facet_wrap(~title_quadriculo,ncol=5,scales="free")
+p_plot <- as_ggplot(grid.arrange(p_EE,p_EI,ncol=1))
+png(paste0("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/figuras/SADs_",
+             unique(df_resultados$SiteCode)[s],".png"),
+      width = 980, height = 1200)
+p_plot
+dev.off()
 }
+  X <- df_resultados %>% filter(SiteCode == unique(df_resultados$SiteCode)[s])
+  #
+  df_SADobs <- rad(read.csv(X[1,"path_SADobs"],header = TRUE)[,"N"])
+  df_SADobs <- data.frame(rank = df_SADobs$rank, abund = df_SADobs$abund)
+  # MNEE
+  df_ <- X %>% filter(MN=="EE")
+  df_SAD_MN <- map_df(df_$path_SADrep,read_csv) %>% 
+    as.data.frame() %>% ddply(.,.(replica,SiteCode,MN,k),function(X) rad(X$N)) %>% 
+    arrange(desc(k))
+  df_SAD_MN <- left_join(x=df_SAD_MN,
+                         y=select(df_,SiteCode,MN,k,title_quadriculo),
+                         by=c("SiteCode","MN","k"))
+p_EE <- ggplot( df_SAD_MN, aes(x = rank, y = abund) ) + 
+      geom_line(alpha=0.3,aes(group=replica)) +
+      geom_line(data = df_SADobs,aes(y=abund,x=rank),color="red",size=0.7) +
+      theme_light() + 
+      labs(title = paste0(df_SAD_MN$SiteCode[1]," MN=",df_SAD_MN$MN[1])) +
+      scale_y_continuous(trans="log10") +
+      facet_wrap(~title_quadriculo,ncol=5,scales="free")
+  # MNEI
+  df_ <- X %>% filter(MN=="EI")
+  df_SAD_MN <- map_df(df_$path_SADrep,read_csv) %>% 
+    as.data.frame() %>% ddply(.,.(replica,SiteCode,MN,k),function(X) rad(X$N)) %>% 
+    arrange(desc(k))
+  df_SAD_MN <- left_join(x=df_SAD_MN,
+                         y=select(df_,SiteCode,MN,k,title_quadriculo),
+                         by=c("SiteCode","MN","k"))
+p_EI <- ggplot( df_SAD_MN, aes(x = rank, y = abund) ) + 
+      geom_line(alpha=0.3,aes(group=replica)) +
+      geom_line(data = df_SADobs,aes(y=abund,x=rank),color="red",size=0.7) +
+      theme_light() + 
+      labs(title = paste0(df_SAD_MN$SiteCode[1]," MN=",df_SAD_MN$MN[1])) +
+      scale_y_continuous(trans="log10") +
+      facet_wrap(~title_quadriculo,ncol=5,scales="free")
+p_plot <- as_ggplot(grid.arrange(p_EE,p_EI,ncol=1))
+png(paste0("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/figuras/SADs_",
+             unique(df_resultados$SiteCode)[s],".png"),
+      width = 980, height = 1200)
+p_plot
+dev.off()
+
+# do.call("grid.arrange",c(l_p,ncol=1))
 ```
 
-```{r anexo 2 plot das figuras,echo=FALSE,eval=TRUE}
+```{r anexo 2 plot das figuras,echo=FALSE,eval=FALSE}
 #
-library(imager)
+df_plot <- data.frame(SiteCode =Sys.glob("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/figuras/*.png") %>% 
+  gsub("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/figuras/SADs_","",.) %>% gsub(".png","",.),
+  png_path = Sys.glob("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/figuras/*.png"))
+df_plot$png_path <- as.character(df_plot$png_path)
+  
+  
+  # %>% 
+  # adply(.,1,function(x) unname( unlist( strsplit(x,"_",fixed = TRUE))),.id = NULL) %>% 
+  # rename(SiteCode = V1,MN = V2)
 #
-df_plot <- Sys.glob("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/figuras/*SADs.png") %>% 
-  gsub("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/figuras/","",.) %>% gsub("_SADs.png","",.) %>% 
-  adply(.,1,function(x) unname( unlist( strsplit(x,"_",fixed = TRUE))),.id = NULL) %>% 
-  rename(SiteCode = V1,MN = V2)
-df_plot$png_path <- Sys.glob("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/figuras/*SADs.png")
-#
+par(mar=c(0.2,0.2,0.2,0.2))
 for(i in 1:nrow(df_plot)){
-  print(paste0(df_plot$SiteCode[i]," MN=",df_plot$MN[i]))
-  png_file <- load.image(df_plot$png_path[i])
-  plot(png_file,axes=FALSE)
+  png_file <- readImage(df_plot$png_path[i])
+  # dim(png_file)
+  imageShow(png_file)
 }
 ```
 
