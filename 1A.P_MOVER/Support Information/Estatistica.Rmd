@@ -30,18 +30,11 @@ library(DHARMa)
 library(broom.mixed)
 library(MuMIn)
 library(mgcv)
-# library(gratia)
-# library(gamm4)
 library(bbmle)
 library(lme4)
 library(merTools)
 library(magrittr)
 library(gridExtra)
-# library(plotly)
-# library(sjPlot)
-# library(sjlabelled)
-# library(sjmisc)
-# library(stringr)
 library(ggplot2)
 library(tidyr)
 library(purrr)
@@ -145,9 +138,19 @@ __Figura 2.2__ número de SADs não refutadas ~ (d * MN|Site ~ p). Site está or
 ## 2.1 GLMM binomial
 
 ### Modelo cheio: 
+
+
+__linear term__  
   
-i) ~ (p + p^2) * (d + d^2) * MN; if = var_dispersao : contiguous  
-ii) ~ ( p + p^2) * k * MN;   if = var_dispersao : category    
+i) ~ (p + p^2) * (d + d^2) * MN; if : var_dispersao = contiguous  
+ii) ~ ( p + p^2) * k * MN;   if : var_dispersao = category    
+  
+__random term__
+  
+a) 1|SiteCode  
+b) MN|SiteCode  
+c)  (var_dispersao + var_dispersao^2)*MN|SiteCode, if : var = dispersao : contiguous
+
   
 ```{r backup 1, eval=FALSE,echo=FALSE,include=FALSE }
 l_md <- vector("list",8)
@@ -257,6 +260,17 @@ registerDoMC(3)
 l_nRef__modeloCheio <- dlply(df_md,.(var_dispersao),f_md,.parallel = TRUE)
 names(l_nRef__modeloCheio) <- NULL
 l_nRef__modeloCheio <- do.call(c,l_nRef__modeloCheio)
+#
+f_warning <- function(glmm_object){
+  # glmm_object <- l_nRef__modeloCheio[[4]]
+  v_message <- glmm_object@optinfo$conv$lme4$messages %>% 
+    as.character()
+  if(length(v_message)==0){v_message <- "OK"}
+  if(length(v_message)>1){v_message <- v_message[1] }
+  return(v_message)
+}
+df_auditoria.md <- ldply(l_nRef__modeloCheio,f_warning,.id="glmer") %>% 
+  rename(warning_message = V1)
 ```
 
 
@@ -286,30 +300,147 @@ knitr::kable(df_auditoria.md) %>%
   kableExtra::kable_styling()
 ```
 
-
-  
-  
+#### Avaliação de cada modelo que não passou no teste de convergência 
 
 
-```{r rotina de ajustes }
+```{r}
+df_md <- df_resultados %>% 
+  select(n_nRef,p,SiteCode,MN,p.z,d.z,d_Lplot.z) %>% 
+# df_md[,6:8] <- apply(df_md[,6:8],2,as.character)
+# df_md %<>% 
+  gather(key = var_dispersao, value = value_dispersao, d.z:d_Lplot.z) 
 #
+i <- 4
+names(l_nRef__modeloCheio[v_glmerUpdate])[i]
+#
+## update1:
+dados <- df_md %>% filter(var_dispersao == "d.z")
+v_par <- getME(l_nRef__modeloCheio[v_glmerUpdate][[i]],
+               c("theta","fixef"))
+# if 1|Site
+l_nRef__modeloCheio[v_glmerUpdate][[i]] <- 
+  glmer(cbind(n_nRef,100-n_nRef) ~ 
+                         (p.z + I(p.z^2)) * (value_dispersao + I(value_dispersao^2)) * MN + 
+                         (1|SiteCode),
+                       family = "binomial",data=dados,start = v_par,
+                       control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e10)))
+# if MN|Site    
+l_nRef__modeloCheio[v_glmerUpdate][[i]] <- 
+  glmer(cbind(n_nRef,100-n_nRef) ~ 
+                         (p.z + I(p.z^2)) * (value_dispersao + I(value_dispersao^2)) * MN + 
+                         (MN|SiteCode),
+                       family = "binomial",data=dados,start = v_par,
+                       control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e10)))
+```
+  
+  
+  
+__1) d_Lplot 1|Site__  
+  
+    
+1: In (function (par, fn, lower = -Inf, upper = Inf, control = list(),  :
+  NAs introduced by coercion to integer range
+2: In optwrap(optimizer, devfun, start, rho$lower, control = control,  :
+  convergence code 1 from bobyqa: bobyqa -- maximum number of function evaluations exceeded
+3: In (function (par, fn, lower = -Inf, upper = Inf, control = list(),  :
+  NAs introduced by coercion to integer range
+4: In optwrap(optimizer, devfun, start, rho$lower, control = control,  :
+  convergence code 1 from bobyqa: bobyqa -- maximum number of function evaluations exceeded
+5: In checkConv(attr(opt, "derivs"), opt$par, ctrl = control$checkConv,  :
+  Model failed to converge with max|grad| = 0.00342971 (tol = 0.002, component 1)
+6: In checkConv(attr(opt, "derivs"), opt$par, ctrl = control$checkConv,  :
+  Model is nearly unidentifiable: very large eigenvalue
+ - Rescale variables?
+
+
+
+__2) d_Lplot MN|Site__  
+  
+    
+1: In (function (par, fn, lower = -Inf, upper = Inf, control = list(),  :
+  NAs introduced by coercion to integer range
+2: In optwrap(optimizer, devfun, start, rho$lower, control = control,  :
+  convergence code 1 from bobyqa: bobyqa -- maximum number of function evaluations exceeded
+3: In (function (par, fn, lower = -Inf, upper = Inf, control = list(),  :
+  NAs introduced by coercion to integer range
+4: In optwrap(optimizer, devfun, start, rho$lower, control = control,  :
+  convergence code 1 from bobyqa: bobyqa -- maximum number of function evaluations exceeded
+5: In checkConv(attr(opt, "derivs"), opt$par, ctrl = control$checkConv,  :
+  Model failed to converge with max|grad| = 0.00838345 (tol = 0.002, component 1)
+6: In checkConv(attr(opt, "derivs"), opt$par, ctrl = control$checkConv,  :
+  Model is nearly unidentifiable: very large eigenvalue
+ - Rescale variables?
+  
+    
+      
+__3) d 1|Site__  
+  
+  
+1: In (function (par, fn, lower = -Inf, upper = Inf, control = list(),  :
+  NAs introduced by coercion to integer range
+2: In optwrap(optimizer, devfun, start, rho$lower, control = control,  :
+  convergence code 1 from bobyqa: bobyqa -- maximum number of function evaluations exceeded
+3: In (function (par, fn, lower = -Inf, upper = Inf, control = list(),  :
+  NAs introduced by coercion to integer range
+4: In optwrap(optimizer, devfun, start, rho$lower, control = control,  :
+  convergence code 1 from bobyqa: bobyqa -- maximum number of function evaluations exceeded
+5: In checkConv(attr(opt, "derivs"), opt$par, ctrl = control$checkConv,  :
+  Model failed to converge with max|grad| = 40.1829 (tol = 0.002, component 1)
+6: In checkConv(attr(opt, "derivs"), opt$par, ctrl = control$checkConv,  :
+  Model is nearly unidentifiable: very large eigenvalue
+ - Rescale variables?
+     
+  
+         
+ __4) d MN|Site__      
+    
+    
+1: In (function (par, fn, lower = -Inf, upper = Inf, control = list(),  :
+  NAs introduced by coercion to integer range
+2: In optwrap(optimizer, devfun, start, rho$lower, control = control,  :
+  convergence code 1 from bobyqa: bobyqa -- maximum number of function evaluations exceeded
+3: In (function (par, fn, lower = -Inf, upper = Inf, control = list(),  :
+  NAs introduced by coercion to integer range
+4: In optwrap(optimizer, devfun, start, rho$lower, control = control,  :
+  convergence code 1 from bobyqa: bobyqa -- maximum number of function evaluations exceeded
+5: In checkConv(attr(opt, "derivs"), opt$par, ctrl = control$checkConv,  :
+  Model failed to converge with max|grad| = 0.00749388 (tol = 0.002, component 1)
+6: In checkConv(attr(opt, "derivs"), opt$par, ctrl = control$checkConv,  :
+  Model is nearly unidentifiable: very large eigenvalue
+ - Rescale variables?    
+  
+    
+          
+__Mensagens em comum__  
+  
+  
+    
+
+
+
+        
+```{r rotina de ajustes,eval=FALSE,echo=FALSE }
+#
+##
 df_md <- df_resultados %>% 
   select(n_nRef,p,SiteCode,MN,p.z,d.z,d_Lplot.z)
 df_md[,6:7] <- apply(df_md[,6:7],2,as.character)
 df_md %<>% 
-  gather(key = var_dispersao, value = value_dispersao, d.z:d_Lplot.z) %>% 
-  group_by(var_dispersao) %>% nest()
-#
-
-
-
-
+  gather(key = var_dispersao, value = value_dispersao, d.z:d_Lplot.z) # %>% 
+  # group_by(var_dispersao) %>% nest()
+##
+# f_dply <- function(glmer_object){
+#   l_nRef__modeloCheio[[1]]
+# }
+# 
+# 
+# df_mdList <- ldply()
+# rotina
 i <- 1
-md_name <- names(l_nRef__modeloCheio[v_glmerUpdate])[i] %>% 
-  
+names(l_nRef__modeloCheio[v_glmerUpdate])[i]
 v_par <- getME(l_nRef__modeloCheio[v_glmerUpdate][[i]],
                c("theta","fixef"))
-if(md_name)
+## if 1|Site
 l_nRef__modeloCheio[v_glmerUpdate][[i]] <- glmer(cbind(n_nRef,100-n_nRef) ~ 
                          (p.z + I(p.z^2)) * (value_dispersao + I(value_dispersao^2)) * MN + 
                          (1|SiteCode),
@@ -369,31 +500,32 @@ temp <- allFit(l_nRef__modeloCheio[v_glmerUpdate][[1]],parallel = 'multicore', n
 
 
     
-__Tabela 2.1__  Ajuste obtido para os modelos após as rotinas de melhora    
     
-```{r Tabela 21,eval=TRUE,cache=FALSE}
+```{r Tabela 21,eval=FALSE,cache=FALSE,include=FALSE}
 load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md_nRef_GLMM.Rdata")
 df_auditoria.md <- ldply(l_nRef__modeloCheio,f_warning,.id = "glmer") %>% 
   rename(warning_message = V1)
 knitr::kable(df_auditoria.md)
 ```
+
+
   
-__Tabela 2.2__  Ajuste obtido para os modelos após as rotinas de melhora     
+<!-- __Tabela 2.2__  Ajuste obtido para os modelos após as rotinas de melhora      -->
   
     
-```{r Tabela 22}
+```{r Tabela 22,eval=FALSE,include=FALSE}
 AICctab(l_nRef__modeloCheio)
 ```
 
     
-```{r auditoria mais plausivel md_n.ref1, message=FALSE}
+```{r auditoria mais plausivel md_n.ref1, message=FALSE,eval=FALSE,include=FALSE}
 # library(DHARMa)
 md_nRef <- l_md_nRef.GLMM[["d.z d.z*MN|Site"]]
 p_plot <- simulateResiduals(md_nRef,n=1000)
 plot(p_plot)
 ```
 
-__Figura 1.2__ Resíduos Quantílicos do modelo cheio plausível
+<!-- __Figura 1.2__ Resíduos Quantílicos do modelo cheio plausível -->
 
 
 
@@ -410,9 +542,9 @@ __Figura 1.2__ Resíduos Quantílicos do modelo cheio plausível
 
 <!-- __Figura 1.3__ Valores ajustados contra as preditoras lineares  - ESTA DEMORANDO MUITO PARA RODAR AUGMENT PARA O MODELO MAIS PLAUSIVEL -->
   
-### 1.1.2 Modelo cheio: predições
+<!-- ### 1.1.2 Modelo cheio: predições -->
 
-```{r avaliacao por site fig 14,fig.width=8, fig.height=30,message=FALSE,eval=TRUE}
+```{r avaliacao por site fig 14,fig.width=8, fig.height=30,message=FALSE,eval=FALSE,include=FALSE}
 # Dados
 df_plot <- df_md %>% filter(var_dispersao == "d.z")
 df_plot$value_dispersao <- as.numeric(df_plot$value_dispersao)
@@ -439,14 +571,14 @@ ggplot(df_plot,aes(x=value_dispersao,y=n_nRef,group=MN)) +
   facet_wrap(~title,ncol=5)
 ```
 
-__Figura 1.3__ Predito e observado para modelo cheio
+<!-- __Figura 1.3__ Predito e observado para modelo cheio -->
   
-Observamos que é necessário considerar também um termo quadrático para d. Então sigo com a adição de um termo quadrático para d
+<!-- Observamos que é necessário considerar também um termo quadrático para d. Então sigo com a adição de um termo quadrático para d -->
 
-### 1.1.3: update modelo cheio: (p+p^2)*(d+d^2)*MN 
+<!-- ### 1.1.3: update modelo cheio: (p+p^2)*(d+d^2)*MN  -->
 
 
-```{r md_nRef2 e r2cm,echo=TRUE,cache=TRUE,eval=TRUE}
+```{r md_nRef2 e r2cm,echo=TRUE,cache=TRUE,eval=FALSE,echo=FALSE}
 md_nRef2 <- glmer(cbind(n_nRef,100-n_nRef) ~ 
                      (p.z + I(p.z^2)) * (d.z + I(d.z^2)) * MN + ((d.z + I(d.z^2)) * MN|SiteCode),
                    family = "binomial",data=df_resultados,
@@ -455,15 +587,15 @@ md_nRef2 <- glmer(cbind(n_nRef,100-n_nRef) ~
 ```
 
 
-```{r md_nRef2 quant res}
+```{r md_nRef2 quant res,eval=FALSE,echo=FALSE}
 p_plot <- simulateResiduals(md_nRef2,n = 1000)
 plot(p_plot)
 ```
 
-__Figura 1.4__ glmm binomial: nRef ~ (p + p^2) * (d + d^2) * MN + ((d + d^2) * MN | Site)
+<!-- __Figura 1.4__ glmm binomial: nRef ~ (p + p^2) * (d + d^2) * MN + ((d + d^2) * MN | Site) -->
 
 
-```{r avaliacao por site fig 15 glmm p2 d2,fig.width=8, fig.height=30,message=FALSE}
+```{r avaliacao por site fig 15 glmm p2 d2,fig.width=8, fig.height=30,message=FALSE,eval=FALSE}
 # Dados
 df_plot <- df_resultados
 # df_plot <- cbind(df_plot,
@@ -483,9 +615,10 @@ ggplot(df_plot,aes(x=d.z,y=n_nRef,group=MN)) +
   theme_classic() + theme(legend.position="top") + facet_wrap(~title,ncol=5)
 ```
   
-__Figura 1.5__ glmm binomial: nRef ~ (p + p^2) * (d + d^2) * MN + ((d + d^2) * MN | Site)
+<!-- __Figura 1.5__ glmm binomial: nRef ~ (p + p^2) * (d + d^2) * MN + ((d + d^2) * MN | Site) -->
 
-Para MN:EI a adição de d^2 parece que foi suficiente para melhorar o ajuste do modelo, porém para MN:EE é necessário mais flexibilidade. Vou comparar o modelo cheio glmm com um gamm:
+<!-- Para MN:EI a adição de d^2 parece que foi suficiente para melhorar o ajuste do modelo, porém para MN:EE é necessário mais flexibilidade. Vou comparar o modelo cheio glmm com um gamm: -->
+
 
 
 
@@ -500,6 +633,7 @@ df_plot %>% ggplot(aes(x=MN,y=n_nRef)) +
   theme(legend.position="top") +
   facet_wrap(~title,ncol=5)
 ```
+
 
 
 
