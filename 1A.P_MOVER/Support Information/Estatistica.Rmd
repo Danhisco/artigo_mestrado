@@ -7,7 +7,7 @@ output:
     toc: true
     toc_depth: 5
 editor_options: 
-  chunk_output_type: console
+  chunk_output_type: inline
 ---
 
 <style>
@@ -151,57 +151,6 @@ a) 1|SiteCode
 b) MN|SiteCode  
 c)  (var_dispersao + var_dispersao^2)*MN|SiteCode, if : var = dispersao : contiguous
 
-  
-```{r backup 1, eval=FALSE,echo=FALSE,include=FALSE }
-l_md <- vector("list",8)
-names(l_md) <- c("k 1|Site","k MN|Site",
-                 "d 1|Site","d MN|Site","d d*MN|Site",
-                 "d_Lplot 1|Site","d_Lplot MN|Site","d_Lplot d_Lplot*MN|Site")
-# k
-l_md[[1]] <- glmer(cbind(n_nRef,100-n_nRef) ~ 
-                         (p.z + I(p.z^2)) * k * MN +
-                         (1|SiteCode),
-                       family = "binomial",data=df_resultados,
-                       control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e8)))
-l_md[[2]] <- glmer(cbind(n_nRef,100-n_nRef) ~ 
-                         (p.z + I(p.z^2)) * k * MN +
-                         (MN|SiteCode),
-                       family = "binomial",data=df_resultados,
-                       control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e8)))
-# d
-l_md[[3]] <- glmer(cbind(n_nRef,100-n_nRef) ~ 
-                         (p.z + I(p.z^2)) * (d.z + I(d.z^2)) * MN + 
-                         (1|SiteCode),
-                       family = "binomial",data=df_resultados,
-                       control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e8)))
-l_md[[4]] <- glmer(cbind(n_nRef,100-n_nRef) ~ 
-                         (p.z + I(p.z^2)) * (d.z + I(d.z^2)) * MN + 
-                         (MN|SiteCode),
-                       family = "binomial",data=df_resultados,
-                       control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e8)))
-l_md[[5]] <- glmer(cbind(n_nRef,100-n_nRef) ~ 
-                         (p.z + I(p.z^2)) * (d.z + I(d.z^2)) * MN + 
-                         ( (d.z + I(d.z^2) ) * MN|SiteCode),
-                       family = "binomial",data=df_resultados,
-                       control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e8)))
-# d_Lplot
-l_md[[6]] <- glmer(cbind(n_nRef,100-n_nRef) ~ 
-                         (p.z + I(p.z^2)) * (d_Lplot.z + I(d_Lplot.z^2)) * MN + 
-                         (1|SiteCode),
-                       family = "binomial",data=df_resultados,
-                       control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e8)))
-l_md[[7]] <- glmer(cbind(n_nRef,100-n_nRef) ~ 
-                         (p.z + I(p.z^2)) * (d_Lplot.z + I(d_Lplot.z^2)) * MN + 
-                         (MN|SiteCode),
-                       family = "binomial",data=df_resultados,
-                       control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e8)))
-l_md[[8]] <- glmer(cbind(n_nRef,100-n_nRef) ~ 
-                         (p.z + I(p.z^2)) * (d_Lplot.z + I(d_Lplot.z^2)) * MN + 
-                         ( (d.z + I(d.z^2) ) * MN|SiteCode),
-                       family = "binomial",data=df_resultados,
-                       control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e8)))
-AICctab(l_md)
-```
 
 
 ```{r glmm n_nRef comparacao modelos cheios, echo=TRUE,eval=FALSE,cache=TRUE,message=FALSE,warning=FALSE}
@@ -219,7 +168,6 @@ f_md <- function(dados){
     names(l_md) <- c(paste0(var_dispersao," 1|Site"),
                      paste0(var_dispersao," MN|Site"))
     dados$value_dispersao <- factor(dados$value_dispersao,levels = unique(dados$value_dispersao)[20:1])
-    # dados <- df_md %>% filter(var_dispersao == "k")
     l_md[[1]] <- glmer(cbind(n_nRef,100-n_nRef) ~ 
                          (p.z + I(p.z^2)) * value_dispersao * MN +
                          (1|SiteCode),
@@ -231,7 +179,6 @@ f_md <- function(dados){
                        family = "binomial",data=dados,
                        control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e9)))
   }else{
-    # dados <- df_md %>% filter(var_dispersao == "d.z")
     dados$value_dispersao <- as.numeric(dados$value_dispersao)
     l_md <- vector("list",3)
     names(l_md) <- c(paste0(var_dispersao," 1|Site"),
@@ -299,117 +246,37 @@ v_glmerUpdate <- df_auditoria.md[df_auditoria.md$warning_message != "OK",]$glmer
 knitr::kable(df_auditoria.md) %>% 
   kableExtra::kable_styling()
 ```
-
-#### Avisos de Convergência
-
-
+  
+    
+#### allFit  
+  
+  
 ```{r rotina de avaliacao individual dos modelos cheios 1,echo=TRUE}
-df_md <- df_resultados %>% 
-  select(n_nRef,p,SiteCode,MN,p.z,d.z,d_Lplot.z) %>% 
-# df_md[,6:8] <- apply(df_md[,6:8],2,as.character)
-# df_md %<>% 
-  gather(key = var_dispersao, value = value_dispersao, d.z:d_Lplot.z) 
-#
 i <- 4
 names(l_nRef__modeloCheio[v_glmerUpdate])[i]
 #
 ## update1:
-dados <- df_md %>% filter(var_dispersao == "d.z")
-v_par <- getME(l_nRef__modeloCheio[v_glmerUpdate][[i]],
-               c("theta","fixef"))
-# if 1|Site
-l_nRef__modeloCheio[v_glmerUpdate][[i]] <- 
-  glmer(cbind(n_nRef,100-n_nRef) ~ 
-                         (p.z + I(p.z^2)) * (value_dispersao + I(value_dispersao^2)) * MN + 
-                         (1|SiteCode),
-                       family = "binomial",data=dados,start = v_par,
-                       control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e10)))
-# if MN|Site    
-l_nRef__modeloCheio[v_glmerUpdate][[i]] <- 
-  glmer(cbind(n_nRef,100-n_nRef) ~ 
-                         (p.z + I(p.z^2)) * (value_dispersao + I(value_dispersao^2)) * MN + 
-                         (MN|SiteCode),
-                       family = "binomial",data=dados,start = v_par,
-                       control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e10)))
+md_allFit <- allFit(l_nRef__modeloCheio[v_glmerUpdate][[i]],maxfun = 1e5, parallel = 'multicore', ncpus = 3)
 ```
   
   
   
 __1) d_Lplot 1|Site__  
-  
-    
-1: In (function (par, fn, lower = -Inf, upper = Inf, control = list(),  :
-  NAs introduced by coercion to integer range
-2: In optwrap(optimizer, devfun, start, rho$lower, control = control,  :
-  convergence code 1 from bobyqa: bobyqa -- maximum number of function evaluations exceeded
-3: In (function (par, fn, lower = -Inf, upper = Inf, control = list(),  :
-  NAs introduced by coercion to integer range
-4: In optwrap(optimizer, devfun, start, rho$lower, control = control,  :
-  convergence code 1 from bobyqa: bobyqa -- maximum number of function evaluations exceeded
-5: In checkConv(attr(opt, "derivs"), opt$par, ctrl = control$checkConv,  :
-  Model failed to converge with max|grad| = 0.00342971 (tol = 0.002, component 1)
-6: In checkConv(attr(opt, "derivs"), opt$par, ctrl = control$checkConv,  :
-  Model is nearly unidentifiable: very large eigenvalue
- - Rescale variables?
 
-
+7 optimizer(s) failed
 
 __2) d_Lplot MN|Site__  
   
-    
-1: In (function (par, fn, lower = -Inf, upper = Inf, control = list(),  :
-  NAs introduced by coercion to integer range
-2: In optwrap(optimizer, devfun, start, rho$lower, control = control,  :
-  convergence code 1 from bobyqa: bobyqa -- maximum number of function evaluations exceeded
-3: In (function (par, fn, lower = -Inf, upper = Inf, control = list(),  :
-  NAs introduced by coercion to integer range
-4: In optwrap(optimizer, devfun, start, rho$lower, control = control,  :
-  convergence code 1 from bobyqa: bobyqa -- maximum number of function evaluations exceeded
-5: In checkConv(attr(opt, "derivs"), opt$par, ctrl = control$checkConv,  :
-  Model failed to converge with max|grad| = 0.00838345 (tol = 0.002, component 1)
-6: In checkConv(attr(opt, "derivs"), opt$par, ctrl = control$checkConv,  :
-  Model is nearly unidentifiable: very large eigenvalue
- - Rescale variables?
-  
-    
+7 optimizer(s) failed
       
 __3) d 1|Site__  
-  
-  
-1: In (function (par, fn, lower = -Inf, upper = Inf, control = list(),  :
-  NAs introduced by coercion to integer range
-2: In optwrap(optimizer, devfun, start, rho$lower, control = control,  :
-  convergence code 1 from bobyqa: bobyqa -- maximum number of function evaluations exceeded
-3: In (function (par, fn, lower = -Inf, upper = Inf, control = list(),  :
-  NAs introduced by coercion to integer range
-4: In optwrap(optimizer, devfun, start, rho$lower, control = control,  :
-  convergence code 1 from bobyqa: bobyqa -- maximum number of function evaluations exceeded
-5: In checkConv(attr(opt, "derivs"), opt$par, ctrl = control$checkConv,  :
-  Model failed to converge with max|grad| = 40.1829 (tol = 0.002, component 1)
-6: In checkConv(attr(opt, "derivs"), opt$par, ctrl = control$checkConv,  :
-  Model is nearly unidentifiable: very large eigenvalue
- - Rescale variables?
-     
-  
+
+7 optimizer(s) failed
          
- __4) d MN|Site__      
-    
-    
-1: In (function (par, fn, lower = -Inf, upper = Inf, control = list(),  :
-  NAs introduced by coercion to integer range
-2: In optwrap(optimizer, devfun, start, rho$lower, control = control,  :
-  convergence code 1 from bobyqa: bobyqa -- maximum number of function evaluations exceeded
-3: In (function (par, fn, lower = -Inf, upper = Inf, control = list(),  :
-  NAs introduced by coercion to integer range
-4: In optwrap(optimizer, devfun, start, rho$lower, control = control,  :
-  convergence code 1 from bobyqa: bobyqa -- maximum number of function evaluations exceeded
-5: In checkConv(attr(opt, "derivs"), opt$par, ctrl = control$checkConv,  :
-  Model failed to converge with max|grad| = 0.00749388 (tol = 0.002, component 1)
-6: In checkConv(attr(opt, "derivs"), opt$par, ctrl = control$checkConv,  :
-  Model is nearly unidentifiable: very large eigenvalue
- - Rescale variables?    
-    
-    
+__4) d MN|Site__      
+  
+7 optimizer(s) failed    
+
   
 ### Modelo cheio 2: 
 
@@ -429,19 +296,17 @@ f_md <- function(dados){
     names(l_md) <- c(paste0(var_dispersao," 1|Site"),
                      paste0(var_dispersao," MN|Site"))
     dados$value_dispersao <- factor(dados$value_dispersao,levels = unique(dados$value_dispersao)[20:1])
-    # dados <- df_md %>% filter(var_dispersao == "k")
     l_md[[1]] <- glmer(cbind(n_nRef,100-n_nRef) ~ 
                          (p.z + I(p.z^2)) * value_dispersao * MN +
                          (1|SiteCode),
                        family = "binomial",data=dados,
-                       control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e10)))
+                       control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e9)))
     l_md[[2]] <- glmer(cbind(n_nRef,100-n_nRef) ~ 
                          (p.z + I(p.z^2)) * value_dispersao * MN +
                          (MN|SiteCode),
                        family = "binomial",data=dados,
-                       control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e10)))
+                       control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e9)))
   }else{
-    # dados <- df_md %>% filter(var_dispersao == "d.z")
     dados$value_dispersao <- as.numeric(dados$value_dispersao)
     l_md <- vector("list",4)
     names(l_md) <- c(paste0(var_dispersao," 1|Site"),
@@ -478,7 +343,30 @@ names(l_nRef__modeloCheio2) <- NULL
 l_nRef__modeloCheio2 <- do.call(c,l_nRef__modeloCheio2)
 #
 f_warning <- function(glmm_object){
-  # glmm_object <- l_nRef__modeloCheio[[4]]
+  v_message <- glmm_object@optinfo$conv$lme4$messages %>% 
+    as.character()
+  if(length(v_message)==0){v_message <- "OK"}
+  if(length(v_message)>1){v_message <- v_message[1] }
+  return(v_message)
+}
+df_auditoria.md <- ldply(l_nRef__modeloCheio2,f_warning,.id="glmer") %>% 
+  rename(warning_message = V1)
+```
+
+
+```{r l_nRef__modeloCheio2,eval=FALSE,echo=FALSE}
+save(l_nRef__modeloCheio2,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md_nRef_GLMM2.Rdata")
+```
+  
+    
+__Table 2.2__ Modelos Cheios estimados e avisos de convergência    
+    
+      
+```{r warningns l_nRef__modeloCheio2,eval=TRUE,echo=FALSE}
+load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md_nRef_GLMM2.Rdata")
+# avaliação e melhora do ajuste dos modelos
+## warnings
+f_warning <- function(glmm_object){
   v_message <- glmm_object@optinfo$conv$lme4$messages %>% 
     as.character()
   if(length(v_message)==0){v_message <- "OK"}
@@ -492,55 +380,69 @@ v_glmerUpdate <- df_auditoria.md[df_auditoria.md$warning_message != "OK",]$glmer
 knitr::kable(df_auditoria.md) %>% 
   kableExtra::kable_styling()
 ```
-
-
-
-```{r melhoria de modelo cheio 2}
+  
+#### allFit  
+  
+```{r melhoria de modelo cheio 2,eval=FALSE}
 #
-i <- 1
-names(l_nRef__modeloCheio[v_glmerUpdate])[i]
+i <- 2
+names(l_nRef__modeloCheio2[v_glmerUpdate])[i]
 #
 ## update 2
-md_allFit <- allFit(l_nRef__modeloCheio[v_glmerUpdate][[i]],maxfun = 1e5, parallel = 'multicore', ncpus = 3)
-df_auditoria.md <- ldply(md_allFit,f_warning,.id="optimizer") %>% 
-  rename(warning_message = V1)
+md_allFit <- allFit(l_nRef__modeloCheio2[v_glmerUpdate][[i]],maxfun = 1e5, parallel = 'multicore', ncpus = 3)
+# df_auditoria.md <- ldply(md_allFit,f_warning,.id="optimizer") %>% 
+  # rename(warning_message = V1)
 # 
 ```
   
   
 __d_Lplot.z 1|Site__    
-1: In (function (par, fn, lower = -Inf, upper = Inf, control = list(),  :
-  NAs introduced by coercion to integer range
-2: In optwrap(optimizer, devfun, start, rho$lower, control = control,  :
-  convergence code 1 from bobyqa: bobyqa -- maximum number of function evaluations exceeded
-3: In (function (par, fn, lower = -Inf, upper = Inf, control = list(),  :
-  NAs introduced by coercion to integer range
-4: In optwrap(optimizer, devfun, start, rho$lower, control = control,  :
-  convergence code 1 from bobyqa: bobyqa -- maximum number of function evaluations exceeded
-5: In checkConv(attr(opt, "derivs"), opt$par, ctrl = control$checkConv,  :
-  Model failed to converge with max|grad| = 249.566 (tol = 0.002, component 1)  
+7 optimizer(s) failed
 
 
+__d.z 1|Site__ 
+7 optimizer(s) failed
 
 
+### Comparação de Modelos Cheios:
+
+```{r l_nRef_ModeloCheioFinal,eval=FALSE,echo=TRUE}
+v_glmerOK <- df_auditoria.md[df_auditoria.md$warning_message == "OK",]$glmer %>% 
+  as.character()
+l_nRef_ModeloCheioFinal <- l_nRef__modeloCheio2[v_glmerOK]
+save(l_nRef_ModeloCheioFinal,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md_nRef_ModeloCheioFinal.Rdata")
+```
+
+```{r nRef modelo cheio final tabela de aIC,results="hide"}
+load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md_nRef_ModeloCheioFinal.Rdata")
+df_tableGLMM <- print(AICctab(l_nRef_ModeloCheioFinal,weights=TRUE)) %>% 
+  as.data.frame()
+df_tableGLMM$GLMM <- row.names(df_tableGLMM) %>% gsub(".z","",.)
+df_tableGLMM$weight <- as.character(df_tableGLMM$weight)
+df_tableGLMM$dAICc <- as.numeric(as.character(df_tableGLMM$dAICc))
+rownames(df_tableGLMM) <- NULL
+df_tableGLMM <- df_tableGLMM[,c(4,1:3)]
+```
+
+__Tabela 2.3__ Comparação baseada em AICc dos modelos cheios  
+  
+```{r}
+knitr::kable(df_tableGLMM) %>% 
+  kableExtra::kable_styling()
+```
 
 
-
-
-
-
-
-
+#### Diagnostico do modelo cheio mais plausível
 
     
 ```{r auditoria mais plausivel md_n.ref1, message=FALSE,eval=FALSE,include=FALSE}
 # library(DHARMa)
-md_nRef <- l_md_nRef.GLMM[["d.z d.z*MN|Site"]]
+md_nRef <- l_nRef_ModeloCheioFinal[["d.z^2 (d.z+d.z^2)*MN|Site"]]
 p_plot <- simulateResiduals(md_nRef,n=1000)
 plot(p_plot)
 ```
 
-<!-- __Figura 1.2__ Resíduos Quantílicos do modelo cheio plausível -->
+__Figura 1.2__ Resíduos Quantílicos do modelo cheio plausível
 
 
 
