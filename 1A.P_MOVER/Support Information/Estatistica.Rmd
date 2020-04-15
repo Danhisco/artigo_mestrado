@@ -137,7 +137,7 @@ __Figura 2.2__ número de SADs não refutadas ~ (d * MN|Site ~ p). Site está or
     
 ## 2.1 GLMM binomial
 
-### Modelo cheio: 
+### Modelo cheio 1: 
 
 
 __linear term__  
@@ -300,10 +300,10 @@ knitr::kable(df_auditoria.md) %>%
   kableExtra::kable_styling()
 ```
 
-#### Avaliação de cada modelo que não passou no teste de convergência 
+#### Avisos de Convergência
 
 
-```{r}
+```{r rotina de avaliacao individual dos modelos cheios 1,echo=TRUE}
 df_md <- df_resultados %>% 
   select(n_nRef,p,SiteCode,MN,p.z,d.z,d_Lplot.z) %>% 
 # df_md[,6:8] <- apply(df_md[,6:8],2,as.character)
@@ -408,114 +408,129 @@ __3) d 1|Site__
 6: In checkConv(attr(opt, "derivs"), opt$par, ctrl = control$checkConv,  :
   Model is nearly unidentifiable: very large eigenvalue
  - Rescale variables?    
-  
     
-          
-__Mensagens em comum__  
-  
-  
     
+  
+### Modelo cheio 2: 
 
 
-
-        
-```{r rotina de ajustes,eval=FALSE,echo=FALSE }
-#
-##
+```{r glmm n_nRef comparacao modelos cheios2, echo=TRUE,eval=FALSE,cache=TRUE,message=FALSE,warning=FALSE}
+# dados
 df_md <- df_resultados %>% 
-  select(n_nRef,p,SiteCode,MN,p.z,d.z,d_Lplot.z)
-df_md[,6:7] <- apply(df_md[,6:7],2,as.character)
+  select(n_nRef,p,SiteCode,MN,p.z,k,d.z,d_Lplot.z)
+df_md[,6:8] <- apply(df_md[,6:8],2,as.character)
 df_md %<>% 
-  gather(key = var_dispersao, value = value_dispersao, d.z:d_Lplot.z) # %>% 
-  # group_by(var_dispersao) %>% nest()
-##
-# f_dply <- function(glmer_object){
-#   l_nRef__modeloCheio[[1]]
-# }
-# 
-# 
-# df_mdList <- ldply()
-# rotina
-i <- 1
-names(l_nRef__modeloCheio[v_glmerUpdate])[i]
-v_par <- getME(l_nRef__modeloCheio[v_glmerUpdate][[i]],
-               c("theta","fixef"))
-## if 1|Site
-l_nRef__modeloCheio[v_glmerUpdate][[i]] <- glmer(cbind(n_nRef,100-n_nRef) ~ 
-                         (p.z + I(p.z^2)) * (value_dispersao + I(value_dispersao^2)) * MN + 
+  gather(key = var_dispersao, value = value_dispersao, k:d_Lplot.z) 
+# funcao ajuste dos modelos
+f_md <- function(dados){
+  var_dispersao <- unique(dados$var_dispersao)
+  if(var_dispersao == "k"){
+    l_md <- vector("list",2)
+    names(l_md) <- c(paste0(var_dispersao," 1|Site"),
+                     paste0(var_dispersao," MN|Site"))
+    dados$value_dispersao <- factor(dados$value_dispersao,levels = unique(dados$value_dispersao)[20:1])
+    # dados <- df_md %>% filter(var_dispersao == "k")
+    l_md[[1]] <- glmer(cbind(n_nRef,100-n_nRef) ~ 
+                         (p.z + I(p.z^2)) * value_dispersao * MN +
+                         (1|SiteCode),
+                       family = "binomial",data=dados,
+                       control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e10)))
+    l_md[[2]] <- glmer(cbind(n_nRef,100-n_nRef) ~ 
+                         (p.z + I(p.z^2)) * value_dispersao * MN +
+                         (MN|SiteCode),
+                       family = "binomial",data=dados,
+                       control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e10)))
+  }else{
+    # dados <- df_md %>% filter(var_dispersao == "d.z")
+    dados$value_dispersao <- as.numeric(dados$value_dispersao)
+    l_md <- vector("list",4)
+    names(l_md) <- c(paste0(var_dispersao," 1|Site"),
+                     paste0(var_dispersao," MN|Site"),
+                     paste0(var_dispersao," ",var_dispersao,"*MN|Site"),
+                     paste0(var_dispersao,"^2 (",var_dispersao,"+",var_dispersao,"^2)*MN|Site"))
+    l_md[[1]] <- glmer(cbind(n_nRef,100-n_nRef) ~ 
+                         (p.z + I(p.z^2)) * value_dispersao * MN + 
                          (1|SiteCode),
                        family = "binomial",data=dados,
                        control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e9)))
-
-
-## update: inicio com os parâmetros estimados
-f_update1 <- function(glmm_object){
-  # glmm_object <- l_nRef__modeloCheio[v_glmerUpdate][[2]]
-  v_vars <- getME(glmm_object,c("theta","fixef"))
-  glmm_update <- update(glmm_object,start=v_vars)
+    l_md[[2]] <- glmer(cbind(n_nRef,100-n_nRef) ~ 
+                         (p.z + I(p.z^2)) * value_dispersao * MN + 
+                         (MN|SiteCode),
+                       family = "binomial",data=dados,
+                       control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e9)))
+    l_md[[3]] <- glmer(cbind(n_nRef,100-n_nRef) ~ 
+                         (p.z + I(p.z^2)) * value_dispersao * MN + 
+                         (value_dispersao * MN|SiteCode),
+                       family = "binomial",data=dados,
+                       control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e9)))
+    l_md[[4]] <- glmer(cbind(n_nRef,100-n_nRef) ~ 
+                         (p.z + I(p.z^2)) * (value_dispersao + I(value_dispersao^2)) * MN + 
+                         ( (value_dispersao + I(value_dispersao^2) ) * MN|SiteCode),
+                       family = "binomial",data=dados,
+                       control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e9)))
+    
+  }
+  return(l_md)
 }
-############################################
-################# error ####################
-############################################
-# Error in do.ply(i) : 
-# task 1 failed - "'data' not found, and some variables missing from formula environment"
-# registerDoMC(3)
-# l_nRef__modeloCheio[v_glmerUpdate] <- llply(l_nRef__modeloCheio[v_glmerUpdate],f_update1) # ,
-                                            # .parallel = TRUE,
-                                            # .paropts=list(.export=c('data','main.function'),.packages=.packages(all.available=T)))
-############################################
-################# error ####################
-############################################
-for(i in 1:length(l_nRef__modeloCheio[v_glmerUpdate])){
-  v_vars <- getME(l_nRef__modeloCheio[v_glmerUpdate][[i]],
-                  c("theta","fixef"))
-  l_nRef__modeloCheio[v_glmerUpdate][[i]] <- update(l_nRef__modeloCheio[v_glmerUpdate][[i]],
-                                                    start=v_vars)
+registerDoMC(3)
+l_nRef__modeloCheio2 <- dlply(df_md,.(var_dispersao),f_md,.parallel = TRUE)
+names(l_nRef__modeloCheio2) <- NULL
+l_nRef__modeloCheio2 <- do.call(c,l_nRef__modeloCheio2)
+#
+f_warning <- function(glmm_object){
+  # glmm_object <- l_nRef__modeloCheio[[4]]
+  v_message <- glmm_object@optinfo$conv$lme4$messages %>% 
+    as.character()
+  if(length(v_message)==0){v_message <- "OK"}
+  if(length(v_message)>1){v_message <- v_message[1] }
+  return(v_message)
 }
-df_auditoria.md<- ldply(l_nRef__modeloCheio[c(v_glmerUpdate)],f_warning,.id = "glmer") %>% 
-  dplyr::rename(warning_message = V1)
-v_glmerUpdate <- df_auditoria.md[df_auditoria.md$warning_message != "OK",]$glmer %>% 
-  as.character()
-## update: aumentar número de iterações do otimizador
-################### mesmo erro ###################
-# f_update2 <- function(glmm_object){
-#   glmm_update <- update(glmm_object,control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e10)))
-# }
-# registerDoMC(3)
-# l_nRef__modeloCheio[v_glmerUpdate] <- llply(l_nRef__modeloCheio[c(v_glmerUpdate)], f_update1,.parallel = TRUE) 
-################### mesmo erro ###################
-for(i in 1:length(l_nRef__modeloCheio[v_glmerUpdate])){
-  l_nRef__modeloCheio[v_glmerUpdate][[i]] <- update(l_nRef__modeloCheio[v_glmerUpdate][[i]],
-                                                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e10)))
-}
-df_auditoria.md <- ldply(l_nRef__modeloCheio[c(v_glmerUpdate)],f_warning,.id = "glmer") %>% 
+df_auditoria.md <- ldply(l_nRef__modeloCheio2,f_warning,.id="glmer") %>% 
   rename(warning_message = V1)
 v_glmerUpdate <- df_auditoria.md[df_auditoria.md$warning_message != "OK",]$glmer %>% 
   as.character()
-## update: try all optimizers
-temp <- allFit(l_nRef__modeloCheio[v_glmerUpdate][[1]],parallel = 'multicore', ncpus = 3)
-
-
+knitr::kable(df_auditoria.md) %>% 
+  kableExtra::kable_styling()
 ```
 
 
-    
-    
-```{r Tabela 21,eval=FALSE,cache=FALSE,include=FALSE}
-load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md_nRef_GLMM.Rdata")
-df_auditoria.md <- ldply(l_nRef__modeloCheio,f_warning,.id = "glmer") %>% 
+
+```{r melhoria de modelo cheio 2}
+#
+i <- 1
+names(l_nRef__modeloCheio[v_glmerUpdate])[i]
+#
+## update 2
+md_allFit <- allFit(l_nRef__modeloCheio[v_glmerUpdate][[i]],maxfun = 1e5, parallel = 'multicore', ncpus = 3)
+df_auditoria.md <- ldply(md_allFit,f_warning,.id="optimizer") %>% 
   rename(warning_message = V1)
-knitr::kable(df_auditoria.md)
+# 
 ```
+  
+  
+__d_Lplot.z 1|Site__    
+1: In (function (par, fn, lower = -Inf, upper = Inf, control = list(),  :
+  NAs introduced by coercion to integer range
+2: In optwrap(optimizer, devfun, start, rho$lower, control = control,  :
+  convergence code 1 from bobyqa: bobyqa -- maximum number of function evaluations exceeded
+3: In (function (par, fn, lower = -Inf, upper = Inf, control = list(),  :
+  NAs introduced by coercion to integer range
+4: In optwrap(optimizer, devfun, start, rho$lower, control = control,  :
+  convergence code 1 from bobyqa: bobyqa -- maximum number of function evaluations exceeded
+5: In checkConv(attr(opt, "derivs"), opt$par, ctrl = control$checkConv,  :
+  Model failed to converge with max|grad| = 249.566 (tol = 0.002, component 1)  
 
 
-  
-<!-- __Tabela 2.2__  Ajuste obtido para os modelos após as rotinas de melhora      -->
-  
-    
-```{r Tabela 22,eval=FALSE,include=FALSE}
-AICctab(l_nRef__modeloCheio)
-```
+
+
+
+
+
+
+
+
+
+
 
     
 ```{r auditoria mais plausivel md_n.ref1, message=FALSE,eval=FALSE,include=FALSE}
