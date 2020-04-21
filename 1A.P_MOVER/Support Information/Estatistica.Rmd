@@ -1,5 +1,5 @@
 ---
-Ftitle: "Estatistica"
+Ftitle: "Apêndice 2: Descrição Estatística"
 author: "Mori, Danilo"
 date: "31/10/2019"
 output: 
@@ -7,7 +7,7 @@ output:
     toc: true
     toc_depth: 5
 editor_options: 
-  chunk_output_type: inline
+  chunk_output_type: console
 ---
 
 <style>
@@ -68,21 +68,6 @@ df_resultados.z <- as.data.frame(apply(df_resultados[,c("p","Ntotal","log_Sobs",
 names(df_resultados.z) <- sapply(names(df_resultados.z), function(x) paste0(x,".z"))
 df_resultados %<>% cbind(.,df_resultados.z) %>% 
   select(-k_1,-k_1.z)
-# names(df_resultados)
-# str(df_resultados)
-
-
-####################################
-####### usado anteriormente ########
-####################################
-# # df_U
-# df_resultados.U <- df_resultados %>% filter(MN=="EE") %>% distinct()
-# # df_EI
-# df_resultados.EI <- df_resultados %>% filter(MN=="EI") %>% distinct()
-# df_resultados.EI$modulo_diffS[df_resultados.EI$modulo_diffS == 0] <- 
-#   min(df_resultados.EI$modulo_diffS[df_resultados.EI$modulo_diffS != 0])*IQR(df_resultados.EI$modulo_diffS)/max(df_resultados.EI$modulo_diffS)
-# df_resultados.EI %<>% mutate(log_modulo_diffS = log(modulo_diffS),
-#                              log_modulo_diffS.z = f_z(log_modulo_diffS))
 ```
 
 
@@ -111,10 +96,10 @@ l_p[[2]] <- ggplot(df_resultados,aes(x=k,y=d_Lplot)) +
   geom_jitter(alpha=0.3) +
   geom_boxplot(alpha=0.6) +
   coord_flip()
-l_p[[3]] <- ggplot(df_resultados, aes(x=p,y=S_obs)) +
+l_p[[3]] <- ggplot(filter(df_resultados,MN=="EE"&k=="0.99"), aes(x=p,y=S_obs)) +
   geom_point(alpha=0.3)
-l_p[[4]] <- ggplot(df_resultados,aes(x="",y=p)) + geom_jitter(alpha=0.3) + geom_boxplot(alpha=0.6) + labs(x="")
-l_p[[5]] <- ggplot(df_resultados,aes(x="",y=S_obs)) + geom_jitter(alpha=0.3) + geom_boxplot(alpha=0.6) + labs(x="")
+l_p[[4]] <- ggplot(filter(df_resultados,MN=="EE"&k=="0.99"),aes(x="",y=p)) + geom_jitter(alpha=0.3) + geom_boxplot(alpha=0.6) + labs(x="")
+l_p[[5]] <- ggplot(filter(df_resultados,MN=="EE"&k=="0.99"),aes(x="",y=S_obs)) + geom_jitter(alpha=0.3) + geom_boxplot(alpha=0.6) + labs(x="")
 layout_mat <- rbind(c(1,1,1,2,2,2),
                     c(3,3,3,4,5,NA))
 # do.call("grid.arrange",c(l_p[1:3],layout_matrix=1,top="Possible Predictor Variables"))
@@ -407,11 +392,8 @@ knitr::kable(df_auditoria.md) %>%
 #### allFit  
   
 ```{r melhoria de modelo cheio 2,eval=FALSE}
-#
-i <- 1
+i <- 2
 names(l_nRef__modeloCheio2[v_glmerUpdate])[i]
-#
-## update 2
 md_allFit <- allFit(l_nRef__modeloCheio2[v_glmerUpdate][[i]],maxfun = 1e5, parallel = 'multicore', ncpus = 3)
 ```
   
@@ -446,54 +428,73 @@ df_tableGLMM <- df_tableGLMM[,c(4,1:3)]
 
 __Tabela 2.3__ Comparação baseada em AICc dos modelos cheios  
   
-```{r}
+```{r tabela 23}
 knitr::kable(df_tableGLMM) %>% 
   kableExtra::kable_styling()
 ```
+  
+  
+__Tabela 2.4__ Coeficiente de Determinação Condicional e Marginal
+
+```{r tabela 24 coeficiente de determinacao condicional e marginal,cache=TRUE}
+md_nRef <- glmer(cbind(n_nRef,100-n_nRef) ~ 
+                   (p.z + I(p.z^2)) * (d.z + I(d.z^2)) * MN + 
+                   ( (d.z + I(d.z^2) ) * MN|SiteCode),
+                 family = "binomial",data=df_resultados,
+                 control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e9)),
+                 na.action = "na.fail")
+r.squaredGLMM(md_nRef)
+```
 
 
-#### Diagnostico do modelo cheio mais plausível 1
+
+
+#### Diagnostico do modelo cheio mais plausível 
 
     
 ```{r auditoria mais plausivel md_n.ref1, message=FALSE,eval=TRUE,echo=FALSE}
-# library(DHARMa)
-md_nRef <- l_nRef_ModeloCheioFinal[["d.z^2 (d.z+d.z^2)*MN|Site"]]
 p_plot <- simulateResiduals(md_nRef,n=1000)
 plot(p_plot)
 ```
 
-__Figura 1.2__ Resíduos Quantílicos do modelo cheio plausível
+__Figura 2.3__ Resíduos Quantílicos do modelo cheio plausível
+  
+  
+```{r figura 24 qqplots random effects}
+df_ranef <- ranef(md_nRef)$SiteCode 
+df_ranef$SiteCode <- row.names(df_ranef)
+row.names(df_ranef) <- NULL
+df_ranef %>% 
+  gather(key = parameter_class,value = parameter_value, -SiteCode) %>% 
+  ggplot(aes(sample=parameter_value)) + 
+  stat_qq(alpha=0.3) + stat_qq_line(alpha=0.3,col="red") + theme_classic() +
+  facet_wrap(~parameter_class,scales="free",ncol=3)
+```
+    
+__Figura 2.4__ Quantile-quantile plot random effects.  
 
 
-#### Diagnostico do modelo cheio mais plausível 2
-
-
-```{r graf diag 2 glmm p^2 n_nRef fig 13, include=FALSE,eval=FALSE}
-# teste <- augment(lm(log(Stotal) ~ p,df_resultados)) %>% as.data.frame()
-# df_plot <- augment(md_nRef) %>% as.data.frame() # demorando muito
-# # df_plot %>% names
-# l_p <- vector("list",3)
-# l_p[[1]] <- ggplot(df_plot,aes(x=p.z,y=.fitted)) + geom_point(alpha=0.3) + geom_line(aes(group=SiteCode)) + facet_wrap(~MN,ncol=2)
-# l_p[[2]] <- ggplot(df_plot,aes(x=I.p.z.2.,y=.fitted)) + geom_point(alpha=0.3) + geom_line(aes(group=SiteCode)) + facet_wrap(~MN,ncol=2)
-# l_p[[3]] <- ggplot(df_plot,aes(x=d_Lplot.z,y=.fitted)) + geom_point(alpha=0.3) + geom_line(aes(group=SiteCode)) + facet_wrap(~MN,ncol=2)
-# do.call("grid.arrange",c(l_p,ncol=1))
+```{r fiigura 25}
+# dados
+df_md <- md_nRef@frame
+df_md$nRef_observado <- df_md$`cbind(n_nRef, 100 - n_nRef)`[,1]
+df_md$nRef_predito <- predict(md_nRef,type="response") * 100
+# graficos
+ggplot(df_md,aes(x=nRef_observado,y=nRef_predito)) +
+  geom_smooth(method = "lm",aes(group=SiteCode),se=FALSE,alpha=0.3) +
+  geom_abline(slope = 1,intercept = 0,col="red",alpha=0.8,size=2) +
+  geom_point(alpha=0.3) +
+  facet_wrap(~MN,ncol=2,scales="free") + theme_classic() + xlim(0,100) + ylim(0,100) 
 ```
 
-<!-- __Figura 1.3__ Valores ajustados contra as preditoras lineares  - ESTA DEMORANDO MUITO PARA RODAR AUGMENT PARA O MODELO MAIS PLAUSIVEL -->
-  
-<!-- ### 1.1.2 Modelo cheio: predições -->
+
+__Figura 2.5__ Predito e observado pelo modelo. Em vermelho linha y=x; em azul um modelo linear por sítio de amostragem.  
+
 
 ```{r avaliacao por site fig 14,fig.width=8, fig.height=30,message=FALSE,eval=TRUE,echo=FALSE}
 # Dados
-## usados para o ajuste
-df_md <- df_resultados %>% 
-  select(n_nRef,p,SiteCode,MN,p.z,k,d.z,d_Lplot.z)
-df_md[,6:8] <- apply(df_md[,6:8],2,as.character)
-df_md %<>% 
-  gather(key = var_dispersao, value = value_dispersao, k:d_Lplot.z)
 ## filtrados para o modelo
-df_plot <- df_md %>% filter(var_dispersao == "d.z")
-df_plot$value_dispersao <- as.numeric(df_plot$value_dispersao)
+df_plot <- df_resultados
 df_plot$Pr_nRef <- predict(md_nRef,type="response")*100
 # df_plot %>% str
 # Graficos
@@ -507,72 +508,66 @@ ggplot(df_plot,aes(x=value_dispersao,y=n_nRef,group=MN)) +
   facet_wrap(~title,ncol=6)
 ```
 
-<!-- __Figura 1.3__ Predito e observado para modelo cheio -->
+__Figura 2.6__ Predito e observado para modelo cheio
+    
   
-<!-- Observamos que é necessário considerar também um termo quadrático para d. Então sigo com a adição de um termo quadrático para d -->
+### Seleção da combinação de preditoras:    
 
-<!-- ### 1.1.3: update modelo cheio: (p+p^2)*(d+d^2)*MN  -->
-
-
-```{r md_nRef2 e r2cm,echo=TRUE,cache=TRUE,eval=FALSE,echo=FALSE}
-md_nRef2 <- glmer(cbind(n_nRef,100-n_nRef) ~ 
-                     (p.z + I(p.z^2)) * (d.z + I(d.z^2)) * MN + ((d.z + I(d.z^2)) * MN|SiteCode),
-                   family = "binomial",data=df_resultados,
-                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-# MuMIn::r.squaredGLMM(md_nRef2)
+__Modelo Global__  
+  
+    
+```{r modelo global, eval=FALSE,echo=TRUE}
+md_nRef <- glmer(cbind(n_nRef,100-n_nRef) ~ 
+                   (p.z + I(p.z^2)) * (d.z + I(d.z^2)) * MN + 
+                   ( (d.z + I(d.z^2) ) * MN|SiteCode),
+                 family = "binomial",data=df_resultados,
+                 control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e9)),
+                 na.action = "na.fail")
 ```
 
 
-```{r md_nRef2 quant res,eval=FALSE,echo=FALSE}
-p_plot <- simulateResiduals(md_nRef2,n = 1000)
-plot(p_plot)
-```
 
-<!-- __Figura 1.4__ glmm binomial: nRef ~ (p + p^2) * (d + d^2) * MN + ((d + d^2) * MN | Site) -->
+__Tabela 2.5__ Tabela de Seleção de Modelos baseado em AICc
 
 
-```{r avaliacao por site fig 15 glmm p2 d2,fig.width=8, fig.height=30,message=FALSE,eval=FALSE}
-# Dados
-df_plot <- df_resultados
-# df_plot <- cbind(df_plot,
-#   predictInterval(merMod = md_nRef2,
-#                          level = 0.95, n.sims=200,
-#                          stat="median",type = "probability",
-#                          include.resid.var = TRUE)*100
-#                  )
-df_plot$Pr_nRef <- predict(md_nRef2,type="response")*100
-# Graficos
-df_plot %<>% mutate(title = paste0(SiteCode, " p=",round(p,digits = 3))) %>% arrange(p)
-df_plot$title <- factor(df_plot$title,levels = unique(df_plot$title))
-ggplot(df_plot,aes(x=d.z,y=n_nRef,group=MN)) +
-  geom_point(aes(color=MN),alpha=0.3) +
-  geom_line(aes(y=Pr_nRef,color=MN),alpha=0.3) +
-  scale_color_manual(values=c("#FF0000", "#000000")) +
-  theme_classic() + theme(legend.position="top") + facet_wrap(~title,ncol=5)
+```{r modelo global dredge n_nRef,eval=FALSE,echo=FALSE}
+dredge_glmmEE <- dredge(md_nRef,trace = FALSE,evaluate=TRUE)
+dredge_GLMMnRef <- dredge_glmmEE
+save(dredge_GLMMnRef,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/dredge_GLMMnRef1.Rdata")
 ```
   
-<!-- __Figura 1.5__ glmm binomial: nRef ~ (p + p^2) * (d + d^2) * MN + ((d + d^2) * MN | Site) -->
-
-<!-- Para MN:EI a adição de d^2 parece que foi suficiente para melhorar o ajuste do modelo, porém para MN:EE é necessário mais flexibilidade. Vou comparar o modelo cheio glmm com um gamm: -->
-
-
-
-
-```{r figura 16 _ comparacao variancia dos modelos pelas preditoras, fig.width=8, fig.height=30, eval=FALSE}
-df_plot <- df_resultados
-df_plot %<>% mutate(title = paste0(SiteCode, " p=",round(p,digits = 3))) %>% arrange(p)
-df_plot$title <- factor(df_plot$title,levels = unique(df_plot$title))
-df_plot %>% ggplot(aes(x=MN,y=n_nRef)) +
-  geom_boxplot(alpha=0.6,aes(color=MN)) +
-  geom_jitter(alpha=0.3,aes(color=MN)) +
-  scale_color_manual(values=c("#FF0000", "#000000")) +
-  theme(legend.position="top") +
-  facet_wrap(~title,ncol=5)
+  
+```{r nRef dredge modelo subset>7,eval=TRUE,echo=FALSE}
+load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/dredge_GLMMnRef1.Rdata")
+subset(dredge_GLMMnRef,delta<7)
+```
+  
+  
+### Model Averaging:      
+  
+    
+```{r model averaging EE MuMIn e AICcmodavg,message=FALSE,eval=FALSE}
+library(AICcmodavg)
+# todas as combinações de modelo do modelo cheio
+registerDoMC(3)
+l_md.dredge_nRef <- llply(dredge(md_nRef,trace = FALSE,evaluate=FALSE),eval,.parallel = TRUE)
+save(l_md.dredge_nRef,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/dredge_GLMMnRef2.Rdata")
+# Model Averaging for SiteCode predictions
+mdAvg_nRef__MuMIn <- model.avg(l_md.dredge_nRef)
+save(mdAvg_nRef__MuMIn,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_nRef__MuMIn.Rdata")
+# Model Averaging for new data predictions
+df_pred <- expand.grid(SiteCode=levels(df_resultados$SiteCode)[1],
+                       MN = levels(df_resultados$MN),
+                       d.z=seq(min(df_resultados$d.z),max(df_resultados$d.z),length=40),
+                       p.z=seq(min(df_resultados$p.z),max(df_resultados$p.z),length=200))
+mdAvg_nRef__AICcmodavg <- modavgPred(l_md.dredge_nRef,newdata = df_pred) %>%
+  cbind(df_pred)
+save(mdAvg_nRef__AICcmodavg,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_nRef__AICcmodavg.Rdata")
 ```
 
-
-
-
+  
+  
+  
 <!-- ## 1.2 GLMM binomail subset:MN==EE -->
 
 <!-- ### Modelo cheio -->
