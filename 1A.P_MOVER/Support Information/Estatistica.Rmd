@@ -474,7 +474,7 @@ df_ranef %>%
 __Figura 2.4__ Quantile-quantile plot random effects.  
 
 
-```{r fiigura 25}
+```{r fiigura 25,fig.height=4}
 # dados
 df_md <- md_nRef@frame
 df_md$nRef_observado <- df_md$`cbind(n_nRef, 100 - n_nRef)`[,1]
@@ -491,7 +491,7 @@ ggplot(df_md,aes(x=nRef_observado,y=nRef_predito)) +
 __Figura 2.5__ Predito e observado pelo modelo. Em vermelho linha y=x; em azul um modelo linear por sítio de amostragem.  
 
 
-```{r avaliacao por site fig 14,fig.width=8, fig.height=30,message=FALSE,eval=TRUE,echo=FALSE}
+```{r avaliacao por site fig 26, fig.width=8, fig.height=30,message=FALSE,eval=TRUE,echo=FALSE}
 # Dados
 ## filtrados para o modelo
 df_plot <- df_resultados
@@ -500,7 +500,7 @@ df_plot$Pr_nRef <- predict(md_nRef,type="response")*100
 # Graficos
 df_plot %<>% mutate(title = paste0(SiteCode, " p=",round(p,digits = 3))) %>% arrange(p)
 df_plot$title <- factor(df_plot$title,levels = unique(df_plot$title))
-ggplot(df_plot,aes(x=value_dispersao,y=n_nRef,group=MN)) +
+ggplot(df_plot,aes(x=d.z,y=n_nRef,group=MN)) +
   geom_point(aes(color=MN),alpha=0.3) +
   geom_line(aes(y=Pr_nRef,color=MN),alpha=0.3) +
   scale_color_manual(values=c("#FF0000", "#000000")) +
@@ -510,6 +510,18 @@ ggplot(df_plot,aes(x=value_dispersao,y=n_nRef,group=MN)) +
 
 __Figura 2.6__ Predito e observado para modelo cheio
     
+
+
+
+
+
+
+
+
+
+
+
+
   
 ### Seleção da combinação de preditoras:    
 
@@ -527,7 +539,7 @@ md_nRef <- glmer(cbind(n_nRef,100-n_nRef) ~
 
 
 
-__Tabela 2.5__ Tabela de Seleção de Modelos baseado em AICc
+__Tabela 2.5__ Tabela de Seleção de Modelos, deltaAICc<7
 
 
 ```{r modelo global dredge n_nRef,eval=FALSE,echo=FALSE}
@@ -565,8 +577,8 @@ mdAvg_nRef__AICcmodavg <- modavgPred(l_md.dredge_nRef,newdata = df_pred) %>%
 save(mdAvg_nRef__AICcmodavg,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_nRef__AICcmodavg.Rdata")
 ```
 
-  
-  
+
+
   
 <!-- ## 1.2 GLMM binomail subset:MN==EE -->
 
@@ -2063,3 +2075,4 @@ save(mdAvg_nRef__AICcmodavg,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MO
 
 
 
+  
