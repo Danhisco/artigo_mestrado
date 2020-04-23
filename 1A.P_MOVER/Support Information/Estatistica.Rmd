@@ -36,7 +36,7 @@ library(lme4)
 library(merTools)
 library(magrittr)
 library(gridExtra)
-library(ggplot2)
+library(ggplot2); theme_set(theme_classic())
 library(tidyr)
 library(purrr)
 library(plyr)
@@ -565,20 +565,28 @@ f_md <- function(dados){
 }
 registerDoMC(2)
 l_md <- dlply(df_md,"model_class",f_md,.parallel = TRUE)
+```
+
+
+```{r l_nRefEE_estudoGAMM, echo=FALSE, eval=FALSE}
 l_nRefEE_estudoGAMM <- l_md
 save(l_nRefEE_estudoGAMM,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_nRefEE_estudoGAMM.Rdata")
-AICctab(l_md,weights=TRUE)
 ```
+
+```{r AICctab ,eval=TRUE,echo=FALSE}
+load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_nRefEE_estudoGAMM.Rdata")
+AICctab(l_nRefEE_estudoGAMM,weights=TRUE)
+```
+
 
 
 ### Comparação Modelos Cheios
 
-```{r comparacao modelos cheios,echo=TRUE,eval=FALSE}
+```{r comparacao modelos cheios,echo=TRUE,eval=TRUE}
 # dados
 df_md <- df_resultados %>% filter(MN=="EE") %>% 
   distinct() %>% 
-  mutate(rep = 1) %>% 
-  group_by(rep) %>% nest
+  mutate(rep = 1)
 df_md <- left_join(x=data.frame(rep=1,
                                 md_class=c("glmm d+d^2|Site",
                                            "glmm d|Site",
@@ -587,8 +595,7 @@ df_md <- left_join(x=data.frame(rep=1,
                                            "gamm d|Site common",
                                            "gamm 1|Site")),
                    y=df_md,
-                   by="rep") %>% 
-  unnest(cols = c(data))
+                   by="rep")
 # função de ajuste
 f_md <- function(dados){
   md_class <- unique(dados$md_class)
@@ -631,9 +638,13 @@ f_md <- function(dados){
   }
   return(md_)
 }
+```
+
+```{r dlply f md nRef EE, eval=FALSE,echo=TRUE}
 registerDoMC(3)
 l_nRefEE_mdCheio <- dlply(df_md,"md_class",f_md,.parallel = TRUE)
 ```
+
 
 
 ```{r save l_nRefEE_mdCheio, eval=FALSE}
@@ -650,13 +661,89 @@ md_nRefEE <- l_nRefEE_mdCheio[["gamm d|Site for each"]]
 #### Diagnostico modelo cheio
 
 
-__Figura 2.2.1__ Gráficos Diagnostico modelo cheio mais plausível
+__Figura 2.2.1__ Observado e predito pelo modelo cheio mais plausível  
 
-```{r}
-appraise(md_nRefEE)
+```{r fig 221 predito e observado por sitio md_nRefEE, echo=FALSE,eval=TRUE, fig.width=8, fig.height=30,message=FALSE}
+# dados
+df_plot <- df_resultados %>% filter(MN=="EE") %>% distinct()
+df_plot$nRef_predito <- predict.gam(md_nRefEE,se.fit = TRUE,type="response")$fit*100
+df_plot$nRef_se <- predict.gam(md_nRefEE,se.fit = TRUE,type="response")$se*100
+df_plot %<>%
+  mutate(title = paste0(SiteCode, " p=",round(p,digits = 3)),
+         yLower=nRef_predito-nRef_se,
+         yUpper=nRef_predito+nRef_se) %>% 
+  arrange(p)
+df_plot$title <- factor(df_plot$title,levels = unique(df_plot$title))
+# plot
+ggplot(df_plot,aes(x=d.z,y=n_nRef)) +
+  geom_ribbon(aes(ymin = yLower, ymax = yUpper),alpha=0.3,fill="blue") +
+  geom_point(alpha=0.3) +
+  geom_line(aes(y=nRef_predito),alpha=0.5,col="red") +
+  theme_classic() + labs(x="d(metros)",y="nRef(count)") + labs(title = "subset : MN==EE")+
+  facet_wrap(~title,ncol=6)
 ```
 
 
+
+__Figura 2.2.2__ Diagnostico: avaliação do ajuste pelas preditoras lineares
+
+```{r fig 222,echo=FALSE,eval=TRUE,fig.height=5}
+#
+df_plot <- augment(md_nRefEE) 
+df_plot1 <- df_plot %>% 
+  select(p.z,d.z,.fitted,.resid,.hat,.cooksd) %>% 
+  gather(key = preditora_class, value = preditora_value,p.z:d.z) %>% 
+  gather(key = var_diagnostico, value = var_value,.fitted:.cooksd)
+df_plot1$var_diagnostico <- factor(df_plot1$var_diagnostico,levels = unique(df_plot1$var_diagnostico))
+#
+f_p <- function(dados){
+  title_ <- unique(dados$var_diagnostico) %>% 
+    as.character()
+  p <- ggplot(dados,aes(x=preditora_value,y=var_value)) + 
+  geom_point(alpha=0.3) + 
+  geom_smooth(method = "loess",se=TRUE) + 
+  facet_wrap(~preditora_class,ncol=2,scales="free") +
+  labs(title = title_,x="",y="")
+}
+l_p <- dlply(df_plot1,.(var_diagnostico),f_p)
+# p_ <- ggplot(df_plot,aes(y=var_value)) + 
+#   # geom_jitter(alpha=0.3) +
+#   geom_boxplot() + 
+#   facet_wrap(~var_diagnostico,ncol=4,scales="free")
+do.call("grid.arrange",c(l_p,ncol=2))
+#
+# ggplot(df_plot,aes(x=p.z,y=.fitted)) + 
+#   geom_point(alpha=0.3) + 
+#   geom_smooth(method = "loess",se=TRUE) +
+#   scale_y_continuous(breaks = round(seq(min(df_plot$.fitted), max(df_plot$.fitted), by = 100),1))
+  # facet_wrap(~preditora_class,ncol=2,scales="free") +
+  # labs(title = title_,x="",y="")
+```
+
+
+#### Comparação Modelo Cheio sem outliers
+
+```{r }
+# sites outlier
+v_sitesOut_nRefEE <- filter(df_plot,.fitted < -300 | .fitted > 380 | .cooksd > 2000) %>%
+  .$SiteCode %>% unique
+# dados
+df_md <- df_resultados %>% filter(MN=="EE" & !(SiteCode %in% v_sitesOut_nRefEE)) %>% 
+  distinct() %>% 
+  mutate(rep = 1) 
+df_md <- left_join(x=data.frame(rep=1,
+                                md_class=c("glmm d+d^2|Site",
+                                           "glmm d|Site",
+                                           "glmm 1|Site",
+                                           "gamm d|Site for each",
+                                           "gamm d|Site common",
+                                           "gamm 1|Site")),
+                   y=df_md,
+                   by="rep")
+# ajuste modelos
+registerDoMC(3)
+l_nRefEE_mdCheio__sOut <- dlply(df_md,"md_class",f_md,.parallel = TRUE)
+```
 
   
 ## 2.3 GLMM binomial, subset=MNEI
@@ -761,18 +848,18 @@ f_md <- function(dados){
   return(md_)
 }
 registerDoMC(3)
-l_nRefEE_mdCheio <- dlply(df_md,"md_class",f_md,.parallel = TRUE)
+l_nRefEI_mdCheio <- dlply(df_md,"md_class",f_md,.parallel = TRUE)
 ```
 
 
 ```{r save l_nRefEE_mdCheio, eval=FALSE}
-save(l_nRefEE_mdCheio,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_nRefEE_mdCheio.Rdata")
+save(l_nRefEI_mdCheio,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_nRefEI_mdCheio.Rdata")
 ```
 
 ```{r AICctab l_nRefEE_mdCheio,echo=FALSE,eval=TRUE}
-load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_nRefEE_mdCheio.Rdata")
-AICctab(l_nRefEE_mdCheio,weights=TRUE)
-md_nRefEE <- l_nRefEE_mdCheio[["gamm d|Site for each"]]
+load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_nRefEI_mdCheio.Rdata")
+AICctab(l_nRefEI_mdCheio,weights=TRUE)
+# md_nRefEI <- l_nRefEI_mdCheio[["gamm d|Site for each"]]
 ```
 
 
