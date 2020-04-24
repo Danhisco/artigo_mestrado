@@ -582,7 +582,7 @@ AICctab(l_nRefEE_estudoGAMM,weights=TRUE)
 
 ### Comparação Modelos Cheios
 
-```{r comparacao modelos cheios,echo=TRUE,eval=TRUE}
+```{r comparacao modelos cheios nRefEE,echo=TRUE,eval=TRUE}
 # dados
 df_md <- df_resultados %>% filter(MN=="EE") %>% 
   distinct() %>% 
@@ -727,6 +727,37 @@ do.call("grid.arrange",c(l_p,ncol=2))
 ```
 
 
+```{r nRefEE candidatos outlier,eval=TRUE,echo=TRUE}
+v_sitesOut_nRefEE <- filter(df_plot,.fitted < -300 | .fitted > 380 | .cooksd > 2000) %>%
+  .$SiteCode %>% unique
+```
+
+```{r nRefEE possiveis sitios outliers,eval=TRUE,echo=FALSE,fig.width=4, fig.height=2}
+# dados
+df_plot <- df_resultados %>% filter(MN=="EE") %>% distinct()
+df_plot$nRef_predito <- predict.gam(md_nRefEE1,se.fit = TRUE,type="response")$fit*100
+df_plot$nRef_se <- predict.gam(md_nRefEE1,se.fit = TRUE,type="response")$se*100
+df_plot %<>%
+  mutate(title = paste0(SiteCode, " p=",round(p,digits = 3)),
+         yLower=nRef_predito-nRef_se,
+         yUpper=nRef_predito+nRef_se) %>% 
+  arrange(p)
+df_plot$title <- factor(df_plot$title,levels = unique(df_plot$title))
+df_plot %<>% filter(SiteCode %in% v_sitesOut_nRefEE)
+# plot
+ggplot(df_plot,aes(x=d.z,y=n_nRef)) +
+  geom_ribbon(aes(ymin = yLower, ymax = yUpper),alpha=0.3,fill="blue") +
+  geom_point(alpha=0.3) +
+  geom_line(aes(y=nRef_predito),alpha=0.5,col="red") +
+  theme_classic() + labs(x="d(metros)",y="nRef(count)") + labs(title = "subset : MN==EE, outliers?")+
+  facet_wrap(~title,ncol=3)
+```
+
+
+  
+filter(df_plot,.fitted < -300 | .fitted > 380 | .cooksd > 2000):  
+MGlavr6 PEsvfer PRsapo   
+  
 #### Comparação Modelo Cheio sem outliers
 
 ```{r nRefEE sem outliers md cheio,eval=FALSE,echo=TRUE}
@@ -762,9 +793,7 @@ AICctab(l_nRefEE_mdCheio__sOut)
   
     
 #### Diagnosticos modelo cheio sem outliers  
-  
-   
-   
+
 __Figura 2.2.4__ Appraise(md_nRefEE_sOut)       
       
 ```{r md cheio sOut nRefEE,echo=FALSE,eval=TRUE}
@@ -843,7 +872,7 @@ ii) Pelo observado nos dados (figuras 2.1 e 2.2) vou comparar dois smoother type
 iii) Para isso vou ajuster um smoother para d por Sítio de amostragem com um mesmo parâmetro de penalização, dessa maneira eu considero a variação por sítio de amostragem na variável d sem um elevado custo computacional.  
 
 
-```{r nRef MNEE estudo GAMM smoother type,echo=TRUE,eval=FALSE}
+```{r nRef MNEI estudo GAMM smoother type,echo=TRUE,eval=FALSE}
 # dados
 df_md <- df_resultados %>% filter(MN=="EI") %>% distinct()
 df_md <- rbind(mutate(df_md,model_class = "cr"),
@@ -883,7 +912,7 @@ AICctab(l_nRefEI_estudoGAMM,weights=TRUE)
 
 ### Comparação Modelos Cheios
 
-```{r comparacao modelos cheios,echo=TRUE,eval=FALSE}
+```{r comparacao modelos cheios nRefEI,echo=TRUE,eval=FALSE}
 # dados
 df_md <- df_resultados %>% filter(MN=="EI") %>% 
   distinct() %>% 
@@ -903,11 +932,11 @@ l_nRefEI_mdCheio <- dlply(df_md,"md_class",f_md,.parallel = TRUE)
 ```
 
 
-```{r save l_nRefEE_mdCheio, eval=FALSE}
+```{r save l_nRefEI_mdCheio, eval=FALSE}
 save(l_nRefEI_mdCheio,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_nRefEI_mdCheio.Rdata")
 ```
 
-```{r AICctab l_nRefEE_mdCheio,echo=FALSE,eval=TRUE}
+```{r AICctab l_nRefEI_mdCheio,echo=FALSE,eval=TRUE}
 load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_nRefEI_mdCheio.Rdata")
 AICctab(l_nRefEI_mdCheio,weights=TRUE)
 md_nRefEI <- l_nRefEI_mdCheio[["gamm d|Site for each"]]
