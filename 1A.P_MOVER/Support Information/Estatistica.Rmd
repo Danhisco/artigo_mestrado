@@ -7,7 +7,7 @@ output:
     toc: true
     toc_depth: 5
 editor_options: 
-  chunk_output_type: inline
+  chunk_output_type: console
 ---
 
 <style>
@@ -564,16 +564,15 @@ f_md <- function(dados){
   return(md_)
 }
 registerDoMC(2)
-l_md <- dlply(df_md,"model_class",f_md,.parallel = TRUE)
+l_nRefEE_estudoGAMM <- dlply(df_md,"model_class",f_md,.parallel = TRUE)
 ```
 
 
 ```{r l_nRefEE_estudoGAMM, echo=FALSE, eval=FALSE}
-l_nRefEE_estudoGAMM <- l_md
 save(l_nRefEE_estudoGAMM,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_nRefEE_estudoGAMM.Rdata")
 ```
 
-```{r AICctab ,eval=TRUE,echo=FALSE}
+```{r AICctab ,eval=FALSE,echo=FALSE}
 load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_nRefEE_estudoGAMM.Rdata")
 AICctab(l_nRefEE_estudoGAMM,weights=TRUE)
 ```
@@ -659,12 +658,22 @@ md_nRefEE1 <- l_nRefEE_mdCheio[["gamm d|Site for each"]]
 
 #### Diagnostico modelo cheio
 
-__Figura 2.2.1__ Appraise(md_nRefEE)
+__Figura 2.2.1__ gam.check(md_nRefEE1)
 
 
 ```{r fig 221,eval=TRUE,echo=FALSE}
-appraise(md_nRefEE1)
+par(mfrow=c(2,2))
+gam.check(md_nRefEE1)
 ```
+  
+  
+__tabela 2.2.1__ Summary
+  
+```{r tabela 221,eval=TRUE,echo=FALSE}
+summary(md_nRefEE1)
+```
+
+
 
 
 __Figura 2.2.2__ Observado e predito pelo modelo cheio mais plausível  
@@ -755,9 +764,6 @@ ggplot(df_plot,aes(x=d.z,y=n_nRef)) +
 
 
   
-filter(df_plot,.fitted < -300 | .fitted > 380 | .cooksd > 2000):  
-MGlavr6 PEsvfer PRsapo   
-  
 #### Comparação Modelo Cheio sem outliers
 
 ```{r nRefEE sem outliers md cheio,eval=FALSE,echo=TRUE}
@@ -788,7 +794,7 @@ save(l_nRefEE_mdCheio__sOut,file = "~/Documentos/Doutorado/artigo_mestrado/1A.P_
 
 ```{r AICctab l_nRefEE_mdCheio__sOut}
 load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_nRefEE_mdCheio__sOut.Rdata")
-AICctab(l_nRefEE_mdCheio__sOut)
+AICctab(l_nRefEE_mdCheio__sOut,weights=TRUE)
 ```
   
     
@@ -803,9 +809,9 @@ appraise(md_nRefEE_sOut)
 ```
   
   
-__Figura 2.2.5__ Observado e predito pelo modelo cheio mais plausível  
+<!-- __Figura 2.2.5__ Observado e predito pelo modelo cheio mais plausível   -->
   
-```{r fig 225 predito e observado por sitio md_nRefEE, echo=FALSE,eval=TRUE, fig.width=8, fig.height=30,message=FALSE}
+```{r fig 225 predito e observado por sitio md_nRefEE, echo=FALSE,eval=FALSE, fig.width=8, fig.height=30,message=FALSE}
 # dados
 df_plot <- df_md
 df_plot$nRef_predito <- predict.gam(md_nRefEE_sOut,se.fit = TRUE,type="response")$fit*100
@@ -826,9 +832,9 @@ ggplot(df_plot,aes(x=d.z,y=n_nRef)) +
 ```
 
 
-__Figura 2.2.6__ Diagnostico: avaliação do ajuste pelas preditoras lineares
+__Figura 2.2.5__ Diagnostico: avaliação do ajuste pelas preditoras lineares
 
-```{r fig 226,echo=FALSE,eval=TRUE,fig.height=5}
+```{r fig 225,echo=FALSE,eval=TRUE,fig.height=5}
 #
 df_plot <- augment(md_nRefEE_sOut) 
 df_plot1 <- df_plot %>% 
@@ -860,8 +866,7 @@ do.call("grid.arrange",c(l_p,ncol=2))
   # facet_wrap(~preditora_class,ncol=2,scales="free") +
   # labs(title = title_,x="",y="")
 ```
-
-
+  
   
 ## 2.3 GLMM binomial, subset=MNEI
 
@@ -948,9 +953,13 @@ md_nRefEI <- l_nRefEI_mdCheio[["gamm d|Site for each"]]
 __Figura 2.3.1__ appraise(md_nRefEI)
 
 ```{r fig 231,echo=FALSE,eval=TRUE}
-appraise(md_nRefEI)
+par(mfrow=c(2,2))
+gam.check(md_nRefEI)
 ```
 
+```{r summary nRefEI,echo=FALSE}
+summary(md_nRefEI)
+```
 
 
 __Figura 2.3.2__ Predito e observado por sítio 
@@ -1016,9 +1025,55 @@ do.call("grid.arrange",c(l_p,ncol=2))
   
 ## 2.4 Conjunto Completo dos Dados
 
+### Dados
+
+```{r}
+# new data
+df_pred0 <- expand.grid(SiteCode=levels(df_resultados$SiteCode)[1],
+                       d.z=seq(min(df_resultados$d.z),max(df_resultados$d.z),length=40),
+                       p.z=seq(min(df_resultados$p.z),max(df_resultados$p.z),length=200))
+# number of posterior draws
+f_rmvn <- function(n,mu,sig){
+  L <- mroot(sig)
+  m <- ncol(L)
+  t(mu + L%*%matrix(rnorm(m*n),m,n))
+}
+# lista de modelos
+load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_nRefEE_mdCheio.Rdata")
+load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_nRefEI_mdCheio.Rdata")
+l_mdNref <- list()
+l_mdNref[[1]] <- l_nRefEE_mdCheio[["gamm d|Site for each"]]
+l_mdNref[[2]] <- l_nRefEI_mdCheio[["gamm d|Site for each"]]
+names(l_mdNref) <- c("EE","EI")
+# Função para indice para calculo do intervalo de credibilidade
+## codigo adaptado de post de Gavin Simpson 2016
+## acessado em abril 2020
+## https://fromthebottomoftheheap.net/2016/12/15/simultaneous-interval-revisited/
+f_CI.index <- function(gamm,df=df_pred0,N=10000){
+  Vb_ <- vcov(gamm)
+  pred_ <- predict.gam(gamm,df,se.fit = TRUE)
+  se.fit_ <- pred_$se.fit 
+  BUdiff_ <- f_rmvn(N,mu=rep(0,nrow(Vb_)),sig=Vb_)
+  Cg_ <- predict(gamm,df,type="lpmatrix")
+  simDev_ <- Cg_ %*% t(BUdiff_)
+  absDev_ <- abs(sweep(simDev_, 1, se.fit_, FUN = "/"))
+  masd_ <- apply(absDev_, 2L, max)
+  crit_ <- quantile(masd_,prob=0.95,type=8)
+return(crit_)  
+}
+# calculo index
+# set.seed(1)
+registerDoMC(2)
+df_CI.index <- ldply(l_mdNref,f_CI.index,.id="MN") #,.parallel = TRUE
 
 
-```{r preparacao dos dados }
+
+```
+
+
+
+
+```{r preparacao dos dados,eval=FALSE,echo=FALSE,include=FALSE }
 # dados
 df_pred0 <- expand.grid(SiteCode=levels(df_resultados$SiteCode)[1],
                        d.z=seq(min(df_resultados$d.z),max(df_resultados$d.z),length=40),
@@ -1060,7 +1115,7 @@ df_predEI <- cbind(df_pred0,
 
 
 
-```{r}
+```{r eval=FALSE,include=FALSE}
 
 
 
