@@ -1027,116 +1027,70 @@ do.call("grid.arrange",c(l_p,ncol=2))
 
 ### Dados
 
-```{r}
+```{r objetos para a figura final nRef,eval=TRUE,echo=FALSE}
+load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_nRefEE_mdCheio.Rdata")
+load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_nRefEI_mdCheio.Rdata")
+```
+  
+The following code was adapted from Gavin Simpson (2016) blog post [acessado em abril de 2020]:  
+https://fromthebottomoftheheap.net/2016/12/15/simultaneous-interval-revisited/
+
+
+
+```{r calculo do intervalo de confianca da distuicao posteriori,eval=FALSE,echo=TRUE}
 # new data
 df_pred0 <- expand.grid(SiteCode=levels(df_resultados$SiteCode)[1],
                        d.z=seq(min(df_resultados$d.z),max(df_resultados$d.z),length=40),
                        p.z=seq(min(df_resultados$p.z),max(df_resultados$p.z),length=200))
-# number of posterior draws
-f_rmvn <- function(n,mu,sig){
-  L <- mroot(sig)
-  m <- ncol(L)
-  t(mu + L%*%matrix(rnorm(m*n),m,n))
-}
-# lista de modelos
-load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_nRefEE_mdCheio.Rdata")
-load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_nRefEI_mdCheio.Rdata")
 l_mdNref <- list()
 l_mdNref[[1]] <- l_nRefEE_mdCheio[["gamm d|Site for each"]]
 l_mdNref[[2]] <- l_nRefEI_mdCheio[["gamm d|Site for each"]]
 names(l_mdNref) <- c("EE","EI")
-
-# Função para indice para calculo do intervalo de credibilidade
-## codigo adaptado de post de Gavin Simpson 2016
-## acessado em abril 2020
-## https://fromthebottomoftheheap.net/2016/12/15/simultaneous-interval-revisited/
-f_CI_PosteriorDistribution <- function(gamm,df=df_pred0,N=1e5,output="quantil95"){
-  Vb_ <- vcov(gamm)
-  Cg_ <- predict(gamm,df,type="lpmatrix")
-  pred_ <- predict.gam(gamm,df,se.fit = TRUE)
-  if(output=="crit"){
-    se.fit_ <- pred_$se.fit 
-    BUdiff_ <- f_rmvn(N,mu=rep(0,nrow(Vb_)),sig=Vb_)
-    simDev_ <- Cg_ %*% t(BUdiff_)
-    absDev_ <- abs(sweep(simDev_, 1, se.fit_, FUN = "/"))
-    masd_ <- apply(absDev_, 2L, max)
-    crit_ <- quantile(masd_,prob=0.95,type=8)
-  return(crit_)
-  }else{
-   sims <- f_rmvn(N,mu=coef(gamm),sig=Vb_)
-   fits <- Cg_ %*% t(sims)
-   PI <- t(apply(fits,1,quantile,prob=c(.025,0.975)))
-   pred <- pred_$fit
-  return(PI)
-  }
+# function
+f_predict_PostDist <- function(gamm,df=df_pred0,N=1e4){
+  #objetos em comum
+  beta <- coef(gamm)
+  Vb <- vcov(gamm)
+  Xp <- predict(gamm,df,type="lpmatrix")
+  pred <- predict.gam(gamm,df,se.fit = TRUE)
+  se.fit <- pred$se.fit 
+  ### estabelece um fator de correção para se.fit
+  BUdiff <- MASS::mvrnorm(N,mu=rep(0,nrow(Vb)),Sigma=Vb)
+  simDev <- Xp %*% t(BUdiff)
+  absDev <- abs(sweep(simDev, 1, se.fit, FUN = "/"))
+  masd <- apply(absDev, 2L, max)
+  crit <- quantile(masd,prob=0.95,type=8)
+  ### simula todos os intervalos de confinça
+  ### e então calcula os quantis para cada ponto predito
+  sims <- MASS::mvrnorm(N,mu=beta,Sigma=Vb)
+  fits <- Xp %*% t(sims)
+  q_fits <- t(apply(fits,1,quantile,prob=c(.025,0.5,0.975)))
+  ## output
+  df_return <- cbind(df,
+                     data.frame(fit = pred$fit,
+                                se.fit = pred$se.fit,
+                                median_fit = q_fits[,2],
+                                q_.025 = q_fits[,1],
+                                q_.975 = q_fits[,3])
+                     )
+  df_return %<>% 
+    mutate(upper.fit = fit + (crit*se.fit),
+           lower.fit = fit - (crit*se.fit)) %>% 
+    select(SiteCode,p.z,d.z,fit,se.fit,upper.fit,lower.fit,median_fit,q_.025,q_.975)
+  return(df_return)
 }
-# calculo index
-# set.seed(1)
-registerDoMC(2)
-df_CI.index <- ldply(l_mdNref,f_CI.index,.id="MN") #,.parallel = TRUE
-
-# Intevalo onde 95% das funções da distribuição a posteori 
-## segundo Simon Wood 2011
-
-gamm <- l_mdNref[[1]]
-n.rep=10000
-df=df_pred0
-
-beta <- coef(gamm)
-Vb <- vcov(gamm)
-
-Cv <- chol(Vb)
-nb <- length(beta)
-br <- t(Cv) %*% matrix(rnorm(n.rep*nb),nb,n.rep) + beta
-
-Xp <- predict(gamm,newdata=df,type="lpmatrix")
-lp <- Xp%*%br
-fv <- arm::invlogit(lp)
-
-yr <- matrix(rbinom(fv*0,size = 100,prob = ),nrow(fv),ncol(fv))
-
+df_plot <- ldply(l_mdNref,f_predict_PostDist,.id="MN")
 ```
 
+```{r save df_plotnRef,eval=FALSE,echo=FALSE}
+df_plot_nRef <- df_plot
+write.csv(df_plot_nRef,
+          file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/df_plot_nRef",
+          row.names = FALSE)
+```
 
-
-
-```{r preparacao dos dados,eval=FALSE,echo=FALSE,include=FALSE }
+```{r resultados figura 1A,echo=FALSE,eval=TRUE }
 # dados
-df_pred0 <- expand.grid(SiteCode=levels(df_resultados$SiteCode)[1],
-                       d.z=seq(min(df_resultados$d.z),max(df_resultados$d.z),length=40),
-                       p.z=seq(min(df_resultados$p.z),max(df_resultados$p.z),length=200))
-## EI
-predict_nRefEI <- predict.gam(md_nRefEI,newdata = df_pred,type = "link",se.fit = TRUE)
-df_predEI <- cbind(df_pred0,
-                   data.frame(MN="EI",
-                              fit=predict_nRefEI$fit,
-                              se.fit=predict_nRefEI$se.fit)) %>% 
-  mutate(upper_fit = fit + se.fit,
-         lower_fit = fit - se.fit,
-         Pr_nRef = arm::invlogit(fit),
-         upper_Pr_nRef = arm::invlogit(upper_fit),
-         lower_Pr_nRef = arm::invlogit(lower_fit))
-## EE
-predict_nRefEE <- predict.gam(md_nRefEE,newdata = df_pred,type = "link",se.fit = TRUE)
-df_predEI <- cbind(df_pred0,
-                   data.frame(MN="EE",
-                              fit=predict_nRefEI$fit,
-                              se.fit=predict_nRefEI$se.fit)) %>% 
-  mutate(upper_fit = fit + se.fit,
-         lower_fit = fit - se.fit,
-         Pr_nRef = arm::invlogit(fit),
-         upper_Pr_nRef = arm::invlogit(upper_fit),
-         lower_Pr_nRef = arm::invlogit(lower_fit))
-# graficos 1
-
-
-
-# graficos
-         # logOR_EE.EI = fitEE - fitEI,
-         # upper_logOR_EE.EI = upper_fitEE - upper_fitEI,
-         # lower_logOR_EE.EI = lower_fitEE - lower_fitEI)
-
-
 ```
 
 
