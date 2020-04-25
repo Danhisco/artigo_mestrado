@@ -7,7 +7,7 @@ output:
     toc: true
     toc_depth: 5
 editor_options: 
-  chunk_output_type: console
+  chunk_output_type: inline
 ---
 
 <style>
@@ -37,7 +37,8 @@ library(merTools)
 library(magrittr)
 library(gridExtra)
 library(ggplot2); theme_set(theme_classic())
-library(tidyr)
+library(tidymv)
+Flibrary(tidyr)
 library(purrr)
 library(plyr)
 library(dplyr)
@@ -1076,7 +1077,7 @@ f_predict_PostDist <- function(gamm,df=df_pred0,N=1e4){
   df_return %<>% 
     mutate(upper.fit = fit + (crit*se.fit),
            lower.fit = fit - (crit*se.fit)) %>% 
-    select(SiteCode,p.z,d.z,fit,se.fit,upper.fit,lower.fit,median_fit,q_.025,q_.975)
+    select(SiteCode,d.z,p.z,fit,se.fit,upper.fit,lower.fit,median_fit,q_.025,q_.975)
   return(df_return)
 }
 df_plot <- ldply(l_mdNref,f_predict_PostDist,.id="MN")
@@ -1089,19 +1090,79 @@ write.csv(df_plot_nRef,
           row.names = FALSE)
 ```
 
-```{r resultados figura 1A,echo=FALSE,eval=TRUE }
+```{r read df_plot_nRef,eval=TRUE,echo=FALSE}
+df_plot <- read.csv("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/df_plot_nRef",
+                         header = TRUE, as.is = TRUE)
+```
+
+
+__Figura 2.4.1__ 
+
+```{r resultados figura 1A,echo=FALSE,eval=TRUE}
 # dados
+df_plot1 <- as.data.frame(apply(df_plot[,5:11],2,function(X) arm::invlogit(X)*100))
+names(df_plot1) <- sapply(names(df_plot1), function(x) paste0(x,"_response"))
+df_plot %<>% cbind(.,df_plot1)
+# comparacao
+f_predict <- function(gamm,df=df_pred0){
+  pred <- predict.gam(gamm,newdata = df,type = "response",se.fit = TRUE)
+  df_return <- cbind(df,
+                     data.frame(fit = pred$fit,
+                                se.fit = pred$se.fit))
+  df_return %<>% 
+    mutate(upper.fit = fit + (2*se.fit),
+           lower.fit = fit - (2*se.fit))
+  return(df_return)
+}
+df_ <- ldply(l_mdNref,f_predict,.id = "MN")
+#
+df_auditoria <- inner_join(x=select(df_plot,SiteCode,d.z,p.z,MN,fit_response,se.fit_response),
+                           y=df_,
+                           by=c("MN","SiteCode","d.z","p.z"))
+l_p <- list()
+l_p[[1]] <- ggplot(df_auditoria,aes(x=fit,y=fit_response)) +
+  geom_point(alpha=0.3)
+l_p[[2]] <- ggplot(df_auditoria,aes(x=se.fit,y=se.fit_response)) +
+  geom_point(alpha=0.3)
+p1 <- do.call("grid.arrange",c(l_p,ncol=2,top="predict type inv(link) (y) ~ type response (x)")) %>% 
+  ggpubr::as_ggplot()
+l_p <- list()
+l_p[[1]] <- ggplot(df_plot,aes(x=fit_response,y=median_fit_response)) +
+  geom_point(alpha=0.3) + labs(title = "fit")
+l_p[[2]] <- ggplot(df_plot,aes(x=upper.fit_response,y=q_.025_response)) +
+  geom_point(alpha=0.3) + labs(title = "upper fit")
+l_p[[3]] <- ggplot(df_plot,aes(x=lower.fit_response,y=q_.975_response)) +
+  geom_point(alpha=0.3) + labs(title = "lower fit")
+p2 <- do.call("grid.arrange",c(l_p,ncol=2,top=" quantile ~ crit * se.fit (x)")) %>% 
+  ggpubr::as_ggplot()
+grid.arrange(p1,p2,ncol=1,
+             layout_matrix = rbind(1,2,2))
 ```
 
 
 
 
-```{r eval=FALSE,include=FALSE}
 
 
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!-- codigo extra -->
+
+```{r nref antigo eval=FALSE,include=FALSE}
 df_plot <- rbind(mdAvg_nRefEE__AICcmodavg,mdAvg_nRefEI__AICcmodavg)
 df_plot %<>% mutate(p = p.z * sd(df_resultados$p) + mean(df_resultados$p),
                     d = d.z*sd(df_resultados$d) + mean(df_resultados$d))
