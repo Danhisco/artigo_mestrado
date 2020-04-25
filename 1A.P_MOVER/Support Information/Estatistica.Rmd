@@ -1045,28 +1045,55 @@ l_mdNref <- list()
 l_mdNref[[1]] <- l_nRefEE_mdCheio[["gamm d|Site for each"]]
 l_mdNref[[2]] <- l_nRefEI_mdCheio[["gamm d|Site for each"]]
 names(l_mdNref) <- c("EE","EI")
+
 # Função para indice para calculo do intervalo de credibilidade
 ## codigo adaptado de post de Gavin Simpson 2016
 ## acessado em abril 2020
 ## https://fromthebottomoftheheap.net/2016/12/15/simultaneous-interval-revisited/
-f_CI.index <- function(gamm,df=df_pred0,N=10000){
+f_CI_PosteriorDistribution <- function(gamm,df=df_pred0,N=1e5,output="quantil95"){
   Vb_ <- vcov(gamm)
-  pred_ <- predict.gam(gamm,df,se.fit = TRUE)
-  se.fit_ <- pred_$se.fit 
-  BUdiff_ <- f_rmvn(N,mu=rep(0,nrow(Vb_)),sig=Vb_)
   Cg_ <- predict(gamm,df,type="lpmatrix")
-  simDev_ <- Cg_ %*% t(BUdiff_)
-  absDev_ <- abs(sweep(simDev_, 1, se.fit_, FUN = "/"))
-  masd_ <- apply(absDev_, 2L, max)
-  crit_ <- quantile(masd_,prob=0.95,type=8)
-return(crit_)  
+  pred_ <- predict.gam(gamm,df,se.fit = TRUE)
+  if(output=="crit"){
+    se.fit_ <- pred_$se.fit 
+    BUdiff_ <- f_rmvn(N,mu=rep(0,nrow(Vb_)),sig=Vb_)
+    simDev_ <- Cg_ %*% t(BUdiff_)
+    absDev_ <- abs(sweep(simDev_, 1, se.fit_, FUN = "/"))
+    masd_ <- apply(absDev_, 2L, max)
+    crit_ <- quantile(masd_,prob=0.95,type=8)
+  return(crit_)
+  }else{
+   sims <- f_rmvn(N,mu=coef(gamm),sig=Vb_)
+   fits <- Cg_ %*% t(sims)
+   PI <- t(apply(fits,1,quantile,prob=c(.025,0.975)))
+   pred <- pred_$fit
+  return(PI)
+  }
 }
 # calculo index
 # set.seed(1)
 registerDoMC(2)
 df_CI.index <- ldply(l_mdNref,f_CI.index,.id="MN") #,.parallel = TRUE
 
+# Intevalo onde 95% das funções da distribuição a posteori 
+## segundo Simon Wood 2011
 
+gamm <- l_mdNref[[1]]
+n.rep=10000
+df=df_pred0
+
+beta <- coef(gamm)
+Vb <- vcov(gamm)
+
+Cv <- chol(Vb)
+nb <- length(beta)
+br <- t(Cv) %*% matrix(rnorm(n.rep*nb),nb,n.rep) + beta
+
+Xp <- predict(gamm,newdata=df,type="lpmatrix")
+lp <- Xp%*%br
+fv <- arm::invlogit(lp)
+
+yr <- matrix(rbinom(fv*0,size = 100,prob = ),nrow(fv),ncol(fv))
 
 ```
 
