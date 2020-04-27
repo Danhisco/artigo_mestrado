@@ -648,10 +648,16 @@ ggplot(df_md,aes(x=nRef_observado,y=nRef_predito)) +
 
 ### Seleção de Variáveis e Model Averaging
 
-```{r selecao de variaveis nRefEE,eval=TRUE,echo=FALSE}
+```{r l_md.dredge_nRefEE,eval=FALSE,echo=FALSE}
 # todas as combinações de modelo do modelo cheio
 registerDoMC(3)
 l_md.dredge_nRefEE <- llply(dredge(md_nRefEE,trace = FALSE,evaluate=FALSE), eval,.parallel = TRUE)
+save(l_md.dredge_nRefEE,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md.dredge_nRefEE.Rdata")
+```
+
+
+```{r selecao de variaveis nRefEE,eval=TRUE,echo=FALSE,results='hide'}
+load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md.dredge_nRefEE.Rdata")
 # AICctab
 df_tableGLMM <- print(AICctab(l_md.dredge_nRefEE,weights=TRUE)) %>% 
   as.data.frame()
@@ -682,6 +688,64 @@ df_pred <- expand.grid(SiteCode=levels(df_resultados$SiteCode)[1],
 mdAvg_nRefEE__AICcmodavg <- modavgPred(l_md.dredge_nRefEE,newdata = df_pred) %>%
   cbind(df_pred)
 save(mdAvg_nRefEE__AICcmodavg,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_nRefEE__AICcmodavg.Rdata")
+```
+  
+    
+__Figura 2.2.4__ Observado e predito pelo modelo médio
+
+```{r fig 224 nRefEE observado e predito modelo medio, comment=FALSE, message=FALSE,warning=FALSE,results="hide",fig.width=8, fig.height=30}
+# Modelo Global
+load(file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_nRefEE__MuMIn.Rdata")
+# Predição
+df_md <- df_resultados %>% filter(MN=="EE")
+df_md$Pr_nRef <- predict(mdAvg_nRefEE__MuMIn,type="response")*100
+# Gráfico
+df_md %<>% mutate(title = paste0(SiteCode," p=",round(p,3))) %>% arrange(p)
+df_md$title <- factor(df_md$title,levels = unique(df_md$title))
+ggplot(df_md,aes(x=d,y=n_nRef)) +
+  geom_point() + geom_line(aes(y=Pr_nRef),color="red") +
+  labs(x="Dispersão Média",
+       y="Número de SADs não Refutadas",
+       title="Prob. Não Refutar uma SAD neutra MN=EE") +
+  facet_wrap(~title,ncol=5)
+```
+  
+  
+__Figura 2.2.5__ Predito pelo modelo médio para novo conjunto de dados
+
+```{r figura 225 predito modelo medio novo conjunto de dados}
+# dados
+load(file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_nRefEE__AICcmodavg.Rdata")
+df_plot <- mdAvg_nRefEE__AICcmodavg
+df_plot %<>% 
+  mutate(p = p.z * sd(df_resultados$p) + mean(df_resultados$p),
+         d = d.z*sd(df_resultados$d) + mean(df_resultados$d))
+# graficos
+l_p.nRefEE_AICcmodavg <- list()
+l_p.nRefEE_AICcmodavg[[1]] <- ggplot(df_plot,aes(x=p,y=d,fill=mod.avg.pred)) +
+  geom_tile() +
+  scale_fill_gradient2(limits = c(0,1),midpoint=0.5, low="red", high="blue",mid="green") +
+  labs(title="Prob de não Refutar",
+       fill="Probability") + theme_classic()
+l_p.nRefEE_AICcmodavg[[2]] <- ggplot(df_plot,aes(x=p,y=d,fill=lower.CL)) +
+  geom_tile() +
+  scale_fill_gradient2(limits = c(0,1),midpoint=0.5, low="red", high="blue",mid="green") +
+  labs(title="Lower IC (5%)",
+       fill="Probability") + theme_classic()
+l_p.nRefEE_AICcmodavg[[3]] <- ggplot(df_plot,aes(x=p,y=d,fill=upper.CL)) +
+  geom_tile() +
+  scale_fill_gradient2(limits = c(0,1),midpoint=0.5, low="red", high="blue",mid="green") +
+  labs(title="Upper IC (95%)",
+       fill="Probability") + theme_classic()
+grid.arrange(l_p.nRefEE_AICcmodavg[[1]],l_p.nRefEE_AICcmodavg[[2]],l_p.nRefEE_AICcmodavg[[3]],
+             layout_matrix=rbind(rep(1,4),
+                                 rep(1,4),
+                                 rep(1,4),
+                                 rep(1,4),
+                                 c(2,2,3,3),
+                                 c(2,2,3,3))
+             )
+
 ```
 
 
@@ -731,13 +795,13 @@ f_md <- function(dados){
 }
 ```
 
-```{r dlply f md nRef EE, eval=FALSE,echo=TRUE}
+```{r dlply f md nRef EI, eval=FALSE,echo=TRUE}
 registerDoMC(2)
 l_nRefEI_mdCheio <- dlply(df_md,"md_class",f_md,.parallel = TRUE)
 ```
 
 
-```{r save l_nRefEE_mdCheio, eval=FALSE}
+```{r save l_nRefEI_mdCheio, eval=FALSE}
 save(l_nRefEI_mdCheio,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_nRefEI_mdCheio.Rdata")
 ```
 
@@ -805,10 +869,16 @@ ggplot(df_md,aes(x=nRef_observado,y=nRef_predito)) +
 
 ### Seleção de Variáveis e Model Averaging
 
-```{r selecao de variaveis nRefEE,eval=TRUE,echo=FALSE}
+```{r l_md.dredge_nRefEI,eval=FALSE,echo=FALSE}
 # todas as combinações de modelo do modelo cheio
-registerDoMC(2)
+registerDoMC(3)
 l_md.dredge_nRefEI <- llply(dredge(md_nRefEI,trace = FALSE,evaluate=FALSE), eval,.parallel = TRUE)
+save(l_md.dredge_nRefEI,file = "~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md.dredge_nRefEI.Rdata")
+```
+
+
+```{r selecao de variaveis nRefEI,eval=TRUE,echo=FALSE,results='hide'}
+load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md.dredge_nRefEI.Rdata")
 # AICctab
 df_tableGLMM <- print(AICctab(l_md.dredge_nRefEI,weights=TRUE)) %>% 
   as.data.frame()
@@ -840,7 +910,238 @@ mdAvg_nRefEI__AICcmodavg <- modavgPred(l_md.dredge_nRefEI,newdata = df_pred) %>%
   cbind(df_pred)
 save(mdAvg_nRefEI__AICcmodavg,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_nRefEI__AICcmodavg.Rdata")
 ```
+    
+  
+__Figura 2.3.4__ Observado e predito pelo modelo médio
+  
+```{r fig 234 nRefEI observado e predito modelo medio, comment=FALSE, message=FALSE,warning=FALSE,results="hide",fig.width=8, fig.height=30}
+# Modelo Global
+load(file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_nRefEI__MuMIn.Rdata")
+# Predição
+df_md <- df_resultados %>% filter(MN=="EI")
+df_md$Pr_nRef <- predict(mdAvg_nRefEI__MuMIn,type="response")*100
+# Gráfico
+df_md %<>% mutate(title = paste0(SiteCode," p=",round(p,3))) %>% arrange(p)
+df_md$title <- factor(df_md$title,levels = unique(df_md$title))
+ggplot(df_md,aes(x=d,y=n_nRef)) +
+  geom_point() + geom_line(aes(y=Pr_nRef),color="red") +
+  labs(x="Dispersão Média",
+       y="Número de SADs não Refutadas",
+       title="Prob. Não Refutar uma SAD neutra MN=EI") +
+  facet_wrap(~title,ncol=5)
+```
 
 
 
+__Figura 2.3.5__ Predito pelo modelo médio para novo conjunto de dados
+
+```{r figura 235 predito modelo medio novo conjunto de dados}
+# dados
+load(file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_nRefEI__AICcmodavg.Rdata")
+df_plot <- mdAvg_nRefEI__AICcmodavg
+df_plot %<>% 
+  mutate(p = p.z * sd(df_resultados$p) + mean(df_resultados$p),
+         d = d.z*sd(df_resultados$d) + mean(df_resultados$d))
+# graficos
+l_p.nRefEI_AICcmodavg <- list()
+l_p.nRefEI_AICcmodavg[[1]] <- ggplot(df_plot,aes(x=p,y=d,fill=mod.avg.pred)) +
+  geom_tile() +
+  scale_fill_gradient2(limits = c(0,1),midpoint=0.5, low="red", high="blue",mid="green") +
+  labs(title="Prob de não Refutar",
+       fill="Probability") + theme_classic()
+l_p.nRefEI_AICcmodavg[[2]] <- ggplot(df_plot,aes(x=p,y=d,fill=lower.CL)) +
+  geom_tile() +
+  scale_fill_gradient2(limits = c(0,1),midpoint=0.5, low="red", high="blue",mid="green") +
+  labs(title="Lower IC (5%)",
+       fill="Probability") + theme_classic()
+l_p.nRefEI_AICcmodavg[[3]] <- ggplot(df_plot,aes(x=p,y=d,fill=upper.CL)) +
+  geom_tile() +
+  scale_fill_gradient2(limits = c(0,1),midpoint=0.5, low="red", high="blue",mid="green") +
+  labs(title="Upper IC (95%)",
+       fill="Probability") + theme_classic()
+grid.arrange(l_p.nRefEI_AICcmodavg[[1]],l_p.nRefEI_AICcmodavg[[2]],l_p.nRefEI_AICcmodavg[[3]],
+             layout_matrix=rbind(rep(1,4),
+                                 rep(1,4),
+                                 rep(1,4),
+                                 rep(1,4),
+                                 c(2,2,3,3),
+                                 c(2,2,3,3))
+             )
+```
+
+
+## Figura Final
+
+```{r figura final nRef,eval=TRUE,echo=FALSE}
+#############
+# dados
+## MNEE
+load(file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_nRefEE__AICcmodavg.Rdata")
+mdAvg_nRefEE__AICcmodavg$MN <- "EE"
+## MNEI
+load(file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_nRefEI__AICcmodavg.Rdata")
+mdAvg_nRefEI__AICcmodavg$MN <- "EI"
+## df comum
+df_plot <- rbind(mdAvg_nRefEE__AICcmodavg,mdAvg_nRefEI__AICcmodavg)
+df_plot %<>% mutate(p = p.z * sd(df_resultados$p) + mean(df_resultados$p),
+                    d = d.z*sd(df_resultados$d) + mean(df_resultados$d))
+## Gráficos
+l_p.nRefEE_AICcmodavg <- list()
+labels_IC <- c(lower.CL="IC 5%", upper.CL="IC 95%")
+## predição média para ambos modelos
+l_p.nRefEE_AICcmodavg[[1]] <- ggplot(df_plot,aes(x=p,y=d,fill=mod.avg.pred)) +
+  geom_tile() +
+  scale_fill_gradient2(limits = c(0,1),midpoint=0.5, low="red", high="blue",mid="green") +
+  labs(
+    # title="Probabilidade de Não Refutar",
+       fill="Probability") +
+  theme_classic() + facet_wrap(~MN,ncol=2) + theme(legend.position="top")
+## IC para MNEE
+df_plotEE <- df_plot %>% filter(MN=="EE") %>%
+  gather(key = IC_class ,value = IC_pred,lower.CL:upper.CL)
+l_p.nRefEE_AICcmodavg[[2]] <- ggplot(df_plotEE,aes(x=p,y=d,fill=IC_pred)) +
+  geom_tile() +
+  scale_fill_gradient2(limits = c(0,1),midpoint=0.5, low="red", high="blue",mid="green") +
+  theme_classic() + facet_wrap(~IC_class,ncol=2,labeller = labeller(IC_class = labels_IC)) + theme(legend.position='none')
+## IC para MNEI
+df_plotEI <- df_plot %>% filter(MN=="EI") %>%
+  gather(key = IC_class ,value = IC_pred,lower.CL:upper.CL)
+l_p.nRefEE_AICcmodavg[[3]] <- ggplot(df_plotEI,aes(x=p,y=d,fill=IC_pred)) +
+  geom_tile() +
+  scale_fill_gradient2(limits = c(0,1),midpoint=0.5, low="red", high="blue",mid="green") +
+  theme_classic() + facet_wrap(~IC_class,ncol=2,labeller = labeller(IC_class = labels_IC)) + theme(legend.position='none')
+## Arranjo dos gráficos
+grid.arrange(l_p.nRefEE_AICcmodavg[[1]],l_p.nRefEE_AICcmodavg[[2]],l_p.nRefEE_AICcmodavg[[3]],top="Prob(não refutar)",
+             layout_matrix=rbind(rep(1,4),
+                                 rep(1,4),
+                                 rep(1,4),
+                                 rep(1,4),
+                                 c(2,2,3,3),
+                                 c(2,2,3,3))
+             )
+# p1
+```
+
+
+```{r eval=TRUE}
+# predição na escala da função de ligação
+## EE
+load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md.dredge_nRefEE.Rdata")
+load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md.dredge_nRefEI.Rdata")
+# Model Averaging for new data predictions
+df_pred <- expand.grid(SiteCode=levels(df_resultados$SiteCode)[1],
+                       d.z=seq(min(df_resultados$d.z),max(df_resultados$d.z),length=40),
+                       p.z=seq(min(df_resultados$p.z),max(df_resultados$p.z),length=200))
+l_md <- list()
+l_md[[1]] <- l_md.dredge_nRefEE
+l_md[[2]] <- l_md.dredge_nRefEI
+names(l_md) <- c("EE","EI")
+# funcao
+f_modavgPred <- function(md_object, df = df_pred, type_ = "link"){
+  md_avg <- modavgPred(md_object, newdata = df, type = type_ ) %>%
+  cbind(df)
+}
+registerDoMC(2)
+l_mdPredict <- llply(l_md,f_modavgPred,.parallel = TRUE)
+
+
+
+save(mdAvg_nRefEI__AICcmodavg,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_nRefEI__AICcmodavg.Rdata")
+## EI
+# Model Averaging for new data predictions
+df_pred <- expand.grid(SiteCode=levels(df_resultados$SiteCode)[1],
+                       d.z=seq(min(df_resultados$d.z),max(df_resultados$d.z),length=40),
+                       p.z=seq(min(df_resultados$p.z),max(df_resultados$p.z),length=200))
+mdAvg_nRefEI__AICcmodavg <- modavgPred(l_md.dredge_nRefEI,newdata = df_pred) %>%
+  cbind(df_pred)
+save(mdAvg_nRefEI__AICcmodavg,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_nRefEI__AICcmodavg.Rdata")
+
+
+### log OR EE/EI
+# df_plot %>% names
+f_logOR <- function(Pr_A,Pr_B){
+  logOR <- log( (Pr_A * (1-Pr_B)) / (Pr_B * (1-Pr_A)) )
+  return(logOR)
+}
+df_plot_logOR <- cbind(df_plotEE[,c("p","d")],
+                       data.frame(logOR_EE.EI = f_logOR(Pr_A = mdAvg_nRefEE__AICcmodavg$mod.avg.pred,
+                                                        Pr_B = mdAvg_nRefEI__AICcmodavg$mod.avg.pred),
+                                  lower.logOR_EE.EI = f_logOR(Pr_A = mdAvg_nRefEE__AICcmodavg$lower.CL,
+                                                              Pr_B = mdAvg_nRefEI__AICcmodavg$lower.CL),
+                                  upper.logOR_EE.EI = f_logOR(Pr_A = mdAvg_nRefEE__AICcmodavg$upper.CL,
+                                                              Pr_B = mdAvg_nRefEI__AICcmodavg$upper.CL),
+                                  Pr_nRefEE = mdAvg_nRefEE__AICcmodavg$mod.avg.pred,
+                                  Pr_nRefEI = mdAvg_nRefEI__AICcmodavg$mod.avg.pred,
+                                  lower.Pr_EE = mdAvg_nRefEE__AICcmodavg$lower.CL,
+                                  lower.Pr_EI = mdAvg_nRefEI__AICcmodavg$lower.CL,
+                                  upper.Pr_EE = mdAvg_nRefEE__AICcmodavg$upper.CL,
+                                  upper.Pr_EI = mdAvg_nRefEE__AICcmodavg$upper.CL
+                            )
+                       )
+l_p <- list()
+l_p[[1]] <- df_plot_logOR[,3:5] %>% 
+  gather(key=logOR_class, value=logOR_value,logOR_EE.EI:upper.logOR_EE.EI) %>%
+  ggplot(aes(x=.$logOR_value)) + labs(x="",title = "log OR") +
+  geom_histogram(bins=60) + facet_wrap(~logOR_class,ncol=3)
+l_p[[2]] <- df_plot_logOR[,6:11] %>% 
+  gather(key=Pr_class, value=Pr_value,Pr_nRefEE:upper.Pr_EI) %>%
+  ggplot(aes(x=.$Pr_value)) + labs(x="",title = "Probability") +
+  geom_histogram(bins=60) + facet_wrap(~Pr_class,ncol=3,dir = "v")
+grid.arrange(l_p[[1]],l_p[[2]],
+             layout_matrix = rbind(1,2,2))
+```
+  
+  
+  
+```{r eval=FALSE}
+l_p <- list()
+l_p[[1]] <- df_plot_logOR %>% 
+  select(logOR_EE.EI,Pr_nRefEE,Pr_nRefEI) %>% 
+  gather(key = MN, value=Pr_nRef,Pr_nRefEE:Pr_nRefEI) %>% 
+  ggplot(aes(x=Pr_nRef,y=logOR_EE.EI)) + 
+  geom_point(alpha = 0.3) + facet_wrap(~MN,ncol=1)
+l_p[[2]] <- df_plot_logOR %>% 
+  select(lower.logOR_EE.EI,lower.Pr_EE,lower.Pr_EI) %>% 
+  gather(key = MN, value=lower.Pr_nRef,lower.Pr_EE:lower.Pr_EI) %>% 
+  ggplot(aes(x=lower.Pr_nRef,y=lower.Pr_nRef)) + 
+  geom_point(alpha = 0.3) + facet_wrap(~MN,ncol=1)
+l_p[[3]] <- df_plot_logOR %>% 
+  select(upper.logOR_EE.EI,upper.Pr_EE,upper.Pr_EI) %>% 
+  gather(key = MN, value=upper.Pr_nRef,upper.Pr_EE:upper.Pr_EI) %>% 
+  ggplot(aes(x=upper.Pr_nRef,y=upper.Pr_nRef)) + 
+  geom_point(alpha = 0.3) + facet_wrap(~MN,ncol=1)
+
+```
+
+
+
+
+
+
+```{r eval=FALSE}
+l_p <- list()  
+l_p[[1]] <- ggplot(df_plot_logOR,aes(x=p,y=d,fill=logOR_EE.EI)) +
+  geom_tile() +
+  scale_fill_gradient2(limits = c(min(df_plot_logOR$logOR_EE.EI),
+                                  max(df_plot_logOR$logOR_EE.EI)),
+                       midpoint=mean(df_plot_logOR$logOR_EE.EI), 
+                       low="red", high="blue",mid="green") +
+  labs(
+    # title="Probabilidade de Não Refutar",
+       fill="log Odds Ratio( EE / EI ) ") +
+  theme(legend.position="top")
+labels_IC <- c(lower.logOR_EE.EI="IC 5%", upper.logOR_EE.EI="IC 95%")
+l_p[[2]] <- df_plot_logOR %>%
+  gather(key = IC_class ,value = IC_pred,lower.logOR_EE.EI:upper.logOR_EE.EI) %>% 
+  ggplot(aes(x=p,y=d,fill=IC_pred)) +
+  geom_tile() +
+  scale_fill_gradient2(limits = c(min(df_plot_logOR$logOR_EE.EI),
+                                  max(df_plot_logOR$logOR_EE.EI)),
+                       midpoint=mean(df_plot_logOR$logOR_EE.EI), 
+                       low="red", high="blue",mid="green") +
+  facet_wrap(~IC_class,ncol=2,labeller = labeller(IC_class = labels_IC)) + theme(legend.position='none')
+## Arranjo dos gráficos
+p2 <- grid.arrange(l_p[[1]],l_p[[2]],top="log(OR(EE/EI))",ncol=1)
+
+```
 
