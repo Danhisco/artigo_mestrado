@@ -7,7 +7,7 @@ output:
     toc: true
     toc_depth: 5
 editor_options: 
-  chunk_output_type: console
+  chunk_output_type: inline
 ---
 
 <style>
@@ -151,6 +151,7 @@ ggplot(df_plot,aes(x=d.z,y=n_nRef,group=MN)) +
 
 
   
+__Figura 2.3__ n_nRef ~ variáveis categoricas  
     
 ## 2.1 GLMM binomial
 
@@ -464,9 +465,12 @@ r.squaredGLMM(md_nRef)
 __Figura 2.3__ Resíduos Quantílicos do modelo cheio plausível  
   
     
-```{r auditoria mais plausivel md_n.ref1, message=FALSE,eval=TRUE,echo=FALSE}
-p_plot <- simulateResiduals(md_nRef,n=1000)
+```{r auditoria mais plausivel md_n.ref1, message=FALSE,eval=FALSE,echo=FALSE}
+p_plot <- simulateResiduals(md_nRef,n=250,refit = TRUE)
 plot(p_plot)
+testOverdispersion(p_plot)
+# ggplot(df_resultados,aes(x=df_resultados$n_nRef)) +
+#   geom_histogram(bins=60) + facet_wrap(~MN,ncol=2)
 ```
   
   
@@ -971,8 +975,12 @@ grid.arrange(l_p.nRefEI_AICcmodavg[[1]],l_p.nRefEI_AICcmodavg[[2]],l_p.nRefEI_AI
 
 
 ## Figura Final
-
-```{r figura final nRef,eval=TRUE,echo=FALSE}
+  
+### Probabilidade de Não Refutar  
+  
+__Figura 2.4.1__ modavgPred(type="response")  
+  
+```{r 241 figura final nRef,eval=TRUE,echo=FALSE}
 #############
 # dados
 ## MNEE
@@ -1021,13 +1029,74 @@ grid.arrange(l_p.nRefEE_AICcmodavg[[1]],l_p.nRefEE_AICcmodavg[[2]],l_p.nRefEE_AI
              )
 # p1
 ```
+  
+
+__Figura 2.4.2__ arm::invlogit(modavgPred(type="link"))
+  
+```{r load l_mdPredict nRef,eval=TRUE,echo=FALSE}
+load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_mdPredict__nRef.Rdata")
+```
+
+```{r figura 242,eval=TRUE,echo=FALSE}
+df_plot <- bind_rows(l_mdPredict,.id = "MN")
+df_plot %<>% mutate(p = p.z * sd(df_resultados$p) + mean(df_resultados$p),
+                    d = d.z*sd(df_resultados$d) + mean(df_resultados$d))
+df_plot1 <- apply(df_plot[,c(3:4,6:7)],2,arm::invlogit) %>% as.data.frame
+df_plot <- cbind(df_plot[c("MN","p","d")],
+                 df_plot1)
+
+## Gráficos
+l_p.nRefEE_response <- list()
+labels_IC <- c(lower.CL="IC 5%", upper.CL="IC 95%")
+## predição média para ambos modelos
+l_p.nRefEE_response[[1]] <- ggplot(df_plot,aes(x=p,y=d,fill=mod.avg.pred)) +
+  geom_tile() +
+  scale_fill_gradient2(limits = c(0,1),midpoint=0.5, low="red", high="blue",mid="green") +
+  labs(
+    # title="Probabilidade de Não Refutar",
+       fill="Probability") +
+  theme_classic() + facet_wrap(~MN,ncol=2) + theme(legend.position="top")
+## IC para MNEE
+df_plotEE <- df_plot %>% filter(MN=="EE") %>%
+  gather(key = IC_class ,value = IC_pred,lower.CL:upper.CL)
+l_p.nRefEE_response[[2]] <- ggplot(df_plotEE,aes(x=p,y=d,fill=IC_pred)) +
+  geom_tile() +
+  scale_fill_gradient2(limits = c(0,1),midpoint=0.5, low="red", high="blue",mid="green") +
+  theme_classic() + facet_wrap(~IC_class,ncol=2,labeller = labeller(IC_class = labels_IC)) + theme(legend.position='none')
+## IC para MNEI
+df_plotEI <- df_plot %>% filter(MN=="EI") %>%
+  gather(key = IC_class ,value = IC_pred,lower.CL:upper.CL)
+l_p.nRefEE_response[[3]] <- ggplot(df_plotEI,aes(x=p,y=d,fill=IC_pred)) +
+  geom_tile() +
+  scale_fill_gradient2(limits = c(0,1),midpoint=0.5, low="red", high="blue",mid="green") +
+  theme_classic() + facet_wrap(~IC_class,ncol=2,labeller = labeller(IC_class = labels_IC)) + theme(legend.position='none')
+## Arranjo dos gráficos
+grid.arrange(l_p.nRefEE_response[[1]],l_p.nRefEE_response[[2]],l_p.nRefEE_response[[3]],top="Prob(não refutar)",
+             layout_matrix=rbind(rep(1,4),
+                                 rep(1,4),
+                                 rep(1,4),
+                                 rep(1,4),
+                                 c(2,2,3,3),
+                                 c(2,2,3,3))
+             )
+
+```
 
 
-```{r eval=TRUE}
+
+### Log Odds Ratio(EE/EI)
+  
+  
+```{r echo=FALSE,eval=FALSE}
 # predição na escala da função de ligação
 ## EE
 load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md.dredge_nRefEE.Rdata")
 load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md.dredge_nRefEI.Rdata")
+```
+
+__Janela de Código 2.4.1__ modavgPred(type="link")
+
+```{r predito na escala da funcao de ligacao nRef ambos modelos, eval=FALSE,echo=TRUE}
 # Model Averaging for new data predictions
 df_pred <- expand.grid(SiteCode=levels(df_resultados$SiteCode)[1],
                        d.z=seq(min(df_resultados$d.z),max(df_resultados$d.z),length=40),
@@ -1043,88 +1112,68 @@ f_modavgPred <- function(md_object, df = df_pred, type_ = "link"){
 }
 registerDoMC(2)
 l_mdPredict <- llply(l_md,f_modavgPred,.parallel = TRUE)
+```
+
+```{r echo=FALSE,eval=FALSE}
+save(l_mdPredict,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_mdPredict__nRef.Rdata")
+```
 
 
-
-save(mdAvg_nRefEI__AICcmodavg,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_nRefEI__AICcmodavg.Rdata")
-## EI
-# Model Averaging for new data predictions
-df_pred <- expand.grid(SiteCode=levels(df_resultados$SiteCode)[1],
-                       d.z=seq(min(df_resultados$d.z),max(df_resultados$d.z),length=40),
-                       p.z=seq(min(df_resultados$p.z),max(df_resultados$p.z),length=200))
-mdAvg_nRefEI__AICcmodavg <- modavgPred(l_md.dredge_nRefEI,newdata = df_pred) %>%
-  cbind(df_pred)
-save(mdAvg_nRefEI__AICcmodavg,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_nRefEI__AICcmodavg.Rdata")
-
-
-### log OR EE/EI
-# df_plot %>% names
-f_logOR <- function(Pr_A,Pr_B){
-  logOR <- log( (Pr_A * (1-Pr_B)) / (Pr_B * (1-Pr_A)) )
-  return(logOR)
-}
-df_plot_logOR <- cbind(df_plotEE[,c("p","d")],
-                       data.frame(logOR_EE.EI = f_logOR(Pr_A = mdAvg_nRefEE__AICcmodavg$mod.avg.pred,
-                                                        Pr_B = mdAvg_nRefEI__AICcmodavg$mod.avg.pred),
-                                  lower.logOR_EE.EI = f_logOR(Pr_A = mdAvg_nRefEE__AICcmodavg$lower.CL,
-                                                              Pr_B = mdAvg_nRefEI__AICcmodavg$lower.CL),
-                                  upper.logOR_EE.EI = f_logOR(Pr_A = mdAvg_nRefEE__AICcmodavg$upper.CL,
-                                                              Pr_B = mdAvg_nRefEI__AICcmodavg$upper.CL),
-                                  Pr_nRefEE = mdAvg_nRefEE__AICcmodavg$mod.avg.pred,
-                                  Pr_nRefEI = mdAvg_nRefEI__AICcmodavg$mod.avg.pred,
-                                  lower.Pr_EE = mdAvg_nRefEE__AICcmodavg$lower.CL,
-                                  lower.Pr_EI = mdAvg_nRefEI__AICcmodavg$lower.CL,
-                                  upper.Pr_EE = mdAvg_nRefEE__AICcmodavg$upper.CL,
-                                  upper.Pr_EI = mdAvg_nRefEE__AICcmodavg$upper.CL
-                            )
-                       )
+__Figura 2.4.2__ log odds ratio auto coerência. Nas duas ultimas linhas no eixo y está a variável no respectivo histogram na primeira coluna.   
+  
+```{r calculo do log Odds ratio e figura de autocoerencia,eval=TRUE,echo=TRUE,fig.width=10}
+#
+df_plot_logOR <- data.frame(p.z = l_mdPredict[["EE"]]$p.z,
+                            d.z = l_mdPredict[["EE"]]$d.z,
+                            logOR_EE.EI = l_mdPredict[["EE"]]$mod.avg.pred - l_mdPredict[["EI"]]$mod.avg.pred,
+                            lower.logOR_EE.EI = l_mdPredict[["EE"]]$lower.CL - l_mdPredict[["EI"]]$lower.CL,
+                            upper.logOR_EE.EI = l_mdPredict[["EE"]]$upper.CL - l_mdPredict[["EI"]]$upper.CL,
+                            logOdds_EE = l_mdPredict[["EE"]]$mod.avg.pred,
+                            lower.logOdds_EE = l_mdPredict[["EE"]]$lower.CL,
+                            upper.logOdds_EE = l_mdPredict[["EE"]]$upper.CL,
+                            logOdds_EI = l_mdPredict[["EI"]]$mod.avg.pred,
+                            lower.logOdds_EI = l_mdPredict[["EI"]]$lower.CL,
+                            upper.logOdds_EI = l_mdPredict[["EI"]]$upper.CL)
 l_p <- list()
 l_p[[1]] <- df_plot_logOR[,3:5] %>% 
   gather(key=logOR_class, value=logOR_value,logOR_EE.EI:upper.logOR_EE.EI) %>%
-  ggplot(aes(x=.$logOR_value)) + labs(x="",title = "log OR") +
-  geom_histogram(bins=60) + facet_wrap(~logOR_class,ncol=3)
-l_p[[2]] <- df_plot_logOR[,6:11] %>% 
-  gather(key=Pr_class, value=Pr_value,Pr_nRefEE:upper.Pr_EI) %>%
-  ggplot(aes(x=.$Pr_value)) + labs(x="",title = "Probability") +
-  geom_histogram(bins=60) + facet_wrap(~Pr_class,ncol=3,dir = "v")
-grid.arrange(l_p[[1]],l_p[[2]],
-             layout_matrix = rbind(1,2,2))
+  ggplot(aes(x=.$logOR_value)) + labs(x="",y="") +
+  geom_histogram(bins=60) + facet_wrap(~logOR_class,ncol=3,dir = "v")
+for(i in 3:5){
+  l_p[[i-1]] <- df_plot_logOR[,c(i,i+3,i+6)] %>% 
+    gather(key = "logOdds_MN", value = "logOdds_value", names(.)[-1]) %>% 
+    ggplot(aes_string(x=names(.)[3],y=names(.)[1])) + 
+    geom_point(alpha=0.3) +
+    facet_wrap(~logOdds_MN,ncol=1) + labs(x="",y="")
+}
+grid.arrange(l_p[[1]],l_p[[2]],l_p[[3]],l_p[[4]],
+             layout_matrix = rbind(c(1,1,1),
+                                   2:4)
+             )
 ```
-  
-  
-  
-```{r eval=FALSE}
-l_p <- list()
-l_p[[1]] <- df_plot_logOR %>% 
-  select(logOR_EE.EI,Pr_nRefEE,Pr_nRefEI) %>% 
-  gather(key = MN, value=Pr_nRef,Pr_nRefEE:Pr_nRefEI) %>% 
-  ggplot(aes(x=Pr_nRef,y=logOR_EE.EI)) + 
-  geom_point(alpha = 0.3) + facet_wrap(~MN,ncol=1)
-l_p[[2]] <- df_plot_logOR %>% 
-  select(lower.logOR_EE.EI,lower.Pr_EE,lower.Pr_EI) %>% 
-  gather(key = MN, value=lower.Pr_nRef,lower.Pr_EE:lower.Pr_EI) %>% 
-  ggplot(aes(x=lower.Pr_nRef,y=lower.Pr_nRef)) + 
-  geom_point(alpha = 0.3) + facet_wrap(~MN,ncol=1)
-l_p[[3]] <- df_plot_logOR %>% 
-  select(upper.logOR_EE.EI,upper.Pr_EE,upper.Pr_EI) %>% 
-  gather(key = MN, value=upper.Pr_nRef,upper.Pr_EE:upper.Pr_EI) %>% 
-  ggplot(aes(x=upper.Pr_nRef,y=upper.Pr_nRef)) + 
-  geom_point(alpha = 0.3) + facet_wrap(~MN,ncol=1)
+    
+__Figura 2.4.3__ Log odds ratio EE/EI  
 
-```
-
-
-
-
-
-
-```{r eval=FALSE}
+```{r fig 243, eval=TRUE,fig.width=10}
+df_plot_logOR %<>% 
+  mutate(p = p.z * sd(df_resultados$p) + mean(df_resultados$p),
+         d = d.z * sd(df_resultados$d) + mean(df_resultados$d))
+df_ <- apply(df_plot_logOR[,3:5], 2, f_z) %>% as.data.frame
+names(df_) <- sapply(names(df_),function(x) paste0(x,".z"))
+df_ <- cbind(df_plot_logOR,df_)
 l_p <- list()  
+v_limits <- c(min = min(c(df_plot_logOR$logOR_EE.EI,
+                          df_plot_logOR$lower.logOR_EE.EI,
+                          df_plot_logOR$upper.logOR_EE.EI)),
+              max = max(c(df_plot_logOR$logOR_EE.EI,
+                          df_plot_logOR$lower.logOR_EE.EI,
+                          df_plot_logOR$upper.logOR_EE.EI)),
+              avg = mean(df_plot_logOR$logOR_EE.EI)
+              )
 l_p[[1]] <- ggplot(df_plot_logOR,aes(x=p,y=d,fill=logOR_EE.EI)) +
   geom_tile() +
-  scale_fill_gradient2(limits = c(min(df_plot_logOR$logOR_EE.EI),
-                                  max(df_plot_logOR$logOR_EE.EI)),
-                       midpoint=mean(df_plot_logOR$logOR_EE.EI), 
+  scale_fill_gradient2(limits = c(v_limits[1],v_limits[2]),
+                       midpoint = v_limits[3], 
                        low="red", high="blue",mid="green") +
   labs(
     # title="Probabilidade de Não Refutar",
@@ -1135,13 +1184,281 @@ l_p[[2]] <- df_plot_logOR %>%
   gather(key = IC_class ,value = IC_pred,lower.logOR_EE.EI:upper.logOR_EE.EI) %>% 
   ggplot(aes(x=p,y=d,fill=IC_pred)) +
   geom_tile() +
-  scale_fill_gradient2(limits = c(min(df_plot_logOR$logOR_EE.EI),
-                                  max(df_plot_logOR$logOR_EE.EI)),
-                       midpoint=mean(df_plot_logOR$logOR_EE.EI), 
+  scale_fill_gradient2(limits = c(v_limits[1],v_limits[2]),
+                       midpoint = v_limits[3], 
                        low="red", high="blue",mid="green") +
   facet_wrap(~IC_class,ncol=2,labeller = labeller(IC_class = labels_IC)) + theme(legend.position='none')
 ## Arranjo dos gráficos
-p2 <- grid.arrange(l_p[[1]],l_p[[2]],top="log(OR(EE/EI))",ncol=1)
+grid.arrange(l_p[[1]],l_p[[2]],
+                   layout_matrix = rbind(1,1,2))
 
 ```
+
+
+#### Estudo log Odds Ratio (EE/EI)
+
+```{r estudo log odds ratio nao truncado, fig.height=3,fig.width=10}
+df_plot <- bind_rows(l_mdPredict,.id = "MN")
+df_plot %<>% mutate(p = p.z * sd(df_resultados$p) + mean(df_resultados$p),
+                    d = d.z*sd(df_resultados$d) + mean(df_resultados$d))
+df_ <- apply(df_plot[,c(3:4,6:7)],2,arm::invlogit) %>% as.data.frame
+names(df_) <- sapply(names(df_), function(x) paste0(x,"_response"))
+df_plot <- cbind(df_plot,df_)
+l_p <- list()
+l_p[[1]] <- df_plot %>% 
+  ggplot(aes(x=mod.avg.pred,y=mod.avg.pred_response)) +
+  geom_point(alpha=0.3) +
+  facet_wrap(~MN,ncol=2) + labs(x="log Odds",y="Prob","modelo médio",title="fit")
+l_p[[2]] <- df_plot %>% 
+  ggplot(aes(x=upper.CL,y=upper.CL_response)) +
+  geom_point(alpha=0.3) +
+  facet_wrap(~MN,ncol=2) + labs(x="log Odds",y="Prob","modelo médio",title="upper")
+l_p[[3]] <- df_plot %>% 
+  ggplot(aes(x=lower.CL,y=lower.CL_response)) +
+  geom_point(alpha=0.3) +
+  facet_wrap(~MN,ncol=2) + labs(x="log Odds",y="Prob","modelo médio",title="lower")
+do.call("grid.arrange",c(l_p,ncol=3,top="não truncado"))
+```
+
+```{r estudo log odds ratio truncado, fig.height=3,fig.width=10}
+# truncar o log odds para poder avaliar o log odds ratio
+v_range <- c(min = df_plot %>% filter(MN=="EE") %>% .$lower.CL %>% min,
+             max = df_plot %>% filter(MN=="EE") %>% .$upper.CL %>% max)
+## fit
+df_plot$mod.avg.pred[df_plot$mod.avg.pred>v_range[2]] <- v_range[2] + 1 
+df_plot$mod.avg.pred[df_plot$mod.avg.pred<v_range[1]] <- v_range[1] - 1 
+## lower
+df_plot$lower.CL[df_plot$lower.CL>v_range[2]] <- v_range[2] + 1 
+df_plot$lower.CL[df_plot$lower.CL<v_range[1]] <- v_range[1] - 1 
+## upper
+df_plot$upper.CL[df_plot$upper.CL>v_range[2]] <- v_range[2] + 1 
+df_plot$upper.CL[df_plot$upper.CL<v_range[1]] <- v_range[1] - 1 
+###
+l_p <- list()
+l_p[[1]] <- df_plot %>%
+  ggplot(aes(x=mod.avg.pred,y=mod.avg.pred_response)) +
+  geom_point(alpha=0.3) +
+  facet_wrap(~MN,ncol=2) + labs(x="log Odds",y="Prob","modelo médio",title="fit")
+l_p[[2]] <- df_plot %>% 
+  ggplot(aes(x=upper.CL,y=upper.CL_response)) +
+  geom_point(alpha=0.3) +
+  facet_wrap(~MN,ncol=2) + labs(x="log Odds",y="Prob","modelo médio",title="upper")
+l_p[[3]] <- df_plot %>% 
+  ggplot(aes(x=lower.CL,y=lower.CL_response)) +
+  geom_point(alpha=0.3) +
+  facet_wrap(~MN,ncol=2) + labs(x="log Odds",y="Prob","modelo médio",title="lower")
+do.call("grid.arrange",c(l_p,ncol=3,top="truncado [min(EE), max(EE)]"))
+```
+
+
+ 
+```{r}
+df_EE <- df_plot %>% filter(MN == "EE")
+df_EI <- df_plot %>% filter(MN == "EI")
+df_plot_logOR <- cbind(df_EE[,c("p","d")],
+                       logOR_EE.EI = df_EE$mod.avg.pred - df_EI$mod.avg.pred,
+                       lower.logOR_EE.EI = df_EE$lower.CL - df_EI$lower.CL,
+                       upper.logOR_EE.EI = df_EE$upper.CL - df_EI$upper.CL)
+#################3
+l_p <- list()  
+v_limits <- c(min = min(c(df_plot_logOR$logOR_EE.EI,
+                          df_plot_logOR$lower.logOR_EE.EI,
+                          df_plot_logOR$upper.logOR_EE.EI)),
+              max = max(c(df_plot_logOR$logOR_EE.EI,
+                          df_plot_logOR$lower.logOR_EE.EI,
+                          df_plot_logOR$upper.logOR_EE.EI)),
+              avg = mean(df_plot_logOR$logOR_EE.EI)
+              )
+l_p[[1]] <- ggplot(df_plot_logOR,aes(x=p,y=d,fill=logOR_EE.EI)) +
+  geom_tile() +
+  scale_fill_gradient2(limits = c(v_limits[1],v_limits[2]),
+                       midpoint = 0, 
+                       low="red", high="blue",mid="green") +
+  labs(
+    # title="Probabilidade de Não Refutar",
+       fill="log Odds Ratio( EE / EI ) ") +
+  theme(legend.position="top")
+labels_IC <- c(lower.logOR_EE.EI="IC 5%", upper.logOR_EE.EI="IC 95%")
+l_p[[2]] <- df_plot_logOR %>%
+  gather(key = IC_class ,value = IC_pred,lower.logOR_EE.EI:upper.logOR_EE.EI) %>% 
+  ggplot(aes(x=p,y=d,fill=IC_pred)) +
+  geom_tile() +
+  scale_fill_gradient2(limits = c(v_limits[1],v_limits[2]),
+                       midpoint = 0, 
+                       low="red", high="blue",mid="green") +
+  facet_wrap(~IC_class,ncol=2,labeller = labeller(IC_class = labels_IC)) + theme(legend.position='none')
+## Arranjo dos gráficos
+grid.arrange(l_p[[1]],l_p[[2]],
+                   layout_matrix = rbind(1,1,1,1,2,2))
+```
+ 
+
+  
+```{r graficos exploratorios extra nRef conjunto completo, echo=FALSE,eval=FALSE}
+# #
+df_plot_logOR1 <- apply(df_plot_logOR[,3:11],2,arm::invlogit) %>% as.data.frame()
+names(df_plot_logOR1) <- sapply(names(df_plot_logOR1),function(X) paste0("response.",X))
+df_plot_logOR1 <- cbind(df_plot_logOR[,1:2],df_plot_logOR1)
+
+# 
+# df_plot %>% names
+# df_plot_logOR1 %>% names
+# par(mfrow=c(2,3))
+# plot(df_plot$mod.avg.pred[df_plot$MN=="EE"] ~ df_plot_logOR1$exp.logOdds_EE)
+# plot(df_plot$lower.CL[df_plot$MN=="EE"] ~ df_plot_logOR1$exp.lower.logOdds_EE)
+# plot(df_plot$upper.CL[df_plot$MN=="EE"] ~ df_plot_logOR1$exp.upper.logOdds_EE)
+# plot(df_plot$mod.avg.pred[df_plot$MN=="EI"] ~ df_plot_logOR1$exp.logOdds_EI)
+# plot(df_plot$lower.CL[df_plot$MN=="EI"] ~ df_plot_logOR1$exp.lower.logOdds_EI)
+# plot(df_plot$upper.CL[df_plot$MN=="EI"] ~ df_plot_logOR1$exp.upper.logOdds_EI)
+# par(mfrow=c(1,1))
+# 
+# hist(df_plot_logOR$logOdds_EI,breaks = 60)
+# hist(df_plot_logOR$lower.logOdds_EI,breaks = 60)
+# hist(df_plot_logOR$upper.logOdds_EI,breaks = 60)
+# 
+# df_predEI <- merTools::predictInterval(md_nRefEI,type = "linear.prediction")
+# hist(df_predEI$fit,breaks=60)
+# hist(df_predEI$upr,breaks=60)
+# hist(df_predEI$lwr,breaks=60)
+# df_EI <- cbind(md_nRefEI@frame,
+#                df_predEI)
+# 
+# 
+# 
+
+f_predict <- function(glmer_object){
+  df_ <- merTools::predictInterval(glmer_object,type = "linear.prediction")
+  df_ <- cbind(glmer_object@frame,
+               df_)
+  df_2 <- apply(df_[,c("fit","upr","lwr")],2,arm::invlogit) %>% as.data.frame()
+  names(df_2) <- sapply(names(df_2), function(x) paste0(x,"_response"))
+  df_ <- cbind(df_,df_2)
+  return(df_)
+}
+l_md <- list()
+l_md[[1]] <- md_nRefEE
+l_md[[2]] <- md_nRefEI
+l_md[[3]] <- md_nRef
+names(l_md) <- c("EE","EI","c(EE,EI)")
+registerDoMC(3)
+l_dfPred <- llply(l_md,f_predict,.parallel = TRUE)
+
+
+l_dfPred[[2]]$fit %>% summary
+l_dfPred[[3]] %>% filter(MN == "EI") %>% .$fit %>% summary
+
+df_ <- l_dfPred[[3]]
+df_$nRef <- df_$`cbind(n_nRef, 100 - n_nRef)`[,1]
+df_ %>% filter(nRef == 0 | nRef == 100) %>% sample_n(size=10)
+
+# 
+l_p <- list()
+l_p[[1]] <- df_plot_logOR1[,3:5] %>%
+  gather(key = OR_class, value = OR_value, exp.logOR_EE.EI : exp.upper.logOR_EE.EI) %>%
+  ggplot(aes(x=.$OR_value)) + labs(x="") +
+  geom_histogram(bins=60) + facet_wrap(~OR_class,ncol=3,dir = "v")
+for(i in 3:5){
+  l_p[[i-1]] <- df_plot_logOR1[,c(i,i+3,i+6)] %>%
+    gather(key = "Odds_MN", value = "Odds_value", names(.)[-1]) %>%
+    ggplot(aes_string(x=names(.)[3],y=names(.)[1])) +
+    geom_point(alpha=0.3) +
+    facet_wrap(~Odds_MN,ncol=1) + labs(x="",y="")
+}
+grid.arrange(l_p[[1]],l_p[[2]],l_p[[3]],l_p[[4]],
+             layout_matrix = rbind(c(1,1,1),
+                                   2:4)
+             )
+# df_plot %>% names
+```
+  
+  
+### Figura Final  
+  
+```{r figura final nRef,echo=FALSE,eval=TRUE,fig.width=10}
+# dados
+df_plot <- bind_rows(l_mdPredict,.id = "MN")
+df_plot %<>% mutate(p = p.z * sd(df_resultados$p) + mean(df_resultados$p),
+                    d = d.z*sd(df_resultados$d) + mean(df_resultados$d))
+df_ <- apply(df_plot[,c(3:4,6:7)],2,arm::invlogit) %>% as.data.frame
+names(df_) <- sapply(names(df_), function(x) paste0(x,"_response"))
+df_plot <- cbind(df_plot,df_)
+# plots Probabilidad de não refutar
+l_p <- list()
+labels_IC <- c(lower.CL_response="IC 5%", upper.CL_response="IC 95%")
+## predição média para ambos modelos
+l_p[[1]] <- ggplot(df_plot,aes(x=p,y=d,fill=mod.avg.pred_response)) +
+  geom_tile() +
+  scale_fill_gradient2(limits = c(0,1),midpoint=0.5, low="red", high="blue",mid="green") +
+  labs(title="Probability") +
+  theme_classic() + facet_wrap(~MN,ncol=2) + theme(legend.position="top",legend.title = element_blank())
+## IC para MNEE
+df_plotEE <- df_plot %>% filter(MN=="EE") %>%
+  gather(key = IC_class ,value = IC_pred,lower.CL_response:upper.CL_response)
+l_p[[2]] <- ggplot(df_plotEE,aes(x=p,y=d,fill=IC_pred)) +
+  geom_tile() +
+  scale_fill_gradient2(limits = c(0,1),midpoint=0.5, low="red", high="blue",mid="green") +
+  theme_classic() + facet_wrap(~IC_class,ncol=2,labeller = labeller(IC_class = labels_IC)) + theme(legend.position='none')
+## IC para MNEI
+df_plotEI <- df_plot %>% filter(MN=="EI") %>%
+  gather(key = IC_class ,value = IC_pred,lower.CL_response:upper.CL_response)
+l_p[[3]] <- ggplot(df_plotEI,aes(x=p,y=d,fill=IC_pred)) +
+  geom_tile() +
+  scale_fill_gradient2(limits = c(0,1),midpoint=0.5, low="red", high="blue",mid="green") +
+  theme_classic() + facet_wrap(~IC_class,ncol=2,labeller = labeller(IC_class = labels_IC)) + theme(legend.position='none')
+# plots para log odds ratio
+## truncado
+v_range <- c(min = df_plot %>% filter(MN=="EE") %>% .$lower.CL %>% min,
+             max = df_plot %>% filter(MN=="EE") %>% .$upper.CL %>% max)
+## fit
+df_plot$mod.avg.pred[df_plot$mod.avg.pred>v_range[2]] <- v_range[2] + 1 
+df_plot$mod.avg.pred[df_plot$mod.avg.pred<v_range[1]] <- v_range[1] - 1 
+## lower
+df_plot$lower.CL[df_plot$lower.CL>v_range[2]] <- v_range[2] + 1 
+df_plot$lower.CL[df_plot$lower.CL<v_range[1]] <- v_range[1] - 1 
+## upper
+df_plot$upper.CL[df_plot$upper.CL>v_range[2]] <- v_range[2] + 1 
+df_plot$upper.CL[df_plot$upper.CL<v_range[1]] <- v_range[1] - 1 
+## dados
+df_EE <- df_plot %>% filter(MN == "EE")
+df_EI <- df_plot %>% filter(MN == "EI")
+df_plot_logOR <- cbind(df_EE[,c("p","d")],
+                       logOR_EE.EI = df_EE$mod.avg.pred - df_EI$mod.avg.pred,
+                       lower.logOR_EE.EI = df_EE$lower.CL - df_EI$lower.CL,
+                       upper.logOR_EE.EI = df_EE$upper.CL - df_EI$upper.CL)
+## graficos
+v_limits <- c(min = min(c(df_plot_logOR$logOR_EE.EI,
+                          df_plot_logOR$lower.logOR_EE.EI,
+                          df_plot_logOR$upper.logOR_EE.EI)),
+              max = max(c(df_plot_logOR$logOR_EE.EI,
+                          df_plot_logOR$lower.logOR_EE.EI,
+                          df_plot_logOR$upper.logOR_EE.EI)),
+              avg = mean(df_plot_logOR$logOR_EE.EI))
+l_p[[4]] <- ggplot(df_plot_logOR,aes(x=p,y=d,fill=logOR_EE.EI)) +
+  geom_tile() + theme_classic() +
+  scale_fill_gradient2(limits = c(v_limits[1],v_limits[2]),
+                       midpoint = 0, 
+                       low="red", high="blue",mid="green") +
+  labs(title="log OR(EE/EI)") +
+  theme(legend.position="top",legend.title = element_blank())
+labels_IC2 <- c(lower.logOR_EE.EI="IC 5%", upper.logOR_EE.EI="IC 95%")
+l_p[[5]] <- df_plot_logOR %>%
+  gather(key = IC_class ,value = IC_pred,lower.logOR_EE.EI:upper.logOR_EE.EI) %>% 
+  ggplot(aes(x=p,y=d,fill=IC_pred)) +
+  geom_tile() + theme_classic() +
+  scale_fill_gradient2(limits = c(v_limits[1],v_limits[2]),
+                       midpoint = 0, 
+                       low="red", high="blue",mid="green") +
+  facet_wrap(~IC_class,ncol=2,labeller = labeller(IC_class = labels_IC2)) + theme(legend.position='none') 
+## Arranjo dos gráficos
+# l_p[[1]],l_p[[2]],l_p[[3]],l_p[[4]],l_p[[5]],
+lay_mat <- rbind(c(rep(1,4),c(4,4)),
+                 c(rep(1,4),c(4,4)),
+                 c(rep(1,4),c(4,4)),
+                 c(rep(1,4),c(4,4)),
+                 rep(c(2,3,5),each=2),
+                 rep(c(2,3,5),each=2))
+grid.arrange(grobs = l_p, layout_matrix = lay_mat)
+
+```
+
 
