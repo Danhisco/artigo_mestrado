@@ -1197,6 +1197,8 @@ grid.arrange(l_p[[1]],l_p[[2]],
 
 #### Estudo log Odds Ratio (EE/EI)
 
+__figura 2.4.4__ Probabilidade ~ log Odds
+
 ```{r estudo log odds ratio nao truncado, fig.height=3,fig.width=10}
 df_plot <- bind_rows(l_mdPredict,.id = "MN")
 df_plot %<>% mutate(p = p.z * sd(df_resultados$p) + mean(df_resultados$p),
@@ -1250,9 +1252,9 @@ l_p[[3]] <- df_plot %>%
 do.call("grid.arrange",c(l_p,ncol=3,top="truncado [min(EE), max(EE)]"))
 ```
 
-
+__Figura 2.4.5__ Log odds ratio truncado  
  
-```{r}
+```{r fig 245}
 df_EE <- df_plot %>% filter(MN == "EE")
 df_EI <- df_plot %>% filter(MN == "EI")
 df_plot_logOR <- cbind(df_EE[,c("p","d")],
@@ -1296,6 +1298,11 @@ grid.arrange(l_p[[1]],l_p[[2]],
 
   
 ### Figura Final  
+
+```{r load l_mdPredict nRef figura final,eval=TRUE,echo=FALSE}
+load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_mdPredict__nRef.Rdata")
+```
+
   
 ```{r figura final nRef,echo=FALSE,eval=TRUE,fig.width=10}
 # dados
@@ -1312,22 +1319,27 @@ labels_IC <- c(lower.CL_response="IC 5%", upper.CL_response="IC 95%")
 l_p[[1]] <- ggplot(df_plot,aes(x=p,y=d,fill=mod.avg.pred_response)) +
   geom_tile() +
   scale_fill_gradient2(limits = c(0,1),midpoint=0.5, low="red", high="blue",mid="green") +
+  scale_fill_distiller(palette = "Spectral") +
   labs(title="Probability") +
-  theme_classic() + facet_wrap(~MN,ncol=2) + theme(legend.position="top",legend.title = element_blank())
+  theme_classic() + facet_wrap(~MN,ncol=2) + theme(legend.position="top",
+                                                   legend.title = element_blank(),
+                                                   panel.background = element_rect(fill = "gray78")) 
 ## IC para MNEE
 df_plotEE <- df_plot %>% filter(MN=="EE") %>%
   gather(key = IC_class ,value = IC_pred,lower.CL_response:upper.CL_response)
 l_p[[2]] <- ggplot(df_plotEE,aes(x=p,y=d,fill=IC_pred)) +
   geom_tile() +
   scale_fill_gradient2(limits = c(0,1),midpoint=0.5, low="red", high="blue",mid="green") +
-  theme_classic() + facet_wrap(~IC_class,ncol=2,labeller = labeller(IC_class = labels_IC)) + theme(legend.position='none')
+  scale_fill_distiller(palette = "Spectral") +
+  theme_classic() + facet_wrap(~IC_class,ncol=2,labeller = labeller(IC_class = labels_IC)) + theme(legend.position='none',panel.background = element_rect(fill = "gray78"))
 ## IC para MNEI
 df_plotEI <- df_plot %>% filter(MN=="EI") %>%
   gather(key = IC_class ,value = IC_pred,lower.CL_response:upper.CL_response)
 l_p[[3]] <- ggplot(df_plotEI,aes(x=p,y=d,fill=IC_pred)) +
   geom_tile() +
   scale_fill_gradient2(limits = c(0,1),midpoint=0.5, low="red", high="blue",mid="green") +
-  theme_classic() + facet_wrap(~IC_class,ncol=2,labeller = labeller(IC_class = labels_IC)) + theme(legend.position='none')
+  scale_fill_distiller(palette = "Spectral") +
+  theme_classic() + facet_wrap(~IC_class,ncol=2,labeller = labeller(IC_class = labels_IC)) + theme(legend.position='none',panel.background = element_rect(fill = "gray78"))
 # plots para log odds ratio
 ## truncado
 v_range <- c(min = df_plot %>% filter(MN=="EE") %>% .$lower.CL %>% min,
@@ -1361,8 +1373,11 @@ l_p[[4]] <- ggplot(df_plot_logOR,aes(x=p,y=d,fill=logOR_EE.EI)) +
   scale_fill_gradient2(limits = c(v_limits[1],v_limits[2]),
                        midpoint = 0, 
                        low="red", high="blue",mid="green") +
+  scale_fill_distiller(palette = "Spectral") +
   labs(title="log OR(EE/EI)") +
-  theme(legend.position="top",legend.title = element_blank())
+  theme(legend.position="top",
+        legend.title = element_blank(),
+        panel.background = element_rect(fill = "gray78"))
 labels_IC2 <- c(lower.logOR_EE.EI="IC 5%", upper.logOR_EE.EI="IC 95%")
 l_p[[5]] <- df_plot_logOR %>%
   gather(key = IC_class ,value = IC_pred,lower.logOR_EE.EI:upper.logOR_EE.EI) %>% 
@@ -1371,7 +1386,8 @@ l_p[[5]] <- df_plot_logOR %>%
   scale_fill_gradient2(limits = c(v_limits[1],v_limits[2]),
                        midpoint = 0, 
                        low="red", high="blue",mid="green") +
-  facet_wrap(~IC_class,ncol=2,labeller = labeller(IC_class = labels_IC2)) + theme(legend.position='none') 
+  scale_fill_distiller(palette = "Spectral") +
+  facet_wrap(~IC_class,ncol=2,labeller = labeller(IC_class = labels_IC2)) + theme(legend.position='none',panel.background = element_rect(fill = "gray78")) 
 ## Arranjo dos gráficos
 # l_p[[1]],l_p[[2]],l_p[[3]],l_p[[4]],l_p[[5]],
 lay_mat <- rbind(c(rep(1,4),c(4,4)),
