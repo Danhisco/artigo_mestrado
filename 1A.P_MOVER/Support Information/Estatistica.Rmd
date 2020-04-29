@@ -7,7 +7,7 @@ output:
     toc: true
     toc_depth: 5
 editor_options: 
-  chunk_output_type: inline
+  chunk_output_type: console
 ---
 
 <style>
@@ -468,7 +468,7 @@ __Figura 2.3__ Resíduos Quantílicos do modelo cheio plausível
 ```{r auditoria mais plausivel md_n.ref1, message=FALSE,eval=FALSE,echo=FALSE}
 p_plot <- simulateResiduals(md_nRef,n=250,refit = TRUE)
 plot(p_plot)
-testOverdispersion(p_plot)
+testDispersion(p_plot)
 # ggplot(df_resultados,aes(x=df_resultados$n_nRef)) +
 #   geom_histogram(bins=60) + facet_wrap(~MN,ncol=2)
 ```
@@ -1293,84 +1293,7 @@ grid.arrange(l_p[[1]],l_p[[2]],
 ```
  
 
-  
-```{r graficos exploratorios extra nRef conjunto completo, echo=FALSE,eval=FALSE}
-# #
-df_plot_logOR1 <- apply(df_plot_logOR[,3:11],2,arm::invlogit) %>% as.data.frame()
-names(df_plot_logOR1) <- sapply(names(df_plot_logOR1),function(X) paste0("response.",X))
-df_plot_logOR1 <- cbind(df_plot_logOR[,1:2],df_plot_logOR1)
 
-# 
-# df_plot %>% names
-# df_plot_logOR1 %>% names
-# par(mfrow=c(2,3))
-# plot(df_plot$mod.avg.pred[df_plot$MN=="EE"] ~ df_plot_logOR1$exp.logOdds_EE)
-# plot(df_plot$lower.CL[df_plot$MN=="EE"] ~ df_plot_logOR1$exp.lower.logOdds_EE)
-# plot(df_plot$upper.CL[df_plot$MN=="EE"] ~ df_plot_logOR1$exp.upper.logOdds_EE)
-# plot(df_plot$mod.avg.pred[df_plot$MN=="EI"] ~ df_plot_logOR1$exp.logOdds_EI)
-# plot(df_plot$lower.CL[df_plot$MN=="EI"] ~ df_plot_logOR1$exp.lower.logOdds_EI)
-# plot(df_plot$upper.CL[df_plot$MN=="EI"] ~ df_plot_logOR1$exp.upper.logOdds_EI)
-# par(mfrow=c(1,1))
-# 
-# hist(df_plot_logOR$logOdds_EI,breaks = 60)
-# hist(df_plot_logOR$lower.logOdds_EI,breaks = 60)
-# hist(df_plot_logOR$upper.logOdds_EI,breaks = 60)
-# 
-# df_predEI <- merTools::predictInterval(md_nRefEI,type = "linear.prediction")
-# hist(df_predEI$fit,breaks=60)
-# hist(df_predEI$upr,breaks=60)
-# hist(df_predEI$lwr,breaks=60)
-# df_EI <- cbind(md_nRefEI@frame,
-#                df_predEI)
-# 
-# 
-# 
-
-f_predict <- function(glmer_object){
-  df_ <- merTools::predictInterval(glmer_object,type = "linear.prediction")
-  df_ <- cbind(glmer_object@frame,
-               df_)
-  df_2 <- apply(df_[,c("fit","upr","lwr")],2,arm::invlogit) %>% as.data.frame()
-  names(df_2) <- sapply(names(df_2), function(x) paste0(x,"_response"))
-  df_ <- cbind(df_,df_2)
-  return(df_)
-}
-l_md <- list()
-l_md[[1]] <- md_nRefEE
-l_md[[2]] <- md_nRefEI
-l_md[[3]] <- md_nRef
-names(l_md) <- c("EE","EI","c(EE,EI)")
-registerDoMC(3)
-l_dfPred <- llply(l_md,f_predict,.parallel = TRUE)
-
-
-l_dfPred[[2]]$fit %>% summary
-l_dfPred[[3]] %>% filter(MN == "EI") %>% .$fit %>% summary
-
-df_ <- l_dfPred[[3]]
-df_$nRef <- df_$`cbind(n_nRef, 100 - n_nRef)`[,1]
-df_ %>% filter(nRef == 0 | nRef == 100) %>% sample_n(size=10)
-
-# 
-l_p <- list()
-l_p[[1]] <- df_plot_logOR1[,3:5] %>%
-  gather(key = OR_class, value = OR_value, exp.logOR_EE.EI : exp.upper.logOR_EE.EI) %>%
-  ggplot(aes(x=.$OR_value)) + labs(x="") +
-  geom_histogram(bins=60) + facet_wrap(~OR_class,ncol=3,dir = "v")
-for(i in 3:5){
-  l_p[[i-1]] <- df_plot_logOR1[,c(i,i+3,i+6)] %>%
-    gather(key = "Odds_MN", value = "Odds_value", names(.)[-1]) %>%
-    ggplot(aes_string(x=names(.)[3],y=names(.)[1])) +
-    geom_point(alpha=0.3) +
-    facet_wrap(~Odds_MN,ncol=1) + labs(x="",y="")
-}
-grid.arrange(l_p[[1]],l_p[[2]],l_p[[3]],l_p[[4]],
-             layout_matrix = rbind(c(1,1,1),
-                                   2:4)
-             )
-# df_plot %>% names
-```
-  
   
 ### Figura Final  
   
