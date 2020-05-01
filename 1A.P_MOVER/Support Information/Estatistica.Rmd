@@ -1089,7 +1089,6 @@ grid.arrange(l_p.nRefEE_response[[1]],l_p.nRefEE_response[[2]],l_p.nRefEE_respon
   
 ```{r echo=FALSE,eval=FALSE}
 # predição na escala da função de ligação
-## EE
 load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md.dredge_nRefEE.Rdata")
 load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md.dredge_nRefEI.Rdata")
 ```
@@ -1116,6 +1115,11 @@ l_mdPredict <- llply(l_md,f_modavgPred,.parallel = TRUE)
 
 ```{r echo=FALSE,eval=FALSE}
 save(l_mdPredict,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_mdPredict__nRef.Rdata")
+```
+
+
+```{r load l_mdPredict nRef 1,eval=TRUE,echo=FALSE}
+load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_mdPredict__nRef.Rdata")
 ```
 
 
@@ -1178,6 +1182,7 @@ l_p[[1]] <- ggplot(df_plot_logOR,aes(x=p,y=d,fill=logOR_EE.EI)) +
   labs(
     # title="Probabilidade de Não Refutar",
        fill="log Odds Ratio( EE / EI ) ") +
+  scale_fill_distiller(palette = "Spectral") +
   theme(legend.position="top")
 labels_IC <- c(lower.logOR_EE.EI="IC 5%", upper.logOR_EE.EI="IC 95%")
 l_p[[2]] <- df_plot_logOR %>%
@@ -1187,6 +1192,7 @@ l_p[[2]] <- df_plot_logOR %>%
   scale_fill_gradient2(limits = c(v_limits[1],v_limits[2]),
                        midpoint = v_limits[3], 
                        low="red", high="blue",mid="green") +
+  scale_fill_distiller(palette = "Spectral") +
   facet_wrap(~IC_class,ncol=2,labeller = labeller(IC_class = labels_IC)) + theme(legend.position='none')
 ## Arranjo dos gráficos
 grid.arrange(l_p[[1]],l_p[[2]],
@@ -1252,17 +1258,25 @@ l_p[[3]] <- df_plot %>%
 do.call("grid.arrange",c(l_p,ncol=3,top="truncado [min(EE), max(EE)]"))
 ```
 
-__Figura 2.4.5__ Log odds ratio truncado  
+__Figura 2.4.5__ Log odds ratio não truncado e truncado
  
 ```{r fig 245}
+# dados geral
+df_plot <- bind_rows(l_mdPredict,.id = "MN")
+df_plot %<>% mutate(p = p.z * sd(df_resultados$p) + mean(df_resultados$p),
+                    d = d.z*sd(df_resultados$d) + mean(df_resultados$d))
+df_ <- apply(df_plot[,c(3:4,6:7)],2,arm::invlogit) %>% as.data.frame
+names(df_) <- sapply(names(df_), function(x) paste0(x,"_response"))
+df_plot <- cbind(df_plot,df_)
+############################################
+############### não truncado ###############
+############################################
 df_EE <- df_plot %>% filter(MN == "EE")
 df_EI <- df_plot %>% filter(MN == "EI")
 df_plot_logOR <- cbind(df_EE[,c("p","d")],
                        logOR_EE.EI = df_EE$mod.avg.pred - df_EI$mod.avg.pred,
                        lower.logOR_EE.EI = df_EE$lower.CL - df_EI$lower.CL,
                        upper.logOR_EE.EI = df_EE$upper.CL - df_EI$upper.CL)
-#################3
-l_p <- list()  
 v_limits <- c(min = min(c(df_plot_logOR$logOR_EE.EI,
                           df_plot_logOR$lower.logOR_EE.EI,
                           df_plot_logOR$upper.logOR_EE.EI)),
@@ -1271,14 +1285,16 @@ v_limits <- c(min = min(c(df_plot_logOR$logOR_EE.EI,
                           df_plot_logOR$upper.logOR_EE.EI)),
               avg = mean(df_plot_logOR$logOR_EE.EI)
               )
+l_p <- list()  
 l_p[[1]] <- ggplot(df_plot_logOR,aes(x=p,y=d,fill=logOR_EE.EI)) +
   geom_tile() +
   scale_fill_gradient2(limits = c(v_limits[1],v_limits[2]),
-                       midpoint = 0, 
+                       midpoint = v_limits[3], 
                        low="red", high="blue",mid="green") +
   labs(
     # title="Probabilidade de Não Refutar",
-       fill="log Odds Ratio( EE / EI ) ") +
+       fill="não truncado ") +
+  scale_fill_distiller(palette = "Spectral") +
   theme(legend.position="top")
 labels_IC <- c(lower.logOR_EE.EI="IC 5%", upper.logOR_EE.EI="IC 95%")
 l_p[[2]] <- df_plot_logOR %>%
@@ -1286,12 +1302,73 @@ l_p[[2]] <- df_plot_logOR %>%
   ggplot(aes(x=p,y=d,fill=IC_pred)) +
   geom_tile() +
   scale_fill_gradient2(limits = c(v_limits[1],v_limits[2]),
+                       midpoint = v_limits[3], 
+                       low="red", high="blue",mid="green") +
+  scale_fill_distiller(palette = "Spectral") +
+  facet_wrap(~IC_class,ncol=2,labeller = labeller(IC_class = labels_IC)) + theme(legend.position='none')
+############################################
+################# truncado #################
+############################################
+# truncar o log odds para poder avaliar o log odds ratio
+v_range <- c(min = df_plot %>% filter(MN=="EE") %>% .$lower.CL %>% min,
+             max = df_plot %>% filter(MN=="EE") %>% .$upper.CL %>% max)
+## fit
+df_plot$mod.avg.pred[df_plot$mod.avg.pred>v_range[2]] <- v_range[2] + 1 
+df_plot$mod.avg.pred[df_plot$mod.avg.pred<v_range[1]] <- v_range[1] - 1 
+## lower
+df_plot$lower.CL[df_plot$lower.CL>v_range[2]] <- v_range[2] + 1 
+df_plot$lower.CL[df_plot$lower.CL<v_range[1]] <- v_range[1] - 1 
+## upper
+df_plot$upper.CL[df_plot$upper.CL>v_range[2]] <- v_range[2] + 1 
+df_plot$upper.CL[df_plot$upper.CL<v_range[1]] <- v_range[1] - 1
+# 
+df_EE <- df_plot %>% filter(MN == "EE")
+df_EI <- df_plot %>% filter(MN == "EI")
+df_plot_logOR <- cbind(df_EE[,c("p","d")],
+                       logOR_EE.EI = df_EE$mod.avg.pred - df_EI$mod.avg.pred,
+                       lower.logOR_EE.EI = df_EE$lower.CL - df_EI$lower.CL,
+                       upper.logOR_EE.EI = df_EE$upper.CL - df_EI$upper.CL)
+v_limits <- c(min = min(c(df_plot_logOR$logOR_EE.EI,
+                          df_plot_logOR$lower.logOR_EE.EI,
+                          df_plot_logOR$upper.logOR_EE.EI)),
+              max = max(c(df_plot_logOR$logOR_EE.EI,
+                          df_plot_logOR$lower.logOR_EE.EI,
+                          df_plot_logOR$upper.logOR_EE.EI)),
+              avg = mean(df_plot_logOR$logOR_EE.EI)
+              )
+l_p[[3]] <- ggplot(df_plot_logOR,aes(x=p,y=d,fill=logOR_EE.EI)) +
+  geom_tile() +
+  scale_fill_gradient2(limits = c(v_limits[1],v_limits[2]),
                        midpoint = 0, 
                        low="red", high="blue",mid="green") +
+  labs(
+    # title="Probabilidade de Não Refutar",
+       fill="truncado") +
+  scale_fill_distiller(palette = "Spectral") +
+  theme(legend.position="top")
+labels_IC <- c(lower.logOR_EE.EI="IC 5%", upper.logOR_EE.EI="IC 95%")
+l_p[[4]] <- df_plot_logOR %>%
+  gather(key = IC_class ,value = IC_pred,lower.logOR_EE.EI:upper.logOR_EE.EI) %>% 
+  ggplot(aes(x=p,y=d,fill=IC_pred)) +
+  geom_tile() +
+  scale_fill_gradient2(limits = c(v_limits[1],v_limits[2]),
+                       midpoint = 0, 
+                       low="red", high="blue",mid="green") +
+  scale_fill_distiller(palette = "Spectral") +
   facet_wrap(~IC_class,ncol=2,labeller = labeller(IC_class = labels_IC)) + theme(legend.position='none')
 ## Arranjo dos gráficos
-grid.arrange(l_p[[1]],l_p[[2]],
-                   layout_matrix = rbind(1,1,1,1,2,2))
+grid.arrange(l_p[[1]],l_p[[2]],l_p[[3]],l_p[[4]],
+                   layout_matrix = rbind(c(1,3),
+                                         c(1,3),
+                                         c(1,3),
+                                         c(1,3),
+                                         c(1,3),
+                                         c(1,3),
+                                         c(1,3),
+                                         c(2,4),
+                                         c(2,4),
+                                         c(2,4),
+                                         c(2,4)))
 ```
  
 
@@ -1304,7 +1381,7 @@ load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md
 ```
 
   
-```{r figura final nRef,echo=FALSE,eval=TRUE,fig.width=10}
+```{r figura final nRef,echo=FALSE,eval=TRUE,fig.width=10,message=FALSE,warning=FALSE}
 # dados
 df_plot <- bind_rows(l_mdPredict,.id = "MN")
 df_plot %<>% mutate(p = p.z * sd(df_resultados$p) + mean(df_resultados$p),
@@ -1401,3 +1478,25 @@ grid.arrange(grobs = l_p, layout_matrix = lay_mat)
 ```
 
 
+#### Stats for the article
+  
+Para d = 20, qual intervalo de p logOR c [-5,5]?      
+  
+```{r}
+l_range <- list()
+l_range[[1]] <- df_plot_logOR %>% filter(d == max(.$d)) %>% 
+  filter(logOR_EE.EI >-5 & logOR_EE.EI<5) %>% .$p %>% range %>% round(.,2) #logOR_EE.EI %in% (-5:5)
+l_range[[2]] <- df_plot_logOR %>% filter(d == max(.$d)) %>% 
+  filter(lower.logOR_EE.EI >-5 & lower.logOR_EE.EI<5) %>% .$p %>% range %>% round(.,2) #logOR_EE.EI %in% (-5:5)
+l_range[[3]] <- df_plot_logOR %>% filter(d == max(.$d)) %>% 
+  filter(upper.logOR_EE.EI >-5 & upper.logOR_EE.EI<5) %>% .$p %>% range %>% round(.,2) #logOR_EE.EI %in% (-5:5)
+names(l_range) <- c("fit","lower","upper")
+l_range %<>% bind_rows() %>% as.data.frame()
+l_range$range <- c("min","max")
+l_range <- l_range[,c(4,1:3)]
+l_range <- bind_rows(l_range,
+                     cbind(data.frame(range = "diff"),
+                           as.data.frame(t(apply(l_range[,2:4],2,diff))))
+          )
+l_range
+```
