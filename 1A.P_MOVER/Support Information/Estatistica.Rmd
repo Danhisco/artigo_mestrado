@@ -37,6 +37,7 @@ library(merTools)
 library(magrittr)
 library(gridExtra)
 library(ggplot2); theme_set(theme_classic())
+library(metR)
 library(tidyr)
 library(purrr)
 library(plyr)
@@ -1138,6 +1139,16 @@ df_plot_logOR <- data.frame(p.z = l_mdPredict[["EE"]]$p.z,
                             logOdds_EI = l_mdPredict[["EI"]]$mod.avg.pred,
                             lower.logOdds_EI = l_mdPredict[["EI"]]$lower.CL,
                             upper.logOdds_EI = l_mdPredict[["EI"]]$upper.CL)
+
+df_plot_logOR[,3:5] %>% 
+  gather(key=logOR_class, value=logOR_value,logOR_EE.EI:upper.logOR_EE.EI) %>%
+  ggplot(aes(y=logOR_value,x=logOR_class)) + labs(x="",y="") +
+  geom_boxplot() +
+  geom_jitter(alpha=0.3) 
+#+ 
+# +
+  # facet_wrap(~logOR_class,ncol=3,dir = "v")
+
 l_p <- list()
 l_p[[1]] <- df_plot_logOR[,3:5] %>% 
   gather(key=logOR_class, value=logOR_value,logOR_EE.EI:upper.logOR_EE.EI) %>%
@@ -1419,17 +1430,17 @@ l_p[[3]] <- ggplot(df_plotEI,aes(x=p,y=d,fill=IC_pred)) +
   theme_classic() + facet_wrap(~IC_class,ncol=2,labeller = labeller(IC_class = labels_IC)) + theme(legend.position='none',panel.background = element_rect(fill = "gray78"))
 # plots para log odds ratio
 ## truncado
-v_range <- c(min = df_plot %>% filter(MN=="EE") %>% .$lower.CL %>% min,
-             max = df_plot %>% filter(MN=="EE") %>% .$upper.CL %>% max)
-## fit
-df_plot$mod.avg.pred[df_plot$mod.avg.pred>v_range[2]] <- v_range[2] + 1 
-df_plot$mod.avg.pred[df_plot$mod.avg.pred<v_range[1]] <- v_range[1] - 1 
-## lower
-df_plot$lower.CL[df_plot$lower.CL>v_range[2]] <- v_range[2] + 1 
-df_plot$lower.CL[df_plot$lower.CL<v_range[1]] <- v_range[1] - 1 
-## upper
-df_plot$upper.CL[df_plot$upper.CL>v_range[2]] <- v_range[2] + 1 
-df_plot$upper.CL[df_plot$upper.CL<v_range[1]] <- v_range[1] - 1 
+# v_range <- c(min = df_plot %>% filter(MN=="EE") %>% .$lower.CL %>% min,
+#              max = df_plot %>% filter(MN=="EE") %>% .$upper.CL %>% max)
+# ## fit
+# df_plot$mod.avg.pred[df_plot$mod.avg.pred>v_range[2]] <- v_range[2] + 1 
+# df_plot$mod.avg.pred[df_plot$mod.avg.pred<v_range[1]] <- v_range[1] - 1 
+# ## lower
+# df_plot$lower.CL[df_plot$lower.CL>v_range[2]] <- v_range[2] + 1 
+# df_plot$lower.CL[df_plot$lower.CL<v_range[1]] <- v_range[1] - 1 
+# ## upper
+# df_plot$upper.CL[df_plot$upper.CL>v_range[2]] <- v_range[2] + 1 
+# df_plot$upper.CL[df_plot$upper.CL<v_range[1]] <- v_range[1] - 1 
 ## dados
 df_EE <- df_plot %>% filter(MN == "EE")
 df_EI <- df_plot %>% filter(MN == "EI")
@@ -1448,7 +1459,7 @@ v_limits <- c(min = min(c(df_plot_logOR$logOR_EE.EI,
 l_p[[4]] <- ggplot(df_plot_logOR,aes(x=p,y=d,fill=logOR_EE.EI)) +
   geom_tile() + theme_classic() +
   scale_fill_gradient2(limits = c(v_limits[1],v_limits[2]),
-                       midpoint = 0, 
+                       # midpoint = 0, 
                        low="red", high="blue",mid="green") +
   scale_fill_distiller(palette = "Spectral") +
   labs(title="log OR(EE/EI)") +
@@ -1461,7 +1472,7 @@ l_p[[5]] <- df_plot_logOR %>%
   ggplot(aes(x=p,y=d,fill=IC_pred)) +
   geom_tile() + theme_classic() +
   scale_fill_gradient2(limits = c(v_limits[1],v_limits[2]),
-                       midpoint = 0, 
+                       # midpoint = 0, 
                        low="red", high="blue",mid="green") +
   scale_fill_distiller(palette = "Spectral") +
   facet_wrap(~IC_class,ncol=2,labeller = labeller(IC_class = labels_IC2)) + theme(legend.position='none',panel.background = element_rect(fill = "gray78")) 
@@ -1476,6 +1487,39 @@ lay_mat <- rbind(c(rep(1,4),c(4,4)),
 grid.arrange(grobs = l_p, layout_matrix = lay_mat)
 
 ```
+
+
+
+```{r}
+df_EE <- df_plot %>% filter(MN == "EE")
+df_EI <- df_plot %>% filter(MN == "EI")
+df_plot_logOR <- cbind(df_EE[,c("p","d")],
+                       logOR_EE.EI = df_EE$mod.avg.pred - df_EI$mod.avg.pred,
+                       lower.logOR_EE.EI = df_EE$lower.CL - df_EI$lower.CL,
+                       upper.logOR_EE.EI = df_EE$upper.CL - df_EI$upper.CL)
+## graficos
+v_limits <- c(min = min(c(df_plot_logOR$logOR_EE.EI,
+                          df_plot_logOR$lower.logOR_EE.EI,
+                          df_plot_logOR$upper.logOR_EE.EI)),
+              max = max(c(df_plot_logOR$logOR_EE.EI,
+                          df_plot_logOR$lower.logOR_EE.EI,
+                          df_plot_logOR$upper.logOR_EE.EI)),
+              avg = mean(df_plot_logOR$logOR_EE.EI))
+ggplot(df_plot_logOR,aes(x=p,y=d,fill=logOR_EE.EI)) +
+  geom_tile() + theme_classic() +
+  scale_fill_gradient2(limits = c(v_limits[1],v_limits[2]),
+                       # midpoint = 0, 
+                       low="red", high="blue",mid="green") +
+  scale_fill_distiller(palette = "Spectral") +
+  geom_contour(aes(z=logOR_EE.EI),alpha=0.4,col="black",
+               breaks = round(quantile(df_plot_logOR$logOR_EE.EI, seq(0, 1, 0.1)), 0)) +
+  geom_text_contour(aes(z=logOR_EE.EI),stroke=0.2) +
+  labs(title="log OR(EE/EI)") +
+  theme(legend.position="top",
+        legend.title = element_blank(),
+        panel.background = element_rect(fill = "gray78"))
+```
+
 
 
 #### Stats for the article
