@@ -7,7 +7,7 @@ output:
     toc: true
     toc_depth: 5
 editor_options: 
-  chunk_output_type: console
+  chunk_output_type: inline
 ---
 
 <style>
@@ -36,6 +36,7 @@ library(AICcmodavg)
 library(merTools)
 library(magrittr)
 library(gridExtra)
+library(directlabels)
 library(ggplot2); theme_set(theme_classic())
 library(metR)
 library(tidyr)
@@ -1497,6 +1498,7 @@ df_plot_logOR <- cbind(df_EE[,c("p","d")],
                        logOR_EE.EI = df_EE$mod.avg.pred - df_EI$mod.avg.pred,
                        lower.logOR_EE.EI = df_EE$lower.CL - df_EI$lower.CL,
                        upper.logOR_EE.EI = df_EE$upper.CL - df_EI$upper.CL)
+# df_plot_logOR$logOR_EE.EI %>% summary
 ## graficos
 v_limits <- c(min = min(c(df_plot_logOR$logOR_EE.EI,
                           df_plot_logOR$lower.logOR_EE.EI,
@@ -1505,19 +1507,28 @@ v_limits <- c(min = min(c(df_plot_logOR$logOR_EE.EI,
                           df_plot_logOR$lower.logOR_EE.EI,
                           df_plot_logOR$upper.logOR_EE.EI)),
               avg = mean(df_plot_logOR$logOR_EE.EI))
-ggplot(df_plot_logOR,aes(x=p,y=d,fill=logOR_EE.EI)) +
+l_p1 <- ggplot(df_plot_logOR,aes(x=p,y=d,fill=logOR_EE.EI)) +
   geom_tile() + theme_classic() +
-  scale_fill_gradient2(limits = c(v_limits[1],v_limits[2]),
-                       # midpoint = 0, 
-                       low="red", high="blue",mid="green") +
-  scale_fill_distiller(palette = "Spectral") +
-  geom_contour(aes(z=logOR_EE.EI),alpha=0.4,col="black",
-               breaks = round(quantile(df_plot_logOR$logOR_EE.EI, seq(0, 1, 0.1)), 0)) +
-  geom_text_contour(aes(z=logOR_EE.EI),stroke=0.2) +
+  # scale_fill_gradient2(limits = c(v_limits[1],v_limits[2]),
+  #                      # midpoint = 0, 
+  #                      low="red", high="blue",mid="green") +
+  coord_cartesian(expand = FALSE) + 
   labs(title="log OR(EE/EI)") +
   theme(legend.position="top",
-        legend.title = element_blank(),
-        panel.background = element_rect(fill = "gray78"))
+        legend.title = element_blank()) +
+  scale_fill_distiller(limits = c(v_limits[1],v_limits[2]),
+                       palette = "Spectral",
+                       breaks = c(-20,0,30,60)) +
+  geom_contour(aes(z=logOR_EE.EI),alpha=0.4, col="black",
+               breaks = c(0,10,30)) +
+#+
+  # stat_contour(aes(x=p,y=d,z=logOR_EE.EI),alpha=0.4,col="black",
+               # breaks = c(-10,0,10,30,60))
+  geom_text_contour(aes(z=logOR_EE.EI),stroke=0.2,
+                    breaks = c(0,10,30),
+                    rotate = FALSE)
+l_p1
+# direct.label(l_p1, list(top.pieces,color='black'))
 ```
 
 
