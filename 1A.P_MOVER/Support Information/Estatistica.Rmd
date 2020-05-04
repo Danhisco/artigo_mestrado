@@ -1412,7 +1412,12 @@ l_p[[1]] <- ggplot(df_plot,aes(x=p,y=d,fill=mod.avg.pred_response)) +
   labs(title="Probability") +
   theme_classic() + 
   facet_wrap(~MN,ncol=2) + 
-  theme(legend.position="top",legend.title = element_blank()) 
+  theme(legend.position="top",legend.title = element_blank()) +
+  geom_contour(aes(z=mod.avg.pred_response),alpha=0.4, col="black",
+               breaks = c(0.10,0.25,0.5,0.75,0.90)) +
+  geom_text_contour(aes(z=mod.avg.pred_response),stroke=0.2,
+                    breaks = c(0.10,0.25,0.5,0.75,0.90),
+                    rotate = FALSE)
 ## IC para MNEE
 df_plotEE <- df_plot %>% filter(MN=="EE") %>%
   gather(key = IC_class ,value = IC_pred,lower.CL_response:upper.CL_response)
@@ -1422,7 +1427,12 @@ l_p[[2]] <- ggplot(df_plotEE,aes(x=p,y=d,fill=IC_pred)) +
   scale_fill_distiller(limits = c(0,1),palette = "Spectral") +
   theme_classic() + 
   facet_wrap(~IC_class,ncol=2,labeller = labeller(IC_class = labels_IC)) +
-  theme(legend.position='none')
+  theme(legend.position='none') +
+  geom_contour(aes(z=IC_pred),alpha=0.4, col="black",
+               breaks = c(0.10,0.25,0.5,0.75,0.90)) +
+  geom_text_contour(aes(z=IC_pred),stroke=0.2,
+                    breaks = c(0.10,0.25,0.5,0.75,0.90),
+                    rotate = FALSE)
 ## IC para MNEI
 df_plotEI <- df_plot %>% filter(MN=="EI") %>%
   gather(key = IC_class ,value = IC_pred,lower.CL_response:upper.CL_response)
@@ -1432,7 +1442,12 @@ l_p[[3]] <- ggplot(df_plotEI,aes(x=p,y=d,fill=IC_pred)) +
   scale_fill_distiller(limits = c(0,1),palette = "Spectral") +
   theme_classic() + 
   facet_wrap(~IC_class,ncol=2,labeller = labeller(IC_class = labels_IC)) +
-  theme(legend.position='none')
+  theme(legend.position='none') +
+  geom_contour(aes(z=IC_pred),alpha=0.4, col="black",
+               breaks = c(0.10,0.50,0.90)) +
+  geom_text_contour(aes(z=IC_pred),stroke=0.2,
+                    breaks = c(0.10,0.50,0.90),
+                    rotate = FALSE)
 # plots para log odds ratio
 # dados
 df_EE <- df_plot %>% filter(MN == "EE")
