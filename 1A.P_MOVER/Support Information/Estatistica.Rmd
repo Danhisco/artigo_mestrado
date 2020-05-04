@@ -1417,7 +1417,8 @@ l_p[[1]] <- ggplot(df_plot,aes(x=p,y=d,fill=mod.avg.pred_response)) +
                breaks = c(0.10,0.25,0.5,0.75,0.90)) +
   geom_text_contour(aes(z=mod.avg.pred_response),stroke=0.2,
                     breaks = c(0.10,0.25,0.5,0.75,0.90),
-                    rotate = FALSE)
+                    rotate = FALSE,
+                    size=3)
 ## IC para MNEE
 df_plotEE <- df_plot %>% filter(MN=="EE") %>%
   gather(key = IC_class ,value = IC_pred,lower.CL_response:upper.CL_response)
@@ -1432,7 +1433,8 @@ l_p[[2]] <- ggplot(df_plotEE,aes(x=p,y=d,fill=IC_pred)) +
                breaks = c(0.10,0.25,0.5,0.75,0.90)) +
   geom_text_contour(aes(z=IC_pred),stroke=0.2,
                     breaks = c(0.10,0.25,0.5,0.75,0.90),
-                    rotate = FALSE)
+                    rotate = FALSE,
+                    size=2.7)
 ## IC para MNEI
 df_plotEI <- df_plot %>% filter(MN=="EI") %>%
   gather(key = IC_class ,value = IC_pred,lower.CL_response:upper.CL_response)
@@ -1447,7 +1449,8 @@ l_p[[3]] <- ggplot(df_plotEI,aes(x=p,y=d,fill=IC_pred)) +
                breaks = c(0.10,0.50,0.90)) +
   geom_text_contour(aes(z=IC_pred),stroke=0.2,
                     breaks = c(0.10,0.50,0.90),
-                    rotate = FALSE)
+                    rotate = FALSE,
+                    size=2.7)
 # plots para log odds ratio
 # dados
 df_EE <- df_plot %>% filter(MN == "EE")
@@ -1476,7 +1479,8 @@ l_p[[4]] <- ggplot(df_plot_logOR,aes(x=p,y=d,fill=logOR_EE.EI)) +
                breaks = c(-5,0,5,30)) +
   geom_text_contour(aes(z=logOR_EE.EI),stroke=0.2,
                     breaks = c(-5,0,5,30),
-                    rotate = FALSE)
+                    rotate = FALSE,
+                    size=3)
 labels_IC2 <- c(lower.logOR_EE.EI="IC 5%", upper.logOR_EE.EI="IC 95%")
 l_p[[5]] <- df_plot_logOR %>%
   gather(key = IC_class ,value = IC_pred,lower.logOR_EE.EI:upper.logOR_EE.EI) %>% 
@@ -1492,7 +1496,8 @@ l_p[[5]] <- df_plot_logOR %>%
                breaks = c(-5,0,5,30)) +
   geom_text_contour(aes(z=IC_pred),stroke=0.2,
                     breaks = c(-5,0,5,30),
-                    rotate = FALSE)
+                    rotate = FALSE,
+                    size=2.7)
 ## Arranjo dos gráficos
 # l_p[[1]],l_p[[2]],l_p[[3]],l_p[[4]],l_p[[5]],
 lay_mat <- rbind(c(rep(1,4),c(4,4)),
