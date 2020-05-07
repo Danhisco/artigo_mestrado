@@ -7,7 +7,7 @@ output:
     toc: true
     toc_depth: 5
 editor_options: 
-  chunk_output_type: console
+  chunk_output_type: inline
 ---
 
 <style>
@@ -1511,7 +1511,7 @@ grid.arrange(grobs = l_p, layout_matrix = lay_mat)
 
 
 
-```{r}
+```{r eval=FALSE}
 df_EE <- df_plot %>% filter(MN == "EE")
 df_EI <- df_plot %>% filter(MN == "EI")
 df_plot_logOR <- cbind(df_EE[,c("p","d")],
@@ -1546,7 +1546,10 @@ l_p1 <- ggplot(df_plot_logOR,aes(x=p,y=d,fill=logOR_EE.EI)) +
                # breaks = c(-10,0,10,30,60))
   geom_text_contour(aes(z=logOR_EE.EI),stroke=0.2,
                     breaks = c(-5,0,5,30),
-                    rotate = FALSE)
+                    rotate = FALSE) +
+  # geom_vline(xintercept = 0.25,color="red")
+  geom_hline(yintercept = 9.2,color="red")
+
 l_p1
 # direct.label(l_p1, list(top.pieces,color='black'))
 ```
@@ -1554,17 +1557,19 @@ l_p1
 
 
 #### Stats for the article
+
+##### log OR
   
 Para d = 20, qual intervalo de p logOR c [-5,5]?      
   
 ```{r}
 l_range <- list()
 l_range[[1]] <- df_plot_logOR %>% filter(d == max(.$d)) %>% 
-  filter(logOR_EE.EI >-5 & logOR_EE.EI<5) %>% .$p %>% range %>% round(.,2) #logOR_EE.EI %in% (-5:5)
+  filter(logOR_EE.EI >-5 & logOR_EE.EI<5) %>% .$p %>% range %>% round(.,3) #logOR_EE.EI %in% (-5:5)
 l_range[[2]] <- df_plot_logOR %>% filter(d == max(.$d)) %>% 
-  filter(lower.logOR_EE.EI >-5 & lower.logOR_EE.EI<5) %>% .$p %>% range %>% round(.,2) #logOR_EE.EI %in% (-5:5)
+  filter(lower.logOR_EE.EI >-5 & lower.logOR_EE.EI<5) %>% .$p %>% range %>% round(.,3) #logOR_EE.EI %in% (-5:5)
 l_range[[3]] <- df_plot_logOR %>% filter(d == max(.$d)) %>% 
-  filter(upper.logOR_EE.EI >-5 & upper.logOR_EE.EI<5) %>% .$p %>% range %>% round(.,2) #logOR_EE.EI %in% (-5:5)
+  filter(upper.logOR_EE.EI >-5 & upper.logOR_EE.EI<5) %>% .$p %>% range %>% round(.,3) #logOR_EE.EI %in% (-5:5)
 names(l_range) <- c("fit","lower","upper")
 l_range %<>% bind_rows() %>% as.data.frame()
 l_range$range <- c("min","max")
@@ -1575,3 +1580,333 @@ l_range <- bind_rows(l_range,
           )
 l_range
 ```
+
+
+Para p->0 para qual d logOR < -5?
+
+```{r}
+df_plot_logOR %>% 
+  filter(p == min(.$p)) %>%
+  filter(logOR_EE.EI < -5) %>%
+  .$d %>% range
+```
+
+##### Pr(nRef) subset == EE
+
+Para d=max, qual p Pr(nRef) < 0.75
+
+```{r}
+df_EE %>% 
+  filter(d == max(.$d)) %>% 
+  filter(mod.avg.pred_response < 0.75) %>% 
+  .$p %>% range %>% round(.,digits = 3)
+```
+
+Para p=min, qual d Pr(nRef) < 0.75
+
+```{r}
+df_EE %>% 
+  filter(p == min(.$p)) %>% 
+  filter(mod.avg.pred_response < 0.75) %>% 
+  .$d %>% range %>% round(.,digits = 3)
+```
+
+Para d=max, qual p Pr(nRef) =< 0.10
+
+```{r}
+df_EE %>% 
+  filter(d == max(.$d)) %>% 
+  filter(mod.avg.pred_response <= 0.1) %>% 
+  .$p %>% range %>% round(.,digits = 3)
+```
+
+Para p=min, qual d Pr(nRef) =< 0.10
+
+```{r}
+df_EE %>% 
+  filter(p == min(.$p)) %>% 
+  filter(mod.avg.pred_response <= 0.1) %>% 
+  .$d %>% range %>% round(.,digits = 3)
+```
+  
+Qual o máximo da área de baixo Pr(nRef)?  
+  
+```{r}
+df_EE %>% 
+  filter(d == max(.$d)) %>% 
+  filter(lower.CL_response <= 0.1) %>% 
+  .$p %>% range %>% round(.,digits = 3)
+```
+
+```{r}
+df_EE %>% 
+  filter(p == min(.$p)) %>% 
+  filter(lower.CL_response <= 0.1) %>% 
+  .$d %>% range %>% round(.,digits = 3)
+```
+
+Qual o máximo da área de alto Pr(nRef)?  
+  
+```{r}
+df_EE %>% 
+  filter(d == max(.$d)) %>% 
+  filter(upper.CL_response  < 0.75) %>% 
+  .$p %>% range %>% round(.,digits = 3)
+```
+
+```{r}
+df_EE %>% 
+  filter(p == min(.$p)) %>% 
+  filter(upper.CL_response < 0.75) %>% 
+  .$d %>% range %>% round(.,digits = 3)
+```
+
+##### Pr(nRef) subset == EI
+
+Para d=max, qual p Pr(nRef) < 0.75
+
+```{r}
+df_EI %>% 
+  filter(d == max(.$d)) %>% 
+  filter(mod.avg.pred_response >= 0.90) %>% 
+  .$p %>% range %>% round(.,digits = 3)
+```
+
+Para p=max, qual d Pr(nRef) < 0.75
+
+```{r}
+df_EI %>% 
+  filter(p == max(.$p)) %>% 
+  filter(mod.avg.pred_response >= 0.5) %>% 
+  .$d %>% range %>% round(.,digits = 3)
+```
+
+Para d=max, qual p Pr(nRef) =< 0.10
+
+```{r}
+df_EI %>% 
+  filter(d == max(.$d)) %>% 
+  filter(mod.avg.pred_response <= 0.1) %>% 
+  .$p %>% range %>% round(.,digits = 3)
+```
+
+Para p=min, qual d Pr(nRef) =< 0.10
+
+```{r}
+df_EI %>% 
+  filter(p == max(.$p)) %>% 
+  filter(mod.avg.pred_response <= 0.1) %>% 
+  filter(d > 2) %>% 
+  .$d %>% range %>% round(.,digits = 3)
+```
+  
+Qual o máximo da área de baixo Pr(nRef)?  
+  
+```{r}
+df_EI %>% 
+  filter(d == max(.$d)) %>% 
+  filter(lower.CL_response <= 0.1) %>% 
+  .$p %>% range %>% round(.,digits = 3)
+```
+
+```{r}
+df_EI %>% 
+  filter(p == min(.$p)) %>%
+  filter(lower.CL_response <= 0.1) %>% 
+  filter(d > 2) %>% 
+  .$d %>% range %>% round(.,digits = 3)
+```
+
+Qual o máximo da área de alto Pr(nRef)?  
+  
+```{r}
+df_EI %>% 
+  filter(d == max(.$d)) %>% 
+  filter(upper.CL_response  >= 0.9) %>% 
+  .$p %>% range %>% round(.,digits = 3)
+```
+
+```{r}
+df_EI %>% 
+  filter(p == max(.$p)) %>% 
+  filter(upper.CL_response  >= 0.9) %>% 
+  .$d %>% range %>% round(.,digits = 3)
+```
+
+
+
+# 3 Bias in species richness 
+
+__diffS = (S_MN - S_obs)/S_obs__
+
+__Figura 3.1.1__ Padrões Gerais diffS
+
+```{r fig 31 padroes gerais diffS,message=FALSE,eval=TRUE,echo=FALSE,fig.height=6}
+# gráfico
+df_resultados %>% ggplot(aes(x=p,y=diffS_mean,group=MN)) +
+  # geom_abline(intercept = 0,slope = 0,col="blue") +
+  geom_point(aes(color=MN),alpha=0.3) +
+  scale_color_manual(values=c("#FF0000", "#000000")) +
+  labs(title="diffS = (S - Sobs)/Sobs",x="p",y="diffS",subtitle = "k") +
+  facet_wrap(~k,ncol=5,scales="free")
+# # graficos
+# filter(df_resultados,MN=="EE") %>% select(diff_S0, p, d, Stotal, Ntotal) %>% ggpairs() + labs(title="MNEE")
+# do.call("grid.arrange",c(l_p,ncol=1))
+```
+
+```{r fig 31 continuacao,echo=FALSE,fig.height=4}
+df_resultados %>% ggplot(aes(x=d,y=diffS_mean,color=p)) +
+  geom_point(alpha=0.3) + 
+  geom_line(aes(group=SiteCode),alpha=0.2) + 
+  geom_smooth(method = "loess",color="red",se = FALSE) +
+  labs(subtitle = "d") +
+  facet_wrap(~MN,ncol=2,scales = "free")
+```
+
+```{r fig 31 cont2,echo=FALSE}
+df_resultados %>% ggplot(aes(x=.$diffS_mean)) +
+  geom_histogram(bins = 60) + facet_wrap(~MN,ncol=2,scales = "free") + labs(subtitle = "histogram",x="")
+
+# ggplot(df_resultados,aes(x=df_resultados$n_nRef)) +
+#   geom_histogram(bins=60) + facet_wrap(~MN,ncol=2)
+```
+
+
+
+## MNEE
+
+### Modelo cheio e diagnostico
+
+```{r diff_S MNEE modelo cheio,echo=TRUE}
+# dados
+df_md <- df_resultados %>% filter(MN=="EE") %>% 
+  distinct() %>% 
+  mutate(rep = 1)
+df_md <- left_join(x=data.frame(rep=1,
+                                md_class=c("d 1|Site",
+                                           "d d|Site",
+                                           "d d^2|Site",
+                                           "1 1|Site",
+                                           "1")),
+                   y=df_md,
+                   by="rep")
+# função de ajuste
+f_md <- function(dados){
+  md_class <- unique(dados$md_class)
+  if(md_class == "d 1|Site"){
+    md_ <- lmer(diffS_mean ~ 
+                  (p.z + I(p.z^2)) * (d.z + I(d.z^2)) + 
+                  (1|SiteCode),
+                   data=dados, na.action = "na.fail")
+  }else if(md_class == "d d|Site"){
+    md_ <- lmer(diffS_mean ~ 
+                  (p.z + I(p.z^2)) * (d.z + I(d.z^2)) + 
+                  (d.z|SiteCode),
+                   data=dados, na.action = "na.fail")
+  }else if(md_class == "d d^2|Site"){
+    md_ <- lmer(diffS_mean ~ 
+                  (p.z + I(p.z^2)) * (d.z + I(d.z^2)) + 
+                  (d.z + I(d.z^2)|SiteCode),
+                   data=dados, na.action = "na.fail")
+  }else if(md_class == "1 1|Site"){
+    md_ <- lmer(diffS_mean ~ 1 + 
+                  (1|SiteCode), 
+                data=dados,na.action = "na.fail")
+  }else{
+    md_ <- lm(diffS_mean ~ 1, 
+              data=dados,na.action = "na.fail")
+  }
+  return(md_)
+}
+registerDoMC(3)
+l_md_diffS <- dlply(df_md,.(md_class),f_md,.parallel = TRUE)
+AICctab(l_md_diffS,weights=T)
+```
+
+__Tabela 3.2.1__ Coeficientes de determinação condicional e marginal
+
+```{r}
+md_diffS <- l_md_diffS[["1 1|Site"]]
+MuMIn::r.squaredGLMM(md_diffS)
+```
+
+
+
+__Figura 3.2.1__ Resíduos Quantílicos do modelo mais plausível
+
+```{r fig 321}
+p_plot <- simulateResiduals(md_diffS)
+plot(p_plot)
+```
+
+
+__Figura 3.2.2__ Quantile-quantile plot random effects.    
+
+```{r fig 322, eval=TRUE,echo=FALSE}
+df_ranef <- ranef(md_diffS)$SiteCode
+df_ranef$SiteCode <- row.names(df_ranef)
+row.names(df_ranef) <- NULL
+df_ranef %>% 
+  gather(key = parameter_class,value = parameter_value, -SiteCode) %>% 
+  ggplot(aes(sample=parameter_value)) + 
+  stat_qq(alpha=0.3) + stat_qq_line(alpha=0.3,col="red") +
+  facet_wrap(~parameter_class,scales="free",ncol=3)
+```
+  
+__Figura 3.2.3__ Predito e observado  
+  
+     ,fig.width=8, fig.height=30
+```{r fig 323}
+#
+df_pred <- cbind(md_diffS@frame,
+                 predictInterval(md_diffS,type = "linear.prediction",level = 0.95))
+df_pred$mean_fit <- predict(md_diffS,re.form=~0)
+df_pred$se.mean_fit <- se.fixef(md_diffS)
+f_md <- function(dados){
+  lm_ <- lm(diffS_mean ~ 1, data=dados)
+  df_ <- broom::tidy(lm_) %>% as.data.frame()
+  return(df_)
+}
+registerDoMC(2)
+df_pred %<>% inner_join(x = .,
+                        y = ddply(.,"SiteCode",f_md,.parallel=TRUE),
+                        by = "SiteCode")
+#
+# df_pred %>% names
+df_pred %>%
+  ggplot(aes(x="",y=diffS_mean)) +
+  # geom_crossbar(aes(ymin = mean_fit - se.mean_fit,
+                    # middle = mean_fit,
+                    # ymax = mean_fit + se.mean_fit),
+               # color = "red",alpha = 0.6,outlier.shape = NA) +
+  geom_boxplot(aes(ymin = mean_fit - 1.96 * se.mean_fit,
+                    lower = mean_fit - se.mean_fit,
+                    middle = mean_fit,
+                    upper = mean_fit + se.mean_fit,
+                    ymax = mean_fit + 1.96*se.mean_fit),
+               color = "red",alpha = 0.6,outlier.shape = NA) + #,stat="identity"
+  # facet_wrap(~SiteCode,ncol=6) +
+  # geom_boxplot(aes(ymin = estimate - 1.96 * std.error,
+  #                  lower = estimate - std.error,
+  #                  middle = estimate,
+  #                  upper = estimate + std.error,
+  #                  ymax = estimate + 1.96 * std.error),
+  #              color = "blue",alpha = 0.6,outlier.shape = NA,stat = "identity") +
+  # geom_pointrange(aes(ymin = lwr,
+  #                     middle = fit,
+  #                     ymax = upr),
+  #                 color = "green", alpha = 0.6,outlier.shape = NA) +
+  geom_jitter(alpha=0.3)
+```
+
+```{r}
+sjPlot::tab_model(md_diffS,digits = 4)
+df_pred %>% ddply("SiteCode",summarise,estimate = head(estimate,1)) %>% .$estimate %>% range() %>% formatC(.,format="e",digits = 2)
+
+
+df <- df_pred %>% select(mean_fit,se.mean_fit) %>% head(.,n=1) %>% 
+  mutate(lowerIC = mean_fit - 1.92 * se.mean_fit,
+         upperIC = mean_fit + 1.92 * se.mean_fit)
+apply(df,2, function(X) formatC(X,digits = 2,format = "e"))
+```
+
