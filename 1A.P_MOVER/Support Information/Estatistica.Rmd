@@ -2085,13 +2085,14 @@ df_plot %<>%
 
 # graficos
 v_range <- df_resultados %>% filter(MN == "EE") %>% .$diffS_mean %>% range
+v_limits <- df_plot %>% select(mod.avg.pred,upper.CL,lower.CL) %>% as.matrix %>% as.vector %>% range
 l_p <- list()
 df_plot$MN <- "EI"
 l_p[[1]] <- ggplot(df_plot,aes(x=p,y=d,fill=mod.avg.pred,z=mod.avg.pred)) +
   geom_tile() +
   coord_cartesian(expand = FALSE) +
-  theme(legend.position="top") +
-  scale_fill_gradient2(midpoint=0, low="blue", high="red",mid="green") +
+  scale_fill_gradient2(midpoint=0, low="blue", high="red",mid="green",limits=v_limits) +
+  # scale_colour_gradient(limits=v_limits) +
   stat_subset(aes(subset = mod.avg.pred >= v_range[1] & mod.avg.pred <= v_range[2]),
               alpha=0.5,color="black",size=0.1) +
   geom_contour(breaks=c(-0.25,0.25),color="red",alpha=0.5) +
@@ -2100,29 +2101,35 @@ l_p[[1]] <- ggplot(df_plot,aes(x=p,y=d,fill=mod.avg.pred,z=mod.avg.pred)) +
                     rotate = FALSE,
                     size=2.7) +
   labs(title="Viés da Riqueza Estimada",
-       fill="") + theme_classic() + facet_wrap(~MN,ncol=1)
+       fill="") + theme_classic() + 
+  theme(legend.position="top") +
+  facet_wrap(~MN,ncol=1)
 df_plot$lowerIC <- "Lower IC (5%)"
 l_p[[2]] <- ggplot(df_plot,aes(x=p,y=d,fill=lower.CL,z=lower.CL)) +
   geom_tile() +
   coord_cartesian(expand = FALSE) +
-  theme(legend.position="none") +
-  scale_fill_gradient2(midpoint=0, low="blue", high="red",mid="green") +
+  scale_fill_gradient2(midpoint=0, low="blue", high="red",mid="green",limits=v_limits) +
+  # scale_colour_gradient(limits=v_limits) +
   stat_subset(aes(subset = lower.CL >= v_range[1] & lower.CL <= v_range[2]),
               alpha=0.5,color="black",size=0.01) +
   geom_contour(breaks=c(-0.25,0.25),color="red",alpha=0.5) +
   labs(title="",
-       fill="") + theme_classic() + facet_wrap(~lowerIC,ncol=1)
+       fill="") + theme_classic() + 
+  theme(legend.position="none") +
+  facet_wrap(~lowerIC,ncol=1)
 df_plot$upperIC <- "Upper IC (95%)"
 l_p[[3]] <- ggplot(df_plot,aes(x=p,y=d,fill=upper.CL,z=upper.CL)) +
   geom_tile() +
   coord_cartesian(expand = FALSE) +
-  scale_fill_gradient2(midpoint=0, low="blue", high="red",mid="green") +
+  scale_fill_gradient2(midpoint=0, low="blue", high="red",mid="green",limits=v_limits) +
+  # scale_colour_gradient(limits=v_limits) +
   stat_subset(aes(subset = upper.CL >= v_range[1] & upper.CL <= v_range[2]),
               alpha=0.5,color="black",size=0.01) +
   geom_contour(breaks=c(-0.25,0.25),color="red",alpha=0.5) +
-  theme(legend.position="none") +
   labs(title="",
-       fill="") + theme_classic() + facet_wrap(~upperIC,ncol=1)
+       fill="") + theme_classic() + 
+  theme(legend.position="none") +
+  facet_wrap(~upperIC,ncol=1)
 
 grid.arrange(grobs = l_p,
              layout_matrix=rbind(rep(1,4),
