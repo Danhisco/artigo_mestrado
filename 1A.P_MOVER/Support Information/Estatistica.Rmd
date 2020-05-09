@@ -2016,7 +2016,7 @@ l_md.dredge_diffS <- llply(dredge(md_diffS,trace = FALSE,evaluate=FALSE), eval,.
 ```
 
 
-```{r selecao de variaveis diffS_EI,eval=TRUE,echo=FALSE,results='hide'}
+```{r selecao de variaveis diffS_EI,eval=FALSE,echo=FALSE,results='hide'}
 # AICctab
 df_tableGLMM <- print(AICctab(l_md.dredge_diffS,weights=TRUE)) %>% 
   as.data.frame()
@@ -2140,3 +2140,46 @@ grid.arrange(grobs = l_p,
                                  c(2,2,3,3))
              )
 ```
+
+
+# 4 - Taxa de Especiação Estimada
+  
+__Figura 4.1__ Padrões Gerais  
+    
+    
+```{r U padroes gerais,eval=TRUE,echo=FALSE,fig.height=8,fig.width=8}
+df_U <- df_resultados %>% filter(MN=="EE") %>% distinct
+l_p <- list()
+l_p[[1]] <- ggplot(df_U,aes(x=k,y=U_med)) +
+  geom_jitter(alpha=0.3) +
+  geom_boxplot()
+l_p[[2]] <- ggplot(df_U,aes(x=p,y=U_med)) +
+  geom_point(alpha=0.3) +
+  geom_smooth(method = "loess",se = FALSE,color="red",alpha=0.5) +
+  facet_wrap(~k,ncol=5,scales = "free")
+l_p[[3]] <- ggplot(df_U,aes(x=d,y=U_med)) +
+  geom_point(alpha=0.3,aes(color=p)) +
+  geom_smooth(method = "loess",se = FALSE,color="red",alpha=0.5)
+grid.arrange(grobs=l_p,
+             layout_matrix = rbind(c(2,2),
+                                   c(2,2),
+                                   c(1,3)))
+```
+
+
+__Figura 4.2__ Padrões gerais por Sítio de Amostragem
+
+```{r fig 42,eval=TRUE,echo=FALSE,fig.width=8, fig.height=27}
+df_plot <- df_U %>%
+  mutate(title = paste0(SiteCode," p=",round(p,3))) %>% arrange(p)
+df_plot$title <- factor(df_plot$title,levels = unique(df_plot$title))
+df_plot %>% ggplot(aes(x=d,y=U_med)) +
+  geom_smooth(method = "loess",se = FALSE,color="red",alpha=0.5) +
+  geom_point(alpha=0.5) + 
+  facet_wrap(~title,ncol=5,scales="free")
+```
+
+
+
+
+
