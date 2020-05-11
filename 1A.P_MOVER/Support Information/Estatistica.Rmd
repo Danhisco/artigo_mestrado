@@ -7,7 +7,7 @@ output:
     toc: true
     toc_depth: 5
 editor_options: 
-  chunk_output_type: inline
+  chunk_output_type: console
 ---
 
 <style>
@@ -2073,16 +2073,13 @@ ggplot(df_md,aes(x=d,y=diffS_mean)) +
 
 __Figura 2.3.5__ Predito pelo modelo médio para novo conjunto de dados
 
-```{r figura 235 diffS EI predito modelo medio novo conjunto de dados}
+```{r figura 235 diffS EI predito modelo medio novo conjunto de dados, fig.width=5,fig.height=8}
 # dados
 load(file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_diffS_EI__AICcmodavg.Rdata")
 df_plot <- mdAvg_diffS_EI__AICcmodavg
 df_plot %<>% 
   mutate(p = p.z * sd(df_resultados$p) + mean(df_resultados$p),
          d = d.z*sd(df_resultados$d) + mean(df_resultados$d))
-
-
-
 # graficos
 v_range <- df_resultados %>% filter(MN == "EE") %>% .$diffS_mean %>% range
 v_limits <- df_plot %>% select(mod.avg.pred,upper.CL,lower.CL) %>% as.matrix %>% as.vector %>% range
@@ -2095,9 +2092,9 @@ l_p[[1]] <- ggplot(df_plot,aes(x=p,y=d,fill=mod.avg.pred,z=mod.avg.pred)) +
   # scale_colour_gradient(limits=v_limits) +
   stat_subset(aes(subset = mod.avg.pred >= v_range[1] & mod.avg.pred <= v_range[2]),
               alpha=0.5,color="black",size=0.1) +
-  geom_contour(breaks=c(-0.25,0.25),color="red",alpha=0.5) +
+  geom_contour(breaks=c(-0.6,-0.25,0.25,0.75,1.5,2.5),color="black",alpha=0.5) +
   geom_text_contour(aes(z=mod.avg.pred),stroke=0.2,
-                    breaks = c(-0.25,0.25),
+                    breaks = c(-0.6,-0.25,0.25,0.75,1.5,2.5),
                     rotate = FALSE,
                     size=2.7) +
   labs(title="Viés da Riqueza Estimada",
@@ -2112,7 +2109,8 @@ l_p[[2]] <- ggplot(df_plot,aes(x=p,y=d,fill=lower.CL,z=lower.CL)) +
   # scale_colour_gradient(limits=v_limits) +
   stat_subset(aes(subset = lower.CL >= v_range[1] & lower.CL <= v_range[2]),
               alpha=0.5,color="black",size=0.01) +
-  geom_contour(breaks=c(-0.25,0.25),color="red",alpha=0.5) +
+  geom_contour(breaks=c(-0.6,-0.25,0.25,0.75,1.5,2.5),
+               color="black",alpha=0.5) +
   labs(title="",
        fill="") + theme_classic() + 
   theme(legend.position="none") +
@@ -2125,7 +2123,8 @@ l_p[[3]] <- ggplot(df_plot,aes(x=p,y=d,fill=upper.CL,z=upper.CL)) +
   # scale_colour_gradient(limits=v_limits) +
   stat_subset(aes(subset = upper.CL >= v_range[1] & upper.CL <= v_range[2]),
               alpha=0.5,color="black",size=0.01) +
-  geom_contour(breaks=c(-0.25,0.25),color="red",alpha=0.5) +
+  geom_contour(breaks=c(-0.6,-0.25,0.25,0.75,1.5,2.5),
+               color="black",alpha=0.5) +
   labs(title="",
        fill="") + theme_classic() + 
   theme(legend.position="none") +
@@ -2140,6 +2139,104 @@ grid.arrange(grobs = l_p,
                                  c(2,2,3,3))
              )
 ```
+
+
+__Qual a distribuição de nRef em função de diffS?__
+
+```{r}
+df_plot <- df_resultados %>% filter(MN=="EI") 
+df_plot$diffS_factor <- cut(df_plot$diffS_mean,breaks = c(-Inf,-0.6,-0.25,0.25,0.75,1.5,2.5,Inf))
+l_p <- list()
+l_p[[1]] <- df_plot %>% 
+  ggplot(aes(x=diffS_mean,y=n_nRef)) +
+  coord_cartesian(expand = FALSE) +
+  geom_point(alpha=0.4) +
+  geom_vline(xintercept = c(-0.6,-0.25,0.25,0.75,1.5,2.5),color="red") +
+  labs(x="bias in species richness",y="# unrefuted SADs")
+l_p[[2]] <- df_plot %>% 
+  ggplot(aes(x=diffS_factor,y=n_nRef)) +
+  coord_cartesian(expand = FALSE) +
+  geom_boxplot(color="red",alpha=0.8) +
+  geom_jitter(alpha=0.4) +
+  labs(x="bias in species richness",y="# unrefuted SADs")
+grid.arrange(grobs=l_p,ncol=1)
+```
+
+
+__Qual a distribuição de Pr(nRef) predito em função de diffS predito?__
+
+
+```{r}
+
+
+
+################### diffS EI ###################
+load(file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_diffS_EI__AICcmodavg.Rdata")
+df_plot <- mdAvg_diffS_EI__AICcmodavg
+df_plot %<>% 
+  mutate(p = p.z * sd(df_resultados$p) + mean(df_resultados$p),
+         d = d.z*sd(df_resultados$d) + mean(df_resultados$d))
+# graficos
+v_range <- df_resultados %>% filter(MN == "EE") %>% .$diffS_mean %>% range
+v_limits <- df_plot %>% select(mod.avg.pred,upper.CL,lower.CL) %>% as.matrix %>% as.vector %>% range
+l_p <- list()
+df_plot$MN <- "EI"
+l_p[[1]] <- ggplot(df_plot,aes(x=p,y=d,fill=mod.avg.pred,z=mod.avg.pred)) +
+  geom_tile() +
+  coord_cartesian(expand = FALSE) +
+  scale_fill_gradient2(midpoint=0, low="blue", high="red",mid="green",limits=v_limits) +
+  # scale_colour_gradient(limits=v_limits) +
+  stat_subset(aes(subset = mod.avg.pred >= v_range[1] & mod.avg.pred <= v_range[2]),
+              alpha=0.5,color="black",size=0.1) +
+  geom_contour(breaks=c(-0.6,-0.25,0.25,0.75,1.5,2.5),color="black",alpha=0.5) +
+  geom_text_contour(aes(z=mod.avg.pred),stroke=0.2,
+                    breaks = c(-0.6,-0.25,0.25,0.75,1.5,2.5),
+                    rotate = FALSE,
+                    size=2.7) +
+  labs(title="Viés da Riqueza Estimada",
+       fill="") + theme_classic() + 
+  theme(legend.position="top") +
+  facet_wrap(~MN,ncol=1)
+df_plot$lowerIC <- "Lower IC (5%)"
+l_p[[2]] <- ggplot(df_plot,aes(x=p,y=d,fill=lower.CL,z=lower.CL)) +
+  geom_tile() +
+  coord_cartesian(expand = FALSE) +
+  scale_fill_gradient2(midpoint=0, low="blue", high="red",mid="green",limits=v_limits) +
+  # scale_colour_gradient(limits=v_limits) +
+  stat_subset(aes(subset = lower.CL >= v_range[1] & lower.CL <= v_range[2]),
+              alpha=0.5,color="black",size=0.01) +
+  geom_contour(breaks=c(-0.6,-0.25,0.25,0.75,1.5,2.5),
+               color="black",alpha=0.5) +
+  labs(title="",
+       fill="") + theme_classic() + 
+  theme(legend.position="none") +
+  facet_wrap(~lowerIC,ncol=1)
+df_plot$upperIC <- "Upper IC (95%)"
+l_p[[3]] <- ggplot(df_plot,aes(x=p,y=d,fill=upper.CL,z=upper.CL)) +
+  geom_tile() +
+  coord_cartesian(expand = FALSE) +
+  scale_fill_gradient2(midpoint=0, low="blue", high="red",mid="green",limits=v_limits) +
+  # scale_colour_gradient(limits=v_limits) +
+  stat_subset(aes(subset = upper.CL >= v_range[1] & upper.CL <= v_range[2]),
+              alpha=0.5,color="black",size=0.01) +
+  geom_contour(breaks=c(-0.6,-0.25,0.25,0.75,1.5,2.5),
+               color="black",alpha=0.5) +
+  labs(title="",
+       fill="") + theme_classic() + 
+  theme(legend.position="none") +
+  facet_wrap(~upperIC,ncol=1)
+
+grid.arrange(grobs = l_p,
+             layout_matrix=rbind(rep(1,4),
+                                 rep(1,4),
+                                 rep(1,4),
+                                 rep(1,4),
+                                 c(2,2,3,3),
+                                 c(2,2,3,3))
+             )
+```
+
+
 
 
 # 4 - Taxa de Especiação Estimada
