@@ -2166,7 +2166,7 @@ grid.arrange(grobs=l_p,ncol=1)
 __Qual a distribuição de Pr(nRef) predito em função de diffS predito?__
 
 
-```{r}
+```{r figura final diffS MNEI correcao para PrnRef e logOR,echo=FALSE}
 ################### Pr(nRef) ###################
 load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_mdPredict__nRef.Rdata")
 df_EE <- l_mdPredict[["EE"]]
@@ -2219,97 +2219,73 @@ l_p[[1]] <- ggplot(df_plot1,aes(x=p,y=d,fill=mod.avg.pred,z=mod.avg.pred)) +
        fill="") + theme_classic() + 
   theme(legend.position="top") +
   facet_wrap(~MN,ncol=1)
-df_plot$lowerIC <- "Lower IC (5%)"
-l_p[[2]] <- ggplot(df_plot,aes(x=p,y=d,fill=lower.CL,z=lower.CL)) +
+v_labels <- c(lower.CL = "IC (5%)", upper.CL = "IC (5%)")
+l_p[[2]] <- df_plot1 %>% 
+  gather(key="IC_class",value="IC_value",lower.CL:upper.CL) %>% 
+  ggplot(aes(x=p,y=d,fill=IC_value,z=IC_value)) +
   geom_tile() +
   coord_cartesian(expand = FALSE) +
   scale_fill_gradient2(midpoint=0, low="blue", high="red",mid="green",limits=v_limits) +
   # scale_colour_gradient(limits=v_limits) +
-  stat_subset(aes(subset = lower.CL >= v_range[1] & lower.CL <= v_range[2]),
+  stat_subset(aes(subset = IC_value >= v_range[1] & IC_value <= v_range[2]),
               alpha=0.5,color="black",size=0.01) +
   geom_contour(breaks=c(-0.6,-0.25,0.25,0.75,1.5,2.5),
                color="black",alpha=0.5) +
   labs(title="",
        fill="") + theme_classic() + 
   theme(legend.position="none") +
-  facet_wrap(~lowerIC,ncol=1)
-df_plot$upperIC <- "Upper IC (95%)"
-l_p[[3]] <- ggplot(df_plot,aes(x=p,y=d,fill=upper.CL,z=upper.CL)) +
-  geom_tile() +
-  coord_cartesian(expand = FALSE) +
-  scale_fill_gradient2(midpoint=0, low="blue", high="red",mid="green",limits=v_limits) +
-  # scale_colour_gradient(limits=v_limits) +
-  stat_subset(aes(subset = upper.CL >= v_range[1] & upper.CL <= v_range[2]),
-              alpha=0.5,color="black",size=0.01) +
-  geom_contour(breaks=c(-0.6,-0.25,0.25,0.75,1.5,2.5),
-               color="black",alpha=0.5) +
-  labs(title="",
-       fill="") + theme_classic() + 
-  theme(legend.position="none") +
-  facet_wrap(~upperIC,ncol=1)
-
+  facet_wrap(~IC_class,ncol=2,labeller = labeller(IC_class = v_labels))
 ##########################
 ########### nRef #########
 ##########################
-labels_IC <- c(lower.CL_response="IC 5%", upper.CL_response="IC 95%")
 ## predição média para ambos modelos
-l_p[[1]] <- ggplot(df_plot,aes(x=p,y=d,fill=mod.avg.pred_response)) +
+df_plot1$MN <- "EI"
+l_p[[3]] <- ggplot(df_plot1,aes(x=p,y=d,fill=mod.avg.pred_response)) +
   coord_cartesian(expand = FALSE) + 
   geom_tile() +
   scale_fill_distiller(limits = c(0,1),palette = "Spectral") +
-  labs(title="Probability") +
+  labs(title="Pr(nRef)") +
   theme_classic() + 
-  facet_wrap(~MN,ncol=2) + 
+  facet_wrap(~MN) + 
   theme(legend.position="top",legend.title = element_blank()) +
-  geom_contour(aes(z=mod.avg.pred_response),alpha=0.4, col="black",
-               breaks = c(0.10,0.25,0.5,0.75,0.90)) +
-  geom_text_contour(aes(z=mod.avg.pred_response),stroke=0.2,
-                    breaks = c(0.10,0.25,0.5,0.75,0.90),
-                    rotate = FALSE,
-                    size=3)
-## IC para MNEE
-df_plotEE <- df_plot %>% filter(MN=="EE") %>%
-  gather(key = IC_class ,value = IC_pred,lower.CL_response:upper.CL_response)
-l_p[[2]] <- ggplot(df_plotEE,aes(x=p,y=d,fill=IC_pred)) +
-  coord_cartesian(expand = FALSE) + 
-  geom_tile() +
-  scale_fill_distiller(limits = c(0,1),palette = "Spectral") +
-  theme_classic() + 
-  facet_wrap(~IC_class,ncol=2,labeller = labeller(IC_class = labels_IC)) +
-  theme(legend.position='none') +
-  geom_contour(aes(z=IC_pred),alpha=0.4, col="black",
-               breaks = c(0.10,0.25,0.5,0.75,0.90)) +
-  geom_text_contour(aes(z=IC_pred),stroke=0.2,
-                    breaks = c(0.10,0.25,0.5,0.75,0.90),
+  geom_contour(aes(z=mod.avg.pred),
+               breaks=c(-0.6,-0.25,0.25,0.75,1.5,2.5),
+               color="black",alpha=0.5) +
+  geom_text_contour(aes(z=mod.avg.pred),stroke=0.2,
+                    breaks = c(-0.6,-0.25,0.25,0.75,1.5,2.5),
                     rotate = FALSE,
                     size=2.7)
 ## IC para MNEI
-df_plotEI <- df_plot %>% filter(MN=="EI") %>%
-  gather(key = IC_class ,value = IC_pred,lower.CL_response:upper.CL_response)
-l_p[[3]] <- ggplot(df_plotEI,aes(x=p,y=d,fill=IC_pred)) +
+labels_IC <- c(lower.CL_response="IC 5%", upper.CL_response="IC 95%")
+df_plotEI <- bind_rows(mutate(rename(df_plot1[,c("lower.CL_response","lower.CL","p","d")],
+                              Prob=lower.CL_response,diffS=lower.CL),
+                              IC_class = "lower.CL_response"),
+                       mutate(rename(df_plot1[,c("upper.CL_response","upper.CL","p","d")],
+                              Prob=upper.CL_response,diffS=upper.CL),
+                              IC_class = "upper.CL_response"))
+l_p[[4]] <- ggplot(df_plotEI,aes(x=p,y=d,fill=Prob)) +
   coord_cartesian(expand = FALSE) + 
   geom_tile() +
   scale_fill_distiller(limits = c(0,1),palette = "Spectral") +
   theme_classic() + 
   facet_wrap(~IC_class,ncol=2,labeller = labeller(IC_class = labels_IC)) +
   theme(legend.position='none') +
-  geom_contour(aes(z=IC_pred),alpha=0.4, col="black",
-               breaks = c(0.10,0.50,0.90)) +
-  geom_text_contour(aes(z=IC_pred),stroke=0.2,
-                    breaks = c(0.10,0.50,0.90),
-                    rotate = FALSE,
-                    size=2.7)
+  geom_contour(aes(z=diffS),
+               breaks=c(-0.6,-0.25,0.25,0.75,1.5,2.5),
+               color="black",alpha=0.5)
 # plots para log odds ratio
 # dados
 ## graficos
-v_limits <- c(min = min(c(df_plot_logOR$logOR_EE.EI,
-                          df_plot_logOR$lower.logOR_EE.EI,
-                          df_plot_logOR$upper.logOR_EE.EI)),
-              max = max(c(df_plot_logOR$logOR_EE.EI,
-                          df_plot_logOR$lower.logOR_EE.EI,
-                          df_plot_logOR$upper.logOR_EE.EI)),
-              avg = mean(df_plot_logOR$logOR_EE.EI))
-l_p[[4]] <- ggplot(df_plot_logOR,aes(x=p,y=d,fill=logOR_EE.EI)) +
+v_limits <- df_plot1 %>% 
+  select(logOR_EE.EI:upper.logOR_EE.EI) %>% as.matrix %>% as.vector %>% range
+v_limits <- c(v_limits,mean(df_plot1$logOR_EE.EI))
+df_plot1 %<>% mutate(KS_f_logOR = NA, KS_f_lower.logOR = NA, KS_f_upper.logOR = NA)
+for(i in 13:15){
+  df_plot1[,i] <- ifelse(abs(df_plot1[,i-12]) > 0.25 & 
+                         df_plot1[,i-7] >0.5, 
+                  NA,"yes") %>% as.factor()
+}
+l_p[[5]] <- ggplot(df_plot1,aes(x=p,y=d,fill=logOR_EE.EI)) +
   coord_cartesian(expand = FALSE) + 
   geom_tile() + theme_classic() +
   scale_fill_distiller(limits = c(v_limits[1],v_limits[2]),
@@ -2317,16 +2293,22 @@ l_p[[4]] <- ggplot(df_plot_logOR,aes(x=p,y=d,fill=logOR_EE.EI)) +
   labs(title="log OR(EE/EI)") +
   theme(legend.position="top",
         legend.title = element_blank()) +
-  geom_contour(aes(z=logOR_EE.EI),alpha=0.4, col="black",
+  stat_subset(aes(subset=is.na(KS_f_logOR)),shape=3,alpha=0.5) +
+  geom_contour(aes(z=logOR_EE.EI),alpha=0.3, col="black",
                breaks = c(-5,0,5,30)) +
   geom_text_contour(aes(z=logOR_EE.EI),stroke=0.2,
                     breaks = c(-5,0,5,30),
                     rotate = FALSE,
-                    size=3)
+                    size=2.7)
 labels_IC2 <- c(lower.logOR_EE.EI="IC 5%", upper.logOR_EE.EI="IC 95%")
-l_p[[5]] <- df_plot_logOR %>%
-  gather(key = IC_class ,value = IC_pred,lower.logOR_EE.EI:upper.logOR_EE.EI) %>% 
-  ggplot(aes(x=p,y=d,fill=IC_pred,z=IC_pred)) +
+df_ <- bind_rows(mutate(rename(df_plot1[,c("lower.logOR_EE.EI","KS_f_lower.logOR","p","d")],
+                               logOR=lower.logOR_EE.EI,KS_f=KS_f_lower.logOR),
+                               IC_class = "lower.logOR_EE.EI"),
+                 mutate(rename(df_plot1[,c("upper.logOR_EE.EI","KS_f_upper.logOR","p","d")],
+                              logOR=upper.logOR_EE.EI,KS_f=KS_f_upper.logOR),
+                              IC_class = "upper.logOR_EE.EI"))
+l_p[[6]] <- df_ %>%
+  ggplot(aes(x=p,y=d,fill=logOR,z=logOR)) +
   coord_cartesian(expand = FALSE) + 
   geom_tile() + 
   theme_classic() +
@@ -2334,20 +2316,21 @@ l_p[[5]] <- df_plot_logOR %>%
                        palette = "Spectral") +
   theme(legend.position='none')  +
   facet_wrap(~IC_class,ncol=2,labeller = labeller(IC_class = labels_IC2)) +
-  geom_contour(aes(z=IC_pred),alpha=0.4, col="black",
+  stat_subset(aes(subset=is.na(KS_f)),shape=3,alpha=0.07) +
+  geom_contour(aes(z=logOR),alpha=0.4, col="black",
                breaks = c(-5,0,5,30)) +
-  geom_text_contour(aes(z=IC_pred),stroke=0.2,
+  geom_text_contour(aes(z=logOR),stroke=0.2,
                     breaks = c(-5,0,5,30),
                     rotate = FALSE,
                     size=2.7)
 ## Arranjo dos gráficos
 # l_p[[1]],l_p[[2]],l_p[[3]],l_p[[4]],l_p[[5]],
-lay_mat <- rbind(c(rep(1,4),c(4,4)),
-                 c(rep(1,4),c(4,4)),
-                 c(rep(1,4),c(4,4)),
-                 c(rep(1,4),c(4,4)),
-                 rep(c(2,3,5),each=2),
-                 rep(c(2,3,5),each=2))
+lay_mat <- rbind(c(rep(1,4),rep(3,4),rep(5,4)),
+                 c(rep(1,4),rep(3,4),rep(5,4)),
+                 c(rep(1,4),rep(3,4),rep(5,4)),
+                 c(rep(1,4),rep(3,4),rep(5,4)),
+                 rep(c(2,4,6),each=4),
+                 rep(c(2,4,6),each=4))
 grid.arrange(grobs = l_p, layout_matrix = lay_mat)
 ```
 
