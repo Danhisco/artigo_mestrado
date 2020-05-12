@@ -2370,12 +2370,124 @@ df_plot <- df_U %>%
 df_plot$title <- factor(df_plot$title,levels = unique(df_plot$title))
 df_plot %>% ggplot(aes(x=d,y=U_med)) +
   geom_smooth(method = "loess",se = FALSE,color="red",alpha=0.5) +
-  geom_point(alpha=0.5) + 
+  geom_point(alpha=0.5)
   facet_wrap(~title,ncol=5,scales="free")
 ```
 
 
+```{r}
+ggplot(df_plot,aes(x=df_plot$U_med)) +
+  geom_histogram(bins=60)  + labs(x="",title = "Estimated Speciation Rate (U)")
+```
+
+
 ## Modelos Cheios
+
+### Estudo GAM
+
+```{r nRef MNEE estudo GAMM smoother type,echo=TRUE,eval=FALSE}
+# dados
+df_md <- df_resultados %>% filter(MN=="EE") %>% 
+  distinct() %>% 
+  mutate(rep = 1)
+df_md <- left_join(x=data.frame(rep=1,
+                                md_class=c("tp",
+                                           "ts",
+                                           "ds",
+                                           "cr",
+                                           "cs",
+                                           "cc",
+                                           "ps",
+                                           "gp")),
+                   y=df_md,
+                   by="rep")
+# função
+f_md <- function(dados){
+  model_class <- unique(dados$md_class)
+  if(model_class == "tp"){
+    md_ <- gam(U_med ~ 
+                 s(d.z,bs="tp") + s(p.z,bs="tp") + ti(d.z,p.z,bs=c("tp","tp")) +
+                 s(d.z,SiteCode,bs="fs",xt=list(bs="tp"), m=1),
+                data = dados, Gamma(link = "log"))
+  }else if(model_class == "ts"){
+    md_ <- gam(U_med ~ 
+                 s(d.z,bs="ts") + s(p.z,bs="ts") + ti(d.z,p.z,bs=c("ts","ts")) +
+                 s(d.z,SiteCode,bs="fs",xt=list(bs="ts"), m=1),
+                data = dados, Gamma(link = "log"))
+  }else if(model_class == "ds"){
+    md_ <- gam(U_med ~ 
+                 s(d.z,bs="ds") + s(p.z,bs="ds") + ti(d.z,p.z,bs=c("ds","ds")) +
+                 s(d.z,SiteCode,bs="fs",xt=list(bs="ds"), m=1),
+                data = dados, Gamma(link = "log"))
+  }else if(model_class == "cr"){
+    md_ <- gam(U_med ~ 
+                 s(d.z,bs="cr") + s(p.z,bs="cr") + ti(d.z,p.z,bs=c("cr","cr")) +
+                 s(d.z,SiteCode,bs="fs",xt=list(bs="cr"), m=1),
+                data = dados, Gamma(link = "log"))
+  }else if(model_class == "cs"){
+    md_ <- gam(U_med ~ 
+                 s(d.z,bs="cs") + s(p.z,bs="cs") + ti(d.z,p.z,bs=c("cs","cs")) +
+                 s(d.z,SiteCode,bs="fs",xt=list(bs="cs"), m=1),
+                data = dados, Gamma(link = "log"))
+  }else if(model_class == "cc"){
+    md_ <- gam(U_med ~ 
+                 s(d.z,bs="cc") + s(p.z,bs="cc") + ti(d.z,p.z,bs=c("cc","cc")) +
+                 s(d.z,SiteCode,bs="fs",xt=list(bs="cc"), m=1),
+                data = dados, Gamma(link = "log"))
+  }else if(model_class == "ps"){
+    md_ <- gam(U_med ~ 
+                 s(d.z,bs="ps") + s(p.z,bs="ps") + ti(d.z,p.z,bs=c("ps","ps")) +
+                 s(d.z,SiteCode,bs="fs",xt=list(bs="ps"), m=1),
+                data = dados, Gamma(link = "log"))
+    }else{
+      md_ <- gam(U_med ~ 
+                 s(d.z,bs="gp") + s(p.z,bs="gp") + ti(d.z,p.z,bs=c("gp","gp")) +
+                 s(d.z,SiteCode,bs="fs",xt=list(bs="gp"), m=1),
+                data = dados, Gamma(link = "log"))
+  }
+  return(md_)
+}
+registerDoMC(2)
+l_md.U_gamEstudo <- dlply(df_md,"md_class",f_md,.parallel = TRUE)
+```
+
+```{r}
+save(l_md.U_gamEstudo,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md.U_gamEstudo.Rdata")
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 Commit com os codigos para gamm nRef [referência]:
 97a682916fd0942c0c75ca44fb6c66857ec95706
@@ -2401,6 +2513,9 @@ df_md <- left_join(x=data.frame(rep=1,
 f_md <- function(dados){
   md_class <- unique(dados$md_class)
   if(md_class == "d 1|Site"){
+    
+    
+    
     md_ <- lmer(diffS_mean ~ 
                   (p.z + I(p.z^2)) * (d.z + I(d.z^2)) + 
                   (1|SiteCode),
@@ -2445,7 +2560,6 @@ l_md <- l_md_diffS[c(1,3)]
 AICctab(l_md,weights=TRUE)
 ```
 
-```
 
 
 
