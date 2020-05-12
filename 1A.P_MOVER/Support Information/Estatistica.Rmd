@@ -2375,6 +2375,77 @@ df_plot %>% ggplot(aes(x=d,y=U_med)) +
 ```
 
 
+## Modelos Cheios
+
+Commit com os codigos para gamm nRef [referência]:
+97a682916fd0942c0c75ca44fb6c66857ec95706
+
+
+
+
+
+
+
+
+```{r modelo cheio U, eval=FALSE,echo=TRUE}
+df_md <- df_resultados %>% filter(MN=="EE") %>% 
+  distinct() %>% 
+  mutate(rep = 1)
+df_md <- left_join(x=data.frame(rep=1,
+                                md_class=c("d 1|Site",
+                                           "d d|Site",
+                                           "d d^2|Site")),
+                   y=df_md,
+                   by="rep")
+# função de ajuste
+f_md <- function(dados){
+  md_class <- unique(dados$md_class)
+  if(md_class == "d 1|Site"){
+    md_ <- lmer(diffS_mean ~ 
+                  (p.z + I(p.z^2)) * (d.z + I(d.z^2)) + 
+                  (1|SiteCode),
+                   data=dados, na.action = "na.fail")
+  }else if(md_class == "d d|Site"){
+    md_ <- lmer(diffS_mean ~ 
+                  (p.z + I(p.z^2)) * (d.z + I(d.z^2)) + 
+                  (d.z|SiteCode),
+                   data=dados, na.action = "na.fail")
+  }else{ #(md_class == "d d^2|Site")
+    md_ <- lmer(diffS_mean ~ 
+                  (p.z + I(p.z^2)) * (d.z + I(d.z^2)) + 
+                  (d.z + I(d.z^2)|SiteCode),
+                   data=dados, na.action = "na.fail")
+  }
+  return(md_)
+}
+registerDoMC(2)
+l_md_diffS <- dlply(df_md,.(md_class),f_md,.parallel = TRUE)
+#
+f_warning <- function(glmm_object){
+  v_message <- glmm_object@optinfo$conv$lme4$messages %>% 
+    as.character()
+  if(length(v_message)==0){v_message <- "OK"}
+  if(length(v_message)>1){v_message <- v_message[1] }
+  return(v_message)
+}
+#
+############################
+#### warning convergence ###
+############################
+ldply(l_md_diffS,f_warning,.id="glmer") %>% 
+  rename(warning_message = V1)
+############################
+#### todos os otimizadores ###
+############################
+allFit(l_md_diffS[["d d|Site"]],maxfun = 1e5, parallel = 'multicore', ncpus = 3)
+############################
+#### AICctab ###
+############################
+l_md <- l_md_diffS[c(1,3)]
+AICctab(l_md,weights=TRUE)
+```
+
+```
 
 
 
