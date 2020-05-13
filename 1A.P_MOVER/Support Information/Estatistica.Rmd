@@ -2392,10 +2392,8 @@ df_md <- df_resultados %>% filter(MN=="EE") %>%
   mutate(rep = 1)
 df_md <- left_join(x=data.frame(rep=1,
                                 md_class=c("tp",
-                                           "ts",
                                            "ds",
                                            "cr",
-                                           "cs",
                                            "cc",
                                            "ps",
                                            "gp")),
@@ -2410,11 +2408,6 @@ f_md <- function(dados){
                  s(d.z,bs="tp") + s(p.z,bs="tp") + ti(d.z,p.z,bs=c("tp","tp")) +
                  s(d.z,SiteCode,bs="fs",xt=list(bs="tp"), m=1),
                 data = dados, Gamma(link = "log"))
-  }else if(model_class == "ts"){
-    md_ <- gam(U_med ~ 
-                 s(d.z,bs="ts") + s(p.z,bs="ts") + ti(d.z,p.z,bs=c("ts","ts")) +
-                 s(d.z,SiteCode,bs="fs",xt=list(bs="ts"), m=1),
-                data = dados, Gamma(link = "log"))
   }else if(model_class == "ds"){
     md_ <- gam(U_med ~ 
                  s(d.z,bs="ds") + s(p.z,bs="ds") + ti(d.z,p.z,bs=c("ds","ds")) +
@@ -2424,11 +2417,6 @@ f_md <- function(dados){
     md_ <- gam(U_med ~ 
                  s(d.z,bs="cr") + s(p.z,bs="cr") + ti(d.z,p.z,bs=c("cr","cr")) +
                  s(d.z,SiteCode,bs="fs",xt=list(bs="cr"), m=1),
-                data = dados, Gamma(link = "log"))
-  }else if(model_class == "cs"){
-    md_ <- gam(U_med ~ 
-                 s(d.z,bs="cs") + s(p.z,bs="cs") + ti(d.z,p.z,bs=c("cs","cs")) +
-                 s(d.z,SiteCode,bs="fs",xt=list(bs="cs"), m=1),
                 data = dados, Gamma(link = "log"))
   }else if(model_class == "cc"){
     md_ <- gam(U_med ~ 
@@ -2448,7 +2436,7 @@ f_md <- function(dados){
   }
   return(md_)
 }
-registerDoMC(2)
+registerDoMC(3)
 l_md.U_gamEstudo <- dlply(df_md,"md_class",f_md,.parallel = TRUE)
 ```
 
