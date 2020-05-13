@@ -2516,9 +2516,21 @@ f_md <- function(dados){
   return(md_)
 }
 registerDoMC(2)
-l_md.U_gamEstudo <- dlply(df_md,"md_class",f_md,.parallel = TRUE)
+l_md.U_mdCheio <- dlply(df_md,"md_class",f_md,.parallel = TRUE)
 ```
 
+
+```{r save l_md.U_gamEstudo,eval=FALSE,echo=FALSE}
+save(l_md.U_mdCheio,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md.U_mdCheio.Rdata")
+```
+
+```{r load l_md.U_gamEstudo,eval=TRUE,echo=FALSE}
+load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md.U_mdCheio.Rdata")
+```
+
+```{r}
+AICctab(l_md.U_mdCheio,weights=TRUE)
+```
 
 
 
