@@ -2403,6 +2403,7 @@ df_md <- left_join(x=data.frame(rep=1,
                    by="rep")
 # função
 f_md <- function(dados){
+  dados <- df_md %>% filter(md_class == "tp")
   model_class <- unique(dados$md_class)
   if(model_class == "tp"){
     md_ <- gam(U_med ~ 
@@ -2439,7 +2440,7 @@ f_md <- function(dados){
                  s(d.z,bs="ps") + s(p.z,bs="ps") + ti(d.z,p.z,bs=c("ps","ps")) +
                  s(d.z,SiteCode,bs="fs",xt=list(bs="ps"), m=1),
                 data = dados, Gamma(link = "log"))
-    }else{
+  }else{
       md_ <- gam(U_med ~ 
                  s(d.z,bs="gp") + s(p.z,bs="gp") + ti(d.z,p.z,bs=c("gp","gp")) +
                  s(d.z,SiteCode,bs="fs",xt=list(bs="gp"), m=1),
@@ -2450,6 +2451,48 @@ f_md <- function(dados){
 registerDoMC(2)
 l_md.U_gamEstudo <- dlply(df_md,"md_class",f_md,.parallel = TRUE)
 ```
+
+
+```{r}
+dados <- df_resultados %>% filter(MN=="EE") %>% distinct
+l_md <- list()
+l_md[[1]] <- gam(U_med ~ 
+                 s(d.z,bs="tp") + s(p.z,bs="tp") + ti(d.z,p.z,bs=c("tp","tp")) +
+                 s(d.z,SiteCode,bs="fs",xt=list(bs="tp"), m=1),
+                data = dados, family = Gamma(link = "log"))
+l_md[[2]] <- gam(U_med ~ 
+                 s(d.z,bs="ts") + s(p.z,bs="ts") + ti(d.z,p.z,bs=c("ts","ts")) +
+                 s(d.z,SiteCode,bs="fs",xt=list(bs="ts"), m=1),
+                data = dados, family = Gamma(link = "log"))
+l_md[[3]] <- gam(U_med ~ 
+                 s(d.z,bs="ds") + s(p.z,bs="ds") + ti(d.z,p.z,bs=c("ds","ds")) +
+                 s(d.z,SiteCode,bs="fs",xt=list(bs="ds"), m=1),
+                data = dados, family = Gamma(link = "log"))
+l_md[[4]] <- gam(U_med ~ 
+                 s(d.z,bs="cr") + s(p.z,bs="cr") + ti(d.z,p.z,bs=c("cr","cr")) +
+                 s(d.z,SiteCode,bs="fs",xt=list(bs="cr"), m=1),
+                data = dados, family = Gamma(link = "log"))
+l_md[[5]] <- gam(U_med ~ 
+                 s(d.z,bs="cs") + s(p.z,bs="cs") + ti(d.z,p.z,bs=c("cs","cs")) +
+                 s(d.z,SiteCode,bs="fs",xt=list(bs="cs"), m=1),
+                data = dados, family = Gamma(link = "log"))
+l_md[[6]] <- gam(U_med ~ 
+                 s(d.z,bs="cc") + s(p.z,bs="cc") + ti(d.z,p.z,bs=c("cc","cc")) +
+                 s(d.z,SiteCode,bs="fs",xt=list(bs="cc"), m=1),
+                data = dados, family = Gamma(link = "log"))
+l_md[[7]] <- gam(U_med ~ 
+                 s(d.z,bs="ps") + s(p.z,bs="ps") + ti(d.z,p.z,bs=c("ps","ps")) +
+                 s(d.z,SiteCode,bs="fs",xt=list(bs="ps"), m=1),
+                data = dados, family = Gamma(link = "log"))
+l_md[[8]] <- gam(U_med ~ 
+                 s(d.z,bs="gp") + s(p.z,bs="gp") + ti(d.z,p.z,bs=c("gp","gp")) +
+                 s(d.z,SiteCode,bs="fs",xt=list(bs="gp"), m=1),
+                data = dados, family = Gamma(link = "log"))
+l_md.U_gamEstudo <- l_md
+save(l_md.U_gamEstudo,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md.U_gamEstudo.Rdata")
+```
+
+
 
 ```{r}
 save(l_md.U_gamEstudo,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md.U_gamEstudo.Rdata")
