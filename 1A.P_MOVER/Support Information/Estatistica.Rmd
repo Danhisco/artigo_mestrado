@@ -2362,6 +2362,12 @@ grid.arrange(grobs=l_p,
 ```
 
 
+```{r}
+ggplot(df_U,aes(x=df_U$U_med)) +
+  geom_histogram(bins=60)  + labs(x="",title = "Estimated Speciation Rate (U)")
+```
+
+
 __Figura 4.2__ Padrões gerais por Sítio de Amostragem
 
 ```{r fig 42,eval=TRUE,echo=FALSE,fig.width=8, fig.height=27}
@@ -2375,10 +2381,6 @@ df_plot %>% ggplot(aes(x=d,y=U_med)) +
 ```
 
 
-```{r}
-ggplot(df_plot,aes(x=df_plot$U_med)) +
-  geom_histogram(bins=60)  + labs(x="",title = "Estimated Speciation Rate (U)")
-```
 
 
 ## Modelos Cheios
@@ -2401,7 +2403,6 @@ df_md <- left_join(x=data.frame(rep=1,
                    by="rep")
 # função
 f_md <- function(dados){
-  dados <- df_md %>% filter(md_class == "tp")
   model_class <- unique(dados$md_class)
   if(model_class == "tp"){
     md_ <- gam(U_med ~ 
@@ -2441,87 +2442,82 @@ l_md.U_gamEstudo <- dlply(df_md,"md_class",f_md,.parallel = TRUE)
 ```
 
 
-```{r}
-dados <- df_resultados %>% filter(MN=="EE") %>% distinct
-l_md <- list()
-l_md[[1]] <- gam(U_med ~ 
-                 s(d.z,bs="tp") + s(p.z,bs="tp") + ti(d.z,p.z,bs=c("tp","tp")) +
-                 s(d.z,SiteCode,bs="fs",xt=list(bs="tp"), m=1),
-                data = dados, family = Gamma(link = "log"))
-l_md[[2]] <- gam(U_med ~ 
-                 s(d.z,bs="ts") + s(p.z,bs="ts") + ti(d.z,p.z,bs=c("ts","ts")) +
-                 s(d.z,SiteCode,bs="fs",xt=list(bs="ts"), m=1),
-                data = dados, family = Gamma(link = "log"))
-l_md[[3]] <- gam(U_med ~ 
-                 s(d.z,bs="ds") + s(p.z,bs="ds") + ti(d.z,p.z,bs=c("ds","ds")) +
-                 s(d.z,SiteCode,bs="fs",xt=list(bs="ds"), m=1),
-                data = dados, family = Gamma(link = "log"))
-l_md[[4]] <- gam(U_med ~ 
-                 s(d.z,bs="cr") + s(p.z,bs="cr") + ti(d.z,p.z,bs=c("cr","cr")) +
-                 s(d.z,SiteCode,bs="fs",xt=list(bs="cr"), m=1),
-                data = dados, family = Gamma(link = "log"))
-l_md[[5]] <- gam(U_med ~ 
-                 s(d.z,bs="cs") + s(p.z,bs="cs") + ti(d.z,p.z,bs=c("cs","cs")) +
-                 s(d.z,SiteCode,bs="fs",xt=list(bs="cs"), m=1),
-                data = dados, family = Gamma(link = "log"))
-l_md[[6]] <- gam(U_med ~ 
-                 s(d.z,bs="cc") + s(p.z,bs="cc") + ti(d.z,p.z,bs=c("cc","cc")) +
-                 s(d.z,SiteCode,bs="fs",xt=list(bs="cc"), m=1),
-                data = dados, family = Gamma(link = "log"))
-l_md[[7]] <- gam(U_med ~ 
-                 s(d.z,bs="ps") + s(p.z,bs="ps") + ti(d.z,p.z,bs=c("ps","ps")) +
-                 s(d.z,SiteCode,bs="fs",xt=list(bs="ps"), m=1),
-                data = dados, family = Gamma(link = "log"))
-l_md[[8]] <- gam(U_med ~ 
-                 s(d.z,bs="gp") + s(p.z,bs="gp") + ti(d.z,p.z,bs=c("gp","gp")) +
-                 s(d.z,SiteCode,bs="fs",xt=list(bs="gp"), m=1),
-                data = dados, family = Gamma(link = "log"))
-l_md.U_gamEstudo <- l_md
+```{r save l_md.U_gamEstudo,eval=FALSE,echo=FALSE}
 save(l_md.U_gamEstudo,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md.U_gamEstudo.Rdata")
 ```
 
-
-
-```{r}
-save(l_md.U_gamEstudo,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md.U_gamEstudo.Rdata")
+```{r load l_md.U_gamEstudo,eval=TRUE,echo=FALSE}
+load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md.U_gamEstudo.Rdata")
 ```
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+```{r}
+AICctab(l_md.U_gamEstudo,weights=TRUE)
+```
 
 
 Commit com os codigos para gamm nRef [referência]:
 97a682916fd0942c0c75ca44fb6c66857ec95706
+
+### Comparação Modelos Cheios
+
+```{r}
+df_md <- df_resultados %>% filter(MN=="EE") %>% 
+  distinct() %>% 
+  mutate(rep = 1)
+df_md <- left_join(x=data.frame(rep=1,
+                                md_class=c("glmm d+d^2|Site",
+                                           "glmm d|Site",
+                                           "glmm 1|Site",
+                                           "gamm d|Site for each",
+                                           "gamm d|Site common",
+                                           "gamm 1|Site")),
+                   y=df_md,
+                   by="rep")
+# função de ajuste
+f_md <- function(dados){
+  md_class <- unique(dados$md_class)
+  if(md_class == "glmm d+d^2|Site"){
+    md_ <- glmer(U_med ~
+                   (p.z + I(p.z^2)) * (d.z + I(d.z^2)) + 
+                   (d.z + I(d.z^2)|SiteCode),
+                 family = "binomial",data=dados,
+                 control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e6)),
+                 na.action = "na.fail")
+  }else if(md_class == "glmm d|Site"){
+    md_ <- glmer(U_med ~ 
+                   (p.z + I(p.z^2)) * (d.z + I(d.z^2)) + 
+                   (d.z|SiteCode),
+                 family = "binomial",data=dados,
+                 control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e6)),
+                 na.action = "na.fail")
+  }else if(md_class == "glmm 1|Site"){
+    md_ <- glmer(U_med ~ 
+                   (p.z + I(p.z^2)) * (d.z + I(d.z^2)) + 
+                   (1|SiteCode),
+                 family = "binomial",data=dados,
+                 control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e6)),
+                 na.action = "na.fail")
+  }else if(md_class == "gamm d|Site for each"){
+    md_ <- gam(U_med ~ 
+                 s(p.z,bs="cr") + s(d.z,bs="cr") + ti(p.z,d.z,bs=c("cr","cr")) +
+                 s(SiteCode,bs="re") + s(d.z,by=SiteCode,bs="cr",m=1),
+                data = dados, family = "binomial")
+  }else if(md_class == "gamm d|Site common"){
+    md_ <- gam(U_med ~ 
+                 s(p.z,bs="cr") + s(d.z,bs="cr") + ti(p.z,d.z,bs=c("cr","cr")) +
+                 s(d.z,SiteCode,bs="fs",xt=list(bs="cr"), m=1),
+                data = dados, family = "binomial")
+  }else{
+    md_ <- gam(U_med ~ 
+                 s(p.z,bs="cr") + s(d.z,bs="cr") + ti(p.z,d.z,bs=c("cr","cr")) +
+                 s(SiteCode,bs="re"),
+                data = dados, family = "binomial")
+  }
+  return(md_)
+}
+registerDoMC(2)
+l_md.U_gamEstudo <- dlply(df_md,"md_class",f_md,.parallel = TRUE)
+```
 
 
 
