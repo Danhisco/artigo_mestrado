@@ -2141,25 +2141,86 @@ grid.arrange(grobs = l_p,
 ```
 
 
+## nRef ~ diffS
+
 __Qual a distribuição de nRef em função de diffS?__
+
+__figura __ nRef ~ diffS * k
 
 ```{r}
 df_plot <- df_resultados %>% filter(MN=="EI") 
 df_plot$diffS_factor <- cut(df_plot$diffS_mean,breaks = c(-Inf,-0.6,-0.25,0.25,0.75,1.5,2.5,Inf))
+# l_p <- list()
+df_plot %>% 
+  ggplot(aes(x=diffS_mean,y=n_nRef,color=p)) +
+  # coord_cartesian(expand = TRUE) +
+  stat_density_2d(aes(fill = ..density..), geom = "raster", contour = FALSE) +
+  scale_fill_distiller(palette=4, direction=-1) +
+  scale_x_continuous(expand = c(0, 0)) +
+  scale_y_continuous(expand = c(0, 0)) +
+  scale_color_gradient(low="green",high="red") +
+  geom_point(alpha=0.3) +
+  geom_vline(xintercept = c(-0.6,-0.25,0.25,0.75,1.5,2.5),color="black",alpha=0.5) +
+  labs(x="bias in species richness",y="# unrefuted SADs") + facet_wrap(~k,ncol=5)
+# grid.arrange(grobs=l_p,ncol=1)
+```
+
+```{r}
+df_plot %>%
+  ggplot(aes(x=diffS_mean,y=n_nRef)) +
+  coord_cartesian(expand = TRUE) +
+  # geom_boxplot(color="red",alpha=0.8) +
+  # geom_jitter(alpha=0.4) +
+  geom_point(alpha=0.3) +
+  geom_vline(xintercept = c(-0.6,-0.25,0.25,0.75,1.5,2.5),color="red",alpha=0.5) +
+  labs(x="bias in species richness",y="# unrefuted SADs")
+```
+
+__Qual a distribuição de diffS para nRef>=50?__
+
+```{r}
+df_plot <- df_resultados %>% filter(MN=="EI") 
+df_plot$diffS_factor <- cut(df_plot$diffS_mean,breaks = c(-Inf,-0.6,-0.25,0.25,0.75,1.5,2.5,Inf))
+
 l_p <- list()
 l_p[[1]] <- df_plot %>% 
+  # filter(n_nRef>=50) %>%
   ggplot(aes(x=diffS_mean,y=n_nRef)) +
-  coord_cartesian(expand = FALSE) +
-  geom_point(alpha=0.4) +
-  geom_vline(xintercept = c(-0.6,-0.25,0.25,0.75,1.5,2.5),color="red") +
-  labs(x="bias in species richness",y="# unrefuted SADs")
+  geom_point(alpha=0.3) +
+  labs(x="diffS",y="nRef") +
+  geom_vline(xintercept = c(-0.6,-0.25,0.25,0.75,1.5,2.5),color="red")
+l_p[[3]] <- df_plot %>% 
+  # filter(n_nRef>=50) %>%
+  ggplot(aes(x=.$diffS_mean)) +
+  geom_histogram(bins=60) +
+  labs(x="diffS") +
+  geom_vline(xintercept = c(-0.6,-0.25,0.25,0.75,1.5,2.5),color="red")
 l_p[[2]] <- df_plot %>% 
-  ggplot(aes(x=diffS_factor,y=n_nRef)) +
-  coord_cartesian(expand = FALSE) +
-  geom_boxplot(color="red",alpha=0.8) +
-  geom_jitter(alpha=0.4) +
-  labs(x="bias in species richness",y="# unrefuted SADs")
-grid.arrange(grobs=l_p,ncol=1)
+  # filter(n_nRef>=50) %>%
+  ggplot(aes(y=n_nRef,x=diffS_factor)) +
+  labs(x="diffS",y="nRef") +
+  geom_jitter(alpha=0.3) +
+  geom_boxplot(alpha=0.3,color="red") +
+  theme(axis.text.x = element_blank())
+grid.arrange(grobs=l_p,ncol=2,top="EI")
+```
+
+
+
+__figura __ nRef ~ diffS * p_factor
+
+```{r}
+df_plot %>% mutate(p_factor = cut(p,20)) %>% 
+  ggplot(aes(x=diffS_mean,y=n_nRef,color=d)) +
+  # coord_cartesian(expand = TRUE) +
+  stat_density_2d(aes(fill = ..density..), geom = "raster", contour = FALSE) +
+  scale_fill_distiller(palette=4, direction=-1) +
+  scale_x_continuous(expand = c(0, 0)) +
+  scale_y_continuous(expand = c(0, 0)) +
+  scale_color_gradient(low="green",high="red") +
+  geom_point(alpha=0.2) +
+  geom_vline(xintercept = c(-0.6,-0.25,0.25,0.75,1.5,2.5),color="red",alpha=0.5) +
+  labs(x="bias in species richness",y="# unrefuted SADs") + facet_wrap(~p_factor,ncol=5)
 ```
 
 
@@ -2337,6 +2398,7 @@ grid.arrange(grobs = l_p, layout_matrix = lay_mat)
 
 
 
+
 # 4 - Taxa de Especiação Estimada
   
 __Figura 4.1__ Padrões Gerais  
@@ -2376,7 +2438,7 @@ df_plot <- df_U %>%
 df_plot$title <- factor(df_plot$title,levels = unique(df_plot$title))
 df_plot %>% ggplot(aes(x=d,y=U_med)) +
   geom_smooth(method = "loess",se = FALSE,color="red",alpha=0.5) +
-  geom_point(alpha=0.5)
+  geom_point(alpha=0.5) + 
   facet_wrap(~title,ncol=5,scales="free")
 ```
 
@@ -2458,21 +2520,17 @@ AICctab(l_md.U_gamEstudo,weights=TRUE)
 Commit com os codigos para gamm nRef [referência]:
 97a682916fd0942c0c75ca44fb6c66857ec95706
 
-### Comparação Modelos Cheios
+### Modelos Cheios: diagnostico e comparações
 
-```{r}
+```{r modelo cheio md_U,echo=TRUE,eval=FALSE}
 df_md <- df_resultados %>% filter(MN=="EE") %>% 
-  distinct() %>% 
-  mutate(rep = 1)
-df_md <- left_join(x=data.frame(rep=1,
-                                md_class=c("glmm d+d^2|Site",
+  distinct()
+df_md.class <- data.frame(md_class=c("glmm d+d^2|Site",
                                            "glmm d|Site",
                                            "glmm 1|Site",
                                            "gamm d|Site for each",
                                            "gamm d|Site common",
-                                           "gamm 1|Site")),
-                   y=df_md,
-                   by="rep")
+                                           "gamm 1|Site"))
 # função de ajuste
 f_md <- function(dados){
   md_class <- unique(dados$md_class)
@@ -2480,53 +2538,59 @@ f_md <- function(dados){
     md_ <- glmer(U_med ~
                    (p.z + I(p.z^2)) * (d.z + I(d.z^2)) + 
                    (d.z + I(d.z^2)|SiteCode),
-                 family = "binomial",data=dados,
+                 family = Gamma(link="log"),data=df_md,
                  control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e6)),
                  na.action = "na.fail")
   }else if(md_class == "glmm d|Site"){
     md_ <- glmer(U_med ~ 
                    (p.z + I(p.z^2)) * (d.z + I(d.z^2)) + 
                    (d.z|SiteCode),
-                 family = "binomial",data=dados,
+                 family = Gamma(link="log"),data=df_md,
                  control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e6)),
                  na.action = "na.fail")
   }else if(md_class == "glmm 1|Site"){
     md_ <- glmer(U_med ~ 
                    (p.z + I(p.z^2)) * (d.z + I(d.z^2)) + 
                    (1|SiteCode),
-                 family = "binomial",data=dados,
+                 family = Gamma(link="log"),data=df_md,
                  control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e6)),
                  na.action = "na.fail")
   }else if(md_class == "gamm d|Site for each"){
     md_ <- gam(U_med ~ 
-                 s(p.z,bs="cr") + s(d.z,bs="cr") + ti(p.z,d.z,bs=c("cr","cr")) +
-                 s(SiteCode,bs="re") + s(d.z,by=SiteCode,bs="cr",m=1),
-                data = dados, family = "binomial")
+                 s(p.z,bs="cr",k=10) + s(d.z,bs="cr",k=10) + ti(p.z,d.z,bs=c("cr","cr"),k=c(10,10)) +
+                 s(SiteCode,bs="re") + s(d.z,by=SiteCode,bs="cr",m=1,k=10),
+                data = df_md, family = Gamma(link="log"))
   }else if(md_class == "gamm d|Site common"){
     md_ <- gam(U_med ~ 
-                 s(p.z,bs="cr") + s(d.z,bs="cr") + ti(p.z,d.z,bs=c("cr","cr")) +
-                 s(d.z,SiteCode,bs="fs",xt=list(bs="cr"), m=1),
-                data = dados, family = "binomial")
+                 s(p.z,bs="cr",k=10) + s(d.z,bs="cr",k=10) + ti(p.z,d.z,bs=c("cr","cr"),k=c(10,10)) +
+                 s(d.z,SiteCode,bs="fs",xt=list(bs="cr"), m=1,k=10),
+                data = df_md, family = Gamma(link="log"))
   }else{
     md_ <- gam(U_med ~ 
-                 s(p.z,bs="cr") + s(d.z,bs="cr") + ti(p.z,d.z,bs=c("cr","cr")) +
+                 s(p.z,bs="cr",k=10) + s(d.z,bs="cr",k=10) + ti(p.z,d.z,bs=c("cr","cr"),k=c(10,10)) +
                  s(SiteCode,bs="re"),
-                data = dados, family = "binomial")
+                data = df_md, family = Gamma(link="log"))
   }
   return(md_)
 }
-registerDoMC(2)
-l_md.U_mdCheio <- dlply(df_md,"md_class",f_md,.parallel = TRUE)
+registerDoMC(3)
+l_md.U_mdCheio <- dlply(df_md.class,"md_class",f_md,.parallel = TRUE)
 ```
 
 
-```{r save l_md.U_gamEstudo,eval=FALSE,echo=FALSE}
+```{r save l_md.U_mdCheio,eval=FALSE,echo=FALSE}
 save(l_md.U_mdCheio,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md.U_mdCheio.Rdata")
 ```
 
-```{r load l_md.U_gamEstudo,eval=TRUE,echo=FALSE}
+```{r load l_md.U_mdCheio,eval=TRUE,echo=FALSE}
 load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md.U_mdCheio.Rdata")
 ```
+
+
+```{r}
+# lapply(l_md.U_mdCheio[4:6],function(X) allFit(X,maxfun = 1e6,parallel = 'multicore', ncpus = 3))
+```
+
 
 ```{r}
 AICctab(l_md.U_mdCheio,weights=TRUE)
@@ -2534,71 +2598,8 @@ AICctab(l_md.U_mdCheio,weights=TRUE)
 
 
 
-
-
-
-
-```{r modelo cheio U, eval=FALSE,echo=TRUE}
-df_md <- df_resultados %>% filter(MN=="EE") %>% 
-  distinct() %>% 
-  mutate(rep = 1)
-df_md <- left_join(x=data.frame(rep=1,
-                                md_class=c("d 1|Site",
-                                           "d d|Site",
-                                           "d d^2|Site")),
-                   y=df_md,
-                   by="rep")
-# função de ajuste
-f_md <- function(dados){
-  md_class <- unique(dados$md_class)
-  if(md_class == "d 1|Site"){
-    
-    
-    
-    md_ <- lmer(diffS_mean ~ 
-                  (p.z + I(p.z^2)) * (d.z + I(d.z^2)) + 
-                  (1|SiteCode),
-                   data=dados, na.action = "na.fail")
-  }else if(md_class == "d d|Site"){
-    md_ <- lmer(diffS_mean ~ 
-                  (p.z + I(p.z^2)) * (d.z + I(d.z^2)) + 
-                  (d.z|SiteCode),
-                   data=dados, na.action = "na.fail")
-  }else{ #(md_class == "d d^2|Site")
-    md_ <- lmer(diffS_mean ~ 
-                  (p.z + I(p.z^2)) * (d.z + I(d.z^2)) + 
-                  (d.z + I(d.z^2)|SiteCode),
-                   data=dados, na.action = "na.fail")
-  }
-  return(md_)
-}
-registerDoMC(2)
-l_md_diffS <- dlply(df_md,.(md_class),f_md,.parallel = TRUE)
-#
-f_warning <- function(glmm_object){
-  v_message <- glmm_object@optinfo$conv$lme4$messages %>% 
-    as.character()
-  if(length(v_message)==0){v_message <- "OK"}
-  if(length(v_message)>1){v_message <- v_message[1] }
-  return(v_message)
-}
-#
-############################
-#### warning convergence ###
-############################
-ldply(l_md_diffS,f_warning,.id="glmer") %>% 
-  rename(warning_message = V1)
-############################
-#### todos os otimizadores ###
-############################
-allFit(l_md_diffS[["d d|Site"]],maxfun = 1e5, parallel = 'multicore', ncpus = 3)
-############################
-#### AICctab ###
-############################
-l_md <- l_md_diffS[c(1,3)]
-AICctab(l_md,weights=TRUE)
+```{r}
+md_U <- l_md.U_mdCheio[["gamm d|Site for each"]]
+appraise(md_U)
 ```
-
-
-
 
