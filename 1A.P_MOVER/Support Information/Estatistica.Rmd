@@ -2331,6 +2331,14 @@ grid.arrange(grobs=l_p,
 
 ## nRef ~ diffS
 
+
+```{r}
+
+```
+
+
+
+
 __Qual a distribuição de nRef em função de diffS?__
 
 __figura __ nRef ~ diffS * k
