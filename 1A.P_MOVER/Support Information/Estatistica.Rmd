@@ -2831,3 +2831,7 @@ l_p[[2]] <- ggplot(df_diag, aes(x=d.z,y=.resid)) +
 grid.arrange(grobs=l_p,ncol=2)
 ```
 
+
+commit para 1
+
+e887e47e8beea566d95d930f85003cd8bbb184f3
