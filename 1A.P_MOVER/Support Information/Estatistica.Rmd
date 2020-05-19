@@ -7,7 +7,7 @@ output:
     toc: true
     toc_depth: 5
 editor_options: 
-  chunk_output_type: console
+  chunk_output_type: inline
 ---
 
 <style>
@@ -2831,7 +2831,76 @@ l_p[[2]] <- ggplot(df_diag, aes(x=d.z,y=.resid)) +
 grid.arrange(grobs=l_p,ncol=2)
 ```
 
+### observado e predito por sítio de amostragem
 
-commit para 1
+```{r U_med predito e observado para o modelo cheio,fig.width=8, fig.height=30}
+# dados
+df_ <- broom::augment(md_U)
+# l_pred <- predict.gam(md_U,link=response,se.fit = TRUE)
+# df_$fit_response <- l_pred$fit
+# df_$se.fit_response <- l_pred$se.fit
+df_ %<>% mutate(fit_response = exp(.fitted),
+                se.fit_response = exp(.se.fit),
+                p = p.z * sd(df_resultados$p) + mean(df_resultados$p),
+                d = d.z * sd(df_resultados$d) + mean(df_resultados$d))
+# df_ %>% summary
+# grafico
+df_ %<>% mutate(title = paste0(SiteCode," p=",round(p,3))) %>% arrange(p)
+df_$title <- factor(df_$title,levels = unique(df_$title))
+ggplot(df_,aes(x=d,y=U_med)) +
+  geom_point(alpha=0.3) +
+  # geom_ribbon(aes(ymin=fit_response - 1.96 * se.fit_response,
+  #                 ymax=fit_response + 1.96 * se.fit_response),
+  #             color="blue",alpha=0.4) +
+  geom_line(aes(y=fit_response),color="red",alpha=0.6) +
+  facet_wrap(~title,ncol=5,scales = "free")
+```
+
+O modelo erra para alguns caso, vou comparar com um que utiliza 'tp'
+
+```{r}
+df_md <- df_resultados %>% filter(MN=="EE") %>% distinct()
+md_U.tp <- gam(U_med ~ 
+             s(p.z,bs="tp",k=10) + s(d.z,bs="tp",k=10) + ti(p.z,d.z,bs=c("tp","tp"),k=c(10,10)) +
+             s(SiteCode,bs="re") + s(d.z,by=SiteCode,bs="tp",m=1,k=10),
+             data = df_md, family = Gamma(link="log"))
+save(md_U.tp,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/md_U.tp.Rdata")
+```
+
+
+
+commit para codigos de comparação 
 
 e887e47e8beea566d95d930f85003cd8bbb184f3
+
+### predito
+
+The following code was adapted from Gavin Simpson (2016) blog post [acessado em abril de 2020]:  
+  https://fromthebottomoftheheap.net/2016/12/15/simultaneous-interval-revisited/
+
+```{r}
+# novo conjunto de dados
+df <- expand.grid(SiteCode=levels(df_resultados$SiteCode)[1],
+                  d.z=seq(min(df_resultados$d.z),max(df_resultados$d.z),length=40),
+                  p.z=seq(min(df_resultados$p.z),max(df_resultados$p.z),length=200),
+                  log_Sobs.z=0)
+# modelo mais plausível
+load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md.U_mdCheio.Rdata")
+gamm <- l_md.U_mdCheio[["gamm d|Site for each"]]
+# rotina para obter o intervalo de confiabilidade
+## objetos do modelo estimado
+beta <- coef(gamm) # coeficientes
+Vb <- vcov(gamm) # matrix de variância-covariância
+Xp <- predict(gamm,df,type="lpmatrix") # matrix para predito para o novo conjunto de dados
+pred <- predict.gam(gamm,df,se.fit = TRUE) # esperado
+
+## fator de correção
+BUdiff <- MASS::mvrnorm(N,mu=rep(0,nrow(Vb)),Sigma=Vb)
+simDev <- Xp %*% t(BUdiff)
+absDev <- abs(sweep(simDev, 1, se.fit, FUN = "/"))
+masd <- apply(absDev, 2L, max)
+crit <- quantile(masd,prob=0.95,type=8)
+
+```
+
+
