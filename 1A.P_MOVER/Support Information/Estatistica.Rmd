@@ -7,7 +7,7 @@ output:
     toc: true
     toc_depth: 5
 editor_options: 
-  chunk_output_type: inline
+  chunk_output_type: console
 ---
 
 <style>
@@ -2858,13 +2858,36 @@ ggplot(df_,aes(x=d,y=U_med)) +
 
 O modelo erra para alguns caso, vou comparar com um que utiliza 'tp'
 
-```{r}
+```{r }
 df_md <- df_resultados %>% filter(MN=="EE") %>% distinct()
 md_U.tp <- gam(U_med ~ 
              s(p.z,bs="tp",k=10) + s(d.z,bs="tp",k=10) + ti(p.z,d.z,bs=c("tp","tp"),k=c(10,10)) +
              s(SiteCode,bs="re") + s(d.z,by=SiteCode,bs="tp",m=1,k=10),
-             data = df_md, family = Gamma(link="log"))
+             data = df_md, family = Gamma(link="log"),method = "REML")
 save(md_U.tp,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/md_U.tp.Rdata")
+```
+
+
+```{r mdU.tp ,fig.width=8, fig.height=30}
+df_ <- broom::augment(md_U.tp)
+# l_pred <- predict.gam(md_U,link=response,se.fit = TRUE)
+# df_$fit_response <- l_pred$fit
+# df_$se.fit_response <- l_pred$se.fit
+df_ %<>% mutate(fit_response = exp(.fitted),
+                se.fit_response = exp(.se.fit),
+                p = p.z * sd(df_resultados$p) + mean(df_resultados$p),
+                d = d.z * sd(df_resultados$d) + mean(df_resultados$d))
+# df_ %>% summary
+# grafico
+df_ %<>% mutate(title = paste0(SiteCode," p=",round(p,3))) %>% arrange(p)
+df_$title <- factor(df_$title,levels = unique(df_$title))
+ggplot(df_,aes(x=d,y=U_med)) +
+  geom_point(alpha=0.3) +
+  # geom_ribbon(aes(ymin=fit_response - 1.96 * se.fit_response,
+  #                 ymax=fit_response + 1.96 * se.fit_response),
+  #             color="blue",alpha=0.4) +
+  geom_line(aes(y=fit_response),color="red",alpha=0.6) +
+  facet_wrap(~title,ncol=5,scales = "free")
 ```
 
 
@@ -2872,6 +2895,16 @@ save(md_U.tp,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Inf
 commit para codigos de comparação 
 
 e887e47e8beea566d95d930f85003cd8bbb184f3
+
+```{r}
+df_md <- df_resultados %>% filter(MN=="EE") %>% distinct()
+md_U.REML <- gam(U_med ~ 
+             s(p.z,bs="cr",k=10) + s(d.z,bs="cr",k=10) + ti(p.z,d.z,bs=c("cr","cr"),k=c(10,10)) +
+             s(SiteCode,bs="re") + s(d.z,by=SiteCode,bs="cr",m=1,k=10),
+             data = df_md, family = Gamma(link="log"),method = "REML")
+save(md_U.tp,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/md_U.tp.Rdata")
+```
+
 
 ### predito
 
