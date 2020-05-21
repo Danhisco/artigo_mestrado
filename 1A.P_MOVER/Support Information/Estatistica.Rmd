@@ -2874,6 +2874,37 @@ ggplot(df_plot,aes(x=d.z,y=U_med)) +
 ```
 
 
+### modelo medio
+
+```{r}
+registerDoMC(3)
+l_md.dredge_nRefEE <- llply(dredge(md_nRefEE,trace = FALSE,evaluate=FALSE), eval,.parallel = TRUE)
+save(l_md.dredge_nRefEE,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md.dredge_nRefEE.Rdata")
+
+# Model Averaging for SiteCode predictions
+mdAvg_nRefEE__MuMIn <- model.avg(l_md.dredge_nRefEE)
+save(mdAvg_nRefEE__MuMIn,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_nRefEE__MuMIn.Rdata")
+# Model Averaging for new data predictions
+df_pred <- expand.grid(SiteCode=levels(df_resultados$SiteCode)[1],
+                       d.z=seq(min(df_resultados$d.z),max(df_resultados$d.z),length=40),
+                       p.z=seq(min(df_resultados$p.z),max(df_resultados$p.z),length=200))
+mdAvg_nRefEE__AICcmodavg <- modavgPred(l_md.dredge_nRefEE,newdata = df_pred) %>%
+  cbind(df_pred)
+save(mdAvg_nRefEE__AICcmodavg,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_nRefEE__AICcmodavg.Rdata")
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
 #################### gammm
 
 
