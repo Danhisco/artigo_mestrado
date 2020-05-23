@@ -7,7 +7,7 @@ output:
     toc: true
     toc_depth: 5
 editor_options: 
-  chunk_output_type: inline
+  chunk_output_type: console
 ---
 
 <style>
@@ -2846,7 +2846,6 @@ max(abs(relgrad)) < 0.001
 
 
 ```{r save l_md.U_mdCheio,eval=FALSE,echo=FALSE}
-save(l_md.U_mdCheio,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md.U_mdCheio.Rdata")
 save(l_md.U_mdCheio2,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md.U_mdCheio2.Rdata")
 ```
 
@@ -2963,8 +2962,10 @@ ggplot(df_md,aes(x=d,y=U_med)) +
 
 
 ```{r}
+load(file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md.U_mdCheio.Rdata")
 md_U <- l_md.U_mdCheio[["gamm d|Site for each"]]
 appraise(md_U)
+summary(md_U)
 ```
 
 
@@ -3012,6 +3013,7 @@ grid.arrange(grobs=l_p,ncol=2)
 ### observado e predito por sítio de amostragem
 
 ```{r U_med predito e observado para o modelo cheio,fig.width=8, fig.height=30}
+load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/md_U.update1.Rdata")
 # dados
 df_ <- broom::augment(md_U)
 # l_pred <- predict.gam(md_U,link=response,se.fit = TRUE)
@@ -3027,10 +3029,11 @@ df_ %<>% mutate(title = paste0(SiteCode," p=",round(p,3))) %>% arrange(p)
 df_$title <- factor(df_$title,levels = unique(df_$title))
 ggplot(df_,aes(x=d,y=U_med)) +
   geom_point(alpha=0.3) +
+  geom_line(aes(y=fit_response),color="red",alpha=0.6) +
   # geom_ribbon(aes(ymin=fit_response - 1.96 * se.fit_response,
   #                 ymax=fit_response + 1.96 * se.fit_response),
   #             color="blue",alpha=0.4) +
-  geom_line(aes(y=fit_response),color="red",alpha=0.6) +
+  labs(title="U gam(bs=cr,k=10)") +
   facet_wrap(~title,ncol=5,scales = "free")
 ```
 
@@ -3046,8 +3049,11 @@ save(md_U.tp,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Inf
 ```
 
 
-```{r mdU.tp ,fig.width=8, fig.height=30}
-df_ <- broom::augment(md_U.REML)
+```{r U_med predito e observado para o modelo cheio,fig.width=8, fig.height=30}
+load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/md_U.tp.Rdata")
+# md_U.tp
+# dados
+df_ <- broom::augment(md_U.tp)
 # l_pred <- predict.gam(md_U,link=response,se.fit = TRUE)
 # df_$fit_response <- l_pred$fit
 # df_$se.fit_response <- l_pred$se.fit
@@ -3060,11 +3066,12 @@ df_ %<>% mutate(fit_response = exp(.fitted),
 df_ %<>% mutate(title = paste0(SiteCode," p=",round(p,3))) %>% arrange(p)
 df_$title <- factor(df_$title,levels = unique(df_$title))
 ggplot(df_,aes(x=d,y=U_med)) +
+  geom_line(aes(y=fit_response),color="red",alpha=0.6) +
   geom_point(alpha=0.3) +
   # geom_ribbon(aes(ymin=fit_response - 1.96 * se.fit_response,
   #                 ymax=fit_response + 1.96 * se.fit_response),
   #             color="blue",alpha=0.4) +
-  geom_line(aes(y=fit_response),color="red",alpha=0.6) +
+  labs(title="U; gam(bs=tp)") +
   facet_wrap(~title,ncol=5,scales = "free")
 ```
 
@@ -3096,15 +3103,29 @@ df <- expand.grid(SiteCode=levels(df_resultados$SiteCode)[1],
                   p.z=seq(min(df_resultados$p.z),max(df_resultados$p.z),length=200),
                   log_Sobs.z=0)
 # modelo mais plausível
-load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md.U_mdCheio.Rdata")
-gamm <- l_md.U_mdCheio[["gamm d|Site for each"]]
+load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/md_U.tp.Rdata")
+gamm <- md_U.tp
 # rotina para obter o intervalo de confiabilidade
 ## objetos do modelo estimado
+beta <- coef(gamm)
+V <- vcov(gamm)
+##  simulação de parâmetros
+num_beta_vecs <- 10000
+Cv <- chol(V)
+set.seed(1)
+nus <- rnorm(num_beta_vecs * length(beta))
+beta_sims <- beta + t(Cv) %*% matrix(nus, nrow = length(beta), ncol = num_beta_vecs)
+# dim(beta_sims)
+## para predição de novos dados
+
+```
+
+
+
 beta <- coef(gamm) # coeficientes
 Vb <- vcov(gamm) # matrix de variância-covariância
 Xp <- predict(gamm,df,type="lpmatrix") # matrix para predito para o novo conjunto de dados
 pred <- predict.gam(gamm,df,se.fit = TRUE) # esperado
-
 ## fator de correção
 BUdiff <- MASS::mvrnorm(N,mu=rep(0,nrow(Vb)),Sigma=Vb)
 simDev <- Xp %*% t(BUdiff)
@@ -3112,6 +3133,5 @@ absDev <- abs(sweep(simDev, 1, se.fit, FUN = "/"))
 masd <- apply(absDev, 2L, max)
 crit <- quantile(masd,prob=0.95,type=8)
 
-```
 
 
