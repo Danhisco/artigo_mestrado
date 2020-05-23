@@ -7,7 +7,7 @@ output:
     toc: true
     toc_depth: 5
 editor_options: 
-  chunk_output_type: console
+  chunk_output_type: inline
 ---
 
 <style>
@@ -2879,22 +2879,77 @@ ggplot(df_plot,aes(x=d.z,y=U_med)) +
 registerDoMC(3)
 l_md.dredge_U <- llply(dredge(md_U,trace = FALSE,evaluate=FALSE), eval,.parallel = TRUE)
 save(l_md.dredge_U,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md.dredge_U.Rdata")
-
 # Model Averaging for SiteCode predictions
 mdAvg_U__MuMIn <- model.avg(l_md.dredge_U)
 save(mdAvg_U__MuMIn,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_U__MuMIn.Rdata")
 # Model Averaging for new data predictions
 df_pred <- expand.grid(SiteCode=levels(df_resultados$SiteCode)[1],
                        d.z=seq(min(df_resultados$d.z),max(df_resultados$d.z),length=40),
-                       p.z=seq(min(df_resultados$p.z),max(df_resultados$p.z),length=200))
+                       p.z=seq(min(df_resultados$p.z),max(df_resultados$p.z),length=200),
+                       log_Sobs.z=0)
 mdAvg_U__AICcmodavg <- modavgPred(l_md.dredge_U,newdata = df_pred) %>%
   cbind(df_pred)
 save(mdAvg_U__AICcmodavg,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_U__AICcmodavg.Rdata")
 ```
 
 
+```{r eval=FALSE}
+df_plot <- mdAvg_U__AICcmodavg %>% 
+  mutate(p = p.z * sd(df_resultados$p) + mean(df_resultados$p),
+         d = d.z * sd(df_resultados$d) + mean(df_resultados$d))
+#####
+# plots Probabilidad de não refutar
+l_p <- list()
+labels_IC <- c(lower.CL="IC 5%", upper.CL="IC 95%")
+## predição média para ambos modelos
+l_p[[1]] <- ggplot(df_plot,aes(x=p,y=d,fill=mod.avg.pred)) +
+  coord_cartesian(expand = FALSE) + 
+  geom_tile() +
+  scale_fill_distiller(palette = "Spectral") + #limits = c(0,1),
+  labs(title="U (new singleton/birth event)") +
+  theme_classic() + 
+  theme(legend.position="top",legend.title = element_blank()) +
+  geom_contour(aes(z=mod.avg.pred),alpha=0.4, col="black",
+               breaks = quantile(df_plot$mod.avg.pred,probs = seq(0.1,0.9,by=0.1))) +
+  geom_text_contour(aes(z=mod.avg.pred),stroke=0.2,
+                    breaks = round(quantile(df_plot$mod.avg.pred,probs = seq(0.1,0.9,by=0.1)),digits = 5),
+                    rotate = FALSE,
+                    size=3)
+## IC para MNEE
+df_plotEE <- df_plot %>% filter(MN=="EE") %>%
+  gather(key = IC_class ,value = IC_pred,lower.CL_response:upper.CL_response)
+l_p[[2]] <- ggplot(df_plotEE,aes(x=p,y=d,fill=IC_pred)) +
+  coord_cartesian(expand = FALSE) + 
+  geom_tile() +
+  scale_fill_distiller(limits = c(0,1),palette = "Spectral") +
+  theme_classic() + 
+  facet_wrap(~IC_class,ncol=2,labeller = labeller(IC_class = labels_IC)) +
+  theme(legend.position='none') +
+  geom_contour(aes(z=IC_pred),alpha=0.4, col="black",
+               breaks = c(0.10,0.25,0.5,0.75,0.90)) +
+  geom_text_contour(aes(z=IC_pred),stroke=0.2,
+                    breaks = c(0.10,0.25,0.5,0.75,0.90),
+                    rotate = FALSE,
+                    size=2.7)
+```
 
 
+```{r fig 224 nRefEE observado e predito modelo medio, comment=FALSE, message=FALSE,warning=FALSE,results="hide",fig.width=8, fig.height=30}
+# Modelo Global
+load(file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md.dredge_U.Rdata")
+# Predição
+df_md <- df_resultados %>% filter(MN=="EE")
+df_md$fit <- predict(mdAvg_U__MuMIn,type="response")
+# Gráfico
+df_md %<>% mutate(title = paste0(SiteCode," p=",round(p,3))) %>% arrange(p)
+df_md$title <- factor(df_md$title,levels = unique(df_md$title))
+ggplot(df_md,aes(x=d,y=U_med)) +
+  geom_point() + geom_line(aes(y=fit),color="red") +
+  labs(x="Dispersão Média",
+       y="U",
+       title="U") +
+  facet_wrap(~title,ncol=5,scales="free")
+```
 
 
 
