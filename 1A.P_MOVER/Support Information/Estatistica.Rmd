@@ -7,7 +7,7 @@ output:
     toc: true
     toc_depth: 5
 editor_options: 
-  chunk_output_type: console
+  chunk_output_type: inline
 ---
 
 <style>
@@ -2726,21 +2726,21 @@ f_md <- function(dados){
                    (d.z + I(d.z^2)|SiteCode),
                  family = Gamma(link="log"),data=df_md,
                  control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e6)),
-                 na.action = "na.fail",method="REML")
+                 na.action = "na.fail")
   }else if(md_class == "glmm d|Site"){
     md_ <- glmer(U_med ~ log_Sobs.z +
                    (p.z + I(p.z^2)) * (d.z + I(d.z^2)) + 
                    (d.z|SiteCode),
                  family = Gamma(link="log"),data=df_md,
                  control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e6)),
-                 na.action = "na.fail",method="REML")
+                 na.action = "na.fail")
   }else if(md_class == "glmm 1|Site"){
     md_ <- glmer(U_med ~ log_Sobs.z +
                    (p.z + I(p.z^2)) * (d.z + I(d.z^2)) + 
                    (1|SiteCode),
                  family = Gamma(link="log"),data=df_md,
                  control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e6)),
-                 na.action = "na.fail",method="REML")
+                 na.action = "na.fail")
   }else if(md_class == "gamm d|Site for each"){
     md_ <- gam(U_med ~ log_Sobs.z +
                  s(p.z,bs="cr",k=10) + s(d.z,bs="cr",k=10) + ti(p.z,d.z,bs=c("cr","cr"),k=c(10,10)) +
@@ -3013,27 +3013,44 @@ grid.arrange(grobs=l_p,ncol=2)
 ### observado e predito por sítio de amostragem
 
 ```{r U_med predito e observado para o modelo cheio,fig.width=8, fig.height=30}
-load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/md_U.update1.Rdata")
+load(file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md.U_mdCheio.Rdata")
+gamm <- l_md.U_mdCheio[["gamm d|Site for each"]]
 # dados
-df_ <- broom::augment(md_U)
-# l_pred <- predict.gam(md_U,link=response,se.fit = TRUE)
-# df_$fit_response <- l_pred$fit
-# df_$se.fit_response <- l_pred$se.fit
-df_ %<>% mutate(fit_response = exp(.fitted),
-                se.fit_response = exp(.se.fit),
-                p = p.z * sd(df_resultados$p) + mean(df_resultados$p),
-                d = d.z * sd(df_resultados$d) + mean(df_resultados$d))
+df_ <- broom::augment(gamm)
+beta <- coef(gamm)
+V <- vcov(gamm)
+##  simulação de parâmetros
+num_beta_vecs <- 10000
+Cv <- chol(V)
+set.seed(1)
+nus <- rnorm(num_beta_vecs * length(beta))
+beta_sims <- beta + t(Cv) %*% matrix(nus, nrow = length(beta), ncol = num_beta_vecs)
+# dim(beta_sims)
+matrix_lprediction <- predict(gamm,type="lpmatrix") 
+predict_link <- matrix_lprediction %*% beta_sims
+df_pred <- t(apply(predict_link,1,function(X) quantile(X,probs = c(0.05,0.50,0.95)))) %>% 
+  as.data.frame()
+names(df_pred) <- c("IClower","median","ICupper")
+df_plot <- cbind(df_,df_pred) %>% 
+  mutate(fit = exp(median),
+         lower = exp(IClower),
+         upper = exp(ICupper),
+         fit_predict = exp(.fitted),
+         p = p.z * sd(df_resultados$p) + mean(df_resultados$p),
+         d = d.z * sd(df_resultados$d) + mean(df_resultados$d))
 # df_ %>% summary
 # grafico
-df_ %<>% mutate(title = paste0(SiteCode," p=",round(p,3))) %>% arrange(p)
-df_$title <- factor(df_$title,levels = unique(df_$title))
-ggplot(df_,aes(x=d,y=U_med)) +
-  geom_point(alpha=0.3) +
-  geom_line(aes(y=fit_response),color="red",alpha=0.6) +
+# grafico
+df_plot %<>% mutate(title = paste0(SiteCode," p=",round(p,3))) %>% arrange(p)
+df_plot$title <- factor(df_plot$title,levels = unique(df_plot$title))
+ggplot(df_plot,aes(x=d,y=U_med)) +
+  geom_ribbon(aes(ymin=lower,ymax=upper),alpha=0.3,fill="blue") +
+  geom_line(aes(y=fit),color="red",alpha=0.6) +
+  geom_point(alpha=0.4) +
   # geom_ribbon(aes(ymin=fit_response - 1.96 * se.fit_response,
   #                 ymax=fit_response + 1.96 * se.fit_response),
   #             color="blue",alpha=0.4) +
-  labs(title="U gam(bs=cr,k=10)") +
+  labs(title="U; gam(bs=cr)") +
   facet_wrap(~title,ncol=5,scales = "free")
 ```
 
@@ -3051,6 +3068,9 @@ save(md_U.tp,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Inf
 
 ```{r U_med predito e observado para o modelo cheio,fig.width=8, fig.height=30}
 load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/md_U.tp.Rdata")
+############################
+##### primeiro código ######
+############################
 # md_U.tp
 # dados
 df_ <- broom::augment(md_U.tp)
@@ -3062,12 +3082,39 @@ df_ %<>% mutate(fit_response = exp(.fitted),
                 p = p.z * sd(df_resultados$p) + mean(df_resultados$p),
                 d = d.z * sd(df_resultados$d) + mean(df_resultados$d))
 # df_ %>% summary
+############################
+##### segundo código #######
+############################
+gamm <- md_U.tp
+beta <- coef(gamm)
+V <- vcov(gamm)
+##  simulação de parâmetros
+num_beta_vecs <- 10000
+Cv <- chol(V)
+set.seed(1)
+nus <- rnorm(num_beta_vecs * length(beta))
+beta_sims <- beta + t(Cv) %*% matrix(nus, nrow = length(beta), ncol = num_beta_vecs)
+# dim(beta_sims)
+matrix_lprediction <- predict(gamm,type="lpmatrix") 
+predict_link <- matrix_lprediction %*% beta_sims
+df_pred <- t(apply(predict_link,1,function(X) quantile(X,probs = c(0.05,0.50,0.95)))) %>% 
+  as.data.frame()
+names(df_pred) <- c("IClower","median","ICupper")
+df_plot <- cbind(df_,df_pred) %>% 
+  mutate(fit = exp(median),
+         lower = exp(IClower),
+         upper = exp(ICupper),
+         fit_predict = exp(.fitted),
+         p = p.z * sd(df_resultados$p) + mean(df_resultados$p),
+         d = d.z * sd(df_resultados$d) + mean(df_resultados$d))
+# plot(fit ~ fit_predict,data=df_plot)
 # grafico
-df_ %<>% mutate(title = paste0(SiteCode," p=",round(p,3))) %>% arrange(p)
-df_$title <- factor(df_$title,levels = unique(df_$title))
-ggplot(df_,aes(x=d,y=U_med)) +
-  geom_line(aes(y=fit_response),color="red",alpha=0.6) +
-  geom_point(alpha=0.3) +
+df_plot %<>% mutate(title = paste0(SiteCode," p=",round(p,3))) %>% arrange(p)
+df_plot$title <- factor(df_plot$title,levels = unique(df_plot$title))
+ggplot(df_plot,aes(x=d,y=U_med)) +
+  geom_ribbon(aes(ymin=lower,ymax=upper),alpha=0.3,fill="blue") +
+  geom_line(aes(y=fit),color="red",alpha=0.6) +
+  geom_point(alpha=0.4) +
   # geom_ribbon(aes(ymin=fit_response - 1.96 * se.fit_response,
   #                 ymax=fit_response + 1.96 * se.fit_response),
   #             color="blue",alpha=0.4) +
@@ -3096,8 +3143,37 @@ save(md_U.REML,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support I
 The following code was adapted from Gavin Simpson (2016) blog post [acessado em abril de 2020]:  
   https://fromthebottomoftheheap.net/2016/12/15/simultaneous-interval-revisited/ 
   https://mikl.dk/post/2019-prediction-intervals-for-gam/
+  
+  
+#####################################################
+#####################################################
+#####################################################
+# ggplot(df_plot,aes(x=p,y=d,fill=lower)) +
+#   coord_cartesian(expand = FALSE) + 
+#   geom_tile() +
+#   scale_fill_distiller(palette = "Spectral") +
+#   labs(title="Especiation rate to obtain the observed species richness at equilibrium") +
+#   theme_classic() + 
+#   facet_wrap(~variable,ncol=1) +
+#   theme(legend.position="top",legend.title = element_blank()) #+
+#   # geom_contour(aes(z=upper),alpha=0.4, col="black",
+#   #              breaks = round(quantile(df_plot$fit,probs = c(0.1,0.25,0.5,0.75,0.9)),5) ) +
+#   # geom_text_contour(aes(z=upper),stroke=0.2,
+#   #                   breaks = formatC(quantile(df_plot$fit,probs = c(0.1,0.25,0.5,0.75,0.9)),format = "e", digits = 3),
+#   #                   rotate = FALSE,
+#   #                   size=3)
+# df_plot %>%
+#   gather(key=estimates_class,value=estimates_value,fit:upper) %>%
+#   ggplot(aes(x=.$estimates_value)) + geom_histogram(bins=60) + facet_wrap(~estimates_class,ncol=3,scales="free")
+# summary(do.call("c",df_plot[,8:10]))
 
-```{r}
+#####################################################
+#####################################################
+#####################################################
+
+  
+
+```{r U predito, fig.height=9,fig.width=6}
 # modelo mais plausível
 load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/md_U.tp.Rdata")
 gamm <- md_U.tp
@@ -3119,7 +3195,7 @@ df <- expand.grid(SiteCode=levels(df_resultados$SiteCode)[1],
                   log_Sobs.z=0)
 matrix_lprediction <- predict(gamm,newdata=df,type="lpmatrix") 
 predict_link <- matrix_lprediction %*% beta_sims
-df_pred <- t(apply(predict_link,1,function(X) quantile(X,probs = c(0.10,0.50,0.90)))) %>% 
+df_pred <- t(apply(predict_link,1,function(X) quantile(X,probs = c(0.05,0.50,0.95)))) %>% 
   as.data.frame()
 names(df_pred) <- c("IClower","median","ICupper")
 df_plot <- cbind(df,df_pred) %>% 
@@ -3154,48 +3230,43 @@ l_p[[1]] <- ggplot(df_plot,aes(x=p,y=d,fill=fit)) +
                     rotate = FALSE,
                     size=3)
 
-#####################################################
-#####################################################
-#####################################################
-ggplot(df_plot,aes(x=p,y=d,fill=lower)) +
-  coord_cartesian(expand = FALSE) + 
-  geom_tile() +
-  scale_fill_distiller(palette = "Spectral") +
-  labs(title="Especiation rate to obtain the observed species richness at equilibrium") +
-  theme_classic() + 
-  facet_wrap(~variable,ncol=1) +
-  theme(legend.position="top",legend.title = element_blank()) #+
-  # geom_contour(aes(z=upper),alpha=0.4, col="black",
-  #              breaks = round(quantile(df_plot$fit,probs = c(0.1,0.25,0.5,0.75,0.9)),5) ) +
-  # geom_text_contour(aes(z=upper),stroke=0.2,
-  #                   breaks = formatC(quantile(df_plot$fit,probs = c(0.1,0.25,0.5,0.75,0.9)),format = "e", digits = 3),
-  #                   rotate = FALSE,
-  #                   size=3)
-df_plot %>% 
-  gather(key=estimates_class,value=estimates_value,fit:upper) %>% 
-  ggplot(aes(x=.$estimates_value)) + geom_histogram(bins=60) + facet_wrap(~estimates_class,ncol=3,scales="free")
 
-#####################################################
-#####################################################
-#####################################################
-
-
-df_plot2 <- df_plot %>%
-  gather(key = IC_class ,value = IC_pred,lower:upper)
-labels_IC <- c(lower="IC 5%", upper="IC 95%")
-l_p[[2]] <- ggplot(df_plot2,aes(x=p,y=d,fill=IC_pred)) +
+# df_plot2 <- df_plot %>%
+#   gather(key = IC_class ,value = IC_pred,lower:upper)
+# labels_IC <- c(lower="IC 5%", upper="IC 95%")
+df_plot$IC_pred <- "IC 5%"
+l_p[[2]] <- ggplot(df_plot,aes(x=p,y=d,fill=lower)) +
   coord_cartesian(expand = FALSE) + 
   geom_tile() +
   scale_fill_distiller(palette = "Spectral") +
   theme_classic() + 
-  facet_wrap(~IC_class,ncol=2,labeller = labeller(IC_class = labels_IC)) +
-  theme(legend.position='none') +
-  geom_contour(aes(z=IC_pred),alpha=0.4, col="black",
-               breaks = round(quantile(df_plot$fit,probs = c(0.1,0.25,0.5,0.75,0.9)),5)) +
-  geom_text_contour(aes(z=IC_pred),stroke=0.2,
-                    breaks = round(quantile(df_plot$fit,probs = c(0.1,0.25,0.5,0.75,0.9)),5),
+  facet_wrap(~IC_pred,ncol=1) +
+  theme(legend.position="bottom",legend.title = element_blank()) +
+  geom_contour(aes(z=lower),alpha=0.4, col="black",
+               breaks = round(quantile(df_plot$lower,probs = c(0.1,0.25,0.5,0.75,0.9)),5)) +
+  geom_text_contour(aes(z=lower),stroke=0.2,
+                    breaks = round(quantile(df_plot$lower,probs = c(0.1,0.25,0.5,0.75,0.9)),5),
                     rotate = FALSE,
                     size=2.7)
+df_plot$IC_pred <- "IC 95%"
+l_p[[3]] <- ggplot(df_plot,aes(x=p,y=d,fill=upper)) +
+  coord_cartesian(expand = FALSE) + 
+  geom_tile() +
+  scale_fill_distiller(palette = "Spectral") +
+  theme_classic() + 
+  facet_wrap(~IC_pred,ncol=1) +
+  theme(legend.position="bottom",legend.title = element_blank()) +
+  geom_contour(aes(z=upper),alpha=0.4, col="black",
+               breaks = round(quantile(df_plot$upper,probs = c(0.1,0.25,0.5,0.75,0.9)),5)) +
+  geom_text_contour(aes(z=upper),stroke=0.2,
+                    breaks = round(quantile(df_plot$upper,probs = c(0.1,0.25,0.5,0.75,0.9)),5),
+                    rotate = FALSE,
+                    size=2.7)
+grid.arrange(grobs=l_p,
+             layout_matrix = rbind(1,1,1,
+                                   c(2,3),
+                                   c(2,3))
+             )
 ```
 
 
