@@ -1,0 +1,307 @@
+---
+title: "Figuras Finais"
+author: "Mori, Danilo"
+date: "25/05/2020"
+output: html_document
+---
+
+```{r setup, include=TRUE,echo=FALSE}
+knitr::opts_chunk$set(echo = FALSE, tidy = FALSE, include = TRUE, warning = FALSE,cache = TRUE,message=FALSE,eval=TRUE)
+# setwd("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/")
+knitr::opts_knit$set(root.dir = "~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/")
+```
+
+```{r pacotes,eval=TRUE,echo=TRUE}
+library(parallel)
+library(doMC)
+library(DHARMa)
+library(broom.mixed)
+library(gratia)
+# library(MuMIn)
+library(mgcv)
+library(bbmle)
+library(lme4)
+# library(AICcmodavg)
+library(merTools)
+library(magrittr)
+library(ggplotify)
+library(gridExtra)
+# library(directlabels)
+library(ggplot2); theme_set(theme_classic())
+library(metR)
+library(tidyr)
+library(purrr)
+library(plyr)
+library(dplyr)
+```
+
+```{r dados,message=FALSE}
+### dados ###
+# leitura
+df_resultados <- read.csv(file="/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/resultados/df_resultados.csv",
+                            header = TRUE,as.is=FALSE)[,1:13]
+# padronização
+level_k <- as.character(unique(sort(as.numeric(df_resultados$k),decreasing = TRUE)))
+df_resultados$k <- factor(df_resultados$k,levels = level_k)
+levels(df_resultados$k)[19] <- "0.1"
+# z score
+f_z <- function(x){
+  m <- base::mean(x,na.rm=FALSE)
+  sd <- sd(x,na.rm=FALSE)
+  output <- (x-m)/sd
+  return(output)
+} 
+# names(df_resultados)
+# str(df_resultados)
+df_resultados %<>% mutate(diffS_gamma = diffS_mean + min(diffS_mean)*(-1) + 0.01,
+                          modulo_diffS = abs(diffS_mean),
+                          log_Sobs=log(S_obs))
+
+df_resultados.z <- as.data.frame(apply(df_resultados[,c("p","Ntotal","log_Sobs","k_1","d_Lplot","d","modulo_diffS")],2,f_z))
+names(df_resultados.z) <- sapply(names(df_resultados.z), function(x) paste0(x,".z"))
+df_resultados %<>% cbind(.,df_resultados.z) %>% 
+  select(-k_1,-k_1.z)
+```
+
+
+# 3.1 - Número de SADs não refutadas (nRef)
+
+## Sessão Resultados
+
+```{r load l_mdPredict nRef figura final,eval=TRUE,echo=FALSE}
+load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_mdPredict__nRef.Rdata")
+```
+
+```{r figura final nRef,echo=FALSE,eval=TRUE,fig.width=8,fig.height=8,message=FALSE,warning=FALSE}
+# dados
+df_plot <- bind_rows(l_mdPredict,.id = "MN")
+df_plot %<>% mutate(p = p.z * sd(df_resultados$p) + mean(df_resultados$p),
+                    d = d.z*sd(df_resultados$d) + mean(df_resultados$d))
+df_ <- apply(df_plot[,c(3:4,6:7)],2,arm::invlogit) %>% as.data.frame
+names(df_) <- sapply(names(df_), function(x) paste0(x,"_response"))
+df_plot <- cbind(df_plot,df_)
+# plots Probabilidad de não refutar
+l_p <- list()
+labels_IC <- c(lower.CL_response="IC 5%", upper.CL_response="IC 95%")
+## predição média para ambos modelos
+l_p[[1]] <- ggplot(df_plot,aes(x=p,y=d,fill=mod.avg.pred_response)) +
+  coord_cartesian(expand = FALSE) + 
+  geom_tile() +
+  scale_fill_distiller(limits = c(0,1),palette = "Spectral") +
+  theme_classic() + 
+  facet_wrap(~MN,ncol=2) + 
+  theme(legend.position="top",legend.title = element_blank()) +
+  geom_contour(aes(z=mod.avg.pred_response),alpha=0.4, col="black",
+               breaks = c(0.10,0.25,0.5,0.75,0.90)) +
+  geom_text_contour(aes(z=mod.avg.pred_response),stroke=0.2,
+                    breaks = c(0.10,0.25,0.5,0.75,0.90),
+                    rotate = FALSE,
+                    size=3)
+## IC para MNEE
+df_plotEE <- df_plot %>% filter(MN=="EE") %>%
+  gather(key = IC_class ,value = IC_pred,lower.CL_response:upper.CL_response)
+l_p[[2]] <- ggplot(df_plotEE,aes(x=p,y=d,fill=IC_pred)) +
+  coord_cartesian(expand = FALSE) + 
+  geom_tile() +
+  scale_fill_distiller(limits = c(0,1),palette = "Spectral") +
+  theme_classic() + 
+  facet_wrap(~IC_class,ncol=2,labeller = labeller(IC_class = labels_IC)) +
+  theme(legend.position='none') +
+  geom_contour(aes(z=IC_pred),alpha=0.4, col="black",
+               breaks = c(0.10,0.25,0.5,0.75,0.90)) +
+  geom_text_contour(aes(z=IC_pred),stroke=0.2,
+                    breaks = c(0.10,0.25,0.5,0.75,0.90),
+                    rotate = FALSE,
+                    size=2.7)
+## IC para MNEI
+df_plotEI <- df_plot %>% filter(MN=="EI") %>%
+  gather(key = IC_class ,value = IC_pred,lower.CL_response:upper.CL_response)
+l_p[[3]] <- ggplot(df_plotEI,aes(x=p,y=d,fill=IC_pred)) +
+  coord_cartesian(expand = FALSE) + 
+  geom_tile() +
+  scale_fill_distiller(limits = c(0,1),palette = "Spectral") +
+  theme_classic() + 
+  facet_wrap(~IC_class,ncol=2,labeller = labeller(IC_class = labels_IC)) +
+  theme(legend.position='none') +
+  geom_contour(aes(z=IC_pred),alpha=0.4, col="black",
+               breaks = c(0.10,0.50,0.90)) +
+  geom_text_contour(aes(z=IC_pred),stroke=0.2,
+                    breaks = c(0.10,0.50,0.90),
+                    rotate = FALSE,
+                    size=2.7)
+## Arranjo dos gráficos
+# l_p[[1]],l_p[[2]],l_p[[3]],l_p[[4]],l_p[[5]],
+lay_mat <- rbind(rep(1,2),
+                 rep(1,2),
+                 c(2,3))
+grid.arrange(grobs = l_p, layout_matrix = lay_mat,top="Probabilidade de Não Refutar")
+```
+
+## Sessão Support Information
+
+```{r FF nRef: graficos diagnosticos,eval=TRUE,echo=FALSE,results="hide"}
+#
+df_md <- df_resultados %>% filter(MN=="EE") %>% distinct()
+md_nRefEE <- glmer(cbind(n_nRef,100-n_nRef) ~ 
+                     (p.z + I(p.z^2)) * (d.z + I(d.z^2)) + 
+                     (d.z + I(d.z^2)|SiteCode),
+                   family = "binomial",data=df_md,
+                   control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e6)),
+                   na.action = "na.fail")
+df_md <- df_resultados %>% filter(MN=="EI") %>% distinct()
+md_nRefEI <- glmer(cbind(n_nRef,100-n_nRef) ~ 
+                      (p.z + I(p.z^2)) * (d.z + I(d.z^2)) + 
+                      (d.z + I(d.z^2)|SiteCode),
+                 family = "binomial",data=df_md,
+                 control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e6)),
+                 na.action = "na.fail")
+#
+l_p <- list()
+##############################
+########### MNEE #############
+##############################
+# modelo médio
+load(file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_nRefEE__MuMIn.Rdata")
+## Predição
+df_md <- df_resultados %>% filter(MN=="EE")
+df_md$Pr_nRef <- predict(mdAvg_nRefEE__MuMIn,type="response")*100
+l_p[[1]] <- ggplot(df_md,aes(x=n_nRef,y=Pr_nRef)) +
+  scale_x_continuous(expand = c(0, 0)) +
+  scale_y_continuous(expand = c(0, 0)) +
+  geom_smooth(method = "gam",aes(group=SiteCode),se = FALSE) +
+  geom_abline(intercept = 0,slope=1,color="red") +
+  geom_point(alpha=0.3) +
+  labs(x="observado",y="predito") +
+  facet_wrap(~MN,ncol=1)
+## qqnorm ranef
+df_ranef <- ranef(md_nRefEE)$SiteCode 
+df_ranef$SiteCode <- row.names(df_ranef)
+row.names(df_ranef) <- NULL
+l_p[[2]] <- df_ranef %>% 
+  gather(key = parameter_class,value = parameter_value, -SiteCode) %>% 
+  ggplot(aes(sample=parameter_value)) + 
+  stat_qq(alpha=0.3) + stat_qq_line(alpha=0.3,col="red") +
+  facet_wrap(~parameter_class,scales="free",ncol=1)
+## diagnostico DHARMa
+p_plot <- DHARMa::simulateResiduals(md_nRefEE,n=1000)
+p1 <-  as.ggplot(~plotQQunif(p_plot))
+p2 <-  as.ggplot(~plotResiduals(p_plot))
+l_p[[3]] <- as.ggplot(grid.arrange(p1,p2,ncol=2))
+##############################
+########### MNEI #############
+##############################
+# modelo médio
+load(file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_nRefEI__MuMIn.Rdata")
+## Predição
+df_md <- df_resultados %>% filter(MN=="EI")
+df_md$Pr_nRef <- predict(mdAvg_nRefEI__MuMIn,type="response")*100
+l_p[[4]] <- ggplot(df_md,aes(x=n_nRef,y=Pr_nRef)) +
+  scale_x_continuous(expand = c(0, 0)) +
+  scale_y_continuous(expand = c(0, 0)) +
+  geom_smooth(method = "gam",aes(group=SiteCode),se = FALSE) +
+  geom_abline(intercept = 0,slope=1,color="red") +
+  geom_point(alpha=0.3) +
+  labs(x="observado",y="predito") +
+  facet_wrap(~MN,ncol=1)
+## qqnorm ranef
+df_ranef <- ranef(md_nRefEI)$SiteCode 
+df_ranef$SiteCode <- row.names(df_ranef)
+row.names(df_ranef) <- NULL
+l_p[[5]] <- df_ranef %>% 
+  gather(key = parameter_class,value = parameter_value, -SiteCode) %>% 
+  ggplot(aes(sample=parameter_value)) + 
+  stat_qq(alpha=0.3) + stat_qq_line(alpha=0.3,col="red") +
+  facet_wrap(~parameter_class,scales="free",ncol=1)
+## diagnostico DHARMa
+p_plot <- DHARMa::simulateResiduals(md_nRefEI,n=1000)
+p1 <-  as.ggplot(~plotQQunif(p_plot))
+p2 <-  as.ggplot(~plotResiduals(p_plot))
+l_p[[6]] <- as.ggplot(grid.arrange(p1,p2,ncol=2))
+```
+
+```{r diag nRef, fig.width=9,fig.height=7.5}
+grid.arrange(grobs=l_p,
+             layout_matrix=rbind(c(1,1,2,4,4,5),
+                                 c(1,1,2,4,4,5),
+                                 c(1,1,2,4,4,5),
+                                 rep(c(3,6),each=3),
+                                 rep(c(3,6),each=3)),
+             top="Diagnóstico número de SADs não refutadas"
+             )
+```
+
+
+# 3.2 - Viés na Riqueza Estimada (diffS)
+
+## Sessão Resultados
+
+```{r}
+################### diffS EE ###################
+
+
+################### diffS EI ###################
+load(file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_diffS_EI__AICcmodavg.Rdata")
+df_plot <- mdAvg_diffS_EI__AICcmodavg
+df_plot %<>% 
+  mutate(p = p.z * sd(df_resultados$p) + mean(df_resultados$p),
+         d = d.z*sd(df_resultados$d) + mean(df_resultados$d))
+#
+v_range <- df_resultados %>% filter(MN == "EE") %>% .$diffS_mean %>% range
+v_limits <- df_plot1 %>% 
+  select(mod.avg.pred,upper.CL,lower.CL) %>% 
+  as.matrix %>% as.vector %>% range
+l_p <- list()
+df_plot1$MN <- "EI"
+l_p[[1]] <- ggplot(df_plot1,aes(x=p,y=d,fill=mod.avg.pred,z=mod.avg.pred)) +
+  geom_tile() +
+  coord_cartesian(expand = FALSE) +
+  scale_fill_gradient2(midpoint=0, low="blue", high="red",mid="green",limits=v_limits) +
+  stat_subset(aes(subset = mod.avg.pred >= v_range[1] & mod.avg.pred <= v_range[2]),
+              alpha=0.5,color="black",size=0.1) +
+  geom_contour(breaks=c(-0.6,-0.25,0.25,0.75,1.5,2.5),color="black",alpha=0.5) +
+  geom_text_contour(aes(z=mod.avg.pred),stroke=0.2,
+                    breaks = c(-0.6,-0.25,0.25,0.75,1.5,2.5),
+                    rotate = FALSE,
+                    size=2.7) +
+  labs(title="Viés da Riqueza Estimada",
+       fill="") + theme_classic() + 
+  theme(legend.position="top") +
+  facet_wrap(~MN,ncol=1)
+v_labels <- c(lower.CL = "IC (5%)", upper.CL = "IC (5%)")
+l_p[[2]] <- df_plot1 %>% 
+  gather(key="IC_class",value="IC_value",lower.CL:upper.CL) %>% 
+  ggplot(aes(x=p,y=d,fill=IC_value,z=IC_value)) +
+  geom_tile() +
+  coord_cartesian(expand = FALSE) +
+  scale_fill_gradient2(midpoint=0, low="blue", high="red",mid="green",limits=v_limits) +
+  # scale_colour_gradient(limits=v_limits) +
+  stat_subset(aes(subset = IC_value >= v_range[1] & IC_value <= v_range[2]),
+              alpha=0.5,color="black",size=0.01) +
+  geom_contour(breaks=c(-0.6,-0.25,0.25,0.75,1.5,2.5),
+               color="black",alpha=0.5) +
+  labs(title="",
+       fill="") + theme_classic() + 
+  theme(legend.position="none") +
+  facet_wrap(~IC_class,ncol=2,labeller = labeller(IC_class = v_labels))
+```
+
+
+## Sessão Support Information
+
+# 3.3 - Congruência entre nRef e diffS
+
+## Sessão Resultados
+
+## Sessão Support Information
+
+# 3.4 - Log da razão da chance MNEE/MNEI (logOR)
+
+## Sessão Resultados
+
+## Sessão Support Information
+
+# 3.5 - Taxa de especiação estimada para obter a riqueza observada no equilíbrio (U)
+
+## Sessão Resultados
+
+## Sessão Support Information
