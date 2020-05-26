@@ -7,7 +7,7 @@ output:
     toc: true
     toc_depth: 5
 editor_options: 
-  chunk_output_type: inline
+  chunk_output_type: console
 ---
 
 <style>
@@ -2711,9 +2711,7 @@ Commit com os codigos para gamm nRef [referência]:
 ```{r modelo cheio md_U,echo=TRUE,eval=FALSE}
 df_md <- df_resultados %>% filter(MN=="EE") %>% 
   distinct()
-df_md.class <- data.frame(md_class=c("glmm d+d^2|Site",
-                                     "glmm d|Site",
-                                     "glmm 1|Site",
+df_md.class <- data.frame(md_class=c("glmm 1|Site",
                                      "gamm d|Site for each",
                                      "gamm d|Site common",
                                      "gamm 1|Site"))
@@ -2743,24 +2741,23 @@ f_md <- function(dados){
                  na.action = "na.fail")
   }else if(md_class == "gamm d|Site for each"){
     md_ <- gam(U_med ~ log_Sobs.z +
-                 s(p.z,bs="cr",k=10) + s(d.z,bs="cr",k=10) + ti(p.z,d.z,bs=c("cr","cr"),k=c(10,10)) +
-                 s(SiteCode,bs="re") + s(d.z,by=SiteCode,bs="cr",m=1,k=10),
+                 s(p.z,bs="tp",k=10) + s(d.z,bs="tp",k=10) + ti(p.z,d.z,bs=c("tp","tp"),k=c(10,10)) +
+                 s(SiteCode,bs="re") + s(d.z,by=SiteCode,bs="tp",m=1,k=10),
                 data = df_md, family = Gamma(link="log"),method="REML")
   }else if(md_class == "gamm d|Site common"){
     md_ <- gam(U_med ~ log_Sobs.z +
-                 s(p.z,bs="cr",k=10) + s(d.z,bs="cr",k=10) + ti(p.z,d.z,bs=c("cr","cr"),k=c(10,10)) +
-                 s(d.z,SiteCode,bs="fs",xt=list(bs="cr"), m=1,k=10),
+                 s(p.z,bs="cr",k=10) + s(d.z,bs="tp",k=10) + ti(p.z,d.z,bs=c("tp","tp"),k=c(10,10)) +
+                 s(d.z,SiteCode,bs="fs",xt=list(bs="tp"), m=1,k=10),
                 data = df_md, family = Gamma(link="log"),method="REML")
   }else{
     md_ <- gam(U_med ~ log_Sobs.z +
-                 s(p.z,bs="cr",k=10) + s(d.z,bs="cr",k=10) + ti(p.z,d.z,bs=c("cr","cr"),k=c(10,10)) +
+                 s(p.z,bs="tp",k=10) + s(d.z,bs="tp",k=10) + ti(p.z,d.z,bs=c("tp","tp"),k=c(10,10)) +
                  s(SiteCode,bs="re"),
                 data = df_md, family = Gamma(link="log"),method="REML")
   }
   return(md_)
 }
-registerDoMC(2)
-l_md.U_mdCheio <- dlply(df_md.class,"md_class",f_md,.parallel = TRUE)
+l_md.U_mdCheio <- dlply(df_md.class,"md_class",f_md)
 ```
 
 
@@ -3144,36 +3141,36 @@ The following code was adapted from Gavin Simpson (2016) blog post [acessado em 
   https://fromthebottomoftheheap.net/2016/12/15/simultaneous-interval-revisited/ 
   https://mikl.dk/post/2019-prediction-intervals-for-gam/
   
-  
-#####################################################
-#####################################################
-#####################################################
-# ggplot(df_plot,aes(x=p,y=d,fill=lower)) +
-#   coord_cartesian(expand = FALSE) + 
-#   geom_tile() +
-#   scale_fill_distiller(palette = "Spectral") +
-#   labs(title="Especiation rate to obtain the observed species richness at equilibrium") +
-#   theme_classic() + 
-#   facet_wrap(~variable,ncol=1) +
-#   theme(legend.position="top",legend.title = element_blank()) #+
-#   # geom_contour(aes(z=upper),alpha=0.4, col="black",
-#   #              breaks = round(quantile(df_plot$fit,probs = c(0.1,0.25,0.5,0.75,0.9)),5) ) +
-#   # geom_text_contour(aes(z=upper),stroke=0.2,
-#   #                   breaks = formatC(quantile(df_plot$fit,probs = c(0.1,0.25,0.5,0.75,0.9)),format = "e", digits = 3),
-#   #                   rotate = FALSE,
-#   #                   size=3)
-# df_plot %>%
-#   gather(key=estimates_class,value=estimates_value,fit:upper) %>%
-#   ggplot(aes(x=.$estimates_value)) + geom_histogram(bins=60) + facet_wrap(~estimates_class,ncol=3,scales="free")
-# summary(do.call("c",df_plot[,8:10]))
 
-#####################################################
-#####################################################
-#####################################################
+<!-- ##################################################### -->
+<!-- ##################################################### -->
+<!-- ##################################################### -->
+<!-- # ggplot(df_plot,aes(x=p,y=d,fill=lower)) + -->
+<!-- #   coord_cartesian(expand = FALSE) +  -->
+<!-- #   geom_tile() + -->
+<!-- #   scale_fill_distiller(palette = "Spectral") + -->
+<!-- #   labs(title="Especiation rate to obtain the observed species richness at equilibrium") + -->
+<!-- #   theme_classic() +  -->
+<!-- #   facet_wrap(~variable,ncol=1) + -->
+<!-- #   theme(legend.position="top",legend.title = element_blank()) #+ -->
+<!-- #   # geom_contour(aes(z=upper),alpha=0.4, col="black", -->
+<!-- #   #              breaks = round(quantile(df_plot$fit,probs = c(0.1,0.25,0.5,0.75,0.9)),5) ) + -->
+<!-- #   # geom_text_contour(aes(z=upper),stroke=0.2, -->
+<!-- #   #                   breaks = formatC(quantile(df_plot$fit,probs = c(0.1,0.25,0.5,0.75,0.9)),format = "e", digits = 3), -->
+<!-- #   #                   rotate = FALSE, -->
+<!-- #   #                   size=3) -->
+<!-- # df_plot %>% -->
+<!-- #   gather(key=estimates_class,value=estimates_value,fit:upper) %>% -->
+<!-- #   ggplot(aes(x=.$estimates_value)) + geom_histogram(bins=60) + facet_wrap(~estimates_class,ncol=3,scales="free") -->
+<!-- # summary(do.call("c",df_plot[,8:10])) -->
 
-  
+<!-- ##################################################### -->
+<!-- ##################################################### -->
+<!-- ##################################################### -->
 
-```{r U predito, fig.height=9,fig.width=6}
+
+
+```{r figura final gam U df para predicao, eval=FALSE,echo=TRUE}
 # modelo mais plausível
 load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/md_U.tp.Rdata")
 gamm <- md_U.tp
@@ -3204,38 +3201,19 @@ df_plot <- cbind(df,df_pred) %>%
          upper = exp(ICupper),
          p = p.z * sd(df_resultados$p) + mean(df_resultados$p),
          d = d.z * sd(df_resultados$d) + mean(df_resultados$d))
-##############################################################
-##############################################################
-##############################################################
-# plot(lm(df_plot$median ~ predict(md_U.tp,newdata=df)))
-##############################################################
-##############################################################
-##############################################################
+write.csv(df_plot,file = "~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/df_plotPredU.csv",row.names = FALSE)
+```
+
+
+```{r U predito, fig.height=4,fig.width=9}
+# dados
+df_plot <- read.csv("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/df_plotPredU.csv",
+                    header = TRUE,as.is = TRUE)
 ## graficos
 l_p <- list()
-## predição média para ambos modelos
-df_plot$variable <- "U"
-l_p[[1]] <- ggplot(df_plot,aes(x=p,y=d,fill=fit)) +
-  coord_cartesian(expand = FALSE) + 
-  geom_tile() +
-  scale_fill_distiller(palette = "Spectral") +
-  labs(title="Especiation rate to obtain the observed species richness at equilibrium") +
-  theme_classic() + 
-  facet_wrap(~variable,ncol=1) +
-  theme(legend.position="top",legend.title = element_blank()) +
-  geom_contour(aes(z=fit),alpha=0.4, col="black",
-               breaks = round(quantile(df_plot$fit,probs = c(0.1,0.25,0.5,0.75,0.9)),5) ) +
-  geom_text_contour(aes(z=fit),stroke=0.2,
-                    breaks = formatC(quantile(df_plot$fit,probs = c(0.1,0.25,0.5,0.75,0.9)),format = "e", digits = 3),
-                    rotate = FALSE,
-                    size=3)
-
-
-# df_plot2 <- df_plot %>%
-#   gather(key = IC_class ,value = IC_pred,lower:upper)
-# labels_IC <- c(lower="IC 5%", upper="IC 95%")
-df_plot$IC_pred <- "IC 5%"
-l_p[[2]] <- ggplot(df_plot,aes(x=p,y=d,fill=lower)) +
+# 
+df_plot$IC_pred <- "5% quantile"
+l_p[[1]] <- ggplot(df_plot,aes(x=p,y=d,fill=lower)) +
   coord_cartesian(expand = FALSE) + 
   geom_tile() +
   scale_fill_distiller(palette = "Spectral") +
@@ -3248,7 +3226,23 @@ l_p[[2]] <- ggplot(df_plot,aes(x=p,y=d,fill=lower)) +
                     breaks = round(quantile(df_plot$lower,probs = c(0.1,0.25,0.5,0.75,0.9)),5),
                     rotate = FALSE,
                     size=2.7)
-df_plot$IC_pred <- "IC 95%"
+#
+df_plot$variable <- "median"
+l_p[[2]] <- ggplot(df_plot,aes(x=p,y=d,fill=fit)) +
+  coord_cartesian(expand = FALSE) + 
+  geom_tile() +
+  scale_fill_distiller(palette = "Spectral") +
+  theme_classic() + 
+  facet_wrap(~variable,ncol=1) +
+  theme(legend.position="bottom",legend.title = element_blank()) +
+  geom_contour(aes(z=fit),alpha=0.4, col="black",
+               breaks = round(quantile(df_plot$fit,probs = c(0.1,0.25,0.5,0.75,0.9)),5) ) +
+  geom_text_contour(aes(z=fit),stroke=0.2,
+                    breaks = formatC(quantile(df_plot$fit,probs = c(0.1,0.25,0.5,0.75,0.9)),format = "e", digits = 3),
+                    rotate = FALSE,
+                    size=3)
+#
+df_plot$IC_pred <- "95% quantile"
 l_p[[3]] <- ggplot(df_plot,aes(x=p,y=d,fill=upper)) +
   coord_cartesian(expand = FALSE) + 
   geom_tile() +
@@ -3262,11 +3256,7 @@ l_p[[3]] <- ggplot(df_plot,aes(x=p,y=d,fill=upper)) +
                     breaks = round(quantile(df_plot$upper,probs = c(0.1,0.25,0.5,0.75,0.9)),5),
                     rotate = FALSE,
                     size=2.7)
-grid.arrange(grobs=l_p,
-             layout_matrix = rbind(1,1,1,
-                                   c(2,3),
-                                   c(2,3))
-             )
+grid.arrange(grobs=l_p,ncol=3,top="Speciation Rate")
 ```
 
 
@@ -3283,4 +3273,4 @@ masd <- apply(absDev, 2L, max)
 crit <- quantile(masd,prob=0.95,type=8)
 
 
-
+## 
