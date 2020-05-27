@@ -2,8 +2,17 @@
 title: "Figuras Finais"
 author: "Mori, Danilo"
 date: "25/05/2020"
-output: html_document
+output: 
+  html_document:
+    toc: true
+    toc_depth: 5
+editor_options: 
+  chunk_output_type: inline
 ---
+<style>
+body {
+text-align: justify}
+</style>
 
 ```{r setup, include=TRUE,echo=FALSE}
 knitr::opts_chunk$set(echo = FALSE, tidy = FALSE, include = TRUE, warning = FALSE,cache = TRUE,message=FALSE,eval=TRUE)
@@ -17,11 +26,9 @@ library(doMC)
 library(DHARMa)
 library(broom.mixed)
 library(gratia)
-# library(MuMIn)
 library(mgcv)
 library(bbmle)
 library(lme4)
-# library(AICcmodavg)
 library(merTools)
 library(magrittr)
 library(ggplotify)
@@ -68,11 +75,9 @@ df_resultados %<>% cbind(.,df_resultados.z) %>%
 
 ## Sessão Resultados
 
-```{r load l_mdPredict nRef figura final,eval=TRUE,echo=FALSE}
-load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_mdPredict__nRef.Rdata")
-```
 
 ```{r figura final nRef,echo=FALSE,eval=TRUE,fig.width=8,fig.height=8,message=FALSE,warning=FALSE}
+load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_mdPredict__nRef.Rdata")
 # dados
 df_plot <- bind_rows(l_mdPredict,.id = "MN")
 df_plot %<>% mutate(p = p.z * sd(df_resultados$p) + mean(df_resultados$p),
@@ -137,9 +142,17 @@ lay_mat <- rbind(rep(1,2),
 grid.arrange(grobs = l_p, layout_matrix = lay_mat,top="Probabilidade de Não Refutar")
 ```
 
+
+### Figura 3.1 - legenda:
+
+
+Predito para a probabilidade de não refutar uma SAD por modelo neutro (EE=modelo neutro de espaço explícito, EI=modelo neutro de espaço implícito) em função da  proporção de cobertura vegetal (p), distância média de dispersão (d). Nos painéis superiores há a média, nos painéis inferiores os respectivos intervalo de confiança de 5% e 95%. Utilizamos um GLMM binomial (Bolker et al. 2009) para estimar a probabilidade de não refutar uma SAD neutra,  como variável resposta o número de SADs neutras não refutadas segundo o teste KS bootstrap. O modelo cheio contou com um termo linear e quadrático para p e d na estrutura fixa, e um termo linear e quadrático para d por sítio de amostragem (estrutura aleatória). A predição do modelo médio foi calculado baseado em AICc (Burnham & Andersen 2002).
+
+
+
 ## Sessão Support Information
 
-```{r FF nRef: graficos diagnosticos,eval=TRUE,echo=FALSE,results="hide"}
+```{r FF nRef: graficos diagnosticos,eval=TRUE,echo=FALSE,fig.show='hide'}
 #
 df_md <- df_resultados %>% filter(MN=="EE") %>% distinct()
 md_nRefEE <- glmer(cbind(n_nRef,100-n_nRef) ~ 
@@ -229,6 +242,12 @@ grid.arrange(grobs=l_p,
              top="Diagnóstico número de SADs não refutadas"
              )
 ```
+  
+### Figura S.1 - legenda:  
+  
+Gráficos diagnóstico dos modelos estatísticos ajustados para os dados separados por modelo neutro, primeira coluna modelo neutro de espaço explícito (EE), na segunda coluna o modelo neutro de espaço implícito (EI). Na primeira linha há o predito e observado para o modelo médio, em azul é o estimado pela função geom_smooth do pacote ‘ggplot2’ pelo método ‘gam’ para cada sítio de amostragem. Na segunda linha há o gráfico quantil observado e quantil esperado segundo uma distribuição normal dos coeficientes estimados na estrutura aleatória do modelo cheio. Na terceira linha há os resíduos quantílicos do modelo cheio calculados pela função 'simulateResiduals' do pacote ‘DHARMa’ (REF), primeira coluna há o gráfico quantil-quantil pressuposto distribuição uniforme, na segunda coluna regressão quantílica. Retas vermelhas correspondem à 1=1; exceto nos gráficos de regressão quantílica onde representa a reta da mediana esperada, neste gráfico a linha tracejada vermelha é a mediana estimada. No gráfico quantil-quantil pressuposto uniforme dos resíduos quantílicos há 3 testes: primeiro o de aderência dos resíduos à distribuição uniforme segundo o teste Kolmogorov-Smirnov padrão; o segundo um teste de dispersão dos dados; terceiro um teste de presença de outliers.
+
+
 
 
 # 3.2 - Viés na Riqueza Estimada (diffS)
@@ -293,7 +312,7 @@ grid.arrange(grobs=l_p,
 
 ## Sessão Support Information
 
-```{r results="hide"}
+```{r fig.show='hide'}
 # modelos cheios
 df_md <- df_resultados %>% filter(MN=="EE") %>% distinct
 md_diffS.EE <- lmer(diffS_mean ~ 1 + (1|SiteCode),data=df_md,na.action = "na.fail")
@@ -378,7 +397,7 @@ plot_grid(title,
 
 ## Sessão Resultados
 
-```{r}
+```{r fig.height=5,fig.width=6}
 ggplot(df_resultados,aes(x=diffS_mean,y=n_nRef)) +
   coord_cartesian(expand = TRUE) +
   geom_hex(bins = 30) +
@@ -396,29 +415,6 @@ ggplot(df_resultados,aes(x=diffS_mean,y=n_nRef)) +
 # 3.4 - Log da razão da chance MNEE/MNEI (logOR)
 
 ## Sessão Resultados
-
-```{r}
-df_plot1 <- inner_join(x=select(df_plot,
-                                mod.avg.pred,lower.CL,upper.CL,
-                                p,d),
-                       y=select(df_nRef,
-                                mod.avg.pred_response,lower.CL_response,upper.CL_response,
-                                logOR_EE.EI,lower.logOR_EE.EI,upper.logOR_EE.EI,
-                                p,d),
-                       by=c("p","d"))
-v_limits <- df_plot1 %>% 
-  select(logOR_EE.EI:upper.logOR_EE.EI) %>% as.matrix %>% as.vector %>% range
-v_limits <- c(v_limits,mean(df_plot1$logOR_EE.EI))
-df_plot1 %<>% mutate(KS_f_logOR = NA, KS_f_lower.logOR = NA, KS_f_upper.logOR = NA)
-# i <- 14
-for(i in 12:14){
-  df_plot1[,i] <- ifelse(abs(df_plot1[,i-11]) > 0.25 & 
-                           df_plot1[,i-6] >0.5, 
-                         NA,"yes") %>% as.factor()
-}
-names(df_plot1)[c(i,i-11,i-6)]
-```
-
 
 
 ```{r}
@@ -542,68 +538,6 @@ lay_mat <- rbind(c(1,3),
                  c(1,3),
                  c(2,4))
 grid.arrange(grobs = l_p, layout_matrix = lay_mat,top="log Odds Ratio (EE/EI)")
-```
-
-
-
-
-```{r}
-# 
-load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_mdPredict__nRef.Rdata")
-#
-df_plot <- bind_rows(l_mdPredict,.id = "MN")
-df_plot %<>% mutate(p = p.z * sd(df_resultados$p) + mean(df_resultados$p),
-                    d = d.z*sd(df_resultados$d) + mean(df_resultados$d))
-df_ <- apply(df_plot[,c(3:4,6:7)],2,arm::invlogit) %>% as.data.frame
-names(df_) <- sapply(names(df_), function(x) paste0(x,"_response"))
-df_plot <- cbind(df_plot,df_)
-#
-df_EE <- df_plot %>% filter(MN == "EE")
-df_EI <- df_plot %>% filter(MN == "EI")
-df_plot_logOR <- cbind(df_EE[,c("p","d")],
-                       logOR_EE.EI = df_EE$mod.avg.pred - df_EI$mod.avg.pred,
-                       lower.logOR_EE.EI = df_EE$lower.CL - df_EI$lower.CL,
-                       upper.logOR_EE.EI = df_EE$upper.CL - df_EI$upper.CL)
-## graficos
-v_limits <- c(min = min(c(df_plot_logOR$logOR_EE.EI,
-                          df_plot_logOR$lower.logOR_EE.EI,
-                          df_plot_logOR$upper.logOR_EE.EI)),
-              max = max(c(df_plot_logOR$logOR_EE.EI,
-                          df_plot_logOR$lower.logOR_EE.EI,
-                          df_plot_logOR$upper.logOR_EE.EI)),
-              avg = mean(df_plot_logOR$logOR_EE.EI))
-l_p[[4]] <- ggplot(df_plot_logOR,aes(x=p,y=d,fill=logOR_EE.EI)) +
-  coord_cartesian(expand = FALSE) + 
-  geom_tile() + theme_classic() +
-  scale_fill_distiller(limits = c(v_limits[1],v_limits[2]),
-                       palette = "Spectral") +
-  labs(title="log OR(EE/EI)") +
-  theme(legend.position="top",
-        legend.title = element_blank()) +
-  geom_contour(aes(z=logOR_EE.EI),alpha=0.4, col="black",
-               breaks = c(-5,0,5,30)) +
-  geom_text_contour(aes(z=logOR_EE.EI),stroke=0.2,
-                    breaks = c(-5,0,5,30),
-                    rotate = FALSE,
-                    size=3)
-labels_IC2 <- c(lower.logOR_EE.EI="IC 5%", upper.logOR_EE.EI="IC 95%")
-l_p[[5]] <- df_plot_logOR %>%
-  gather(key = IC_class ,value = IC_pred,lower.logOR_EE.EI:upper.logOR_EE.EI) %>% 
-  ggplot(aes(x=p,y=d,fill=IC_pred,z=IC_pred)) +
-  coord_cartesian(expand = FALSE) + 
-  geom_tile() + 
-  theme_classic() +
-  scale_fill_distiller(limits = c(v_limits[1],v_limits[2]),
-                       palette = "Spectral") +
-  theme(legend.position='none')  +
-  facet_wrap(~IC_class,ncol=2,labeller = labeller(IC_class = labels_IC2)) +
-  geom_contour(aes(z=IC_pred),alpha=0.4, col="black",
-               breaks = c(-5,0,5,30)) +
-  geom_text_contour(aes(z=IC_pred),stroke=0.2,
-                    breaks = c(-5,0,5,30),
-                    rotate = FALSE,
-                    size=2.7)
-
 ```
 
 
