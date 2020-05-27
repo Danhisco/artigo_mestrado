@@ -563,7 +563,7 @@ Log da chance da razão (log OR) de não refutar uma SAD neutra do modelo neutro
 
 ## Sessão Resultados
 
-```{r U predito, fig.height=4,fig.width=9}
+```{r U predito, fig.height=5,fig.width=12}
 # dados
 df_plot <- read.csv("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/df_plotPredU.csv",
                     header = TRUE,as.is = TRUE)
