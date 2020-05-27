@@ -555,7 +555,8 @@ grid.arrange(grobs = l_p, layout_matrix = lay_mat,top="log Odds Ratio (EE/EI)")
 ### Figura 3.4 - legenda:
 
 Log da chance da razão (log OR) de não refutar uma SAD neutra do modelo neutro de espaço explícito (EE) em relação ao modelo neutro de espaço implícito, EE,
- pelo modelo neutro de espaço implícito, EI, (log OR): direita - estimado; esquerda - rachurado se o módulo do viés da riqueza estimada for maior do que 0.25 (figura 3.2) e a probabilidade de não refutar uma SAD neutra for maior do que 0.5 (figura 3.1). O teste KS bootstrap calcula o p-valor da hipótese nula de que a SAD observada e predita são amostradas de uma mesma distribuição teórica baseado na estatística D, a maior distância entre a distribuição empirica acumulada da SAD observada e predita. O viés na riqueza estimada mede a magnitude do desvio na riqueza estimada em termos de proporção de riqueza observada. Podemos pressumir que não é razoável que a probabilidade de não refutar uma SAD neutra seja maior do que 0.5 se o módulo do viés da riqueza estimada for maior do que 0.25. Portanto, a área rachurada mostra onde o teste KS bootstrap deve estar sendo mais rigoroso para EE, que apresenta viés da riqueza estimada próxima de zero, do que para EI que apresenta grande variação no viés da riqueza estimada e mesmo assim ainda pode apresentar alto número de SADs não refutadas (figura 3.3).
+ pelo modelo neutro de espaço implícito, EI, (log OR): direita - estimado; esquerda - rachurado se o módulo do viés da riqueza estimada for maior do que 0.25 (figura 3.2) e a probabilidade de não refutar uma SAD neutra for maior do que 0.5 (figura 3.1). O teste KS bootstrap calcula o p-valor da hipótese nula de que a SAD observada e predita são amostradas de uma mesma distribuição teórica baseado na estatística D, a maior distância entre a distribuição empirica acumulada da SAD observada e predita. O viés na riqueza estimada mede a magnitude do desvio na riqueza estimada em termos de proporção de riqueza observada. Podemos pressumir que não é razoável que a probabilidade de não refutar uma SAD neutra seja maior do que 0.5 se o módulo do viés da riqueza estimada for maior do que 0.25. Portanto, a área rachurada mostra onde o teste KS bootstrap deve estar sendo mais rigoroso para EE, que apresenta viés da riqueza estimada próxima de zero, do que para EI que apresenta grande variação no viés da riqueza estimada e pode apresentar alto número de SADs não refutadas (figura 3.3). Subtraimos o log chance estimada para EE pelo estimado para EI para calcular o log OR. 
+ 
  
 
 # 3.5 - Taxa de especiação estimada para obter a riqueza observada no equilíbrio (U)
@@ -616,6 +617,12 @@ l_p[[3]] <- ggplot(df_plot,aes(x=p,y=d,fill=upper)) +
 grid.arrange(grobs=l_p,ncol=3,top="Speciation Rate")
 ```
 
+### Figura 3.5 - legenda:
+
+Predito para a taxa de especiação necessária para obter a riqueza observada no equilíbrio (U), segundo o modelo neutro de espaço explícito, em função da distância média de dispersão (d) e a proporção de cobertura vegetal na paisagem (p). Ajustamos um modelo generalizado aditivo (Wood 2017) com um smoother isotropico para cada preditora, um tensor para a interação entre as duas preditoras, e um smoother para d por sítio de amostragem com parâmetro de penalização por sítio de amostragem (Pedersen et al. 2019). Presumimos que a distribuição dos coeficiente pode ser aproximada por uma distribuição normal multivariada com média e variância igual aos coeficientes e matriz de covariância estimados pelo modelo. Então fizemos 10000 amostras dos coeficientes e calculamos os quantils de 0.05, 0.50 e 0.95 dos valores preditos para novo conjunto de dados. Notem que há grande variação no range de valores preditos para cada quantil (guia na parte inferior de cada gráfico).
+
+
+
 ## Sessão Support Information
 
 ```{r}
@@ -623,3 +630,7 @@ load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/md_U
 appraise(md_U.tp)
 ```
 
+
+### Figura S.3 - legenda:
+
+Gráficos diagnósticos padrão do pacote "gratia" (REF). Na primeira linha e coluna há os quantils observados e esperados dos resíduos do tipo "deviance"; na segunda coluna e primeira linha há o gráfico de dispersão dos resíduos pelo preditor linear; na segunda linha e primeira coluna o histograma dos resíduos; e por último o observado contra o predito.
