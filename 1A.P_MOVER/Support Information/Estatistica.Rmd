@@ -2827,60 +2827,14 @@ crit <- quantile(masd,prob=0.95,type=8)
 ## 5 Congruência entre nRef e diffS:
 
 ```{r}
-# EE
-df_md <- df_resultados %>% filter(MN=="EE") %>% distinct
-md_diffS.EE <- lmer(diffS_mean ~ 1 + (1|SiteCode),data=df_md,na.action = "na.fail")
-df_predEE <- predictInterval(md_diffS.EE,level = 0.95) %>% 
-  apply(., 2, mean) %>% t %>% as.data.frame()
-
-# dados
-load(file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_diffS_EI__AICcmodavg.Rdata")
-df_plot <- mdAvg_diffS_EI__AICcmodavg
-df_plot %<>% 
-  mutate(p = p.z * sd(df_resultados$p) + mean(df_resultados$p),
-         d = d.z*sd(df_resultados$d) + mean(df_resultados$d))
-# graficos
-v_range <- df_resultados %>% filter(MN == "EE") %>% .$diffS_mean %>% range
-v_limits <- df_plot %>% select(mod.avg.pred,upper.CL,lower.CL) %>% as.matrix %>% as.vector %>% range
-l_p <- list()
-df_plot$MN <- "EI"
-l_p[[1]] <- ggplot(df_plot,aes(x=p,y=d,fill=mod.avg.pred,z=mod.avg.pred)) +
-  geom_tile() +
-  coord_cartesian(expand = FALSE) +
-  scale_fill_gradient2(midpoint=0, low="blue", high="red",mid="green",limits=v_limits) +
-  # scale_colour_gradient(limits=v_limits) +
-  stat_subset(aes(subset = mod.avg.pred >= v_range[1] & mod.avg.pred <= v_range[2]),
-              alpha=0.5,color="black",size=0.1) +
-  geom_contour(breaks=c(-0.6,-0.25,0.25,0.75,1.5,2.5),color="black",alpha=0.5) +
-  geom_text_contour(aes(z=mod.avg.pred),stroke=0.2,
-                    breaks = c(-0.6,-0.25,0.25,0.75,1.5,2.5),
-                    rotate = FALSE,
-                    size=2.7) +
-  labs(title="Viés da Riqueza Estimada",
-       fill="") + theme_classic() + 
-  theme(legend.position="top") +
-  facet_wrap(~MN,ncol=1)
-
-# graficos
-l_p <- list()
-##############################
-########### MNEE #############
-##############################
-df_md <- filter(df_resultados,MN=="EE") %>% distinct()
-l_p[[1]] <- ggplot(df_md,aes(x="",y=diffS_mean)) +
-  geom_jitter(alpha=0.3) +
-  geom_hline(yintercept = c(df_predEE$upr,df_predEE$lwr),color="blue",size=1) +
-  geom_hline(yintercept=df_predEE$fit,color="red",size=1) +
-  theme(axis.ticks.x = element_blank()) +
-  labs(x="",y="observado") + coord_cartesian(expand = FALSE) + facet_wrap(~MN,ncol=1)
-
-
-# 
-l_p[[2]] <- ggplot(df_resultados,aes(x=diffS_mean,y=n_nRef)) +
+ggplot(df_resultados,aes(x=diffS_mean,y=n_nRef)) +
+  coord_cartesian(expand = TRUE) +
   geom_hex(bins = 30) +
   scale_fill_continuous(type = "viridis") +
-  geom_vline(xintercept = c(-0.25,0.25)) +
+  geom_vline(xintercept = c(-0.25,0.25),color="red") +
   labs(x="diffS",y="nRef") +
-  theme_classic() +facet_wrap(~MN,ncol=2,scales="free")
+  theme(legend.position = "top") +
+  theme_classic() +
+  facet_wrap(~MN,ncol=2,scales="free")
 ```
 
