@@ -307,7 +307,20 @@ l_p[[2]] <- df_plot %>%
 grid.arrange(grobs=l_p,
              layout_matrix=rbind(1,1,2),
              top="Viés na Riqueza Estimada")
+# apply(df_predEE,2,function(X) formatC(X,format = "e",digits=3))
 ```
+
+### Figura 3.2 - legenda:  
+
+Predito para o viés na riqueza estimada (diffS) do modelo neutro de espaço implícito (EI) e em detalhe o predito para o modelo neutro de espaço explícito (EE, área racharuda e contorno em vermelho). No painel superior o predito pelo modelo médio, nos painéis inferiores o intervalo de confiança de 5% e 95%. Foi utilizado um LMM (Bolker et al. 2009) para descrever diffS = (S - Sobs)/Sobs, S = riqueza de espécies predita e Sobs = riqueza observada. Para EE um LMM com intercepto global (estrutura fixa) e um intercepto por sítio de amostragem (estrutura aleatória) foi suficiente para descrever o observado. Em vermelho há o contorno do valor de diffS igual à média estimada para EE (-7.14e-3) e a área racharuda corresponde aos valores de diffS dentro do intervalo de confiança de 5% e 95%, -3.410e-2 e 1.971e-02 respectivamente. Para EI um LMM com termo linear e quadrático para p e d na estrutura fixa e um termo linear para d por sítio de amostragem (estrutura aleatporia) foi usado como modelo cheio; o predito para o modelo médio foi calculado segundo AICc (Burnham & Andersen 2002). 
+
+
+
+
+
+
+
+EE foi utilizado para estimar a taxa de especiação necessária para obter a riqueza observada, em média o viés da riqueza estimada para MNEE é igual -7.14e-3 e com máximo e mínimo igual -6.94e-2 e 4.03e-2, respectivamente. As linhas nas duas primeiras colunas correspondem aos contornos de diffS. Na segunda coluna há o predito para Pr(nRef) de EI. Na terceira coluna há o predito para o log da razão de chance (lot OR) de EE em relação EI de não refutar uma SAD neutra. A região hachurada para log OR corresponde aquela área onde Pr(nRef)>0.5 e |diffS|>0.25 para MNEI, ou seja, região onde o teste Kolmogorov-Smirnov bootstrap está inflando a chance de não refutar uma SAD neutra para MNEI.
 
 
 ## Sessão Support Information
