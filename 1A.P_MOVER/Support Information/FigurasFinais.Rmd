@@ -397,6 +397,66 @@ ggplot(df_resultados,aes(x=diffS_mean,y=n_nRef)) +
 
 ## Sessão Resultados
 
+```{r}
+# 
+load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_mdPredict__nRef.Rdata")
+#
+df_plot <- bind_rows(l_mdPredict,.id = "MN")
+df_plot %<>% mutate(p = p.z * sd(df_resultados$p) + mean(df_resultados$p),
+                    d = d.z*sd(df_resultados$d) + mean(df_resultados$d))
+df_ <- apply(df_plot[,c(3:4,6:7)],2,arm::invlogit) %>% as.data.frame
+names(df_) <- sapply(names(df_), function(x) paste0(x,"_response"))
+df_plot <- cbind(df_plot,df_)
+#
+df_EE <- df_plot %>% filter(MN == "EE")
+df_EI <- df_plot %>% filter(MN == "EI")
+df_plot_logOR <- cbind(df_EE[,c("p","d")],
+                       logOR_EE.EI = df_EE$mod.avg.pred - df_EI$mod.avg.pred,
+                       lower.logOR_EE.EI = df_EE$lower.CL - df_EI$lower.CL,
+                       upper.logOR_EE.EI = df_EE$upper.CL - df_EI$upper.CL)
+## graficos
+v_limits <- c(min = min(c(df_plot_logOR$logOR_EE.EI,
+                          df_plot_logOR$lower.logOR_EE.EI,
+                          df_plot_logOR$upper.logOR_EE.EI)),
+              max = max(c(df_plot_logOR$logOR_EE.EI,
+                          df_plot_logOR$lower.logOR_EE.EI,
+                          df_plot_logOR$upper.logOR_EE.EI)),
+              avg = mean(df_plot_logOR$logOR_EE.EI))
+l_p[[4]] <- ggplot(df_plot_logOR,aes(x=p,y=d,fill=logOR_EE.EI)) +
+  coord_cartesian(expand = FALSE) + 
+  geom_tile() + theme_classic() +
+  scale_fill_distiller(limits = c(v_limits[1],v_limits[2]),
+                       palette = "Spectral") +
+  labs(title="log OR(EE/EI)") +
+  theme(legend.position="top",
+        legend.title = element_blank()) +
+  geom_contour(aes(z=logOR_EE.EI),alpha=0.4, col="black",
+               breaks = c(-5,0,5,30)) +
+  geom_text_contour(aes(z=logOR_EE.EI),stroke=0.2,
+                    breaks = c(-5,0,5,30),
+                    rotate = FALSE,
+                    size=3)
+labels_IC2 <- c(lower.logOR_EE.EI="IC 5%", upper.logOR_EE.EI="IC 95%")
+l_p[[5]] <- df_plot_logOR %>%
+  gather(key = IC_class ,value = IC_pred,lower.logOR_EE.EI:upper.logOR_EE.EI) %>% 
+  ggplot(aes(x=p,y=d,fill=IC_pred,z=IC_pred)) +
+  coord_cartesian(expand = FALSE) + 
+  geom_tile() + 
+  theme_classic() +
+  scale_fill_distiller(limits = c(v_limits[1],v_limits[2]),
+                       palette = "Spectral") +
+  theme(legend.position='none')  +
+  facet_wrap(~IC_class,ncol=2,labeller = labeller(IC_class = labels_IC2)) +
+  geom_contour(aes(z=IC_pred),alpha=0.4, col="black",
+               breaks = c(-5,0,5,30)) +
+  geom_text_contour(aes(z=IC_pred),stroke=0.2,
+                    breaks = c(-5,0,5,30),
+                    rotate = FALSE,
+                    size=2.7)
+
+```
+
+
 ## Sessão Support Information
 
 # 3.5 - Taxa de especiação estimada para obter a riqueza observada no equilíbrio (U)
