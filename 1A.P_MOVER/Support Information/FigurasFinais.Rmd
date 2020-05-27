@@ -315,14 +315,6 @@ grid.arrange(grobs=l_p,
 Predito para o viés na riqueza estimada (diffS) do modelo neutro de espaço implícito (EI) e em detalhe o predito para o modelo neutro de espaço explícito (EE, área racharuda e contorno em vermelho). No painel superior o predito pelo modelo médio, nos painéis inferiores o intervalo de confiança de 5% e 95%. Foi utilizado um LMM (Bolker et al. 2009) para descrever diffS = (S - Sobs)/Sobs, S = riqueza de espécies predita e Sobs = riqueza observada. Para EE um LMM com intercepto global (estrutura fixa) e um intercepto por sítio de amostragem (estrutura aleatória) foi suficiente para descrever o observado. Em vermelho há o contorno do valor de diffS igual à média estimada para EE (-7.14e-3) e a área racharuda corresponde aos valores de diffS dentro do intervalo de confiança de 5% e 95%, -3.410e-2 e 1.971e-02 respectivamente. Para EI um LMM com termo linear e quadrático para p e d na estrutura fixa e um termo linear para d por sítio de amostragem (estrutura aleatporia) foi usado como modelo cheio; o predito para o modelo médio foi calculado segundo AICc (Burnham & Andersen 2002). 
 
 
-
-
-
-
-
-EE foi utilizado para estimar a taxa de especiação necessária para obter a riqueza observada, em média o viés da riqueza estimada para MNEE é igual -7.14e-3 e com máximo e mínimo igual -6.94e-2 e 4.03e-2, respectivamente. As linhas nas duas primeiras colunas correspondem aos contornos de diffS. Na segunda coluna há o predito para Pr(nRef) de EI. Na terceira coluna há o predito para o log da razão de chance (lot OR) de EE em relação EI de não refutar uma SAD neutra. A região hachurada para log OR corresponde aquela área onde Pr(nRef)>0.5 e |diffS|>0.25 para MNEI, ou seja, região onde o teste Kolmogorov-Smirnov bootstrap está inflando a chance de não refutar uma SAD neutra para MNEI.
-
-
 ## Sessão Support Information
 
 ```{r fig.show='hide'}
@@ -405,22 +397,30 @@ plot_grid(title,
           ncol=1,rel_heights = c(0.1,1,0.5,0.65))
 ```
 
+### Figura S.2 - legenda:  
+
+Gráficos diagnóstico dos modelos estatísticos ajustados para os dados separados por modelo neutro: primeira coluna - modelo neutro de espaço explícito (EE); segunda coluna - modelo neutro de espaço implícito (EI). Na primeira linha há o observado contra o predito; para EE a média em vermelho e o intervalo de 95% em azul; para EI  em azul há o estimado pela função geom_smooth do pacote ‘ggplot2’ (REF). Na segunda linha há o gráfico quantil observado e quantil esperado segundo uma distribuição normal dos coeficientes estimados na estrutura aleatória do modelo cheio. Na terceira linha há os resíduos quantílicos do pacote ‘DHARMa’, primeira coluna há o gráfico quantil-quantil pressuposto distribuição uniforme, na segunda coluna regressão quantílica. Retas vermelhas correspondem à 1=1; exceto nos gráficos de regressão quantílica onde representa a reta da mediana esperada, linha tracejada vermelha é a mediana estimada. No gráfico quantil-quantil pressuposto uniforme dos resíduos quantílicos há 3 testes: primeiro o de aderência dos resíduos à distribuição uniforme segundo o teste Kolmogorov-Smirnov padrão; o segundo um teste de dispersão dos dados; terceiro um teste de presença de outliers.
 
 # 3.3 - Congruência entre nRef e diffS
 
 ## Sessão Resultados
 
-```{r fig.height=5,fig.width=6}
+```{r fig.height=4,fig.width=8}
 ggplot(df_resultados,aes(x=diffS_mean,y=n_nRef)) +
-  coord_cartesian(expand = TRUE) +
-  geom_hex(bins = 30) +
+  # coord_cartesian(expand = TRUE) +
+  # scale_y_continuous(c(0,0))+
+  geom_bin2d(bins=60) +
   scale_fill_continuous(type = "viridis") +
-  geom_vline(xintercept = c(-0.25,0.25),color="red") +
+  geom_vline(xintercept = c(-0.25,0.25),color="red",alpha=0.7) +
   labs(x="diffS",y="nRef") +
   theme(legend.position = "top") +
   theme_classic() +
   facet_wrap(~MN,ncol=2,scales="free")
 ```
+
+### Figura 3.3 - legenda:
+
+Histograma 2D do número de ocorrência por viés na riqueza estimada (diffS) e número de SADs não refutadas (nRef) por modelo neutro (EE = modelo neutro de espaço explícito; EI = modelo neutro de espaço implícito). O plano diffS e nRef é subdivido em 30 quadrados de igual área, a cor do quadrado representa o número de ocorrências. As linhas verticais vermelhas marcam diffS = -0.25 e 0.25.
 
 
 ## Sessão Support Information
@@ -428,7 +428,6 @@ ggplot(df_resultados,aes(x=diffS_mean,y=n_nRef)) +
 # 3.4 - Log da razão da chance MNEE/MNEI (logOR)
 
 ## Sessão Resultados
-
 
 ```{r}
 ################### Pr(nRef) ###################
