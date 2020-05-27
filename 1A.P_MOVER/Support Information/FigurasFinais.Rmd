@@ -26,7 +26,7 @@ library(merTools)
 library(magrittr)
 library(ggplotify)
 library(gridExtra)
-# library(directlabels)
+library(cowplot)
 library(ggplot2); theme_set(theme_classic())
 library(metR)
 library(tidyr)
@@ -235,62 +235,161 @@ grid.arrange(grobs=l_p,
 
 ## Sessão Resultados
 
-```{r}
-################### diffS EE ###################
-
-
-################### diffS EI ###################
+```{r 32 vies da riqueza estimada, fig.height=6,fig.width=4}
+# EE
+df_md <- df_resultados %>% filter(MN=="EE") %>% distinct
+md_diffS.EE <- lmer(diffS_mean ~ 1 + (1|SiteCode),data=df_md,na.action = "na.fail")
+df_predEE <- predictInterval(md_diffS.EE,level = 0.95) %>% 
+  apply(., 2, mean) %>% t %>% as.data.frame()
+# EI
 load(file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_diffS_EI__AICcmodavg.Rdata")
 df_plot <- mdAvg_diffS_EI__AICcmodavg
 df_plot %<>% 
   mutate(p = p.z * sd(df_resultados$p) + mean(df_resultados$p),
          d = d.z*sd(df_resultados$d) + mean(df_resultados$d))
-#
-v_range <- df_resultados %>% filter(MN == "EE") %>% .$diffS_mean %>% range
-v_limits <- df_plot1 %>% 
-  select(mod.avg.pred,upper.CL,lower.CL) %>% 
-  as.matrix %>% as.vector %>% range
+# graficos
+v_range <- df_predEE[,3:2] %>% as.numeric() %>% unname()
+v_limits <- df_plot %>% select(mod.avg.pred,upper.CL,lower.CL) %>% as.matrix %>% as.vector %>% range
 l_p <- list()
-df_plot1$MN <- "EI"
-l_p[[1]] <- ggplot(df_plot1,aes(x=p,y=d,fill=mod.avg.pred,z=mod.avg.pred)) +
+df_plot$MN <- "EI"
+l_p[[1]] <- ggplot(df_plot,aes(x=p,y=d,fill=mod.avg.pred,z=mod.avg.pred)) +
   geom_tile() +
   coord_cartesian(expand = FALSE) +
   scale_fill_gradient2(midpoint=0, low="blue", high="red",mid="green",limits=v_limits) +
   stat_subset(aes(subset = mod.avg.pred >= v_range[1] & mod.avg.pred <= v_range[2]),
               alpha=0.5,color="black",size=0.1) +
   geom_contour(breaks=c(-0.6,-0.25,0.25,0.75,1.5,2.5),color="black",alpha=0.5) +
+  geom_contour(breaks=df_predEE$fit,color="red",alpha=0.5) +
   geom_text_contour(aes(z=mod.avg.pred),stroke=0.2,
                     breaks = c(-0.6,-0.25,0.25,0.75,1.5,2.5),
                     rotate = FALSE,
                     size=2.7) +
-  labs(title="Viés da Riqueza Estimada",
-       fill="") + theme_classic() + 
-  theme(legend.position="top") +
+  theme_classic() + 
+  theme(legend.position="top") + labs(fill="") +
   facet_wrap(~MN,ncol=1)
-v_labels <- c(lower.CL = "IC (5%)", upper.CL = "IC (5%)")
-l_p[[2]] <- df_plot1 %>% 
-  gather(key="IC_class",value="IC_value",lower.CL:upper.CL) %>% 
-  ggplot(aes(x=p,y=d,fill=IC_value,z=IC_value)) +
+labels_IC <- c(lower.CL="IC 5%", upper.CL="IC 95%")
+l_p[[2]] <- df_plot %>% 
+  gather(key="IC_class",value="IC_pred",lower.CL:upper.CL) %>% 
+  ggplot(aes(x=p,y=d,fill=IC_pred,z=IC_pred)) +
   geom_tile() +
   coord_cartesian(expand = FALSE) +
   scale_fill_gradient2(midpoint=0, low="blue", high="red",mid="green",limits=v_limits) +
-  # scale_colour_gradient(limits=v_limits) +
-  stat_subset(aes(subset = IC_value >= v_range[1] & IC_value <= v_range[2]),
-              alpha=0.5,color="black",size=0.01) +
-  geom_contour(breaks=c(-0.6,-0.25,0.25,0.75,1.5,2.5),
-               color="black",alpha=0.5) +
-  labs(title="",
-       fill="") + theme_classic() + 
-  theme(legend.position="none") +
-  facet_wrap(~IC_class,ncol=2,labeller = labeller(IC_class = v_labels))
+  stat_subset(aes(subset = IC_pred >= v_range[1] & IC_pred <= v_range[2]),
+              alpha=0.5,color="black",size=0.1) +
+  geom_contour(breaks=c(-0.6,-0.25,0.25,0.75,1.5,2.5),color="black",alpha=0.5) +
+  geom_contour(breaks=df_predEE$fit,color="red",alpha=0.5) +
+  # geom_text_contour(aes(z=IC_pred),stroke=0.2,
+  #                   breaks = c(-0.6,-0.25,0.25,0.75,1.5,2.5),
+  #                   rotate = FALSE,
+  #                   size=2.7) +
+  theme_classic() + 
+  theme(legend.position='none') +
+  facet_wrap(~IC_class,ncol=2,labeller = labeller(IC_class = labels_IC))
+grid.arrange(grobs=l_p,
+             layout_matrix=rbind(1,1,2),
+             top="Viés na Riqueza Estimada")
 ```
 
 
 ## Sessão Support Information
 
+```{r results="hide"}
+# modelos cheios
+df_md <- df_resultados %>% filter(MN=="EE") %>% distinct
+md_diffS.EE <- lmer(diffS_mean ~ 1 + (1|SiteCode),data=df_md,na.action = "na.fail")
+df_predEE <- predictInterval(md_diffS.EE,level = 0.95) %>% 
+  apply(., 2, mean) %>% t %>% as.data.frame() %>% 
+  mutate(rep=1)
+df_md <- df_resultados %>% filter(MN=="EI") %>% distinct
+md_diffS.EI <- lmer(diffS_mean ~ 
+                      (p.z + I(p.z^2)) * (d.z + I(d.z^2)) + 
+                      (d.z|SiteCode),
+                    data=df_md, na.action = "na.fail")
+# graficos
+l_p <- list()
+##############################
+########### MNEE #############
+##############################
+df_md <- filter(df_resultados,MN=="EE") %>% distinct()
+l_p[[1]] <- ggplot(df_md,aes(x="",y=diffS_mean)) +
+  geom_jitter(alpha=0.3) +
+  geom_hline(yintercept = c(df_predEE$upr,df_predEE$lwr),color="blue",size=1) +
+  geom_hline(yintercept=df_predEE$fit,color="red",size=1) +
+  theme(axis.ticks.x = element_blank()) +
+  labs(x="",y="observado") + coord_cartesian(expand = FALSE) + facet_wrap(~MN,ncol=1)
+df_ranef <- ranef(md_diffS.EE)$SiteCode 
+df_ranef$SiteCode <- row.names(df_ranef)
+row.names(df_ranef) <- NULL
+l_p[[2]] <- df_ranef %>% 
+  gather(key = parameter_class,value = parameter_value, -SiteCode) %>% 
+  ggplot(aes(sample=parameter_value)) + 
+  stat_qq(alpha=0.3) + stat_qq_line(alpha=0.3,col="red") +
+  facet_wrap(~parameter_class,scales="free",ncol=1)  
+p_plot <- DHARMa::simulateResiduals(md_diffS.EE,n=1000)
+p1 <-  as.ggplot(~plotQQunif(p_plot))
+p2 <-  as.ggplot(~plotResiduals(p_plot,main="Residual vs. predicted"))
+l_p[[3]] <- as.ggplot(grid.arrange(p1,p2,ncol=2))
+##############################
+########### MNEI #############
+##############################
+# modelo médio
+load(file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_diffS_EI__MuMIn.Rdata")
+## Predição
+df_md <- df_resultados %>% filter(MN=="EI")
+df_md$fit <- predict(mdAvg_diffS_EI__MuMIn,type="response")
+l_p[[4]] <- ggplot(df_md,aes(x=diffS_mean,y=fit)) +
+  scale_x_continuous(expand = c(0, 0)) +
+  scale_y_continuous(expand = c(0, 0)) +
+  geom_smooth(method = "gam",aes(group=SiteCode),se = FALSE) +
+  geom_abline(intercept = 0,slope=1,color="red") +
+  geom_point(alpha=0.3) +
+  labs(x="observado",y="predito") +
+  facet_wrap(~MN,ncol=1)
+## qqnorm ranef
+df_ranef <- ranef(md_diffS.EI)$SiteCode 
+df_ranef$SiteCode <- row.names(df_ranef)
+row.names(df_ranef) <- NULL
+l_p[[5]] <- df_ranef %>% 
+  gather(key = parameter_class,value = parameter_value, -SiteCode) %>% 
+  ggplot(aes(sample=parameter_value)) + 
+  stat_qq(alpha=0.3) + stat_qq_line(alpha=0.3,col="red") +
+  facet_wrap(~parameter_class,scales="free",ncol=3)
+## diagnostico DHARMa
+p_plot <- DHARMa::simulateResiduals(md_diffS.EI,n=1000)
+p1 <-  as.ggplot(~plotQQunif(p_plot))
+p2 <-  as.ggplot(~plotResiduals(p_plot))
+l_p[[6]] <- as.ggplot(grid.arrange(p1,p2,ncol=2))
+##############################
+########### arrange ##########
+##############################
+```
+
+```{r fig.height=8,fig.width=6}
+title <- ggdraw() + draw_label("Diagnostic for diffS models", fontface='bold')
+plot_grid(title,
+          plot_grid(l_p[[1]],l_p[[4]]),
+          plot_grid(l_p[[2]],NULL,l_p[[5]],ncol=3,rel_widths = c(0.75,0.5,1.5)),
+          plot_grid(l_p[[3]],l_p[[6]]),
+          ncol=1,rel_heights = c(0.1,1,0.5,0.65))
+```
+
+
 # 3.3 - Congruência entre nRef e diffS
 
 ## Sessão Resultados
+
+```{r}
+ggplot(df_resultados,aes(x=diffS_mean,y=n_nRef)) +
+  coord_cartesian(expand = TRUE) +
+  geom_hex(bins = 30) +
+  scale_fill_continuous(type = "viridis") +
+  geom_vline(xintercept = c(-0.25,0.25),color="red") +
+  labs(x="diffS",y="nRef") +
+  theme(legend.position = "top") +
+  theme_classic() +
+  facet_wrap(~MN,ncol=2,scales="free")
+```
+
 
 ## Sessão Support Information
 
@@ -304,4 +403,64 @@ l_p[[2]] <- df_plot1 %>%
 
 ## Sessão Resultados
 
+```{r U predito, fig.height=4,fig.width=9}
+# dados
+df_plot <- read.csv("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/df_plotPredU.csv",
+                    header = TRUE,as.is = TRUE)
+## graficos
+l_p <- list()
+# 
+df_plot$IC_pred <- "5% quantile"
+l_p[[1]] <- ggplot(df_plot,aes(x=p,y=d,fill=lower)) +
+  coord_cartesian(expand = FALSE) + 
+  geom_tile() +
+  scale_fill_distiller(palette = "Spectral") +
+  theme_classic() + 
+  facet_wrap(~IC_pred,ncol=1) +
+  theme(legend.position="bottom",legend.title = element_blank()) +
+  geom_contour(aes(z=lower),alpha=0.4, col="black",
+               breaks = round(quantile(df_plot$lower,probs = c(0.1,0.25,0.5,0.75,0.9)),5)) +
+  geom_text_contour(aes(z=lower),stroke=0.2,
+                    breaks = round(quantile(df_plot$lower,probs = c(0.1,0.25,0.5,0.75,0.9)),5),
+                    rotate = FALSE,
+                    size=2.7)
+#
+df_plot$variable <- "median"
+l_p[[2]] <- ggplot(df_plot,aes(x=p,y=d,fill=fit)) +
+  coord_cartesian(expand = FALSE) + 
+  geom_tile() +
+  scale_fill_distiller(palette = "Spectral") +
+  theme_classic() + 
+  facet_wrap(~variable,ncol=1) +
+  theme(legend.position="bottom",legend.title = element_blank()) +
+  geom_contour(aes(z=fit),alpha=0.4, col="black",
+               breaks = round(quantile(df_plot$fit,probs = c(0.1,0.25,0.5,0.75,0.9)),5) ) +
+  geom_text_contour(aes(z=fit),stroke=0.2,
+                    breaks = formatC(quantile(df_plot$fit,probs = c(0.1,0.25,0.5,0.75,0.9)),format = "e", digits = 3),
+                    rotate = FALSE,
+                    size=3)
+#
+df_plot$IC_pred <- "95% quantile"
+l_p[[3]] <- ggplot(df_plot,aes(x=p,y=d,fill=upper)) +
+  coord_cartesian(expand = FALSE) + 
+  geom_tile() +
+  scale_fill_distiller(palette = "Spectral") +
+  theme_classic() + 
+  facet_wrap(~IC_pred,ncol=1) +
+  theme(legend.position="bottom",legend.title = element_blank()) +
+  geom_contour(aes(z=upper),alpha=0.4, col="black",
+               breaks = round(quantile(df_plot$upper,probs = c(0.1,0.25,0.5,0.75,0.9)),5)) +
+  geom_text_contour(aes(z=upper),stroke=0.2,
+                    breaks = round(quantile(df_plot$upper,probs = c(0.1,0.25,0.5,0.75,0.9)),5),
+                    rotate = FALSE,
+                    size=2.7)
+grid.arrange(grobs=l_p,ncol=3,top="Speciation Rate")
+```
+
 ## Sessão Support Information
+
+```{r}
+load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/md_U.tp.Rdata")
+appraise(md_U.tp)
+```
+
