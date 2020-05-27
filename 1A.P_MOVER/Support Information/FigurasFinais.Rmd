@@ -398,6 +398,156 @@ ggplot(df_resultados,aes(x=diffS_mean,y=n_nRef)) +
 ## Sessão Resultados
 
 ```{r}
+df_plot1 <- inner_join(x=select(df_plot,
+                                mod.avg.pred,lower.CL,upper.CL,
+                                p,d),
+                       y=select(df_nRef,
+                                mod.avg.pred_response,lower.CL_response,upper.CL_response,
+                                logOR_EE.EI,lower.logOR_EE.EI,upper.logOR_EE.EI,
+                                p,d),
+                       by=c("p","d"))
+v_limits <- df_plot1 %>% 
+  select(logOR_EE.EI:upper.logOR_EE.EI) %>% as.matrix %>% as.vector %>% range
+v_limits <- c(v_limits,mean(df_plot1$logOR_EE.EI))
+df_plot1 %<>% mutate(KS_f_logOR = NA, KS_f_lower.logOR = NA, KS_f_upper.logOR = NA)
+# i <- 14
+for(i in 12:14){
+  df_plot1[,i] <- ifelse(abs(df_plot1[,i-11]) > 0.25 & 
+                           df_plot1[,i-6] >0.5, 
+                         NA,"yes") %>% as.factor()
+}
+names(df_plot1)[c(i,i-11,i-6)]
+```
+
+
+
+```{r}
+################### Pr(nRef) ###################
+load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_mdPredict__nRef.Rdata")
+df_EE <- l_mdPredict[["EE"]]
+df_EI <- l_mdPredict[["EI"]]
+df_EI %<>% mutate(p = p.z * sd(df_resultados$p) + mean(df_resultados$p),
+                  d = d.z*sd(df_resultados$d) + mean(df_resultados$d))
+df_ <- apply(df_EI[,c(2,5:6)],2,arm::invlogit) %>% as.data.frame
+names(df_) <- sapply(names(df_), function(x) paste0(x,"_response"))
+df_nRef <- cbind(df_EI,df_,
+                 logOR_EE.EI = df_EE$mod.avg.pred - df_EI$mod.avg.pred,
+                 lower.logOR_EE.EI = df_EE$lower.CL - df_EI$lower.CL,
+                 upper.logOR_EE.EI = df_EE$upper.CL - df_EI$upper.CL)
+################### diffS EI ###################
+load(file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_diffS_EI__AICcmodavg.Rdata")
+df_plot <- mdAvg_diffS_EI__AICcmodavg
+df_plot %<>% 
+  mutate(p = p.z * sd(df_resultados$p) + mean(df_resultados$p),
+         d = d.z*sd(df_resultados$d) + mean(df_resultados$d))
+################# df_plot1 ###################
+df_plot1 <- inner_join(x=select(df_plot,
+                                mod.avg.pred,lower.CL,upper.CL,
+                                p,d),
+                       y=select(df_nRef,
+                                mod.avg.pred_response,lower.CL_response,upper.CL_response,
+                                logOR_EE.EI,lower.logOR_EE.EI,upper.logOR_EE.EI,
+                                p,d),
+                       by=c("p","d"))
+v_limits <- df_plot1 %>% 
+  select(logOR_EE.EI:upper.logOR_EE.EI) %>% as.matrix %>% as.vector %>% range
+v_limits <- c(v_limits,mean(df_plot1$logOR_EE.EI))
+df_plot1 %<>% mutate(KS_f_logOR = NA, KS_f_lower.logOR = NA, KS_f_upper.logOR = NA)
+for(i in 12:14){
+  df_plot1[,i] <- ifelse(abs(df_plot1[,i-11]) > 0.25 & 
+                           df_plot1[,i-6] >0.5, 
+                         NA,"yes") %>% as.factor()
+}
+############# gráficos #############
+l_p <- list()
+#### sem rachurado
+l_p[[1]] <- ggplot(df_plot1,aes(x=p,y=d,fill=logOR_EE.EI)) +
+  coord_cartesian(expand = FALSE) + 
+  geom_tile() + theme_classic() +
+  scale_fill_distiller(limits = c(v_limits[1],v_limits[2]),
+                       palette = "Spectral") +
+  theme(legend.position="top",
+        legend.title = element_blank()) +
+  # stat_subset(aes(subset=is.na(KS_f_logOR)),shape=3,alpha=0.5) +
+  geom_contour(aes(z=logOR_EE.EI),alpha=0.3, col="black",
+               breaks = c(-5,0,5,30)) +
+  geom_text_contour(aes(z=logOR_EE.EI),stroke=0.2,
+                    breaks = c(-5,0,5,30),
+                    rotate = FALSE,
+                    size=2.7)
+labels_IC2 <- c(lower.logOR_EE.EI="IC 5%", upper.logOR_EE.EI="IC 95%")
+df_ <- bind_rows(mutate(rename(df_plot1[,c("lower.logOR_EE.EI","KS_f_lower.logOR","p","d")],
+                               logOR=lower.logOR_EE.EI,KS_f=KS_f_lower.logOR),
+                        IC_class = "lower.logOR_EE.EI"),
+                 mutate(rename(df_plot1[,c("upper.logOR_EE.EI","KS_f_upper.logOR","p","d")],
+                               logOR=upper.logOR_EE.EI,KS_f=KS_f_upper.logOR),
+                        IC_class = "upper.logOR_EE.EI"))
+l_p[[2]] <- df_ %>%
+  ggplot(aes(x=p,y=d,fill=logOR,z=logOR)) +
+  coord_cartesian(expand = FALSE) + 
+  geom_tile() + 
+  theme_classic() +
+  scale_fill_distiller(limits = c(v_limits[1],v_limits[2]),
+                       palette = "Spectral") +
+  theme(legend.position='none')  +
+  facet_wrap(~IC_class,ncol=2,labeller = labeller(IC_class = labels_IC2)) +
+  # stat_subset(aes(subset=is.na(KS_f)),shape=3,alpha=0.07) +
+  geom_contour(aes(z=logOR),alpha=0.4, col="black",
+               breaks = c(-5,0,5,30)) +
+  geom_text_contour(aes(z=logOR),stroke=0.2,
+                    breaks = c(-5,0,5,30),
+                    rotate = FALSE,
+                    size=2.7)
+
+#### com rachurado
+l_p[[3]] <- ggplot(df_plot1,aes(x=p,y=d,fill=logOR_EE.EI)) +
+  coord_cartesian(expand = FALSE) + 
+  geom_tile() + theme_classic() +
+  scale_fill_distiller(limits = c(v_limits[1],v_limits[2]),
+                       palette = "Spectral") +
+  theme(legend.position="top",
+        legend.title = element_blank()) +
+  stat_subset(aes(subset=is.na(KS_f_logOR)),shape=3,alpha=0.1) +
+  geom_contour(aes(z=logOR_EE.EI),alpha=0.3, col="black",
+               breaks = c(-5,0,5,30)) +
+  geom_text_contour(aes(z=logOR_EE.EI),stroke=0.2,
+                    breaks = c(-5,0,5,30),
+                    rotate = FALSE,
+                    size=2.7)
+labels_IC2 <- c(lower.logOR_EE.EI="IC 5%", upper.logOR_EE.EI="IC 95%")
+df_ <- bind_rows(mutate(rename(df_plot1[,c("lower.logOR_EE.EI","KS_f_lower.logOR","p","d")],
+                               logOR=lower.logOR_EE.EI,KS_f=KS_f_lower.logOR),
+                        IC_class = "lower.logOR_EE.EI"),
+                 mutate(rename(df_plot1[,c("upper.logOR_EE.EI","KS_f_upper.logOR","p","d")],
+                               logOR=upper.logOR_EE.EI,KS_f=KS_f_upper.logOR),
+                        IC_class = "upper.logOR_EE.EI"))
+l_p[[4]] <- df_ %>%
+  ggplot(aes(x=p,y=d,fill=logOR,z=logOR)) +
+  coord_cartesian(expand = FALSE) + 
+  geom_tile() + 
+  theme_classic() +
+  scale_fill_distiller(limits = c(v_limits[1],v_limits[2]),
+                       palette = "Spectral") +
+  theme(legend.position='none')  +
+  facet_wrap(~IC_class,ncol=2,labeller = labeller(IC_class = labels_IC2)) +
+  stat_subset(aes(subset=is.na(KS_f)),shape=3,alpha=0.03) +
+  geom_contour(aes(z=logOR),alpha=0.4, col="black",
+               breaks = c(-5,0,5,30)) +
+  geom_text_contour(aes(z=logOR),stroke=0.2,
+                    breaks = c(-5,0,5,30),
+                    rotate = FALSE,
+                    size=2.7)
+##### arrange
+lay_mat <- rbind(c(1,3),
+                 c(1,3),
+                 c(2,4))
+grid.arrange(grobs = l_p, layout_matrix = lay_mat,top="log Odds Ratio (EE/EI)")
+```
+
+
+
+
+```{r}
 # 
 load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_mdPredict__nRef.Rdata")
 #
