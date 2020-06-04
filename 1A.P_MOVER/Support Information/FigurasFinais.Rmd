@@ -20,7 +20,7 @@ knitr::opts_chunk$set(echo = FALSE, tidy = FALSE, include = TRUE, warning = FALS
 knitr::opts_knit$set(root.dir = "~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/")
 ```
 
-```{r pacotes,eval=TRUE,echo=TRUE}
+```{r pacotes,eval=TRUE,echo=TRUE,warning=FALSE,message=FALSE}
 library(parallel)
 library(doMC)
 library(DHARMa)
@@ -468,6 +468,7 @@ for(i in 12:14){
 }
 ############# gráficos #############
 l_p <- list()
+br <- c(-5,-1,0,1,5,30)
 #### sem rachurado
 l_p[[1]] <- ggplot(df_plot1,aes(x=p,y=d,fill=logOR_EE.EI)) +
   coord_cartesian(expand = FALSE) + 
@@ -478,9 +479,9 @@ l_p[[1]] <- ggplot(df_plot1,aes(x=p,y=d,fill=logOR_EE.EI)) +
         legend.title = element_blank()) +
   # stat_subset(aes(subset=is.na(KS_f_logOR)),shape=3,alpha=0.5) +
   geom_contour(aes(z=logOR_EE.EI),alpha=0.3, col="black",
-               breaks = c(-5,0,5,30)) +
+               breaks = br) +
   geom_text_contour(aes(z=logOR_EE.EI),stroke=0.2,
-                    breaks = c(-5,0,5,30),
+                    breaks = br,
                     rotate = FALSE,
                     size=2.7)
 labels_IC2 <- c(lower.logOR_EE.EI="IC 5%", upper.logOR_EE.EI="IC 95%")
@@ -501,9 +502,9 @@ l_p[[2]] <- df_ %>%
   facet_wrap(~IC_class,ncol=2,labeller = labeller(IC_class = labels_IC2)) +
   # stat_subset(aes(subset=is.na(KS_f)),shape=3,alpha=0.07) +
   geom_contour(aes(z=logOR),alpha=0.4, col="black",
-               breaks = c(-5,0,5,30)) +
+               breaks = br) +
   geom_text_contour(aes(z=logOR),stroke=0.2,
-                    breaks = c(-5,0,5,30),
+                    breaks = br,
                     rotate = FALSE,
                     size=2.7)
 
@@ -517,9 +518,9 @@ l_p[[3]] <- ggplot(df_plot1,aes(x=p,y=d,fill=logOR_EE.EI)) +
         legend.title = element_blank()) +
   stat_subset(aes(subset=is.na(KS_f_logOR)),shape=3,alpha=0.1) +
   geom_contour(aes(z=logOR_EE.EI),alpha=0.3, col="black",
-               breaks = c(-5,0,5,30)) +
+               breaks = br) +
   geom_text_contour(aes(z=logOR_EE.EI),stroke=0.2,
-                    breaks = c(-5,0,5,30),
+                    breaks = br,
                     rotate = FALSE,
                     size=2.7)
 labels_IC2 <- c(lower.logOR_EE.EI="IC 5%", upper.logOR_EE.EI="IC 95%")
@@ -540,9 +541,9 @@ l_p[[4]] <- df_ %>%
   facet_wrap(~IC_class,ncol=2,labeller = labeller(IC_class = labels_IC2)) +
   stat_subset(aes(subset=is.na(KS_f)),shape=3,alpha=0.03) +
   geom_contour(aes(z=logOR),alpha=0.4, col="black",
-               breaks = c(-5,0,5,30)) +
+               breaks = br) +
   geom_text_contour(aes(z=logOR),stroke=0.2,
-                    breaks = c(-5,0,5,30),
+                    breaks = br,
                     rotate = FALSE,
                     size=2.7)
 ##### arrange
