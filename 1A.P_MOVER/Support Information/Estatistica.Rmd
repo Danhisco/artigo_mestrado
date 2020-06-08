@@ -7,7 +7,7 @@ output:
     toc: true
     toc_depth: 5
 editor_options: 
-  chunk_output_type: inline
+  chunk_output_type: console
 ---
 
 <style>
@@ -2686,6 +2686,23 @@ save(md_U.REML,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support I
 ```
 
 
+```{r}
+df_md <- df_resultados %>% filter(MN=="EE") %>% distinct()
+md_U_sSobs <- gam(U_med ~ 
+             s(p.z,bs="tp",k=10) + s(d.z,bs="tp",k=10) + ti(p.z,d.z,bs=c("tp","tp"),k=c(10,10)) +
+             s(SiteCode,bs="re") + s(d.z,by=SiteCode,bs="tp",m=1,k=10),
+             data = df_md, family = Gamma(link="log"),method = "REML")
+save(md_U_sSobs,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/md_U_sSobs.Rdata")
+```
+
+
+```{r}
+df_md <- df_resultados %>% filter(MN=="EE") %>% distinct()
+glmm_U <- glmer(U_med ~ log_Sobs + (1|SiteCode), 
+                data = df_md, family =  Gamma(link="log"))
+```
+
+
 ### predito
 
 The following code was adapted from Gavin Simpson (2016) blog post [acessado em abril de 2020]:  
@@ -2722,9 +2739,12 @@ The following code was adapted from Gavin Simpson (2016) blog post [acessado em 
 
 
 ```{r figura final gam U df para predicao, eval=FALSE,echo=TRUE}
-# modelo mais plausível
-load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/md_U.tp.Rdata")
-gamm <- md_U.tp
+# gamm c Sobs
+# load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/md_U.tp.Rdata")
+# gamm <- md_U.tp
+# gamm s Sobs
+load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/md_U_sSobs.Rdata")
+gamm <- md_U_sSobs
 # rotina para obter o intervalo de confiabilidade
 ## objetos do modelo estimado
 beta <- coef(gamm)
@@ -2732,7 +2752,7 @@ V <- vcov(gamm)
 ##  simulação de parâmetros
 num_beta_vecs <- 10000
 Cv <- chol(V)
-set.seed(1)
+set.seed(as.numeric(Sys.time()))
 nus <- rnorm(num_beta_vecs * length(beta))
 beta_sims <- beta + t(Cv) %*% matrix(nus, nrow = length(beta), ncol = num_beta_vecs)
 # dim(beta_sims)
@@ -2752,7 +2772,7 @@ df_plot <- cbind(df,df_pred) %>%
          upper = exp(ICupper),
          p = p.z * sd(df_resultados$p) + mean(df_resultados$p),
          d = d.z * sd(df_resultados$d) + mean(df_resultados$d))
-write.csv(df_plot,file = "~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/df_plotPredU.csv",row.names = FALSE)
+write.csv(df_plot,file = "~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/df_plotPredU_sSobs.csv",row.names = FALSE)
 ```
 
 
