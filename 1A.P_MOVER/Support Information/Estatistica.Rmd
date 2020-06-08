@@ -74,6 +74,8 @@ df_resultados %<>% cbind(.,df_resultados.z) %>%
   select(-k_1,-k_1.z)
 ```
 
+teste
+
 
 # 1 - Variables
 
