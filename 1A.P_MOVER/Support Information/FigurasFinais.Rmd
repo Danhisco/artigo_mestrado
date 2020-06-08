@@ -16,8 +16,8 @@ text-align: justify}
 
 ```{r setup, include=TRUE,echo=FALSE}
 knitr::opts_chunk$set(echo = FALSE, tidy = FALSE, include = TRUE, warning = FALSE,cache = TRUE,message=FALSE,eval=TRUE)
-# setwd("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/")
-knitr::opts_knit$set(root.dir = "~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/")
+# setwd("~/Documentos/artigo_mestrado/1A.P_MOVER/simulacao/")
+knitr::opts_knit$set(root.dir = "~/Documentos/artigo_mestrado/1A.P_MOVER/simulacao/")
 ```
 
 ```{r pacotes,eval=TRUE,echo=TRUE,warning=FALSE,message=FALSE}
@@ -45,7 +45,7 @@ library(dplyr)
 ```{r dados,message=FALSE}
 ### dados ###
 # leitura
-df_resultados <- read.csv(file="/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/resultados/df_resultados.csv",
+df_resultados <- read.csv(file="/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/simulacao/resultados/df_resultados.csv",
                             header = TRUE,as.is=FALSE)[,1:13]
 # padronização
 level_k <- as.character(unique(sort(as.numeric(df_resultados$k),decreasing = TRUE)))
@@ -77,7 +77,7 @@ df_resultados %<>% cbind(.,df_resultados.z) %>%
 
 
 ```{r figura final nRef,echo=FALSE,eval=TRUE,fig.width=8,fig.height=8,message=FALSE,warning=FALSE}
-load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_mdPredict__nRef.Rdata")
+load("~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_mdPredict__nRef.Rdata")
 # dados
 df_plot <- bind_rows(l_mdPredict,.id = "MN")
 df_plot %<>% mutate(p = p.z * sd(df_resultados$p) + mean(df_resultados$p),
@@ -174,7 +174,7 @@ l_p <- list()
 ########### MNEE #############
 ##############################
 # modelo médio
-load(file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_nRefEE__MuMIn.Rdata")
+load(file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_nRefEE__MuMIn.Rdata")
 ## Predição
 df_md <- df_resultados %>% filter(MN=="EE")
 df_md$Pr_nRef <- predict(mdAvg_nRefEE__MuMIn,type="response")*100
@@ -204,7 +204,7 @@ l_p[[3]] <- as.ggplot(grid.arrange(p1,p2,ncol=2))
 ########### MNEI #############
 ##############################
 # modelo médio
-load(file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_nRefEI__MuMIn.Rdata")
+load(file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_nRefEI__MuMIn.Rdata")
 ## Predição
 df_md <- df_resultados %>% filter(MN=="EI")
 df_md$Pr_nRef <- predict(mdAvg_nRefEI__MuMIn,type="response")*100
@@ -261,7 +261,7 @@ md_diffS.EE <- lmer(diffS_mean ~ 1 + (1|SiteCode),data=df_md,na.action = "na.fai
 df_predEE <- predictInterval(md_diffS.EE,level = 0.95) %>% 
   apply(., 2, mean) %>% t %>% as.data.frame()
 # EI
-load(file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_diffS_EI__AICcmodavg.Rdata")
+load(file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_diffS_EI__AICcmodavg.Rdata")
 df_plot <- mdAvg_diffS_EI__AICcmodavg
 df_plot %<>% 
   mutate(p = p.z * sd(df_resultados$p) + mean(df_resultados$p),
@@ -357,7 +357,7 @@ l_p[[3]] <- as.ggplot(grid.arrange(p1,p2,ncol=2))
 ########### MNEI #############
 ##############################
 # modelo médio
-load(file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_diffS_EI__MuMIn.Rdata")
+load(file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_diffS_EI__MuMIn.Rdata")
 ## Predição
 df_md <- df_resultados %>% filter(MN=="EI")
 df_md$fit <- predict(mdAvg_diffS_EI__MuMIn,type="response")
@@ -431,7 +431,7 @@ Histograma 2D do número de ocorrência por viés na riqueza estimada (diffS) e 
 
 ```{r log OR fig 34,fig.width=8,fig.height=8}
 ################### Pr(nRef) ###################
-load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_mdPredict__nRef.Rdata")
+load("~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_mdPredict__nRef.Rdata")
 df_EE <- l_mdPredict[["EE"]]
 df_EI <- l_mdPredict[["EI"]]
 df_EI %<>% mutate(p = p.z * sd(df_resultados$p) + mean(df_resultados$p),
@@ -443,7 +443,7 @@ df_nRef <- cbind(df_EI,df_,
                  lower.logOR_EE.EI = df_EE$lower.CL - df_EI$lower.CL,
                  upper.logOR_EE.EI = df_EE$upper.CL - df_EI$upper.CL)
 ################### diffS EI ###################
-load(file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_diffS_EI__AICcmodavg.Rdata")
+load(file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_diffS_EI__AICcmodavg.Rdata")
 df_plot <- mdAvg_diffS_EI__AICcmodavg
 df_plot %<>% 
   mutate(p = p.z * sd(df_resultados$p) + mean(df_resultados$p),
@@ -566,7 +566,7 @@ Log da chance da razão (log OR) de não refutar uma SAD neutra do modelo neutro
 
 ```{r U predito, fig.height=5,fig.width=12}
 # dados
-df_plot <- read.csv("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/df_plotPredU.csv",
+df_plot <- read.csv("~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/df_plotPredU.csv",
                     header = TRUE,as.is = TRUE)
 ## graficos
 l_p <- list()
@@ -627,7 +627,7 @@ Predito para a taxa de especiação necessária para obter a riqueza observada n
 ## Sessão Support Information
 
 ```{r}
-load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/md_U.tp.Rdata")
+load("~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/md_U.tp.Rdata")
 appraise(md_U.tp)
 ```
 
