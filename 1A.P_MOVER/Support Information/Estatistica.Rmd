@@ -19,7 +19,7 @@ text-align: justify}
 ```{r setup, include=TRUE,echo=FALSE}
 knitr::opts_chunk$set(echo = FALSE, tidy = FALSE, include = TRUE, warning = FALSE,cache = TRUE,message=FALSE,eval=TRUE)
 # setwd("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/")
-knitr::opts_knit$set(root.dir = "~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/")
+knitr::opts_knit$set(root.dir = "/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/simulacao_codigos_e_resultados")
 ```
 
 ```{r pacotes,eval=TRUE,echo=TRUE}
@@ -49,7 +49,7 @@ library(dplyr)
 ```{r dados,message=FALSE}
 ### dados ###
 # leitura
-df_resultados <- read.csv(file="/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/resultados/df_resultados.csv",
+df_resultados <- read.csv(file="/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/simulacao_codigos_e_resultados/resultados/df_resultados.csv",
                             header = TRUE,as.is=FALSE)[,1:13]
 # padronização
 level_k <- as.character(unique(sort(as.numeric(df_resultados$k),decreasing = TRUE)))
@@ -74,7 +74,7 @@ df_resultados %<>% cbind(.,df_resultados.z) %>%
   select(-k_1,-k_1.z)
 ```
 
-testess
+
 
 
 # 1 - Variables
@@ -83,7 +83,7 @@ __table 1:__
 Variáveis utilizadas na descrição estatística
 
 ```{r 1 tabela de variaveis,echo=FALSE, eval=TRUE}
-df_variaveis <- read.csv("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/tabela_variaveis.csv",
+df_variaveis <- read.csv("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/tabela_variaveis.csv",
                          header = TRUE,as.is = FALSE) %>% 
   filter(code != "1-k")
 knitr::kable(df_variaveis,caption = "Variables") %>%
@@ -245,13 +245,13 @@ df_auditoria.md <- ldply(l_nRef__modeloCheio,f_warning,.id="glmer") %>%
 
 
 ```{r l_md_nRef.GLMM, eval=FALSE,echo=FALSE}
-save(l_nRef__modeloCheio,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md_nRef_GLMM.Rdata")
+save(l_nRef__modeloCheio,file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_md_nRef_GLMM.Rdata")
 ```
   
 __Table 2.1__ Modelos Cheios estimados e avisos de convergência  
   
 ```{r data frame com os avisos de ajustes,eval=TRUE,echo=FALSE}
-load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md_nRef_GLMM.Rdata")
+load("~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_md_nRef_GLMM.Rdata")
 # avaliação e melhora do ajuste dos modelos
 ## warnings
 f_warning <- function(glmm_object){
@@ -378,7 +378,7 @@ df_auditoria.md <- ldply(l_nRef__modeloCheio2,f_warning,.id="glmer") %>%
 
 
 ```{r l_nRef__modeloCheio2,eval=FALSE,echo=FALSE}
-save(l_nRef__modeloCheio2,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md_nRef_GLMM2.Rdata")
+save(l_nRef__modeloCheio2,file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_md_nRef_GLMM2.Rdata")
 ```
   
     
@@ -386,7 +386,7 @@ __Table 2.2__ Modelos Cheios estimados e avisos de convergência
     
       
 ```{r warningns l_nRef__modeloCheio2,eval=TRUE,echo=FALSE}
-load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md_nRef_GLMM2.Rdata")
+load("~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_md_nRef_GLMM2.Rdata")
 # avaliação e melhora do ajuste dos modelos
 ## warnings
 f_warning <- function(glmm_object){
@@ -427,11 +427,11 @@ __d.z 1|Site__
 v_glmerOK <- df_auditoria.md[df_auditoria.md$warning_message == "OK",]$glmer %>% 
   as.character()
 l_nRef_ModeloCheioFinal <- l_nRef__modeloCheio2[v_glmerOK]
-save(l_nRef_ModeloCheioFinal,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md_nRef_ModeloCheioFinal.Rdata")
+save(l_nRef_ModeloCheioFinal,file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_md_nRef_ModeloCheioFinal.Rdata")
 ```
 
 ```{r nRef modelo cheio final tabela de aIC,results="hide"}
-load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md_nRef_ModeloCheioFinal.Rdata")
+load("~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_md_nRef_ModeloCheioFinal.Rdata")
 df_tableGLMM <- print(AICctab(l_nRef_ModeloCheioFinal,weights=TRUE)) %>% 
   as.data.frame()
 df_tableGLMM$GLMM <- row.names(df_tableGLMM) %>% gsub(".z","",.)
@@ -590,14 +590,14 @@ l_nRefEE_mdCheio <- dlply(df_md,"md_class",f_md,.parallel = TRUE)
 
 
 ```{r save l_nRefEE_mdCheio, eval=FALSE}
-save(l_nRefEE_mdCheio,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_nRefEE_mdCheio.Rdata")
+save(l_nRefEE_mdCheio,file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_nRefEE_mdCheio.Rdata")
 ```
 
 
 __Tabela 2.2.1__ Comparação de modelos Cheios
 
 ```{r AICctab l_nRefEE_mdCheio,echo=FALSE,eval=TRUE}
-load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_nRefEE_mdCheio.Rdata")
+load("~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_nRefEE_mdCheio.Rdata")
 AICctab(l_nRefEE_mdCheio,weights=TRUE)
 df_md <- df_resultados %>% filter(MN=="EE") %>% distinct()
 md_nRefEE <- glmer(cbind(n_nRef,100-n_nRef) ~ 
@@ -666,7 +666,7 @@ save(l_md.dredge_nRefEE,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/
 
 
 ```{r selecao de variaveis nRefEE,eval=TRUE,echo=FALSE,results='hide'}
-load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md.dredge_nRefEE.Rdata")
+load("~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_md.dredge_nRefEE.Rdata")
 # AICctab
 df_tableGLMM <- print(AICctab(l_md.dredge_nRefEE,weights=TRUE)) %>% 
   as.data.frame()
@@ -689,14 +689,14 @@ knitr::kable(head(df_tableGLMM,n=10)) %>%
 ```{r model averaging EE MuMIn e AICcmodavg,message=FALSE,eval=FALSE}
 # Model Averaging for SiteCode predictions
 mdAvg_nRefEE__MuMIn <- model.avg(l_md.dredge_nRefEE)
-save(mdAvg_nRefEE__MuMIn,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_nRefEE__MuMIn.Rdata")
+save(mdAvg_nRefEE__MuMIn,file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_nRefEE__MuMIn.Rdata")
 # Model Averaging for new data predictions
 df_pred <- expand.grid(SiteCode=levels(df_resultados$SiteCode)[1],
                        d.z=seq(min(df_resultados$d.z),max(df_resultados$d.z),length=40),
                        p.z=seq(min(df_resultados$p.z),max(df_resultados$p.z),length=200))
 mdAvg_nRefEE__AICcmodavg <- modavgPred(l_md.dredge_nRefEE,newdata = df_pred) %>%
   cbind(df_pred)
-save(mdAvg_nRefEE__AICcmodavg,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_nRefEE__AICcmodavg.Rdata")
+save(mdAvg_nRefEE__AICcmodavg,file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_nRefEE__AICcmodavg.Rdata")
 ```
   
     
@@ -704,7 +704,7 @@ __Figura 2.2.4__ Observado e predito pelo modelo médio
 
 ```{r fig 224 nRefEE observado e predito modelo medio, comment=FALSE, message=FALSE,warning=FALSE,results="hide",fig.width=8, fig.height=30}
 # Modelo Global
-load(file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_nRefEE__MuMIn.Rdata")
+load(file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_nRefEE__MuMIn.Rdata")
 # Predição
 df_md <- df_resultados %>% filter(MN=="EE")
 df_md$Pr_nRef <- predict(mdAvg_nRefEE__MuMIn,type="response")*100
@@ -724,7 +724,7 @@ __Figura 2.2.5__ Predito pelo modelo médio para novo conjunto de dados
 
 ```{r figura 225 predito modelo medio novo conjunto de dados}
 # dados
-load(file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_nRefEE__AICcmodavg.Rdata")
+load(file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_nRefEE__AICcmodavg.Rdata")
 df_plot <- mdAvg_nRefEE__AICcmodavg
 df_plot %<>% 
   mutate(p = p.z * sd(df_resultados$p) + mean(df_resultados$p),
@@ -811,14 +811,14 @@ l_nRefEI_mdCheio <- dlply(df_md,"md_class",f_md,.parallel = TRUE)
 
 
 ```{r save l_nRefEI_mdCheio, eval=FALSE}
-save(l_nRefEI_mdCheio,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_nRefEI_mdCheio.Rdata")
+save(l_nRefEI_mdCheio,file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_nRefEI_mdCheio.Rdata")
 ```
 
 
 __Tabela 2.3.1__ Comparação de modelos Cheios
 
 ```{r AICctab l_nRefEI_mdCheio,echo=FALSE,eval=TRUE}
-load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_nRefEI_mdCheio.Rdata")
+load("~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_nRefEI_mdCheio.Rdata")
 AICctab(l_nRefEI_mdCheio,weights=TRUE)
 df_md <- df_resultados %>% filter(MN=="EI") %>% distinct()
 md_nRefEI <- glmer(cbind(n_nRef,100-n_nRef) ~ 
@@ -882,12 +882,12 @@ ggplot(df_md,aes(x=nRef_observado,y=nRef_predito)) +
 # todas as combinações de modelo do modelo cheio
 registerDoMC(3)
 l_md.dredge_nRefEI <- llply(dredge(md_nRefEI,trace = FALSE,evaluate=FALSE), eval,.parallel = TRUE)
-save(l_md.dredge_nRefEI,file = "~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md.dredge_nRefEI.Rdata")
+save(l_md.dredge_nRefEI,file = "~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_md.dredge_nRefEI.Rdata")
 ```
 
 
 ```{r selecao de variaveis nRefEI,eval=TRUE,echo=FALSE,results='hide'}
-load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md.dredge_nRefEI.Rdata")
+load("~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_md.dredge_nRefEI.Rdata")
 # AICctab
 df_tableGLMM <- print(AICctab(l_md.dredge_nRefEI,weights=TRUE)) %>% 
   as.data.frame()
@@ -917,7 +917,7 @@ df_pred <- expand.grid(SiteCode=levels(df_resultados$SiteCode)[1],
                        p.z=seq(min(df_resultados$p.z),max(df_resultados$p.z),length=200))
 mdAvg_nRefEI__AICcmodavg <- modavgPred(l_md.dredge_nRefEI,newdata = df_pred) %>%
   cbind(df_pred)
-save(mdAvg_nRefEI__AICcmodavg,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_nRefEI__AICcmodavg.Rdata")
+save(mdAvg_nRefEI__AICcmodavg,file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_nRefEI__AICcmodavg.Rdata")
 ```
     
   
@@ -925,7 +925,7 @@ __Figura 2.3.4__ Observado e predito pelo modelo médio
   
 ```{r fig 234 nRefEI observado e predito modelo medio, comment=FALSE, message=FALSE,warning=FALSE,results="hide",fig.width=8, fig.height=30}
 # Modelo Global
-load(file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_nRefEI__MuMIn.Rdata")
+load(file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_nRefEI__MuMIn.Rdata")
 # Predição
 df_md <- df_resultados %>% filter(MN=="EI")
 df_md$Pr_nRef <- predict(mdAvg_nRefEI__MuMIn,type="response")*100
@@ -946,7 +946,7 @@ __Figura 2.3.5__ Predito pelo modelo médio para novo conjunto de dados
 
 ```{r figura 235 predito modelo medio novo conjunto de dados}
 # dados
-load(file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_nRefEI__AICcmodavg.Rdata")
+load(file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_nRefEI__AICcmodavg.Rdata")
 df_plot <- mdAvg_nRefEI__AICcmodavg
 df_plot %<>% 
   mutate(p = p.z * sd(df_resultados$p) + mean(df_resultados$p),
@@ -1008,7 +1008,7 @@ l_p <- list()
 ########### MNEE #############
 ##############################
 # modelo médio
-load(file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_nRefEE__MuMIn.Rdata")
+load(file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_nRefEE__MuMIn.Rdata")
 ## Predição
 df_md <- df_resultados %>% filter(MN=="EE")
 df_md$Pr_nRef <- predict(mdAvg_nRefEE__MuMIn,type="response")*100
@@ -1038,7 +1038,7 @@ l_p[[3]] <- as.ggplot(grid.arrange(p1,p2,ncol=2))
 ########### MNEI #############
 ##############################
 # modelo médio
-load(file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_nRefEI__MuMIn.Rdata")
+load(file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_nRefEI__MuMIn.Rdata")
 ## Predição
 df_md <- df_resultados %>% filter(MN=="EI")
 df_md$Pr_nRef <- predict(mdAvg_nRefEI__MuMIn,type="response")*100
@@ -1085,10 +1085,10 @@ __Figura 2.4.1__ modavgPred(type="response")
 #############
 # dados
 ## MNEE
-load(file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_nRefEE__AICcmodavg.Rdata")
+load(file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_nRefEE__AICcmodavg.Rdata")
 mdAvg_nRefEE__AICcmodavg$MN <- "EE"
 ## MNEI
-load(file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_nRefEI__AICcmodavg.Rdata")
+load(file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_nRefEI__AICcmodavg.Rdata")
 mdAvg_nRefEI__AICcmodavg$MN <- "EI"
 ## df comum
 df_plot <- rbind(mdAvg_nRefEE__AICcmodavg,mdAvg_nRefEI__AICcmodavg)
@@ -1135,7 +1135,7 @@ grid.arrange(l_p.nRefEE_AICcmodavg[[1]],l_p.nRefEE_AICcmodavg[[2]],l_p.nRefEE_AI
 __Figura 2.4.2__ arm::invlogit(modavgPred(type="link"))
   
 ```{r load l_mdPredict nRef,eval=TRUE,echo=FALSE}
-load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_mdPredict__nRef.Rdata")
+load("~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_mdPredict__nRef.Rdata")
 ```
 
 ```{r figura 242,eval=TRUE,echo=FALSE}
@@ -1190,8 +1190,8 @@ grid.arrange(l_p.nRefEE_response[[1]],l_p.nRefEE_response[[2]],l_p.nRefEE_respon
   
 ```{r echo=FALSE,eval=FALSE}
 # predição na escala da função de ligação
-load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md.dredge_nRefEE.Rdata")
-load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md.dredge_nRefEI.Rdata")
+load("~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_md.dredge_nRefEE.Rdata")
+load("~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_md.dredge_nRefEI.Rdata")
 ```
 
 __Janela de Código 2.4.1__ modavgPred(type="link")
@@ -1215,12 +1215,12 @@ l_mdPredict <- llply(l_md,f_modavgPred,.parallel = TRUE)
 ```
 
 ```{r echo=FALSE,eval=FALSE}
-save(l_mdPredict,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_mdPredict__nRef.Rdata")
+save(l_mdPredict,file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_mdPredict__nRef.Rdata")
 ```
 
 
 ```{r load l_mdPredict nRef 1,eval=TRUE,echo=FALSE}
-load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_mdPredict__nRef.Rdata")
+load("~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_mdPredict__nRef.Rdata")
 ```
 
 
@@ -1488,7 +1488,7 @@ grid.arrange(l_p[[1]],l_p[[2]],l_p[[3]],l_p[[4]],
 ### Figura Final  
 
 ```{r load l_mdPredict nRef figura final,eval=TRUE,echo=FALSE}
-load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_mdPredict__nRef.Rdata")
+load("~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_mdPredict__nRef.Rdata")
 ```
 
   
@@ -1953,7 +1953,6 @@ df_ranef %>%
   
 __Figura 3.2.3__ Predito e observado  
   
-     ,fig.width=8, fig.height=30
 ```{r fig 323}
 #
 df_pred <- cbind(md_diffS@frame,
@@ -2136,14 +2135,14 @@ knitr::kable(head(df_tableGLMM,n=10)) %>%
 ```{r model averaging diffS EI MuMIn e AICcmodavg,message=FALSE,eval=FALSE}
 # Model Averaging for SiteCode predictions
 mdAvg_diffS_EI__MuMIn <- model.avg(l_md.dredge_diffS)
-save(mdAvg_diffS_EI__MuMIn,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_diffS_EI__MuMIn.Rdata")
+save(mdAvg_diffS_EI__MuMIn,file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_diffS_EI__MuMIn.Rdata")
 # Model Averaging for new data predictions
 df_pred <- expand.grid(SiteCode=levels(df_resultados$SiteCode)[1],
                        d.z=seq(min(df_resultados$d.z),max(df_resultados$d.z),length=40),
                        p.z=seq(min(df_resultados$p.z),max(df_resultados$p.z),length=200))
 mdAvg_diffS_EI__AICcmodavg <- modavgPred(l_md.dredge_diffS,newdata = df_pred) %>%
   cbind(df_pred)
-save(mdAvg_diffS_EI__AICcmodavg,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_diffS_EI__AICcmodavg.Rdata")
+save(mdAvg_diffS_EI__AICcmodavg,file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_diffS_EI__AICcmodavg.Rdata")
 ```
     
   
@@ -2151,7 +2150,7 @@ __Figura 2.3.4__ Observado e predito pelo modelo médio
   
 ```{r fig 234 diffS EI observado e predito modelo medio, comment=FALSE, message=FALSE,warning=FALSE,results="hide",fig.width=8, fig.height=30}
 # Modelo Global
-load(file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_diffS_EI__MuMIn.Rdata")
+load(file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_diffS_EI__MuMIn.Rdata")
 # Predição
 df_md <- df_resultados %>% filter(MN=="EI")
 df_md$fit <- predict(mdAvg_diffS_EI__MuMIn,type="response")
@@ -2290,7 +2289,7 @@ l_p[[3]] <- as.ggplot(grid.arrange(p1,p2,ncol=2))
 ########### MNEI #############
 ##############################
 # modelo médio
-load(file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_diffS_EI__MuMIn.Rdata")
+load(file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_diffS_EI__MuMIn.Rdata")
 ## Predição
 df_md <- df_resultados %>% filter(MN=="EI")
 df_md$fit <- predict(mdAvg_diffS_EI__MuMIn,type="response")
@@ -2431,11 +2430,11 @@ l_md.U_gamEstudo <- dlply(df_md.class,"md_class",f_md,.parallel = TRUE)
 ```
 
 ```{r save l_md.U_gamEstudo,eval=FALSE,echo=FALSE}
-save(l_md.U_gamEstudo,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md.U_gamEstudo.Rdata")
+save(l_md.U_gamEstudo,file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_md.U_gamEstudo.Rdata")
 ```
 
 ```{r load l_md.U_gamEstudo,eval=TRUE,echo=FALSE}
-load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md.U_gamEstudo.Rdata")
+load("~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_md.U_gamEstudo.Rdata")
 ```
 
 ```{r}
@@ -2501,12 +2500,12 @@ l_md.U_mdCheio <- dlply(df_md.class,"md_class",f_md)
 ```
 
 ```{r}
-save(l_md.U_mdCheio,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md.U_mdCheio.Rdata")
+save(l_md.U_mdCheio,file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_md.U_mdCheio.Rdata")
 ```
 
 
 ```{r}
-load(file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md.U_mdCheio.Rdata")
+load(file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_md.U_mdCheio.Rdata")
 AICctab(l_md.U_mdCheio)
 ```
 
@@ -2540,7 +2539,7 @@ md_U.update1 <- gam(U_med ~
              s(p.z,bs="cr",k=10) + s(d.z,bs="cr",k=12) + ti(p.z,d.z,bs=c("cr","cr"),k=c(10,12)) +
              s(SiteCode,bs="re") + s(d.z,by=SiteCode,bs="cr",m=1,k=12),
              data = df_md, family = Gamma(link="log"))
-save(md_U.update1,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/md_U.update1.Rdata")
+save(md_U.update1,file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/md_U.update1.Rdata")
 ```
 
 ```{r}
@@ -2563,7 +2562,7 @@ grid.arrange(grobs=l_p,ncol=2)
 ### observado e predito por sítio de amostragem
 
 ```{r U_med predito e observado para o modelo cheio,fig.width=8, fig.height=30}
-load(file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md.U_mdCheio.Rdata")
+load(file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_md.U_mdCheio.Rdata")
 gamm <- l_md.U_mdCheio[["gamm d|Site for each"]]
 # dados
 df_ <- broom::augment(gamm)
@@ -2612,12 +2611,12 @@ md_U.tp <- gam(U_med ~
              s(p.z,bs="tp",k=10) + s(d.z,bs="tp",k=10) + ti(p.z,d.z,bs=c("tp","tp"),k=c(10,10)) +
              s(SiteCode,bs="re") + s(d.z,by=SiteCode,bs="tp",m=1,k=10),
              data = df_md, family = Gamma(link="log"),method = "REML")
-save(md_U.tp,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/md_U.tp.Rdata")
+save(md_U.tp,file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/md_U.tp.Rdata")
 ```
 
 
 ```{r U_med predito e observado para o modelo cheio,fig.width=8, fig.height=30}
-load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/md_U.tp.Rdata")
+load("~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/md_U.tp.Rdata")
 ############################
 ##### primeiro código ######
 ############################
@@ -2684,7 +2683,7 @@ md_U.REML <- gam(U_med ~
              s(p.z,bs="cr",k=10) + s(d.z,bs="cr",k=10) + ti(p.z,d.z,bs=c("cr","cr"),k=c(10,10)) +
              s(SiteCode,bs="re") + s(d.z,by=SiteCode,bs="cr",m=1,k=10),
              data = df_md, family = Gamma(link="log"),method = "REML")
-save(md_U.REML,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/md_U.REML.Rdata")
+save(md_U.REML,file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/md_U.REML.Rdata")
 ```
 
 
@@ -2694,7 +2693,7 @@ md_U_sSobs <- gam(U_med ~
              s(p.z,bs="tp",k=10) + s(d.z,bs="tp",k=10) + ti(p.z,d.z,bs=c("tp","tp"),k=c(10,10)) +
              s(SiteCode,bs="re") + s(d.z,by=SiteCode,bs="tp",m=1,k=10),
              data = df_md, family = Gamma(link="log"),method = "REML")
-save(md_U_sSobs,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/md_U_sSobs.Rdata")
+save(md_U_sSobs,file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/md_U_sSobs.Rdata")
 ```
 
 
@@ -2742,10 +2741,10 @@ The following code was adapted from Gavin Simpson (2016) blog post [acessado em 
 
 ```{r figura final gam U df para predicao, eval=FALSE,echo=TRUE}
 # gamm c Sobs
-# load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/md_U.tp.Rdata")
+# load("~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/md_U.tp.Rdata")
 # gamm <- md_U.tp
 # gamm s Sobs
-load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/md_U_sSobs.Rdata")
+load("~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/md_U_sSobs.Rdata")
 gamm <- md_U_sSobs
 # rotina para obter o intervalo de confiabilidade
 ## objetos do modelo estimado
@@ -2774,13 +2773,13 @@ df_plot <- cbind(df,df_pred) %>%
          upper = exp(ICupper),
          p = p.z * sd(df_resultados$p) + mean(df_resultados$p),
          d = d.z * sd(df_resultados$d) + mean(df_resultados$d))
-write.csv(df_plot,file = "~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/df_plotPredU_sSobs.csv",row.names = FALSE)
+write.csv(df_plot,file = "~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/df_plotPredU_sSobs.csv",row.names = FALSE)
 ```
 
 
 ```{r U predito, fig.height=4,fig.width=9}
 # dados
-df_plot <- read.csv("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/df_plotPredU.csv",
+df_plot <- read.csv("~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/df_plotPredU.csv",
                     header = TRUE,as.is = TRUE)
 ## graficos
 l_p <- list()
