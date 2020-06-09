@@ -7,7 +7,7 @@ output:
     toc: true
     toc_depth: 5
 editor_options: 
-  chunk_output_type: console
+  chunk_output_type: inline
 ---
 
 <style>
@@ -17,7 +17,7 @@ text-align: justify}
 
 
 ```{r setup, include=TRUE,echo=FALSE}
-knitr::opts_chunk$set(echo = FALSE, tidy = FALSE, include = TRUE, warning = FALSE,cache = TRUE,message=FALSE,eval=TRUE)
+knitr::opts_chunk$set(echo = TRUE, tidy = FALSE, include = TRUE, warning = FALSE,cache = TRUE,message=FALSE,eval=TRUE)
 # setwd("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/")
 knitr::opts_knit$set(root.dir = "/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/simulacao_codigos_e_resultados")
 ```
@@ -95,7 +95,7 @@ knitr::kable(df_variaveis,caption = "Variables") %>%
 __Figure 1__ Possible Predictor Variables  
   
     
-```{r figura 11 possiveis variaveis preditoras,echo=FALSE,include=TRUE,fig.height=7,fig.align='center',fig.width=7}
+```{r figura 11 possiveis variaveis preditoras,echo=TRUE,include=FALSE,fig.height=7,fig.align='center',fig.width=7}
 l_p <- list()
 l_p[[1]] <- ggplot(df_resultados,aes(x=k,y=d)) +
   geom_jitter(alpha=0.3) +
@@ -122,7 +122,7 @@ grid.arrange(l_p[[1]],l_p[[2]],l_p[[3]],l_p[[4]],l_p[[5]],top="Possible Predicto
     
 __Figura 2.1__ número de SADs não refutadas ~ p *  k * MN. A linha azul é uma estimativa baseada em 'loess'.   
     
-```{r n_nRef padroes gerais fig21}
+```{r n_nRef padroes gerais fig21,eval=FALSE}
 l_p <- vector("list",2)
 l_p[[1]] <- ggplot(filter(df_resultados,k %in% levels(df_resultados$k)[1:10]),
                    aes(x=p,y=n_nRef)) + 
@@ -143,7 +143,7 @@ do.call("grid.arrange",c(l_p,ncol=2))
 __Figura 2.2__ número de SADs não refutadas ~ (d * MN|Site ~ p). Site está ordenado pelo valor de p.  
   
   
-```{r n_nRef padroes gerais fig22 ,fig.width=8, fig.height=27}
+```{r n_nRef padroes gerais fig22 ,fig.width=8, fig.height=27,eval=FALSE}
 df_plot <- df_resultados %>% mutate(title = paste0(SiteCode, " p=",round(p,digits = 3))) %>% arrange(p)
 df_plot$title <- factor(df_plot$title,levels = unique(df_plot$title))
 ggplot(df_plot,aes(x=d.z,y=n_nRef,group=MN)) +
@@ -451,7 +451,7 @@ knitr::kable(df_tableGLMM) %>%
   
 __Tabela 2.4__ Coeficiente de Determinação Condicional e Marginal
 
-```{r tabela 24 coeficiente de determinacao condicional e marginal,cache=TRUE}
+```{r tabela 24 coeficiente de determinacao condicional e marginal,cache=TRUE,eval=TRUE,echo=TRUE}
 md_nRef <- glmer(cbind(n_nRef,100-n_nRef) ~ 
                    (p.z + I(p.z^2)) * (d.z + I(d.z^2)) * MN + 
                    ( (d.z + I(d.z^2) ) * MN|SiteCode),
@@ -2340,7 +2340,7 @@ grid.arrange(grobs=l_p,
 __Figura 4.1__ Padrões Gerais  
     
     
-```{r U padroes gerais,eval=TRUE,echo=FALSE,fig.height=8,fig.width=8}
+```{r U padroes gerais,eval=FALSE,echo=FALSE,fig.height=8,fig.width=8}
 df_U <- df_resultados %>% filter(MN=="EE") %>% distinct
 l_p <- list()
 l_p[[1]] <- ggplot(df_U,aes(x=k,y=U_med)) +
@@ -2360,7 +2360,7 @@ grid.arrange(grobs=l_p,
 ```
 
 
-```{r}
+```{r,eval=FALSE}
 ggplot(df_U,aes(x=df_U$U_med)) +
   geom_histogram(bins=60)  + labs(x="",title = "Estimated Speciation Rate (U)")
 ```
@@ -2368,7 +2368,7 @@ ggplot(df_U,aes(x=df_U$U_med)) +
 
 __Figura 4.2__ Padrões gerais por Sítio de Amostragem
 
-```{r fig 42,eval=TRUE,echo=FALSE,fig.width=8, fig.height=27}
+```{r fig 42,eval=FALSE,echo=FALSE,fig.width=8, fig.height=27}
 df_plot <- df_U %>%
   mutate(title = paste0(SiteCode," p=",round(p,3))) %>% arrange(p)
 df_plot$title <- factor(df_plot$title,levels = unique(df_plot$title))
@@ -2378,10 +2378,59 @@ df_plot %>% ggplot(aes(x=d,y=U_med)) +
   facet_wrap(~title,ncol=5,scales="free")
 ```
 
-```{r}
+```{r eval=FALSE}
 df_resultados %>% ggplot(aes(x=log_Sobs,y=U_med)) +
   geom_point() + geom_smooth(method="lm")
 ```
+  
+## Efeito de log(Sobs)
+
+
+
+```{r}
+df_md <- df_resultados %>% filter(MN=="EE") %>% distinct()
+glmer_U <- glmer(U_med ~ log_Sobs + (1|SiteCode),data=df_md,family = Gamma(link="log"))
+summary(glmer_U)
+```
+
+
+
+```{r}
+p_plot <- simulateResiduals(glmer_U)
+plot(p_plot)
+```
+
+```{r}
+df_ranef <- ranef(glmer_U)$SiteCode
+df_ranef$SiteCode <- row.names(df_ranef)
+row.names(df_ranef) <- NULL
+df_ranef %>% 
+  gather(key = parameter_class,value = parameter_value, -SiteCode) %>% 
+  ggplot(aes(sample=parameter_value)) + 
+  stat_qq(alpha=0.3) + stat_qq_line(alpha=0.3,col="red") +
+  facet_wrap(~parameter_class,scales="free",ncol=3)
+```
+
+```{r}
+df_pred <- cbind(glmer_U@frame,
+                 predictInterval(glmer_U,type = "linear.prediction",level = 0.95))
+df_pred %>% mutate(fit_response = exp(fit)) %>% 
+  ggplot(aes(x=U_med,y=fit_response)) +
+  geom_abline(intercept = 0,slope = 1,color="red") +
+  geom_smooth(method = "loess",se = FALSE,color="blue",aes(group=SiteCode),alpha=0.3,size=0.2) +
+  geom_smooth(method = "lm",se=TRUE,color="green",formula = y~0+x) +
+  coord_cartesian(expand = TRUE) + labs(x="observado",y="predito") +
+  geom_point(alpha=0.3)
+```
+
+O modelo não faz um bom ajuste do observado, para descrever a incerteza do ajuste vou utilizar o intervalo de confiança de 95% bootstrap considerando toda a variação explicada pelo modelo e a variação explicada apenas pela estrutura fixa
+
+```{r}
+MuMIn::r.squaredGLMM(glmer_U)
+```
+
+__bootstrap da predição__
+
 
 
 
@@ -2506,7 +2555,7 @@ save(l_md.U_mdCheio,file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Inform
 
 ```{r}
 load(file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_md.U_mdCheio.Rdata")
-AICctab(l_md.U_mdCheio)
+AICctab(l_md.U_mdCheio,weights=TRUE)
 ```
 
 
