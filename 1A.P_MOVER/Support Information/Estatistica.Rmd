@@ -2431,6 +2431,45 @@ MuMIn::r.squaredGLMM(glmer_U)
 
 __bootstrap da predição__
 
+```{r}
+#new data
+df_newdat <- expand.grid(SiteCode=df_resultados$SiteCode[1], 
+                         log_Sobs = seq(min(df_resultados$log_Sobs),max(df_resultados$log_Sobs), length=150))
+## Passo 2: crie as função que devem ser calculadas dos modelos a cada simulação
+## Previstos por efeitos fixos e aleatórios
+f1 <- function(.) predict(., newdata=df_newdat)
+## Previstos por efeitos fixos (argumento re.form=~0)
+f2 <- function(.) predict(., newdata=df_newdat, re.form=~0)
+## Os dois bootstraps. Ajuste o argumento ncpus para o numero de cores de seu computador
+b3 <- bootMer(glmer_U, FUN = f1, nsim=1000, parallel="multicore", ncpus=2)
+b4 <- bootMer(glmer_U, FUN = f2, nsim=1000, parallel="multicore", ncpus=2)
+## calcula as médias e intervalos de confiança quantílicos para cada combinação de preditoras
+## no novo conjunto de dados
+df_newdat$mean <- apply(b3$t,2,mean)
+df_newdat$IC.low <- apply(b3$t,2,quantile, 0.025)
+df_newdat$IC.upp <- apply(b3$t,2,quantile, 0.975)
+df_newdat$mean.fixed <- apply(b4$t,2,mean)
+df_newdat$IC.low.fixed <- apply(b4$t,2,quantile, 0.025)
+df_newdat$IC.upp.fixed <- apply(b4$t,2,quantile, 0.975)
+df_newdat %<>% mutate(std_mean = exp(mean),
+                      std_IC.low = exp(IC.low),
+                      std_IC.upp = exp(IC.upp),
+                      std_mean.fixed = exp(mean.fixed),
+                      std_IC.low.fixed = exp(IC.low),
+                      std_IC.upp.fixed = exp(IC.upp.fixed))
+
+## graficos
+df_resultados %>% 
+  mutate(log_U = log(U_med)) %>% 
+  ggplot(aes(x=log_Sobs,y=log_U)) + 
+  # geom_ribbon(aes(y = std_mean, ymin=std_IC.low, ymax=std_IC.upp), data=df_newdat, fill="grey15", alpha=0.5) +
+  # geom_ribbon(aes(y=std_mean, ymin=std_IC.low.fixed, ymax=std_IC.upp.fixed), data=df_newdat, fill="white", alpha=0.5) +
+  # geom_line(aes(x=log_Sobs, y=std_mean.fixed), data=df_newdat,color="red") +
+  geom_ribbon(aes(y = mean, ymin=IC.low, ymax=IC.upp), data=df_newdat, fill="grey15", alpha=0.5) +
+  geom_ribbon(aes(y=mean, ymin=IC.low.fixed, ymax=IC.upp.fixed), data=df_newdat, fill="white", alpha=0.5) +
+  geom_line(aes(x=log_Sobs, y=mean.fixed), data=df_newdat,color="red") +
+  geom_point(alpha=0.3) +labs(x="ln(Sobs)",y="ln(U)",title="U - Estimated Especiation Rate")
+```
 
 
 
