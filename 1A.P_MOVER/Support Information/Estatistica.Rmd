@@ -7,7 +7,7 @@ output:
     toc: true
     toc_depth: 5
 editor_options: 
-  chunk_output_type: inline
+  chunk_output_type: console
 ---
 
 <style>
@@ -2393,6 +2393,11 @@ glmer_U <- glmer(U_med ~ log_Sobs + (1|SiteCode),data=df_md,family = Gamma(link=
 summary(glmer_U)
 ```
 
+```{r}
+predict_y <- exp(fixef(glmer_U)[1] + fixef(glmer_U)[2] * df_md$log_Sobs)
+plot(predict_y ~ df_md$log_Sobs)
+```
+
 
 
 ```{r}
@@ -2473,9 +2478,8 @@ df_resultados %>%
 
 
 
-## Modelos Cheios
+## GAMMM
 
-### Estudo GAM
 
 ```{r nRef MNEE estudo GAMM smoother type,echo=TRUE,eval=FALSE}
 # dados
@@ -2488,33 +2492,32 @@ f_md <- function(model_class){
   if(model_class == "tp"){
     md_ <- gam(U_med ~ log_Sobs.z +
                  s(d.z,bs="tp",k=10) + s(p.z,bs="tp",k=10) + ti(d.z,p.z,bs=c("tp","tp"),k=c(10,10)) +
-                 s(d.z,SiteCode,bs="fs",xt=list(bs="tp"), m=1,k=10),
+                 s(SiteCode,bs="re") + s(d.z,by=SiteCode,bs="tp",m=1,k=10),
                 data = df_md, Gamma(link = "log"),method = "REML")
   }else if(model_class == "cr"){
     md_ <- gam(U_med ~ log_Sobs.z +
                  s(d.z,bs="cr",k=10) + s(p.z,bs="cr",k=10) + ti(d.z,p.z,bs=c("cr","cr"),k=c(10,10)) +
-                 s(d.z,SiteCode,bs="fs",xt=list(bs="cr"), m=1,k=10),
+                 s(SiteCode,bs="re") + s(d.z,by=SiteCode,bs="cr",m=1,k=10),
                 data = df_md, Gamma(link = "log"),method = "REML")
   }else if(model_class == "cc"){
     md_ <- gam(U_med ~ log_Sobs.z +
                  s(d.z,bs="cc",k=10) + s(p.z,bs="cc",k=10) + ti(d.z,p.z,bs=c("cc","cc"),k=c(10,10)) +
-                 s(d.z,SiteCode,bs="fs",xt=list(bs="cc"), m=1,k=10),
+                 s(SiteCode,bs="re") + s(d.z,by=SiteCode,bs="cc",m=1,k=10),
                 data = df_md, Gamma(link = "log"),method = "REML")
   }else if(model_class == "ps"){
     md_ <- gam(U_med ~ log_Sobs.z +
                  s(d.z,bs="ps",k=10) + s(p.z,bs="ps",k=10) + ti(d.z,p.z,bs=c("ps","ps"),k=c(10,10)) +
-                 s(d.z,SiteCode,bs="fs",xt=list(bs="ps"), m=1,k=10),
+                 s(SiteCode,bs="re") + s(d.z,by=SiteCode,bs="ps",m=1,k=10),
                 data = df_md, Gamma(link = "log"),method = "REML")
   }else{
       md_ <- gam(U_med ~ log_Sobs.z +
                  s(d.z,bs="gp",k=10) + s(p.z,bs="gp",k=10) + ti(d.z,p.z,bs=c("gp","gp"),k=c(10,10)) +
-                 s(d.z,SiteCode,bs="fs",xt=list(bs="gp"), m=1,k=10),
+                 s(SiteCode,bs="re") + s(d.z,by=SiteCode,bs="gp",m=1,k=10),
                 data = df_md, Gamma(link = "log"),method = "REML")
   }
   return(md_)
 }
-registerDoMC(2)
-l_md.U_gamEstudo <- dlply(df_md.class,"md_class",f_md,.parallel = TRUE)
+l_md.U_gamEstudo <- dlply(df_md.class,"md_class",f_md)
 ```
 
 ```{r save l_md.U_gamEstudo,eval=FALSE,echo=FALSE}
@@ -2597,13 +2600,25 @@ load(file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_md.U_md
 AICctab(l_md.U_mdCheio,weights=TRUE)
 ```
 
+_____com termo parametrico log(Sobs)_____
 
 ```{r}
-
 md_U <- l_md.U_mdCheio[["gamm d|Site for each"]]
 appraise(md_U)
 summary(md_U)
 ```
+
+____sem termo parametrico log(Sobs)__
+
+```{r}
+df_md <- df_resultados %>% filter(MN=="EE") %>% distinct()
+md_U_sSobs <- gam(U_med ~ 
+                    s(p.z,bs="tp",k=10) + s(d.z,bs="tp",k=10) + ti(p.z,d.z,bs=c("tp","tp"),k=c(10,10)) +
+                    s(SiteCode,bs="re") + s(d.z,by=SiteCode,bs="tp",m=1,k=10),
+                  data = df_md, family = Gamma(link="log"),method="REML")  
+```
+
+
 
 
 ```{r}
