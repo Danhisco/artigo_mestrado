@@ -2591,12 +2591,12 @@ l_md.U_mdCheio <- dlply(df_md.class,"md_class",f_md)
 ```
 
 ```{r}
-save(l_md.U_mdCheio,file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_md.U_mdCheio.Rdata")
+save(l_md.U_mdCheio,file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_md.U_mdCheio_Sobs.Rdata")
 ```
 
 
 ```{r}
-load(file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_md.U_mdCheio.Rdata")
+load(file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_md.U_mdCheio_Sobs.Rdata")
 AICctab(l_md.U_mdCheio,weights=TRUE)
 ```
 
@@ -2616,7 +2616,10 @@ md_U_sSobs <- gam(U_med ~
                     s(p.z,bs="tp",k=10) + s(d.z,bs="tp",k=10) + ti(p.z,d.z,bs=c("tp","tp"),k=c(10,10)) +
                     s(SiteCode,bs="re") + s(d.z,by=SiteCode,bs="tp",m=1,k=10),
                   data = df_md, family = Gamma(link="log"),method="REML")  
+save(md_U_sSobs,file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/md_U_sSobs.Rdata")
 ```
+
+
 
 
 
