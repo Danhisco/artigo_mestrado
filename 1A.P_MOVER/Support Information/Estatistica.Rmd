@@ -2627,92 +2627,22 @@ AICctab(md_U_semSobs,md_U_comSobs,weights=TRUE)
 ```
 
 
-
-
-
-```{r}
-load(file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_md.U_mdCheio_semSobs.Rdata")
-AICctab(l_md.U_mdCheio,weights=TRUE)
-```
-
-_____com termo parametrico log(Sobs)_____
-
-```{r}
-md_U <- l_md.U_mdCheio[["gamm d|Site for each"]]
-appraise(md_U)
-summary(md_U)
-```
-
-____sem termo parametrico log(Sobs)__
-
-```{r}
-df_md <- df_resultados %>% filter(MN=="EE") %>% distinct()
-md_U_sSobs <- gam(U_med ~ 
-                    s(p.z,bs="tp",k=10) + s(d.z,bs="tp",k=10) + ti(p.z,d.z,bs=c("tp","tp"),k=c(10,10)) +
-                    s(SiteCode,bs="re") + s(d.z,by=SiteCode,bs="tp",m=1,k=10),
-                  data = df_md, family = Gamma(link="log"),method="REML")  
-save(md_U_sSobs,file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/md_U_sSobs.Rdata")
-```
-
-
-__Comparação gamm com e sem Sobs__
-
-```{r}
-glmer_U_cSobs <- l_md.U_mdCheio[["gamm d|Site for each"]]
-glmer_U_sSobs <- load(file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/md_U_sSobs.Rdata")  
-glmer_U_cSobs %>% summary
-```
-
-
-
-
-
-```{r}
-df_diag <- augment(md_U)
+```{r warning=FALSE,message=FALSE}
+df_diag <- augment(md_U_semSobs)
 l_p <- list()
 l_p[[1]] <- ggplot(df_diag, aes(x=p.z,y=.resid)) +
   geom_smooth(method="loess") +
-  geom_point(alpha=0.3) + labs(title = "p.z")
+  geom_point(alpha=0.3)
 l_p[[2]] <- ggplot(df_diag, aes(x=d.z,y=.resid)) +
   geom_smooth(method="loess") +
-  geom_point(alpha=0.3) + labs(title = "d.z")
-grid.arrange(grobs=l_p,ncol=2)
-```
-
-
-__update 1__
-
-```{r}
-df_md <- df_resultados %>% filter(MN=="EE") %>% distinct()
-md_U.update1 <- gam(U_med ~ 
-             s(p.z,bs="cr",k=10) + s(d.z,bs="cr",k=12) + ti(p.z,d.z,bs=c("cr","cr"),k=c(10,12)) +
-             s(SiteCode,bs="re") + s(d.z,by=SiteCode,bs="cr",m=1,k=12),
-             data = df_md, family = Gamma(link="log"))
-save(md_U.update1,file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/md_U.update1.Rdata")
-```
-
-```{r}
-appraise(md_U.update1)
-```
-
-
-```{r}
-df_diag <- augment(md_U.update1)
-l_p <- list()
-l_p[[1]] <- ggplot(df_diag, aes(x=p.z,y=.resid)) +
-  geom_smooth(method="loess") +
-  geom_point(alpha=0.3) + labs(title = "p.z")
-l_p[[2]] <- ggplot(df_diag, aes(x=d.z,y=.resid)) +
-  geom_smooth(method="loess") +
-  geom_point(alpha=0.3) + labs(title = "d.z")
-grid.arrange(grobs=l_p,ncol=2)
+  geom_point(alpha=0.3)
+grid.arrange(grobs=l_p,ncol=2,top="deviance residual ~ continuous predictors")
 ```
 
 ### observado e predito por sítio de amostragem
 
-```{r U_med predito e observado para o modelo cheio,fig.width=8, fig.height=30}
-load(file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_md.U_mdCheio.Rdata")
-gamm <- l_md.U_mdCheio[["gamm d|Site for each"]]
+```{r U_med predito e observado para o modelo cheio,fig.width=8, fig.height=30,eval=FALSE}
+gamm <- md_U_semSobs
 # dados
 df_ <- broom::augment(gamm)
 beta <- coef(gamm)
@@ -2750,106 +2680,6 @@ ggplot(df_plot,aes(x=d,y=U_med)) +
   #             color="blue",alpha=0.4) +
   labs(title="U; gam(bs=cr)") +
   facet_wrap(~title,ncol=5,scales = "free")
-```
-
-O modelo erra para alguns caso, vou comparar com um que utiliza 'tp'
-
-```{r }
-df_md <- df_resultados %>% filter(MN=="EE") %>% distinct()
-md_U.tp <- gam(U_med ~ 
-             s(p.z,bs="tp",k=10) + s(d.z,bs="tp",k=10) + ti(p.z,d.z,bs=c("tp","tp"),k=c(10,10)) +
-             s(SiteCode,bs="re") + s(d.z,by=SiteCode,bs="tp",m=1,k=10),
-             data = df_md, family = Gamma(link="log"),method = "REML")
-save(md_U.tp,file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/md_U.tp.Rdata")
-```
-
-
-```{r U_med predito e observado para o modelo cheio,fig.width=8, fig.height=30}
-load("~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/md_U.tp.Rdata")
-############################
-##### primeiro código ######
-############################
-# md_U.tp
-# dados
-df_ <- broom::augment(md_U.tp)
-# l_pred <- predict.gam(md_U,link=response,se.fit = TRUE)
-# df_$fit_response <- l_pred$fit
-# df_$se.fit_response <- l_pred$se.fit
-df_ %<>% mutate(fit_response = exp(.fitted),
-                se.fit_response = exp(.se.fit),
-                p = p.z * sd(df_resultados$p) + mean(df_resultados$p),
-                d = d.z * sd(df_resultados$d) + mean(df_resultados$d))
-# df_ %>% summary
-############################
-##### segundo código #######
-############################
-gamm <- md_U.tp
-beta <- coef(gamm)
-V <- vcov(gamm)
-##  simulação de parâmetros
-num_beta_vecs <- 10000
-Cv <- chol(V)
-set.seed(1)
-nus <- rnorm(num_beta_vecs * length(beta))
-beta_sims <- beta + t(Cv) %*% matrix(nus, nrow = length(beta), ncol = num_beta_vecs)
-# dim(beta_sims)
-matrix_lprediction <- predict(gamm,type="lpmatrix") 
-predict_link <- matrix_lprediction %*% beta_sims
-df_pred <- t(apply(predict_link,1,function(X) quantile(X,probs = c(0.05,0.50,0.95)))) %>% 
-  as.data.frame()
-names(df_pred) <- c("IClower","median","ICupper")
-df_plot <- cbind(df_,df_pred) %>% 
-  mutate(fit = exp(median),
-         lower = exp(IClower),
-         upper = exp(ICupper),
-         fit_predict = exp(.fitted),
-         p = p.z * sd(df_resultados$p) + mean(df_resultados$p),
-         d = d.z * sd(df_resultados$d) + mean(df_resultados$d))
-# plot(fit ~ fit_predict,data=df_plot)
-# grafico
-df_plot %<>% mutate(title = paste0(SiteCode," p=",round(p,3))) %>% arrange(p)
-df_plot$title <- factor(df_plot$title,levels = unique(df_plot$title))
-ggplot(df_plot,aes(x=d,y=U_med)) +
-  geom_ribbon(aes(ymin=lower,ymax=upper),alpha=0.3,fill="blue") +
-  geom_line(aes(y=fit),color="red",alpha=0.6) +
-  geom_point(alpha=0.4) +
-  # geom_ribbon(aes(ymin=fit_response - 1.96 * se.fit_response,
-  #                 ymax=fit_response + 1.96 * se.fit_response),
-  #             color="blue",alpha=0.4) +
-  labs(title="U; gam(bs=tp)") +
-  facet_wrap(~title,ncol=5,scales = "free")
-```
-
-
-
-commit para codigos de comparação 
-
-e887e47e8beea566d95d930f85003cd8bbb184f3
-
-```{r}
-df_md <- df_resultados %>% filter(MN=="EE") %>% distinct()
-md_U.REML <- gam(U_med ~ 
-             s(p.z,bs="cr",k=10) + s(d.z,bs="cr",k=10) + ti(p.z,d.z,bs=c("cr","cr"),k=c(10,10)) +
-             s(SiteCode,bs="re") + s(d.z,by=SiteCode,bs="cr",m=1,k=10),
-             data = df_md, family = Gamma(link="log"),method = "REML")
-save(md_U.REML,file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/md_U.REML.Rdata")
-```
-
-
-```{r}
-df_md <- df_resultados %>% filter(MN=="EE") %>% distinct()
-md_U_sSobs <- gam(U_med ~ 
-             s(p.z,bs="tp",k=10) + s(d.z,bs="tp",k=10) + ti(p.z,d.z,bs=c("tp","tp"),k=c(10,10)) +
-             s(SiteCode,bs="re") + s(d.z,by=SiteCode,bs="tp",m=1,k=10),
-             data = df_md, family = Gamma(link="log"),method = "REML")
-save(md_U_sSobs,file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/md_U_sSobs.Rdata")
-```
-
-
-```{r}
-df_md <- df_resultados %>% filter(MN=="EE") %>% distinct()
-glmm_U <- glmer(U_med ~ log_Sobs + (1|SiteCode), 
-                data = df_md, family =  Gamma(link="log"))
 ```
 
 
