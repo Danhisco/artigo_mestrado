@@ -7,7 +7,7 @@ output:
     toc: true
     toc_depth: 5
 editor_options: 
-  chunk_output_type: console
+  chunk_output_type: inline
 ---
 
 <style>
@@ -2542,45 +2542,45 @@ Commit com os codigos para gamm nRef [referência]:
 df_md <- df_resultados %>% filter(MN=="EE") %>% 
   distinct()
 df_md.class <- data.frame(md_class=c("glmm 1|Site",
-                                     "gamm d|Site for each",
+                                           "gamm d|Site for each",
                                      "gamm d|Site common",
                                      "gamm 1|Site"))
 # função de ajuste
 f_md <- function(dados){
   md_class <- unique(dados$md_class)
   if(md_class == "glmm d+d^2|Site"){
-    md_ <- glmer(U_med ~ log_Sobs.z +
+    md_ <- glmer(U_med ~ 
                    (p.z + I(p.z^2)) * (d.z + I(d.z^2)) + 
                    (d.z + I(d.z^2)|SiteCode),
                  family = Gamma(link="log"),data=df_md,
                  control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e6)),
                  na.action = "na.fail")
   }else if(md_class == "glmm d|Site"){
-    md_ <- glmer(U_med ~ log_Sobs.z +
+    md_ <- glmer(U_med ~ 
                    (p.z + I(p.z^2)) * (d.z + I(d.z^2)) + 
                    (d.z|SiteCode),
                  family = Gamma(link="log"),data=df_md,
                  control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e6)),
                  na.action = "na.fail")
   }else if(md_class == "glmm 1|Site"){
-    md_ <- glmer(U_med ~ log_Sobs.z +
+    md_ <- glmer(U_med ~
                    (p.z + I(p.z^2)) * (d.z + I(d.z^2)) + 
                    (1|SiteCode),
                  family = Gamma(link="log"),data=df_md,
                  control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e6)),
                  na.action = "na.fail")
   }else if(md_class == "gamm d|Site for each"){
-    md_ <- gam(U_med ~ log_Sobs.z +
+    md_ <- gam(U_med ~
                  s(p.z,bs="tp",k=10) + s(d.z,bs="tp",k=10) + ti(p.z,d.z,bs=c("tp","tp"),k=c(10,10)) +
                  s(SiteCode,bs="re") + s(d.z,by=SiteCode,bs="tp",m=1,k=10),
                 data = df_md, family = Gamma(link="log"),method="REML")
   }else if(md_class == "gamm d|Site common"){
-    md_ <- gam(U_med ~ log_Sobs.z +
+    md_ <- gam(U_med ~
                  s(p.z,bs="cr",k=10) + s(d.z,bs="tp",k=10) + ti(p.z,d.z,bs=c("tp","tp"),k=c(10,10)) +
                  s(d.z,SiteCode,bs="fs",xt=list(bs="tp"), m=1,k=10),
                 data = df_md, family = Gamma(link="log"),method="REML")
   }else{
-    md_ <- gam(U_med ~ log_Sobs.z +
+    md_ <- gam(U_med ~
                  s(p.z,bs="tp",k=10) + s(d.z,bs="tp",k=10) + ti(p.z,d.z,bs=c("tp","tp"),k=c(10,10)) +
                  s(SiteCode,bs="re"),
                 data = df_md, family = Gamma(link="log"),method="REML")
@@ -2591,12 +2591,47 @@ l_md.U_mdCheio <- dlply(df_md.class,"md_class",f_md)
 ```
 
 ```{r}
-save(l_md.U_mdCheio,file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_md.U_mdCheio_Sobs.Rdata")
+save(l_md.U_mdCheio,file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_md.U_mdCheio_semSobs.Rdata")
 ```
 
 
+__comparação com e sem Sobs___
+
+```{r eval=FALSE}
+# dados
+## sem Sobs
+load(file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_md.U_mdCheio_semSobs.Rdata")
+l_md.U_semSobs <- l_md.U_mdCheio
+# l_md.U_semSobs %>% length()
+## com Sobs
+load(file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_md.U_mdCheio.Rdata")
+l_md.U_comSobs <- l_md.U_mdCheio
+l_md.U_comSobs %>% length()
+
+## AICctab
+# AICctab(l_md.U_semSobs,weights=T)
+md_U_semSobs<- l_md.U_semSobs[["gamm d|Site common"]]
+# AICctab(l_md.U_comSobs,weights=T)
+md_U_comSobs<- l_md.U_comSobs[["gamm d|Site common"]]
+
+## graf diag
+gratia::appraise(md_U_semSobs)
+gratia::appraise(md_U_comSobs)
+
+## summary
+summary(md_U_semSobs)
+summary(md_U_comSobs)
+
+## melhor modelo
+AICctab(md_U_semSobs,md_U_comSobs,weights=TRUE)
+```
+
+
+
+
+
 ```{r}
-load(file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_md.U_mdCheio_Sobs.Rdata")
+load(file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_md.U_mdCheio_semSobs.Rdata")
 AICctab(l_md.U_mdCheio,weights=TRUE)
 ```
 
@@ -2619,6 +2654,14 @@ md_U_sSobs <- gam(U_med ~
 save(md_U_sSobs,file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/md_U_sSobs.Rdata")
 ```
 
+
+__Comparação gamm com e sem Sobs__
+
+```{r}
+glmer_U_cSobs <- l_md.U_mdCheio[["gamm d|Site for each"]]
+glmer_U_sSobs <- load(file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/md_U_sSobs.Rdata")  
+glmer_U_cSobs %>% summary
+```
 
 
 
