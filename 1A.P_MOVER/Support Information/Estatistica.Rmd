@@ -7,7 +7,7 @@ output:
     toc: true
     toc_depth: 5
 editor_options: 
-  chunk_output_type: console
+  chunk_output_type: inline
 ---
 
 <style>
@@ -2580,17 +2580,17 @@ f_md <- function(dados){
                  na.action = "na.fail")
   }else if(md_class == "gamm d|Site for each"){
     md_ <- gam(U_med ~
-                 s(p.z,bs="cr",k=10) + s(d.z,bs="cr",k=10) + ti(p.z,d.z,bs=c("cr","tp"),k=c(10,10)) +
-                 s(SiteCode,bs="re") + s(d.z,by=SiteCode,bs="tp",m=1,k=10),
+                 s(p.z,bs="cr",k=10) + s(d.z,bs="cr",k=10) + ti(p.z,d.z,bs=c("cr","cr"),k=c(10,10)) +
+                 s(SiteCode,bs="re") + s(d.z,by=SiteCode,bs="cr",m=1,k=10),
                 data = df_md, family = Gamma(link="log"),method="REML")
   }else if(md_class == "gamm d|Site common"){
     md_ <- gam(U_med ~
-                 s(p.z,bs="cr",k=10) + s(d.z,bs="tp",k=10) + ti(p.z,d.z,bs=c("tp","tp"),k=c(10,10)) +
-                 s(d.z,SiteCode,bs="fs",xt=list(bs="tp"), m=1,k=10),
+                 s(p.z,bs="cr",k=10) + s(d.z,bs="cr",k=10) + ti(p.z,d.z,bs=c("cr","cr"),k=c(10,10)) +
+                 s(d.z,SiteCode,bs="fs",xt=list(bs="cr"), m=1,k=10),
                 data = df_md, family = Gamma(link="log"),method="REML")
   }else{
     md_ <- gam(U_med ~
-                 s(p.z,bs="tp",k=10) + s(d.z,bs="tp",k=10) + ti(p.z,d.z,bs=c("tp","tp"),k=c(10,10)) +
+                 s(p.z,bs="cr",k=10) + s(d.z,bs="cr",k=10) + ti(p.z,d.z,bs=c("cr","cr"),k=c(10,10)) +
                  s(SiteCode,bs="re"),
                 data = df_md, family = Gamma(link="log"),method="REML")
   }
@@ -2601,6 +2601,12 @@ l_md.U_mdCheio <- dlply(df_md.class,"md_class",f_md)
 
 ```{r}
 save(l_md.U_mdCheio,file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_md.U_mdCheio_semSobs.Rdata")
+```
+
+```{r}
+load("~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_md.U_mdCheio_semSobs.Rdata")
+AICctab(l_md.U_mdCheio,weights=T)
+md_U <- l_md.U_mdCheio[["gamm d|Site for each"]]
 ```
 
 
@@ -2645,7 +2651,7 @@ AICctab(md_U_semSobs,md_U_comSobs,md_U.cr,weights=TRUE)
 
 
 ```{r warning=FALSE,message=FALSE}
-df_diag <- augment(md_U.cr)
+df_diag <- augment(md_U)
 l_p <- list()
 l_p[[1]] <- ggplot(df_diag, aes(x=p.z,y=.resid)) +
   geom_smooth(method="loess") +
@@ -2659,7 +2665,7 @@ grid.arrange(grobs=l_p,ncol=2,top="deviance residual ~ continuous predictors")
 ### observado e predito por sítio de amostragem
 
 ```{r U_med predito e observado para o modelo cheio,fig.width=8, fig.height=30,eval=FALSE}
-gamm <- md_U.cr
+gamm <- md_U
 # dados
 df_ <- broom::augment(gamm)
 beta <- coef(gamm)
