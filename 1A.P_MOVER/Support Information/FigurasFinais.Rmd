@@ -7,7 +7,7 @@ output:
     toc: true
     toc_depth: 5
 editor_options: 
-  chunk_output_type: inline
+  chunk_output_type: console
 ---
 <style>
 body {
@@ -16,8 +16,8 @@ text-align: justify}
 
 ```{r setup, include=TRUE,echo=FALSE}
 knitr::opts_chunk$set(echo = FALSE, tidy = FALSE, include = TRUE, warning = FALSE,cache = TRUE,message=FALSE,eval=TRUE)
-# setwd("~/Documentos/artigo_mestrado/1A.P_MOVER/simulacao/")
-knitr::opts_knit$set(root.dir = "~/Documentos/artigo_mestrado/1A.P_MOVER/simulacao/")
+setwd("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/simulacao_codigos_e_resultados")
+knitr::opts_knit$set(root.dir = "/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/simulacao_codigos_e_resultados")
 ```
 
 ```{r pacotes,eval=TRUE,echo=TRUE,warning=FALSE,message=FALSE}
@@ -45,7 +45,7 @@ library(dplyr)
 ```{r dados,message=FALSE}
 ### dados ###
 # leitura
-df_resultados <- read.csv(file="/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/simulacao/resultados/df_resultados.csv",
+df_resultados <- read.csv(file="/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/simulacao_codigos_e_resultados/resultados/df_resultados.csv",
                             header = TRUE,as.is=FALSE)[,1:13]
 # padronização
 level_k <- as.character(unique(sort(as.numeric(df_resultados$k),decreasing = TRUE)))
@@ -69,6 +69,8 @@ names(df_resultados.z) <- sapply(names(df_resultados.z), function(x) paste0(x,".
 df_resultados %<>% cbind(.,df_resultados.z) %>% 
   select(-k_1,-k_1.z)
 ```
+
+
 
 
 # 3.1 - Número de SADs não refutadas (nRef)
@@ -310,7 +312,7 @@ grid.arrange(grobs=l_p,
 # apply(df_predEE,2,function(X) formatC(X,format = "e",digits=3))
 ```
 
-### Figura 3.2 - legenda:  
+### Figura 3.2.1 - legenda:  
 
 Predito para o viés na riqueza estimada (diffS) do modelo neutro de espaço implícito (EI) e em detalhe o predito para o modelo neutro de espaço explícito (EE, área racharuda e contorno em vermelho). No painel superior o predito pelo modelo médio, nos painéis inferiores o intervalo de confiança de 5% e 95%. Foi utilizado um LMM (Bolker et al. 2009) para descrever diffS = (S - Sobs)/Sobs, S = riqueza de espécies predita e Sobs = riqueza observada. Para EE um LMM com intercepto global (estrutura fixa) e um intercepto por sítio de amostragem (estrutura aleatória) foi suficiente para descrever o observado. Em vermelho há o contorno do valor de diffS igual à média estimada para EE (-7.14e-3) e a área racharuda corresponde aos valores de diffS dentro do intervalo de confiança de 5% e 95%, -3.410e-2 e 1.971e-02 respectivamente. Para EI um LMM com termo linear e quadrático para p e d na estrutura fixa e um termo linear para d por sítio de amostragem (estrutura aleatporia) foi usado como modelo cheio; o predito para o modelo médio foi calculado segundo AICc (Burnham & Andersen 2002). 
 
@@ -401,7 +403,7 @@ plot_grid(title,
 
 Gráficos diagnóstico dos modelos estatísticos ajustados para os dados separados por modelo neutro: primeira coluna - modelo neutro de espaço explícito (EE); segunda coluna - modelo neutro de espaço implícito (EI). Na primeira linha há o observado contra o predito; para EE a média em vermelho e o intervalo de 95% em azul; para EI  em azul há o estimado pela função geom_smooth do pacote ‘ggplot2’ (REF). Na segunda linha há o gráfico quantil observado e quantil esperado segundo uma distribuição normal dos coeficientes estimados na estrutura aleatória do modelo cheio. Na terceira linha há os resíduos quantílicos do pacote ‘DHARMa’, primeira coluna há o gráfico quantil-quantil pressuposto distribuição uniforme, na segunda coluna regressão quantílica. Retas vermelhas correspondem à 1=1; exceto nos gráficos de regressão quantílica onde representa a reta da mediana esperada, linha tracejada vermelha é a mediana estimada. No gráfico quantil-quantil pressuposto uniforme dos resíduos quantílicos há 3 testes: primeiro o de aderência dos resíduos à distribuição uniforme segundo o teste Kolmogorov-Smirnov padrão; o segundo um teste de dispersão dos dados; terceiro um teste de presença de outliers.
 
-# 3.3 - Congruência entre nRef e diffS
+# 3.2.2. - Congruência entre nRef e diffS
 
 ## Sessão Resultados
 
@@ -418,14 +420,12 @@ ggplot(df_resultados,aes(x=diffS_mean,y=n_nRef)) +
   facet_wrap(~MN,ncol=2,scales="free")
 ```
 
-### Figura 3.3 - legenda:
+### Figura 3.2.2 - legenda:
 
 Histograma 2D do número de ocorrência por viés na riqueza estimada (diffS) e número de SADs não refutadas (nRef) por modelo neutro (EE = modelo neutro de espaço explícito; EI = modelo neutro de espaço implícito). O plano diffS e nRef é subdivido em 30 quadrados de igual área, a cor do quadrado representa o número de ocorrências. As linhas verticais vermelhas marcam diffS = -0.25 e 0.25.
 
 
-## Sessão Support Information
-
-# 3.4 - Log da razão da chance MNEE/MNEI (logOR)
+# 3.3 - Log da razão da chance MNEE/MNEI (logOR)
 
 ## Sessão Resultados
 
@@ -553,16 +553,117 @@ lay_mat <- rbind(c(1,3),
 grid.arrange(grobs = l_p, layout_matrix = lay_mat,top="log Odds Ratio (EE/EI)")
 ```
 
-### Figura 3.4 - legenda:
+### Figura 3.3 - legenda:
 
 Log da chance da razão (log OR) de não refutar uma SAD neutra do modelo neutro de espaço explícito (EE) em relação ao modelo neutro de espaço implícito, EE,
  pelo modelo neutro de espaço implícito, EI, (log OR): direita - estimado; esquerda - rachurado se o módulo do viés da riqueza estimada for maior do que 0.25 (figura 3.2) e a probabilidade de não refutar uma SAD neutra for maior do que 0.5 (figura 3.1). O teste KS bootstrap calcula o p-valor da hipótese nula de que a SAD observada e predita são amostradas de uma mesma distribuição teórica baseado na estatística D, a maior distância entre a distribuição empirica acumulada da SAD observada e predita. O viés na riqueza estimada mede a magnitude do desvio na riqueza estimada em termos de proporção de riqueza observada. Podemos pressumir que não é razoável que a probabilidade de não refutar uma SAD neutra seja maior do que 0.5 se o módulo do viés da riqueza estimada for maior do que 0.25. Portanto, a área rachurada mostra onde o teste KS bootstrap deve estar sendo mais rigoroso para EE, que apresenta viés da riqueza estimada próxima de zero, do que para EI que apresenta grande variação no viés da riqueza estimada e pode apresentar alto número de SADs não refutadas (figura 3.3). Subtraimos o log chance estimada para EE pelo estimado para EI para calcular o log OR. 
  
  
+ 
+# 3.4.1 - ln(U) ~ ln(Sobs)
+ 
+## Sessão Resultados
 
-# 3.5 - Taxa de especiação estimada para obter a riqueza observada no equilíbrio (U)
+```{r cache=TRUE}
+# modelo
+df_md <- df_resultados %>% filter(MN=="EE") %>% distinct()
+glmer_U <- glmer(U_med ~ log_Sobs + (1|SiteCode),data=df_md,family = Gamma(link="log"))
+#new data
+df_newdat <- expand.grid(SiteCode=df_resultados$SiteCode[1], 
+                         log_Sobs = seq(min(df_resultados$log_Sobs),max(df_resultados$log_Sobs), length=150))
+## Passo 2: crie as função que devem ser calculadas dos modelos a cada simulação
+## Previstos por efeitos fixos e aleatórios
+f1 <- function(.) predict(., newdata=df_newdat)
+## Previstos por efeitos fixos (argumento re.form=~0)
+f2 <- function(.) predict(., newdata=df_newdat, re.form=~0)
+## Os dois bootstraps. Ajuste o argumento ncpus para o numero de cores de seu computador
+b3 <- bootMer(glmer_U, FUN = f1, nsim=1000, parallel="multicore", ncpus=2)
+b4 <- bootMer(glmer_U, FUN = f2, nsim=1000, parallel="multicore", ncpus=2)
+## calcula as médias e intervalos de confiança quantílicos para cada combinação de preditoras
+## no novo conjunto de dados
+df_newdat$mean <- apply(b3$t,2,mean)
+df_newdat$IC.low <- apply(b3$t,2,quantile, 0.025)
+df_newdat$IC.upp <- apply(b3$t,2,quantile, 0.975)
+df_newdat$mean.fixed <- apply(b4$t,2,mean)
+df_newdat$IC.low.fixed <- apply(b4$t,2,quantile, 0.025)
+df_newdat$IC.upp.fixed <- apply(b4$t,2,quantile, 0.975)
+df_newdat %<>% mutate(std_mean = exp(mean),
+                      std_IC.low = exp(IC.low),
+                      std_IC.upp = exp(IC.upp),
+                      std_mean.fixed = exp(mean.fixed),
+                      std_IC.low.fixed = exp(IC.low),
+                      std_IC.upp.fixed = exp(IC.upp.fixed))
+
+## graficos
+df_resultados %>% 
+  mutate(log_U = log(U_med)) %>% 
+  ggplot(aes(x=log_Sobs,y=log_U)) + 
+  # geom_ribbon(aes(y = std_mean, ymin=std_IC.low, ymax=std_IC.upp), data=df_newdat, fill="grey15", alpha=0.5) +
+  # geom_ribbon(aes(y=std_mean, ymin=std_IC.low.fixed, ymax=std_IC.upp.fixed), data=df_newdat, fill="white", alpha=0.5) +
+  # geom_line(aes(x=log_Sobs, y=std_mean.fixed), data=df_newdat,color="red") +
+  geom_ribbon(aes(y = mean, ymin=IC.low, ymax=IC.upp), data=df_newdat, fill="grey15", alpha=0.5) +
+  geom_ribbon(aes(y=mean, ymin=IC.low.fixed, ymax=IC.upp.fixed), data=df_newdat, fill="white", alpha=0.5) +
+  geom_line(aes(x=log_Sobs, y=mean.fixed), data=df_newdat,color="red") +
+  geom_point(alpha=0.3) +labs(x="ln(Sobs)",y="ln(U)",title="U - Estimated Especiation Rate")
+```
+
+### Legenda Figura 3.4.1:
+
+Log da taxa de especiação estimada ( ln(U) ) pelo log da riqueza observada ( ln(Sobs) ). O modelo utilizado foi um GLMM Gamma com log da riqueza observada como preditora e um intercepto por sítio de amostragem. O modelo ajustado não apresenta boa concordância com os pressupostos do modelo estatístico. O coeficiente de determinação marginal e condicional são aproximadamente 0.48 e 0.65 respectivamente [???]. Os parâmetros do modelo ajustado são -9.479 para o intercepto e 0.9593 para a inclinação em log da riqueza observada. O valor médio estimado é a reta em vermelho; a área em cinza mais claro é o intervalo de confiança de 95% bootstrap quando consideramos apenas a estrutura fixa do modelo; a área em cinza escuro é o intervalo de confiança de 95% quando incluimos a estrutura aleatória.
+ 
+ 
+## Support Information
+
+```{r FF nRef: graficos diagnosticos 1,eval=TRUE,echo=FALSE,fig.show='hide',fig.height=6}
+#
+l_p <- list()
+##############################
+########### MNEE #############
+##############################
+## Predição
+df_md <- augment(glmer_U) %>% 
+  mutate(fit_response = exp(.fitted))
+l_p[[1]] <- ggplot(df_md,aes(x=U_med,y=fit_response)) +
+  scale_x_continuous(expand = c(0, 0)) +
+  scale_y_continuous(expand = c(0, 0)) +
+  geom_abline(intercept = 0,slope = 1,color="red") +
+  geom_smooth(method = "loess",se = FALSE,color="black",aes(group=SiteCode),alpha=0.3,size=0.2) +
+  geom_smooth(method = "lm",se=TRUE,color="blue",formula = y~0+x) +
+  coord_cartesian(expand = TRUE) + labs(x="observado",y="predito") +
+  geom_point(alpha=0.3) +
+  labs(x="observado",y="predito")
+## qqnorm ranef
+df_ranef <- ranef(glmer_U)$SiteCode 
+df_ranef$SiteCode <- row.names(df_ranef)
+row.names(df_ranef) <- NULL
+l_p[[2]] <- df_ranef %>% 
+  gather(key = parameter_class,value = parameter_value, -SiteCode) %>% 
+  ggplot(aes(sample=parameter_value)) + 
+  stat_qq(alpha=0.3) + stat_qq_line(alpha=0.3,col="red") +
+  facet_wrap(~parameter_class,scales="free",ncol=1)
+## diagnostico DHARMa
+p_plot <- DHARMa::simulateResiduals(glmer_U,n=1000)
+l_p[[3]] <- as.ggplot(~plot(p_plot))
+## arrange
+grid.arrange(grobs = l_p,layout_matrix = rbind(c(1,2),3))
+```
+
+### Legenda Figura S.XXXX:
+
+Graficos diagnostico do GLMM para descrever o efeito de log da riqueza observada em U. No primeiro painel há o predito e observado, em vermelho a reta y=x, em azul a regressão linear sem intercepto. No segundo painel o gráfico quantil-quantil do esperado segundo uma distribuiçao normal e o observado. Na segunda linha há os gráficos do pacote DHARMa para os resíduos quantílicos. 
+
+
+# 3.4.2 - U ~ f(d,p)
+
 
 ## Sessão Resultados
+
+```{r include=FALSE,eval=FALSE}
+# df_plot %>% summary
+df_plot %>% select(lower,fit,upper) %>% apply(.,2,range) %>% formatC(.,digits=2,format="e")
+```
+
+
 
 ```{r U predito, fig.height=5,fig.width=12}
 # dados
@@ -618,7 +719,7 @@ l_p[[3]] <- ggplot(df_plot,aes(x=p,y=d,fill=upper)) +
 grid.arrange(grobs=l_p,ncol=3,top="Speciation Rate")
 ```
 
-### Figura 3.5 - legenda:
+### Figura 3.4.2 - legenda:
 
 Predito para a taxa de especiação necessária para obter a riqueza observada no equilíbrio (U), segundo o modelo neutro de espaço explícito, em função da distância média de dispersão (d) e a proporção de cobertura vegetal na paisagem (p). Ajustamos um modelo generalizado aditivo (Wood 2017) com um smoother isotropico para cada preditora, um tensor para a interação entre as duas preditoras, e um smoother para d por sítio de amostragem com parâmetro de penalização por sítio de amostragem (Pedersen et al. 2019). Presumimos que a distribuição dos coeficiente pode ser aproximada por uma distribuição normal multivariada com média e variância igual aos coeficientes e matriz de covariância estimados pelo modelo. Então fizemos 10000 amostras dos coeficientes e calculamos os quantils de 0.05, 0.50 e 0.95 dos valores preditos para novo conjunto de dados. Notem que há grande variação no range de valores preditos para cada quantil (guia na parte inferior de cada gráfico).
 
