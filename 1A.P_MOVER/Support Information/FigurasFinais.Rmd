@@ -77,33 +77,33 @@ df_resultados %<>% cbind(.,df_resultados.z) %>%
 descrição: logOR por d e p, com curva de nível para logOR == 0 (linha contínua e preta, alpha>=0.6); curvas de níveis para sinalizar diffS (linha pontilhadas e preta, alpha<=0.4), linha pontilhada vermelha e área rachurada em preto são média e intervalo de confiança de diffS(MN==EE). 
 
 ```{r figura 2 logOR diffS,echo=FALSE,include=TRUE}
-########################################################
 ################### diffS ##############################
-########################################################
-
-
 # EE
 df_md <- df_resultados %>% filter(MN=="EE") %>% distinct
 md_diffS.EE <- lmer(diffS_mean ~ 1 + (1|SiteCode),data=df_md,na.action = "na.fail")
-df_predEE <- predictInterval(md_diffS.EE,level = 0.95) %>% 
+df_predEE_diffS <- predictInterval(md_diffS.EE,level = 0.95) %>% 
   apply(., 2, mean) %>% t %>% as.data.frame()
 # EI
 load(file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_diffS_EI__AICcmodavg.Rdata")
-df_plot <- mdAvg_diffS_EI__AICcmodavg
-df_plot %<>% 
+df_plot_diffS <- mdAvg_diffS_EI__AICcmodavg
+df_plot_diffS %<>% 
   mutate(p = p.z * sd(df_resultados$p) + mean(df_resultados$p),
          d = d.z*sd(df_resultados$d) + mean(df_resultados$d))
+
 # graficos
-v_range <- df_predEE[,3:2] %>% as.numeric() %>% unname()
-v_limits <- df_plot %>% select(mod.avg.pred,upper.CL,lower.CL) %>% as.matrix %>% as.vector %>% range
+v_range <- df_predEE_diffS[,3:2] %>% as.numeric() %>% unname()
+# v_limits <- df_plot_diffS %>% select(mod.avg.pred,upper.CL,lower.CL) %>% as.matrix %>% as.vector %>% range
 l_p <- list()
-df_plot$MN <- "EI"
-l_p[[1]] <- ggplot(df_plot,aes(x=p,y=d,fill=mod.avg.pred,z=mod.avg.pred)) +
+df_plot_diffS$MN <- "EI"
+l_p[[1]] <- ggplot(df_plot_diffS,aes(x=p,y=d,fill=mod.avg.pred,z=mod.avg.pred)) +
   geom_tile() +
   coord_cartesian(expand = FALSE) +
   scale_fill_gradient2(midpoint=0, low="blue", high="red",mid="green",limits=v_limits) +
+  #####################################
+  ## responsável pela área rachurada ##
   stat_subset(aes(subset = mod.avg.pred >= v_range[1] & mod.avg.pred <= v_range[2]),
               alpha=0.5,color="black",size=0.1) +
+  #####################################
   geom_contour(breaks=c(-0.6,-0.25,0.25,0.75,1.5,2.5),color="black",alpha=0.5) +
   geom_contour(breaks=df_predEE$fit,color="red",alpha=0.5) +
   geom_text_contour(aes(z=mod.avg.pred),stroke=0.2,
@@ -114,7 +114,7 @@ l_p[[1]] <- ggplot(df_plot,aes(x=p,y=d,fill=mod.avg.pred,z=mod.avg.pred)) +
   theme(legend.position="top") + labs(fill="") +
   facet_wrap(~MN,ncol=1)
 labels_IC <- c(lower.CL="IC 5%", upper.CL="IC 95%")
-l_p[[2]] <- df_plot %>% 
+l_p[[2]] <- df_plot_diffS %>% 
   gather(key="IC_class",value="IC_pred",lower.CL:upper.CL) %>% 
   ggplot(aes(x=p,y=d,fill=IC_pred,z=IC_pred)) +
   geom_tile() +
@@ -131,9 +131,9 @@ l_p[[2]] <- df_plot %>%
   theme_classic() + 
   theme(legend.position='none') +
   facet_wrap(~IC_class,ncol=2,labeller = labeller(IC_class = labels_IC))
-grid.arrange(grobs=l_p,
-             layout_matrix=rbind(1,1,2),
-             top="Viés na Riqueza Estimada")
+# grid.arrange(grobs=l_p,
+#              layout_matrix=rbind(1,1,2),
+#              top="Viés na Riqueza Estimada")
 
 ########################################################
 ################### logOR ##############################
@@ -152,14 +152,8 @@ df_nRef <- cbind(df_EI,df_,
                  logOR_EE.EI = df_EE$mod.avg.pred - df_EI$mod.avg.pred,
                  lower.logOR_EE.EI = df_EE$lower.CL - df_EI$lower.CL,
                  upper.logOR_EE.EI = df_EE$upper.CL - df_EI$upper.CL)
-################### diffS EI ###################
-load(file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_diffS_EI__AICcmodavg.Rdata")
-df_plot <- mdAvg_diffS_EI__AICcmodavg
-df_plot %<>% 
-  mutate(p = p.z * sd(df_resultados$p) + mean(df_resultados$p),
-         d = d.z*sd(df_resultados$d) + mean(df_resultados$d))
 ################# df_plot1 ###################
-df_plot1 <- inner_join(x=select(df_plot,
+df_plot1 <- inner_join(x=select(df_plot_diffS,
                                 mod.avg.pred,lower.CL,upper.CL,
                                 p,d),
                        y=select(df_nRef,
@@ -170,16 +164,13 @@ df_plot1 <- inner_join(x=select(df_plot,
 v_limits <- df_plot1 %>% 
   select(logOR_EE.EI:upper.logOR_EE.EI) %>% as.matrix %>% as.vector %>% range
 v_limits <- c(v_limits,mean(df_plot1$logOR_EE.EI))
-df_plot1 %<>% mutate(KS_f_logOR = NA, KS_f_lower.logOR = NA, KS_f_upper.logOR = NA)
-for(i in 12:14){
-  df_plot1[,i] <- ifelse(abs(df_plot1[,i-11]) > 0.25 & 
-                           df_plot1[,i-6] >0.5, 
-                         NA,"yes") %>% as.factor()
-}
+# curvas de nível de logOR #
+br <- 0 #-5,-1,0,1,5,30
+# para área rachurada
+v_range <- df_predEE_diffS[,3:2] %>% as.numeric() %>% unname()
 ############# gráficos #############
 l_p <- list()
-br <- c(-5,-1,0,1,5,30)
-#### sem rachurado
+df_plot1 %<>% mutate(label="Mean")
 l_p[[1]] <- ggplot(df_plot1,aes(x=p,y=d,fill=logOR_EE.EI)) +
   coord_cartesian(expand = FALSE) + 
   geom_tile() + theme_classic() +
@@ -187,13 +178,40 @@ l_p[[1]] <- ggplot(df_plot1,aes(x=p,y=d,fill=logOR_EE.EI)) +
                        palette = "Spectral") +
   theme(legend.position="top",
         legend.title = element_blank()) +
-  # stat_subset(aes(subset=is.na(KS_f_logOR)),shape=3,alpha=0.5) +
-  geom_contour(aes(z=logOR_EE.EI),alpha=0.3, col="black",
+  # curva de nível de logOR
+  geom_contour(aes(z=logOR_EE.EI),alpha=0.7, col="black",
                breaks = br) +
   geom_text_contour(aes(z=logOR_EE.EI),stroke=0.2,
                     breaks = br,
                     rotate = FALSE,
+                    size=2.7) +
+  # diffS
+  ## responsável pela área rachurada ##
+  stat_subset(aes(z=mod.avg.pred,
+                  subset = mod.avg.pred >= v_range[1] & mod.avg.pred <= v_range[2]),
+              alpha=0.3,color="black",size=0.1) +
+  ## curvas de nível de diffS 
+  geom_contour(aes(z=mod.avg.pred),
+               breaks=c(-0.6,-0.25,-0.01,0.25,0.75,1.5,2.5),color="black",alpha=0.3,linetype="dotdash") +
+  ## média de diffS MN==EE
+  geom_contour(aes(z=mod.avg.pred),
+               breaks=df_predEE$fit,color="red",alpha=0.3,linetype="dotdash") +
+  ## texto do contorno
+  geom_text_contour(aes(z=mod.avg.pred),stroke=0.2,
+                    breaks = c(-0.6,-0.25,-0.01,0.25,0.75,1.5,2.5),
+                    rotate = FALSE,
                     size=2.7)
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  facet_wrap(~label,ncol=1)
 labels_IC2 <- c(lower.logOR_EE.EI="IC 5%", upper.logOR_EE.EI="IC 95%")
 df_ <- bind_rows(mutate(rename(df_plot1[,c("lower.logOR_EE.EI","KS_f_lower.logOR","p","d")],
                                logOR=lower.logOR_EE.EI,KS_f=KS_f_lower.logOR),
