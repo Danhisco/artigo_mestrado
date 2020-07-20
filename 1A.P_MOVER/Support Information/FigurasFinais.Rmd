@@ -70,6 +70,11 @@ df_resultados %<>% cbind(.,df_resultados.z) %>%
   select(-k_1,-k_1.z)
 ```
 
+# Figura 1 - Sessão Material e Métodos
+
+# Figura 2 - Sessão de Resultados
+
+# Figura 3 - Sessão Discussão 
 
 
 
