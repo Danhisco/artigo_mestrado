@@ -916,9 +916,9 @@ Comparação das SAD pelo teste KS bootstrap:
 ```{r dados para janela de codigo 12,echo=FALSE,eval=FALSE}
 ### dados
 ## SAD obs
-df_SAD.obs <- read.csv(file="/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/dados_brutos/abundances.csv",
+df_SAD.obs <- read.csv(file="/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/dados_para_iniciar_artigo/abundances.csv",
                        header = TRUE,as.is = TRUE)
-df_SAD.obs %<>% filter(SiteCode %in% unique(df_resultados_final$SiteCode))
+df_SAD.obs %<>% filter(SiteCode %in% unique(df_resultados$SiteCode))
 # f_write <- function(df_){
 #   df_tWrite <- df_[,c("SiteCode","species.correct","N")]
 #   path_ <- paste0("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/SAD_observada/SADobs_",
@@ -929,19 +929,19 @@ df_SAD.obs %<>% filter(SiteCode %in% unique(df_resultados_final$SiteCode))
 # d_ply(df_SAD.obs,"SiteCode",f_write,.parallel = TRUE)
 df_SAD.obs %<>% group_by(SiteCode) %>% nest %>% rename(SAD_obs=data)
 ## SAD replica
-df_SADreplica <- Sys.glob("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/SADs_preditas/*.csv") %>% 
-  gsub("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/SADs_preditas/","",.) %>% 
+df_SADreplica <- Sys.glob("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/simulacao_codigos_e_resultados/SADs_preditas/*.csv") %>% 
+  gsub("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/simulacao_codigos_e_resultados/SADs_preditas/","",.) %>% 
   gsub(".csv","",.) %>%  #gsub("_EI.csv","",.) %>%
   adply(.,1,function(x) unname( unlist( strsplit(x,"_k",fixed = TRUE))),.id = NULL) %>% 
   rename(SiteCode = V1,k = V2)
 df_SADreplica$MN <- adply(df_SADreplica$k,1,function(x) unname( unlist( strsplit(x,"_",fixed = TRUE))),.id = NULL)$V2
 df_SADreplica$k <- adply(df_SADreplica$k,1,function(x) unname( unlist( strsplit(x,"_",fixed = TRUE))),.id = NULL)$V1
-df_SADreplica$file_path <- Sys.glob("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/SADs_preditas/*.csv")
+df_SADreplica$file_path <- Sys.glob("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/simulacao_codigos_e_resultados/SADs_preditas/*.csv")
 df_SADreplica %<>% group_by(SiteCode) %>% nest %>% rename(SAD_MN=data)
 ## merge
-df_resultados <- inner_join(y=df_SADreplica,
-                            x=df_SAD.obs,
-                            by="SiteCode")
+df_SADs <- inner_join(y=df_SADreplica,
+                      x=df_SAD.obs,
+                      by="SiteCode")
 ```
 
 
