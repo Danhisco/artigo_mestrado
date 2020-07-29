@@ -1,0 +1,2816 @@
+---
+title: 'Apêndice 1: criação dos dados'
+author: "MORI, Danilo P; LIMA, Renato AF; COUTINHO, Renato M; PRADO, Paulo I"
+date: "14 de setembro de 2019"
+output: 
+  html_document:
+    toc: true
+    toc_depth: 5
+editor_options: 
+  chunk_output_type: console
+---
+
+<style>
+body {
+text-align: justify}
+</style>
+
+```{r setup, include=FALSE} 
+knitr::opts_chunk$set(echo = FALSE, tidy = TRUE, include = TRUE, warning = FALSE,cache = TRUE,message=FALSE)
+```
+
+```{r pacotes,warning=FALSE,message=FALSE,echo=FALSE}
+library(raster)
+library(rgdal)
+library(sp)
+library(magick)
+library(doMC)
+library(gridExtra)
+library(tidyverse)
+library(magrittr)
+library(plyr)
+library(DHARMa) # resíduos quantilicos
+library(lme4) # pacote de criação dos modelos estatísticos
+library(bbmle)
+```
+
+## Seleção dos levantamentos fitossociológicos
+
+### Seleção dos dados disponíveis
+Filtros gerais:
+i) effort >= 1ha; ii) DBH>=5cm; iii) ano dos dados >= 2000;
+
+Filtros condicionais:
+i) state %in% Rio de Janeira, Rio Grande do Sul -> ano dos dados >= 1990
+ii) state %in% Bahia, Goiás, Mato Grosso do Sul -> ano dos dados >= 2000
+iii) para as demais regiões ->  ano dos dados>= 1995
+iv)  Exceções a esse esquema ocorreram quando trabalhos foram feitos antes do ano de 2000, mas foram realizados em grandes áreas de regiões protegidas (>1000ha) ou em antigos campi universitários, no qual foram incluídos na base de dados.
+
+```{r dados e Primeiro filtro - DBH e amostra em bloco unico e disponibilidade da SAD}
+df_references <- read.csv(file="/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/dados_brutos/references - TreeCo.csv",
+                          as.is = TRUE,header =T, na.strings = c("","NA")) %>%
+   dplyr::select(refID,status,method,arrangement,samples,effort_ha,dbh_cutoff,SiteCode,lat,long,lat_municipio,long_municipio,lat_correct,long_correct,confiabilidade, Unidade_de_conservacao,Unidade_de_conservacao1,UC_area_ha,year_data,year,state,status_diagnostico,S, N,ordem,frag_area,forest_size,frag_check,domain,forest_type,forest_subtype,forest_succession,Reference)
+df_references %>% dim # dim(df_references)
+# df_references %>% names
+# df_references$status_diagnostico %>% unique
+# filtro mais simples
+# df_references$domain %>% unique
+df_1ofiltro <- df_references %>% filter(method=="parcelas" &
+                                         grepl("*contiguous*",arrangement) & 
+                                        effort_ha>=1 &
+                                         grepl("*yes*",status) & 
+                                         grepl("ok*",status_diagnostico) &
+                                         grepl("Atlantic_Forest*",domain) &
+                                        dbh_cutoff %in% c("PBH>=15.0cm","PBH>=15.7cm","DBH>=5.0cm",
+                                                          "DGH>=5.0cm","DBH>5.0cm","DBH>=5.0cm&H>300cm",
+                                                          "DBH>=5.0cm&H>500cm", "DBH>=4.8cm", "DGH30>=5.0cm") )
+df_1ofiltro %>% dim
+# df_1ofiltro$dbh_cutoff %>% unique
+# gravar
+# write.csv(df_1ofiltro,file="/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/df_referencia.csv",row.names = FALSE)
+```
+
+Qual a implicação de utilizar PBH >= 10.0cm? Qual a faixa de dbh_cutoff razoável?
+
+- 7262 trabalhos na references
+- 142 trabalhos ao todo no primeiro filtro
+s
+```{r Segundo filtro fragmentos com area pelo menos 1000ha}
+# se UC protecao integral
+df_simulacao_s_UCprotecao.integral <- df_1ofiltro %>%
+#   # filter(UC_area_ha >= 1000 &
+#          # Unidade_de_conservacao %in% c("UC Protecao Integral","universities and research centers"))
+  filter(UC_area_ha >= 1000 &
+         Unidade_de_conservacao == "universities and research centers")
+df_simulacao_s_UCprotecao.integral %>% dim
+# se UC protecao integral
+df_simulacao_c_UCprotecao.integral <- df_1ofiltro %>% 
+  filter(UC_area_ha >= 1000 &
+         Unidade_de_conservacao %in% c("UC Protecao Integral","universities and research centers"))
+  # filter(UC_area_ha >= 1000 & 
+         # Unidade_de_conservacao == "universities and research centers")
+df_simulacao_c_UCprotecao.integral %>% dim
+```
+
+-->> antes de atualizar (pacotes e references):
+- 48 trabalhos feitos em universidade e UC de proteção integral e UC_area_ha >= 1000ha
+- 42 trabalhos feitos em universidade e UC_area_ha >= 1000ha
+
+-->> depois de atualizar (pacotes e references):
+- 57 trabalhos feitos em universidade e UC de proteção integral e UC_area_ha >= 1000ha
+- 7 trabalhos feitos em universidade e UC_area_ha >= 1000ha
+-obs:
+
+```{r Filtros por estado e ano}
+### 
+df_simulacao_filtro.estate <- filter(df_1ofiltro,state %in% c("RJ","RS") & year >= 1990) # 17 ocorrências do filtro, 14 novas
+df_simulacao_filtro.estate %<>% rbind(.,filter(df_1ofiltro,state %in% c("BA","GO","MS") & year >= 2000)) %>% unique # 22 ocorrências do filtro, 6 novas
+df_simulacao_filtro.estate %<>% rbind(.,filter(df_1ofiltro,!(state %in% c("BA","GO","MS","RJ","RS")) & year >= 1995)) %>% unique # 87 ocorrências, 53 novas 
+df_simulacao_filtro.estate %>% dim
+```
+
+- 108 trabalhos dentro do filtro condicional aos estados
+
+```{r merge dos df}
+# merge
+## c UC protecao integral
+df_ref.C_UCprotecaoIntegral <- rbind(df_simulacao_c_UCprotecao.integral,df_simulacao_filtro.estate) %>% unique
+df_ref.C_UCprotecaoIntegral %>% dim
+## s UC protecao integral
+df_ref.S_UCprotecaoIntegral <- rbind(df_simulacao_s_UCprotecao.integral,df_simulacao_filtro.estate) %>% unique
+df_ref.S_UCprotecaoIntegral %>% dim
+# comparacao
+# df_ref.C_UCprotecaoIntegral %>% filter(!(ordem %in% df_ref.S_UCprotecaoIntegral$ordem))
+# gravar
+## s UC protecao integral
+# write.csv(df_ref.S_UCprotecaoIntegral,file="/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/df_referencia.csv",row.names = FALSE)
+# df_ref.S_UCprotecaoIntegral <- read.csv("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/df_referencia.csv",header = TRUE)
+```
+
+- 2 áreas de UC proteao integral ficaram fora do conjunto, porem como UC_area_HA é muito elevado talvez não seja necessário pois devem corresponder à paisagens com alta cobertura vegetal ?
+
+#### SADs disponíveis
+
+```{r SADs obs disponivel}
+# a abundances atualizada 
+df_SAD.obs <- read.csv(file="/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/dados_brutos/abundances.csv",header = TRUE,as.is = TRUE)
+df_SAD.obs$SiteCode %<>% as.factor()
+df_SAD.obs %<>% group_by(SiteCode) %>% nest()
+df_dados.disponiveis <- left_join(x=df_ref.S_UCprotecaoIntegral,y=df_SAD.obs,by="SiteCode")
+names(df_dados.disponiveis)[33] <- "SAD.obs"
+df_dados.disponiveis %>% dim
+```
+
+- 110 trabalhos com SAD observada disponível;
+
+#### Rasters disponíveis
+
+Pasta atualizada graças ao RAFLima
+
+```{r rasters disponiveis}
+df_tif <- Sys.glob("/home/danilo/Documentos/Doutorado/artigo_mestrado/paisagens_atualizadas/*.tif") %>% # carregando
+  gsub("/home/danilo/Documentos/Doutorado/artigo_mestrado/paisagens_atualizadas/","",.) %>% #removendo estrutura de pastas
+  adply(.,1,function(x) unname( unlist( strsplit(x, "_NA_", fixed = TRUE) ) ),.id = NULL) %>% #dividindo a informação
+  mutate(refID = gsub("ref","",V1),ordem=gsub(".tif","",V2)) %>% dplyr::select(refID,ordem) 
+df_tif$tif.name <- Sys.glob("/home/danilo/Documentos/Doutorado/artigo_mestrado/paisagens_atualizadas/*.tif") #%>% #caminho dos .tif
+class(df_tif$refID) <- class(df_dados.disponiveis$refID)
+class(df_tif$ordem) <- class(df_dados.disponiveis$ordem)
+df_dados.disponiveis <- left_join(x=df_dados.disponiveis,
+                                  y=df_tif,by=c("refID","ordem")) 
+# df_dados.disponiveis %<>% filter(is.na(tif.name)) %>% dplyr::select(refID,ordem) %>% mutate(refID_num = as.integer(refID)) %>% arrange(refID_num)
+# df_dados.disponiveis %>% filter(is.na(tif.name)) %>% select(refID,ordem)
+# gravar
+write.csv(df_dados.disponiveis,file="/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/df_referencia.csv",row.names = FALSE)
+```
+
+- 110 trabalhos com raster disponível daqueles com a SAD disponível.
+
+
+### Escala de Efeito
+
+Para determinar qual a escala espacial adequada utilizei uma análise de 'efeito de escala' (Fahrig et al.).
+
+```{r df para selecao da escala espacial da paisagem,eval=FALSE}
+# pacotes
+library(raster)
+# dados
+## paisagens selecionados e respectiva SAD_obs
+df_paisagem <- read.csv("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/df_raster_e_SAD_atualizados.csv",
+                         header = TRUE,as.is = TRUE)
+f_S <- function(path){
+  v_SAD.obs <- read.csv(path,header = TRUE,as.is = TRUE) %>% 
+    filter(species.correct != "Mortas") %>% .$N
+  df_ <- data.frame(S_obs = length(v_SAD.obs),Ntotal=sum(v_SAD.obs),N_integer = is.integer(sum(v_SAD.obs)))
+  return(df_)
+}
+df_paisagem <- cbind(df_paisagem,
+                     adply(df_paisagem$SAD_obs.name,1,f_S,.id = NULL))
+df_paisagem$SiteCode <- factor(df_paisagem$SiteCode)
+## paisagens disponíveis, Lado_landscape = 800 pixels;  1 pixel = 30x30m
+df_tif <- Sys.glob("/home/danilo/Documentos/Doutorado/artigo_mestrado/paisagens_atualizadas/*.tif") %>% # carregando
+  gsub("/home/danilo/Documentos/Doutorado/artigo_mestrado/paisagens_atualizadas/","",.) %>% #removendo estrutura de pastas
+  adply(.,1,function(x) unname( unlist( strsplit(x, "_NA_", fixed = TRUE) ) ),.id = NULL) %>% #dividindo a informação
+  mutate(refID = gsub("ref","",V1),ordem=gsub(".tif","",V2)) %>% dplyr::select(refID,ordem) 
+df_tif$tif.name <- Sys.glob("/home/danilo/Documentos/Doutorado/artigo_mestrado/paisagens_atualizadas/*.tif") #%>% #caminho dos .tif
+df_tif$refID <- as.numeric(df_tif$refID)
+df_tif$ordem <- as.numeric(df_tif$ordem)
+## merge e valores de raio
+df_se <- inner_join(x=df_paisagem,
+                    y=df_tif,
+                    by=c("refID","ordem"))
+df_se <- left_join(y=df_se,
+                   x=expand.grid(SiteCode = df_se$SiteCode,
+                                 raio_km = seq(0.3,12,by = 0.1) ),
+                   by="SiteCode") %>% 
+  group_by(tif.name) %>% nest()
+df_se$resultado <- vector("list",length = nrow(df_se))
+# rotina
+registerDoMC(2)
+for(i in 1:nrow(df_se)){
+  # raster de paisagem (landsat8 Hansen et al. 2013)
+  raster_ <- raster(df_se$tif.name[i])
+  mat_raster <- matrix(data = getValues(raster_)/100)
+  dim(mat_raster) <- dim(raster_)[1:2]
+  # função para o calculo da cobertura da paisagem local
+  f_p <- function(raio_KM){
+    # 1 pixel = 30x30m
+    raio_pixels <- round(raio_KM * 1000 / 30)
+    raio_max <- nrow(mat_raster)/2
+    local_land <- mat_raster[(raio_max+1-raio_pixels):(raio_max+raio_pixels),
+                             (raio_max+1-raio_pixels):(raio_max+raio_pixels)]
+    v_p <- sum(local_land,na.rm = NULL)/length(local_land)
+    df_ <- data.frame(p=v_p,raio_efetivo.KM=raio_pixels*30/1000)
+    return(df_)
+  }
+  # dados para a f_p
+  df_se$resultado[i][[1]] <- adply(df_se$data[i][[1]]$raio_km,1,f_p,.id = NULL,.parallel = TRUE)
+}
+#
+df_se %<>% unnest(cols = c(data,resultado)) %>% as.data.frame()
+write.csv(df_se,"~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/df_ScaleEffect.csv",row.names = FALSE)
+```
+
+```{r df_se figura 51,eval=TRUE}
+# dados
+df_se <- read.csv("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/df_ScaleEffect.csv",header = TRUE,as.is = TRUE)
+df_se$raio_km <- factor(df_se$raio_km,levels = unique(df_se$raio_km))
+df_se %>% dim
+# graficos exploratórios
+# l_p <- list()
+# l_p[[1]] <- df_se %>% ggplot(aes(x=p,y=S_obs)) +
+#   geom_point(alpha=0.3,aes(size=Ntotal)) +
+#   facet_wrap(~raio_km,ncol=3) + theme(legend.position = "bottom")
+# l_p[[1]]
+# l_p[[2]] <- df_se %>% select(Ntotal) %>% distinct %>% ggplot(aes(x="",y=Ntotal)) + 
+#   geom_boxplot() + 
+#   geom_jitter() + 
+#   labs(x="")
+# l_p[[3]] <- df_se %>% select(S_obs) %>% distinct %>% ggplot(aes(x="",y=S_obs)) + 
+#   geom_boxplot() + 
+#   geom_jitter() + 
+#   labs(x="")
+```
+
+A média e variância de S_obs não apresenta valores próximos `r mean(df_se$S_obs)/var(df_se$S_obs)`, mostrando que os dados apresentam over-dispersion. Assim irei utilizar a distribuição binomial negativa com Ntotal como offset; como preditoras utilizo p e p^2:
+
+```{r ajuste de modelos aos dados,echo=TRUE}
+library(MASS)
+f_glm.nb <- function(data_){
+  md_ <- glm.nb(S_obs ~ p + I(p^2) + offset(log(Ntotal)), data = data_)
+}
+registerDoMC(2)
+l_md <- dlply(df_se,"raio_km",f_glm.nb,.parallel = TRUE)
+# names(l_md) <- paste0("raio = ",levels(df_se$raio_km),"km")
+df_averageSE <- print(AICctab(l_md,weights=TRUE)) %>% 
+  as.data.frame()
+```
+
+Explorei paisagens com raios que vão de 0.3 km até 12.0 km variando por 0.1 km. Para determinar qual a melhor escala vou utilizar a média dos raios ponderada pelo peso de evidência:
+
+```{r}
+df_averageSE$raio_paisagem <- row.names(df_averageSE) %>% as.numeric()
+df_averageSE$weight <- as.numeric(as.character(df_averageSE$weight))
+df_averageSE$dAICc <- as.numeric(as.character(df_averageSE$dAICc))
+df_ <- df_averageSE %>% filter(dAICc<=2)
+raio_medio__delta2 <- weighted.mean(x = df_$raio_paisagem,w = df_$weight)
+raio_medio1__total <- weighted.mean(x = df_averageSE$raio_paisagem,w = df_averageSE$weight)
+```
+
+
+
+
+#### auditoria raster
+
+```{r auditoria rasters}
+library(raster)
+df_dados.disponiveis <- read.csv("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/df_referencia.csv",header = TRUE,as.is = TRUE)
+#arrumando formato
+df_dados.disponiveis$SiteCode %<>% as.character()
+df_dados.disponiveis$tif.name %<>% as.character()
+
+# auditoria das imagens .tif selecionadas
+for(i in 1:nrow(df_dados.disponiveis)){
+ par(mar=c(0,0,2,0))
+  # i <- 1
+ raster <- raster(df_dados.disponiveis$tif.name[i])
+ mat_raster <- matrix(data = getValues(raster)/100)
+ dim(mat_raster) <- dim(raster)[1:2]
+ # rotate <- function(a) t(apply(a, 1, rev))
+ image(mat_raster,main=df_dados.disponiveis$SiteCode[i],col=terrain.colors(12,rev = TRUE),xaxt='n',yaxt='n')
+}
+```
+
+SiteCodes com problemas no raster:
+ nenhum
+ 
+### Criação das Matrizes de Paisagem
+
+```{r png to tif}
+func_tif.png <- function(file){
+  raster <- raster(file) #leitura do raster
+  # raster <- raster(df_dados.disponiveis$tif.name[df_dados.disponiveis$SiteCode=="MGuberl3"])
+  mat_raster <- matrix(data = getValues(raster)/100) #convertendo para matrix
+  dim(mat_raster) <- dim(raster)[1:2]
+  #recorte de 6x6km: os 200x200 pixeis centrais
+  mat_raster <- mat_raster[301:500,301:500]
+  squash::savemat(x = mat_raster, filename = gsub(".tif",".png", file)) #salvando como png
+}
+registerDoMC(3)
+# df_dados.disponiveis %>% filter(is.na(tif.name))
+a_ply(df_dados.disponiveis$tif.name,1,func_tif.png,.parallel = TRUE) #gera 113 .png, oriundos dos .tif
+```
+
+```{r auditoria do recorte e conversao tif para png}
+# leitura
+df_dados.disponiveis %<>% left_join(x=.,
+                                    y=data.frame(png.name = Sys.glob("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/paisagens_atualizadas/*.png"),
+                                                 tif.name = gsub(".png",".tif",
+                                                                 Sys.glob("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/paisagens_atualizadas/*.png")),
+                                    by="tif.name"))
+df_dados.disponiveis$png.name %<>% as.character()
+# auditoria
+for(i in 1:nrow(df_dados.disponiveis)){
+ par(mar=c(0,0,2,0))
+ # i <- 1
+ raster <- raster(df_dados.disponiveis$png.name[i])
+ rotate <- function(a) t(apply(a, 2, rev))
+ image(raster,main=df_dados.disponiveis$SiteCode[i],col=terrain.colors(12,rev = TRUE),xaxt='n',yaxt='n')
+}
+```
+
+```{r include=FALSE}
+aud <- df_dados.disponiveis %>% filter(SiteCode == "MGuberl3") %>% .$png.name %>% raster()
+mat_aud <- matrix(getValues(aud)/255)
+dim(mat_aud) <- dim(aud)[1:2]
+mat_aud[95:104,95:104]
+```
+
+
+
+```{r ajuste resolucao }
+## funcao png -> png ajustado 
+func_png.ajust <- function(file, densidade, A_landscape=500){ # atualizar para o pacote 'magick'
+  system(paste(
+    "convert ",file, " -resize ", densidade*A_landscape,"@ ", file,  
+    sep = ""
+  ))
+}
+df_dados.disponiveis %<>% mutate(DA=Ntotal/effort_ha) 
+a_ply(df_dados.disponiveis,1,function(x) func_png.ajust(file = x$png.name, densidade = x$DA) ) # ajuste da resolucao em funcao da densidade
+## Auditoria da mudança de resolucao 1: número total de pixels - OK
+# df_dados.disponiveis$png.name %<>% as.character()
+# df_plot <- adply(df_dados.disponiveis,1,function(X) image_info(image_read(X$png.name)))
+# df_plot %>% mutate(n_pixel = width * height, n_pixel.esperado = DA * 500) %>%
+#   ggplot(aes(x=n_pixel.esperado,y=n_pixel)) + geom_abline(intercept = 0,slope = 1,color="red") + geom_point()
+# df_plot
+## Auditoria 2: avaliação visual
+# auditoria das imagens .tif selecionadas
+# for(i in 1:nrow(df_dados.disponiveis)){
+#  par(mar=c(0,0,2,0))
+#  # i <- 1
+#  raster <- raster(df_dados.disponiveis$png.name[i])
+#  rotate <- function(a) t(apply(a, 2, rev))
+#  image(raster,main=df_dados.disponiveis$SiteCode[i],col=terrain.colors(12,rev = TRUE),xaxt='n',yaxt='n')
+# }
+# df_dados.disponiveis$png.name %<>% as.character()
+# df_dados.disponiveis %<>% filter(!(SiteCode %in% c("RJpnrj","GOcaldas")))
+
+df_dados.disponiveis %<>% filter(!is.na(DA))
+```
+
+Ajuste de Resolução: OK
+
+- matriz binária -> função focal -> matriz trinária
+
+```{r png para matriz trinaria}
+f_area.simulada <- function(matriz, N){
+#@ matriz :: objeto matriz que representa a posição da unidade de habitat (1) e de não habitat (2).
+#@ N:: tamanho da amostra de indivíduos
+  # Janela de observação
+  d <- ceiling(sqrt(N)*(3/4)) # metade do lado do janela de observação
+  l <- ceiling(dim(matriz)[1]/2) # linha central da paisagem
+  c <- ceiling(dim(matriz)[2]/2) # coluna central da paisagem
+  # define uma janela central na paisagem onde o for sera aplicado
+  m_temp <- matriz[(l-d):(l+d),(c-d):(c+d)]
+  if(length(m_temp[m_temp==1]) < N) { 
+    stop("habitat insuficiente na janela de observação")
+  # tambem deve estar errado, pois janela de observacao ~ 2.25A_sitio
+  } else if (length(m_temp[m_temp==1]) == N) { 
+    stop("area amostral igual janela de observacao")
+  # paisagens que devem estar adequadas para os métodos
+  } else { 
+    # posição de cada elemento da janela de observação, por coluna em ordem crescente
+    col_cresc <- which(m_temp==m_temp, arr.ind = T)
+    # idem na ordem contrária
+    col_decre <- col_cresc[dim(col_cresc)[1]:1,]
+    # posicao de cada elemento, por linha em ordem crescente
+    row_cresc <- col_cresc[order(col_cresc[,1],decreasing = FALSE),] 
+    # idem ao controario
+    row_decre <- row_cresc[dim(col_cresc)[1]:1,] 
+    # (nrow - 1)/2; exclui a posição dos elementos da coluna central da janela de observação
+    ciclo <- (dim(m_temp)[1]-1)/2 # 
+    l_mat_index <- list() #lista que vou usar dentro do for
+    dim_temp <- dim(m_temp)[1]
+    for(i in 1:ciclo){
+      a1 <- col_cresc[col_cresc[,"col"]==i,] #considerando o primeiro ciclo: 1a coluna em ordem crescente
+      b1 <- row_cresc[row_cresc[,"row"]==dim_temp+1-i,] #última linha em ordem crescente 
+      c1 <- col_decre[col_decre[,"col"]==dim_temp+1-i,] #última coluna em ordem reversa
+      d1 <- row_decre[row_decre[,"row"]==i,] #primeira linha em ordem reversa; os demais ciclos são com a segunda coluna, penúltima linha, penúltima coluna e segunda linha, etc  
+      l_mat_index[[i]] <- do.call(rbind,list(a1,b1,c1,d1)) #ao final de cada ciclo eu concateno tudo em uma única matriz
+    }
+    l_mat_index[[(dim_temp+1)/2]] <- col_cresc[col_cresc[,"col"]==(dim_temp+1)/2,] #a coluna central deve ser a última
+    mat_ref <- unique(do.call(rbind, l_mat_index)) #remocao de repeticao. Obtenho uma sequência de elementos que descreve uma espiral quadrada convergente
+    length_ref <- length(m_temp[mat_ref][m_temp[mat_ref]==1]) #variável para indexação:
+    m_temp[mat_ref][m_temp[mat_ref]==1][(1+length_ref-N):length_ref] <- 2 #os N últimos elementos que são iguais a 1 e troco por 2
+    matriz[(l-d):(l+d),(c-d):(c+d)] <- m_temp #substituo a matriz de volta
+    return(matriz)
+  }
+}
+
+f_mat.tri <- function(png, abund){ #png.file, número de indivíduos presente 
+  janela <- matrix(1,3,3) 
+  raster <- raster(png)
+  mat <- matrix(getValues(raster)/255, ncol = ncol(raster), nrow = nrow(raster))
+  raster_binario <- raster( matrix(nrow = nrow(mat), ncol = ncol(mat), sapply(mat, function(x) ifelse(x >= 0.7, 1, 0)) ) ) 
+  func_focal <- function(x) ifelse(sum(x[x==1]) >= 5, 1, x[5])
+  binario.focal <- as.matrix( focal(raster_binario, janela, func_focal, pad=TRUE, padvalues = 0))
+  mat_tri <- try(f_area.simulada(matriz = binario.focal, N = abund))
+  if(class(mat_tri) == "matrix"){ 
+    try(write.table(x = mat_tri, 
+                    file = gsub(".png",".txt", png),
+                    sep = " ", row.names = FALSE, col.names = FALSE))
+  }
+}
+df_dados.disponiveis$png.name %<>% as.character
+registerDoMC(3)
+a_ply(df_dados.disponiveis,1,function(X) f_mat.tri(png = X$png.name,abund = X$Ntotal),.parallel = TRUE) 
+### Auditoria
+## leitura 
+df_dados.disponiveis <- read.csv("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/df_referencia.csv",header = TRUE,as.is = TRUE)
+df_dados.disponiveis %<>% left_join(x=.,
+                                    y=data.frame(txt.name = Sys.glob("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/paisagens_atualizadas/*.txt"),
+                                                 tif.name = aaply(Sys.glob("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/paisagens_atualizadas/*.txt"),1,
+                                                                   function(X) gsub(".txt",".tif",X)),
+                                    by="tif.name"))
+df_dados.disponiveis$txt.name %<>% as.character()
+df_dados.disponiveis$SiteCode %<>% as.character()
+df_dados.disponiveis %<>% filter(!is.na(txt.name))
+## grafico
+rotate <- function(a) t(apply(a, 2, rev))
+for(i in 1:nrow(df_dados.disponiveis)){
+  par(mar=c(0,0,2,0))
+  # i <- 3
+ txt_file <- read.table(df_dados.disponiveis$txt.name[i],header = TRUE,sep = " ",as.is = FALSE) %>% as.matrix
+ image(rotate(txt_file),main=df_dados.disponiveis$SiteCode[i],col=terrain.colors(12,rev = TRUE),xaxt='n',yaxt='n')
+}
+```
+
+Em alguns casos a comunidade local foi dividida em mais de um fragmento:
+"BAlenc4","MGuberl7",SCserra4","RScach1","RScach2","SCarar","MScoru2","SPeea1"
+
+```{r }
+df_dados.disponiveis %<>% filter(!(SiteCode %in% c("BAlenc4","MGuberl7","SCserra4","RScach1","RScach2","SCarar","MScoru2","SPeea1")))
+write.csv(df_dados.disponiveis,file="/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/df_dados_auditados.csv",row.names = FALSE)
+```
+
+
+```{r REMOVER, include=FALSE}
+df_auditoria <- df_dados.disponiveis %>% filter(SiteCode %in% c("MGlavr4","MSlada5", "MSlada3", "BAuruc", "MGlavr6","SCcric1"))
+f_auditoria <- function(X){
+  # X <- df_auditoria[1,]
+  mat_ <- read.table(X,header = TRUE,sep = " ",as.is = FALSE)
+  v_values_mat_ <- mat_ %>% as.matrix %>%  as.vector %>% unique
+  return(v_values_mat_)
+}
+df_auditoria$txt.name %<>% as.character()
+df_auditoria$valores_txt.file <- alply(df_auditoria,1,function(Y) f_auditoria(X=Y$txt.name))
+# df_auditoria$valores_txt.file[[9]]
+df_auditoria$txt.name %<>% as.character()
+df_auditoria$SiteCode %<>% as.character()
+## grafico
+# rotate <- function(a) t(apply(a, 2, rev))
+# for(i in 1:nrow(df_auditoria)){
+#   par(mar=c(0,0,2,0))
+#   # i <- 2
+#  txt_file <- read.table(df_auditoria$txt.name[i],header = TRUE,sep = " ",as.is = FALSE) %>% as.matrix
+#  image(rotate(txt_file),main=df_auditoria$SiteCode[i],col=terrain.colors(12,rev = TRUE),xaxt='n',yaxt='n')
+# }
+df_write <- df_dados.disponiveis %>% 
+  filter(!(SiteCode %in% c("MGlavr4","MSlada5", "MSlada3", "BAuruc", "MGlavr6","SCcric1")))
+write.csv(df_write, 
+          file="/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/df_dados_auditados.csv", 
+          row.names=FALSE)
+```
+
+__Substituição de eventuais NAs por 0__
+
+```{r remocao de NAs dos txt file}
+f_NA_zero <- function(path_){
+  mat_paisagem <- read.table(file=path_,header = FALSE)
+  mat_paisagem[is.na(mat_paisagem)] <- 0
+  write.table(x = mat_paisagem,file = path_,sep = " ", row.names = FALSE, col.names = FALSE)
+}
+df_dados.disponiveis$txt.name %<>% as.character()
+# df_dados.disponiveis$txt.name[1]
+rregisterDoMC(3)
+a_ply(df_dados.disponiveis$txt.name,1,f_NA_zero)
+```
+
+
+## Parametrização dos dados
+
+### Proporção de cobertura vegetal 
+
+```{r tree cover}
+df_simulacao <- read.csv("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/df_dados_auditados.csv",header = TRUE,as.is = TRUE)
+f_tree.cover <- function(file_path){
+  mat_paisagem <- read.table(file=file_path,sep=" ",header=TRUE)
+  tree.cover <- as.vector(mat_paisagem)
+  tree.cover <- tree.cover[!is.na(tree.cover)]
+  p <- 1 - length(tree.cover[tree.cover==0])/length(tree.cover)
+  return(p)
+}
+registerDoMC(3)
+df_simulacao$p <- aaply(df_simulacao$txt.name,1,f_tree.cover,.parallel = TRUE)
+#
+# summary SAD.obs
+df_SAD.obs <- read.csv(file="/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/dados_brutos/abundances.csv",header = TRUE,as.is = TRUE)
+df_SAD.obs$SiteCode %<>% as.factor()
+# merge e summarise
+df_simulacao %<>% inner_join(x=.,
+                             y=ddply(df_SAD.obs,"SiteCode",summarise,
+                                     Ntotal=sum(N), Stotal=length(species.correct)),
+                             by="SiteCode")
+# df_simulacao$p %>% summary
+df_simulacao %>% ggplot(aes(x=p,y=Stotal)) + geom_point()
+```
+
+figura X. p X Stotal
+
+Auditoria final: p X image(txt.file)
+
+```{r auditoria}
+df_plot <- df_simulacao %>% select(SiteCode,p,txt.name) %>% distinct()
+for(i in 1:nrow(df_plot)){
+  par(mar=c(0,0,2,0))
+  # i <- 2
+  txt_file <- read.table(df_plot$txt.name[i],
+                        header = TRUE,sep = " ",as.is = FALSE) %>% as.matrix
+  image(txt_file,
+        main=paste0(df_plot$SiteCode[i]," p=",df_plot$p[i]),
+        col=terrain.colors(12,rev = TRUE),xaxt='n',yaxt='n')
+}
+
+df_simulacao$txt.name %>% table
+
+
+# df_simulacao %<>% filter(!(SiteCode %in% c("RJpnrj","GOcaldas")))
+write.csv(df_simulacao, 
+          file="/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/df_dados_auditados.csv", 
+          row.names=FALSE)
+```
+
+"BAlenc4","MGuberl7",SCserra4","RScach1","RScach2","SCarar","MScoru2","SPeea1"
+
+### Distância média para cada k
+
+__Funções Construidas__
+
+```{r funcoes para parametrizar}
+library(rmutil)
+library(lamW)
+qkernel<- function(sigma, kernel, p, density=20852/50, npoints = 1e5){
+    kernel <- match.arg(kernel, choices=c("normal","gaussian","laplace","uniform"))
+    d_ind_MA  <- 100/sqrt(density)
+    if(kernel=="laplace"){
+        b_laplace <- sigma / sqrt(2)
+        X_laplace <- d_ind_MA * round(rlaplace(npoints, s=b_laplace) / d_ind_MA) 
+        Y_laplace <- d_ind_MA * round(rlaplace(npoints, s=b_laplace) / d_ind_MA)
+        dist_laplace <- sqrt(X_laplace^2+Y_laplace^2)
+        result <- quantile(dist_laplace, p)
+    }
+    if(kernel=="normal"|kernel=="gaussian"){
+        b_norm <- sigma 
+        X_norm <- d_ind_MA * round(rnorm(npoints, sd=b_norm) / d_ind_MA)
+        Y_norm <- d_ind_MA * round(rnorm(npoints, sd=b_norm) / d_ind_MA)
+        dist_norm <- sqrt(X_norm^2+Y_norm^2)
+        result <- quantile(dist_norm, p)
+    }
+    if(kernel=="uniform"){
+        b_unif <- sigma/2
+        X_unif <- d_ind_MA * round(runif(npoints, min = -b_unif, max = b_unif) / d_ind_MA)
+        Y_unif <- d_ind_MA * round(runif(npoints, min = -b_unif, max = b_unif) / d_ind_MA)
+        dist_unif <- sqrt(X_unif^2+Y_unif^2)
+        result <- quantile(dist_unif, p)
+    }
+    return(unname(result))
+}
+
+sigkernel <- function(kernel, p, distance, density=20852/50,
+                      npoints =1e5, sigma.min = 1, sigma.max= 100){
+    f1 <- function(x) distance - qkernel(x, kernel, p, density, npoints)
+    uniroot( f1 , lower = sigma.min, upper = sigma.max)
+}
+```
+
+__Estimativa__
+
+percentis utilizados: c(0.99, 0.95:0.05) 
+
+```{r estimando sigmas para os fragmentos do TreeCo, include=FALSE}
+#
+df_simulacao <- read.csv("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/df_dados_auditados.csv",header = TRUE)
+#preparando os dados#
+percentil <- c(0.99,seq(0.95,0.05,-0.05))
+df_simulacao %<>% left_join(x=.,
+                            y=expand.grid(SiteCode = df_simulacao$SiteCode, k = percentil),
+                            by="SiteCode")
+
+#guardando os níveis de kernel 
+df_simulacao$kernel_type <- "laplace"
+df_simulacao$kernel_code <- "2"
+df_simulacao %>% str
+df_simulacao %<>% mutate(DA=Ntotal/effort_ha,dist_0 = 100/sqrt(DA)) 
+df_simulacao$d <- NA
+df_simulacao$kernel_type <- as.character(df_simulacao$kernel_type)
+
+## estimando os sigmas ##
+# source("/home/danilo/Documents/dissertacao/R_source/utility_functions.R")
+
+# funcao para paralelizar
+func_llply <- function(i,data_frame=df_simulacao){
+  df_temp <- data_frame
+  sigma <- sigkernel(kernel = df_temp[i,"kernel_type"], 
+                     p = df_temp[i,"k"], 
+                     distance = df_temp[i,"dist_0"], 
+                     density = df_temp[i,"DA"],
+                     sigma.min=1e-6, 
+                     sigma.max=1e6)$root  
+}
+
+# funcao para paralelizar #
+# paralelizando e armazensando os dados #
+registerDoMC(4)
+replica.sim <- as.list(1:dim(df_simulacao)[1])
+resultados <- llply(.data = replica.sim, .fun = func_llply, .parallel = TRUE)
+df_simulacao$d <- unlist(resultados)
+#
+df_simulacao$d %>% summary
+#
+# df_simulacao <- read.csv("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/df_dados_auditados.csv",header = TRUE)
+df_simulacao %<>% mutate(k_perc = factor(k))
+levels(df_simulacao$k_perc)[2] <- "0.10"
+df_simulacao %>% ggplot(aes(x=k_perc,y=d)) +
+  geom_jitter() +
+  geom_boxplot() +
+  labs(x="% de propágulos na vizinhança imediata",y="Distância média de dispersão (metros)")
+  theme(legend.position = "none")
+#
+write.csv(df_simulacao, 
+          file="/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/df_dados_auditados.csv", 
+          row.names=FALSE)
+```
+
+Figura . Distância média de dispersão por classe de k
+
+## Análise Estatística Completa
+
+```{r preparacao dos dados,warning=FALSE,message=FALSE, include=FALSE}
+### leitura ###
+df_resultados <- readr::read_csv("/home/danilo/Documentos/Doutorado/artigo_mestrado/simulacao/resultados/df_resultados.csv")
+# names(df_resultados)[1] <- "Site"
+# df_resultados %>% str
+### padronização ###
+## fatores
+# df_resultados$Site <- factor(df_resultados$Site)
+# df_resultados$k <- factor(df_resultados$k,levels=unique(df_resultados$k))
+df_resultados$k.0 = as.numeric(as.character(df_resultados$k))
+df_resultados$MN <- factor(df_resultados$MN,levels = c("EE","EI"))
+# df_resultados$k %>% contrasts()
+# df_resultados$MN %>% contrasts()
+
+### z score ### 
+f_z <- function(x){
+  m <- base::mean(x,na.rm=TRUE)
+  sd <- sd(x,na.rm=TRUE)
+  output <- (x-m)/sd
+  return(output)
+} 
+# names(df_resultados)
+df_resultados.z <- as.data.frame(apply(df_resultados[c("p","J","S","k.0")],2,f_z))
+names(df_resultados.z) <- sapply(names(df_resultados.z), function(x) paste(gsub(".0","",x),".z",sep=""))
+df_resultados %<>% cbind(.,df_resultados.z)
+### Summary ###
+# df_resultados %>% head
+
+### para auditoria ### remover depois 
+df_resultados.rep <- read.csv("/home/danilo/Documentos/Doutorado/artigo_mestrado/simulacao/resultados/df_replicas.csv")
+df_resultados.rep %<>% left_join(x=.,y=df_resultados[,c("SiteCode","J","S")],by="SiteCode")
+```
+
+### Descrição dos Levantamentos Selecionados
+
+```{r figura 1, fig.width=8, fig.height=5, fig.align="center", include=FALSE}
+df_plot <- df_resultados %>% dplyr::filter(k=="0.99" & MN=="EE") %>% dplyr::select(Site, p, S,p.z,S.z) %>% unique
+
+# avaliando as curvas pelo quantiles
+# df_plot %<>% mutate(terceiro_quantil = ifelse(p>quantile(df_plot$p,probs=0.75),">_3oQ","<_3oQ")) 
+l_p <- vector("list",6)
+l_p[[1]] <- ggplot(df_plot, aes(x=p)) +
+  geom_histogram(bins=30) +
+  geom_vline(xintercept = c(quantile(df_plot$p,probs = c(0.25,0.50,0.75))),color="red")
+  # geom_density()
+l_p[[2]] <- ggplot(df_plot, aes(x=p.z)) +
+  geom_histogram(bins=30) +
+  geom_vline(xintercept = c(quantile(df_plot$p.z,probs = c(0.25,0.50,0.75))),color="red")
+  # geom_density()
+l_p[[3]] <- ggplot(df_plot, aes(x=S)) +
+  geom_histogram(bins=30) +
+  geom_vline(xintercept = quantile(df_plot$S,probs = c(0.25,0.50,0.75)),color="red")
+l_p[[4]] <- ggplot(df_plot, aes(x=S.z)) +
+  geom_histogram(bins=30) +
+  geom_vline(xintercept = c(quantile(df_plot$S.z,probs = c(0.25,0.50,0.75))),color="red")
+l_p[[5]] <- ggplot(df_plot, aes(x=p,y=S)) +
+  geom_hline(yintercept = quantile(df_plot$S,probs = c(0.25,0.50,0.75)),color="red") +
+  geom_vline(xintercept = quantile(df_plot$p,probs = c(0.25,0.50,0.75)),color="red") +
+  geom_point() + 
+  geom_smooth(method="lm")
+l_p[[6]] <- ggplot(df_plot, aes(x=p.z,y=S.z)) +
+  geom_hline(yintercept = quantile(df_plot$S.z,probs = c(0.25,0.50,0.75)),color="red") +
+  geom_vline(xintercept = quantile(df_plot$p.z,probs = c(0.25,0.50,0.75)),color="red") +
+  geom_point() + 
+  geom_smooth(method="lm")
+# do.call("grid.arrange",c(l_p,ncol=3))
+grid.arrange(l_p[[1]],l_p[[2]],l_p[[3]],l_p[[4]],l_p[[5]],l_p[[6]],
+             layout_matrix = rbind(c(1,1,3,3,5,5),
+                                   c(2,2,4,4,6,6) )
+             )
+
+```
+
+Figura 1. Na primeira linha há as variáveis na escala padrão; na segunda linha as variáveis após transformação Z (centra a média em zero e desloca a variação para o centro da distribuição REVISÃO). As linhas em vermelho equivalem ao quantil de 0.25%, 0.50% e 0.75% da amostra. S = riqueza observada; p = proporção de cobertura vegetal na paisagem
+
+  A proporção de cobertura vegetal variou de 0.0074 até 1, o quantil de 25% é de 0.2916, a média é 0.6727 e o quantil de 75% é de 0.9216 (figura 1). A riqueza observada variou de 26 até 230, o quantil de 25% é de 73.75, a média é 105.85, e o quantil de 75% é 134 (figura 1). Há um vies na amostra que apresenta mais trabalhos em paisagens com alta cobertura vegetal do que em baixas, por exemplo, o primeiro 1/4 da amostra está entre 0.00 e 0.30, enquanto o último 1/4 está comprimido entre 0.92 e 1 (figura 1). A riqueza observada apresenta um outro padrão com uma tendência central e uma assimetria para a esquerda [REVISAR]: 50% da amostra está entre 73 e 134 com média e mediana próximos de 100; o primeiro 1/4 da amostra está entre 26 e 73 enquanto o último 1/4 varia entre 134 e 230, o range do 1o quarto equivale à metade do range do último quarto da amostra. Há certa covariação entre p e S: o último quarto de p varia acima do quantil de 25%; enquanto o primeiro quarto de p varia até a mediana de S. Porém os 50% centrais de cada variável estão representadas em todo o gradiente de variação da outra, e.g., entre o quantil de 25% e 75% de p observamos S que varia desde de valores inferiores à 50 até superiores à 200; e um padrão se observa para S. Para realizar a análise estatística aplicamos a transformaçaõ Z em p e S. A transformação Z centraliza no zero a média da distribuição e converte da escala da variável para a de desvio-padrões; dessa forma torna-se mais direta a interpretação de modelos lineares generalizados hierarquicos (REF 2006). Essa transformação move a variação para a região central da distribuição mantendo a relação geral entre as observações (figura 1). Não há motivos a priori para pensar que a predição dos modelos pode ser influênciada pela covariação entre p e S. [DÚVIDA] Paulo, lembro que discutimos sobre a relação entre teste frequentista e o efeito de S * p; me recordo de algo como que ao utilizar o p-valor estariamos de alguma forma ponderando isso [DÚVIDA].
+
+
+
+
+
+
+
+
+
+
+
+## Figuras Extras
+
+
+```{r figura X dispersao dos individuos segundo a funcao de dispersao utilizada, include=FALSE}
+# calcular d a partir do m de BCI
+# library(lamW)
+# m <- 0.1
+# J <- 213724
+# A <- 50
+# DA <- J/A
+# L=sqrt((J/DA)*10000)
+# l_cel <- 100/sqrt(DA)
+# d <- sqrt(2)*L*m / (m * lambertW0(-exp(-1/m)/m) +1)
+# 
+# 
+# 
+# # simulação da chuva de propágulos assumindo dist Laplace para os dados de BCI
+# library(rmutil)
+# density <- 20852/50
+# npoints <- 1e5
+# d_ind_MA  <- 100/sqrt(density)
+# b_laplace <- sigma / sqrt(2)
+# X_laplace.CM <- d_ind_MA * round(rlaplace(npoints, s=b_laplace) / d_ind_MA) 
+# Y_laplace.CM <- d_ind_MA * round(rlaplace(npoints, s=b_laplace) / d_ind_MA)
+# X_laplace <- rlaplace(npoints, s=b_laplace)
+# Y_laplace <- rlaplace(npoints, s=b_laplace)
+# 
+# 
+# dist_laplace <- sqrt(X_laplace^2+Y_laplace^2)
+# plot(x=X_laplace,y=Y_laplace)
+# plot(density(dist_laplace))
+
+
+```
+
+Figura X. Chuva de propágulos pressuposta pela simulação coalescente. No primeiro quadro
+
+  
+  Os sítios variam na densidade observada e portanto a distância entre os indivíudos na paisagem varia. Então optamos por parametrizar a dispersão pela proporção de propágulos que permanece até a vizinhança imediata da planta progenitora (k), padronizamos pela distância entre o centro de unidades de habitat adjacentes (l=100/sqrt(DA_obs)). Estimamos a distância média de dispersão necessária para obter determinado k.
+
+
+
+
+A chuva de propágulos pode ser entendida como o produto da fecundidade e função de dispersão (Clark et al. 1999). Por conta do pressuposto da equivalência funcional todos os indivíduos produzem o mesmo número de propágulos por unidade de tempo (Hubbell 2001), assim, podemos simular cenários de limitação à dispersão em função da porcentagem de propágulos que permace até determinada distância da planta progenitora. Dessa maneira, não precisamos definir a dispersão em termos de distância per se mas em termos de porcentagem de indivíduos que permanecem na área imediata da planta progenitora. Para isso é necessário estabelecer uma distância padrão da planta progenitora e estimar ou definir a porcentagem de indivíduos que se mantêm até esta distância padrão. Como distância padronizamos $l_{cel}$, assim, cada paisagem possui uma distância padrão que depende da densidade observada de indivíduos naquela paisagem [REESCREVER]. Podemos estimar qual a porcentagem de propágulos até a distância padrão que um determinado sd gera, partindo de um m (eqn 2); ou podemos informar a priori quais as porcentagens de interesse e estimar o sd necessário para gerar tais porcentagens. Na simulação coalescente, utilizamos 12 valores de porcentagem para simular os cenários de limitação à dispersão: 99%, seq(95,50,by=-5)% e 25%. Apesar da simulação coalescente ser bem eficiente e permitir simular paisagens infinitas, funções de dispersão que apresentam dispersão muito elevadas são computacionalmente muito onerosas (Rosindell et al. 2008) e apresentariam pouco realismo biológico (REFERÊNCIA), logo, não utilizamos porcentagens muito baixas (e.g.<1%).
+
+Para estimar o sd necessário para gerar uma determinada porcentagem de propágulos até a distância padronizada, desenvolvemos uma função no ambiente de programação R (R language team). A seguir o código utilizado nessa função, note que a função permite utilizar 3 distribuições de probabilidade (uniforme, normal e Laplace), contudo utilizamos apenas a distribuição Laplace.
+
+
+## Anexo:
+
+### Imagens das matrizes de paisagem
+
+
+```{r matrizees de paisagem, include=FALSE}
+path_paisagens <- Sys.glob("/home/danilo/Documentos/Doutorado/artigo_mestrado/simulacao/*.txt")
+df_simulacao <- map_df(Sys.glob("~/Documentos/Doutorado/artigo_mestrado/simulacao/U/*.csv"),read.csv) 
+df_simulacao %<>% dplyr::select(SiteCode,p,J,S,DA,txt.file) %>% unique %>% 
+  left_join(x=.,
+            y=data.frame(txt.file=gsub("/home/danilo/Documentos/Doutorado/artigo_mestrado/simulacao/","",path_paisagens),path_paisagens),
+            by = "txt.file")
+df_simulacao$path_paisagens %<>% as.character()
+
+## matriz de paisagem
+
+# f_plot <- function(X){
+#   mat_paisagem <- read.table(X$path_paisagens,header = FALSE) %>% as.matrix()
+#   rotate <- function(a) t(apply(a, 2, rev))
+#   image(rotate(mat_paisagem),main=X$txt.file)
+# }
+# par(mfrow=c(20,4))
+# registerDoMC(2)
+# a_ply(df_simulacao,1,f_plot,.parallel = TRUE)
+
+
+for(i in 1:nrow(df_simulacao)){
+  X <- df_simulacao[i,]
+  mat_paisagem <- read.table(X$path_paisagens,header = FALSE) %>% as.matrix()
+  dim_ <- 
+  is.na(mat_paisagem) <- 0
+  
+  rotate <- function(a) t(apply(a, 2, rev))
+  image(rotate(mat_paisagem),main=paste0(X$SiteCode, " p=",X$p," J=",X$J," S=",X$S))
+}
+
+```
+
+
+
+
+
+
+######################3
+
+
+
+
+
+  
+<!-- ## 1.2 GLMM binomail subset:MN==EE -->
+
+<!-- ### Modelo cheio -->
+
+<!-- ```{r glmm quadratico n_nRef MNEE modelo cheio,echo=TRUE,eval=FALSE} -->
+<!-- l_md <- vector("list",3) -->
+<!-- names(l_md) <- c("1|Site","d|Site","d + d^2|Site") -->
+<!-- l_md[[1]] <- glmer(cbind(n_nRef,100-n_nRef) ~ -->
+<!--                      ( p.z + I(p.z^2) ) * ( d.z + I(d.z^2) ) + -->
+<!--                      (1|SiteCode), -->
+<!--                    family = "binomial",data=filter(df_resultados,MN=="EE"), -->
+<!--                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- l_md[[2]] <- glmer(cbind(n_nRef,100-n_nRef) ~ -->
+<!--                      ( p.z + I(p.z^2) ) * ( d.z + I(d.z^2) ) + -->
+<!--                      (d.z|SiteCode), -->
+<!--                    family = "binomial",data=filter(df_resultados,MN=="EE"), -->
+<!--                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- l_md[[3]] <- glmer(cbind(n_nRef,100-n_nRef) ~ -->
+<!--                      ( p.z + I(p.z^2) ) * ( d.z + I(d.z^2) ) + -->
+<!--                      (d.z + I(d.z^2)|SiteCode), -->
+<!--                    family = "binomial",data=filter(df_resultados,MN=="EE"), -->
+<!--                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- ``` -->
+
+<!-- ```{r l_md_nRef.GLMM_EE,echo=FALSE,eval=FALSE} -->
+<!-- l_md_nRef.GLMM_EE <- l_md -->
+<!-- save(l_md_nRef.GLMM_EE,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md_nRef.GLMM_EE.Rdata") -->
+<!-- ``` -->
+
+<!-- __Tabela 1.2.1__ AICctab para n_nRef MNEE  -->
+
+<!-- ```{r glmm quadratico n_nRef MNEE modelo cheio AICctab} -->
+<!-- load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md_nRef.GLMM_EE.Rdata") -->
+<!-- AICctab(l_md_nRef.GLMM_EE,weights=TRUE) -->
+<!-- ``` -->
+
+
+<!-- O modelo mais plausível considera um termo linear e quadrático para d na estrutura aletória.  -->
+
+
+<!-- ```{r fig 119 res quant glmm cheio MNEE} -->
+<!-- p_plot <- DHARMa::simulateResiduals(l_md_nRef.GLMM_EE[["d + d^2|Site"]],n=1000) -->
+<!-- plot(p_plot) -->
+<!-- ``` -->
+
+<!-- __Figura 1.6__ Resíduos Quantílicos do glmm cheio para MNEE     -->
+
+
+<!-- __Tabela 1.2.2__ R2 condicional e marginal modelo cheio nRef  -->
+
+<!-- ```{r tabela md cheio para MNEE nRef,message=FALSE,warning=FALSE} -->
+<!-- r.squaredGLMM(l_md_nRef.GLMM_EE[["d + d^2|Site"]]) -->
+<!-- ``` -->
+
+
+
+<!-- ```{r avaliacao por site fig 17 glmm EE p2 d2,fig.width=8, fig.height=30,message=FALSE,eval=FALSE} -->
+<!-- # Dados -->
+<!-- df_plot <- df_resultados %>% filter(MN=="EE") -->
+<!-- # df_plot <- cbind(df_plot, -->
+<!-- #   predictInterval(merMod = l_md_nRef.GLMM_EE[["d + d^2|Site"]], -->
+<!-- #                          level = 0.95, n.sims=200, -->
+<!-- #                          stat="median",type = "probability", -->
+<!-- #                          include.resid.var = TRUE)*100 -->
+<!-- #                  ) -->
+<!-- df_plot$Pr_nRef <- predict(l_md_nRef.GLMM_EE[["d + d^2|Site"]],type="response")*100 -->
+<!-- # Graficos -->
+<!-- df_plot %<>% mutate(title = paste0(SiteCode, " p=",round(p,digits = 3))) %>% arrange(p) -->
+<!-- df_plot$title <- factor(df_plot$title,levels = unique(df_plot$title)) -->
+<!-- ggplot(df_plot,aes(x=d.z,y=n_nRef)) + -->
+<!--   geom_point() + -->
+<!--   geom_line(aes(y=Pr_nRef),color="red") + -->
+<!--   theme_light() + theme(legend.position="top") + facet_wrap(~title,ncol=5) -->
+<!-- ``` -->
+
+<!-- <!-- __Figura 1.7__ Predito pelo modelo cheio com termo quadrático para p e d para MN=EE --> -->
+
+
+<!-- ### Seleção de Variáveis -->
+
+
+
+<!-- ```{r modelo global e R2m/c MNEE, echo=TRUE,cache=TRUE} -->
+<!-- # dados -->
+<!-- df_md <- filter(df_resultados,MN=="EE") -->
+<!-- # modelo global -->
+<!-- global_md <- glmer(cbind(n_nRef,100-n_nRef) ~ -->
+<!--                      ( p.z + I(p.z^2) ) * ( d.z + I(d.z^2) ) + -->
+<!--                      (d.z + I(d.z^2)|SiteCode), -->
+<!--                    family = "binomial",data=df_md, -->
+<!--                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)),na.action = "na.fail") -->
+<!-- ``` -->
+
+
+<!-- __Tabela 1.2.3__ R2 condicional e marginal do modelo global -->
+
+<!-- ```{r modelo global dredge e AICctab delta 7 n_nRefEE} -->
+<!-- dredge_glmmEE <- dredge(global_md,trace = FALSE,evaluate=TRUE) -->
+<!-- subset(dredge_glmmEE,delta<7) -->
+<!-- ``` -->
+
+
+
+
+
+
+```{r model averaging EE MuMIn e AICcmodavg,message=FALSE,eval=FALSE}
+library(AICcmodavg)
+# todas as combinações de modelo do modelo cheio
+l_md.dredge_nRefEE <- lapply(dredge(global_md,trace = FALSE,evaluate=FALSE), eval)
+# Model Averaging for SiteCode predictions
+mdAvg_nRefEE__MuMIn <- model.avg(l_md.dredge_nRefEE) #,subset<2
+save(mdAvg_nRefEE__MuMIn,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_nRefEE__MuMIn.Rdata")
+# Model Averaging for new data predictions
+df_pred <- expand.grid(SiteCode=levels(df_resultados$SiteCode)[1],
+                       d.z=seq(min(df_resultados$d.z),max(df_resultados$d.z),length=40),
+                       p.z=seq(min(df_resultados$p.z),max(df_resultados$p.z),length=200))
+mdAvg_nRefEE__AICcmodavg <- modavgPred(l_md.dredge_nRefEE,newdata = df_pred) %>%
+  cbind(df_pred)
+save(mdAvg_nRefEE__AICcmodavg,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_nRefEE__AICcmodavg.Rdata")
+```
+
+<!-- #### Predito para cada Sítio -->
+
+<!-- Para avaliar o ajuste do modelo ao conjunto de dados utilizo funções do pacote MuMIn (REF) que permite calcular a predição do modelo médio para o conjunto original de dados.   -->
+
+
+<!-- ```{r glmm quadratico n_nRef MNEE selecao de variaveis, comment=FALSE, message=FALSE,warning=FALSE,results="hide",fig.width=8, fig.height=30} -->
+<!-- # Modelo Global -->
+<!-- load(file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_nRefEE__MuMIn.Rdata") -->
+<!-- # Predição -->
+<!-- df_md <- df_resultados %>% filter(MN=="EE") -->
+<!-- df_md$Pr_nRef <- predict(mdAvg_nRefEE__MuMIn,type="response")*100 -->
+<!-- # Gráfico -->
+<!-- df_md %<>% mutate(title = paste0(SiteCode," p=",round(p,3))) %>% arrange(p) -->
+<!-- df_md$title <- factor(df_md$title,levels = unique(df_md$title)) -->
+<!-- ggplot(df_md,aes(x=d,y=n_nRef)) + -->
+<!--   geom_point() + geom_line(aes(y=Pr_nRef),color="red") + -->
+<!--   labs(x="Dispersão Média", -->
+<!--        y="Número de SADs não Refutadas", -->
+<!--        title="Prob. Não Refutar uma SAD neutra MN=EE") + -->
+<!--   facet_wrap(~title,ncol=5) + theme_light() -->
+<!-- ``` -->
+
+<!-- __Figura 1.7__ Predições por sítio de amostragem do modelo médio calculado a partir do modelo global  -->
+<!-- ; pontos: número de SADs neutras refutadas para uma bateria de simulações com um determinada distância média de dispersão; eixo x = distância média de dispersão / largura da área de amostragem; a linha é a probabilidade de não refutar uma SAD neutra segundo a predição média do conjunto de sub-modelos dentro do intervalo de plausibilidade de 7 (Burnham et al 2011) -->
+
+
+<!-- #### Predito para novo conjunto de dados   -->
+
+<!-- Para avaliar o predito e intervalo de confiança de 95% pelo modelo médio utilizo funções do pacote AICcmodavg (REF).   -->
+
+<!-- ```{r fig 18 predito para novo conjunto de dados glmm nRefEE AICcmodavg} -->
+<!-- # dados -->
+<!-- ## modelo médio -->
+<!-- load(file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_nRefEE__AICcmodavg.Rdata") -->
+<!-- df_plot <- mdAvg_nRefEE__AICcmodavg -->
+<!-- # df_plot %>% names -->
+<!-- df_plot %<>% mutate(p = p.z * sd(df_resultados$p) + mean(df_resultados$p),d = d.z*sd(df_resultados$d) + mean(df_resultados$d)) -->
+
+
+<!-- l_p.nRefEE_AICcmodavg <- list() -->
+<!-- l_p.nRefEE_AICcmodavg[[1]] <- ggplot(df_plot,aes(x=p,y=d,fill=mod.avg.pred)) + -->
+<!--   geom_tile() + -->
+<!--   scale_fill_gradient2(limits = c(0,1),midpoint=0.5, low="red", high="blue",mid="green") + -->
+<!--   labs(title="Prob de não Refutar", -->
+<!--        fill="Probability") + theme_classic() -->
+<!-- l_p.nRefEE_AICcmodavg[[2]] <- ggplot(df_plot,aes(x=p,y=d,fill=lower.CL)) + -->
+<!--   geom_tile() + -->
+<!--   scale_fill_gradient2(limits = c(0,1),midpoint=0.5, low="red", high="blue",mid="green") + -->
+<!--   labs(title="Lower IC (5%)", -->
+<!--        fill="Probability") + theme_classic() -->
+<!-- l_p.nRefEE_AICcmodavg[[3]] <- ggplot(df_plot,aes(x=p,y=d,fill=upper.CL)) + -->
+<!--   geom_tile() + -->
+<!--   scale_fill_gradient2(limits = c(0,1),midpoint=0.5, low="red", high="blue",mid="green") + -->
+<!--   labs(title="Upper IC (95%)", -->
+<!--        fill="Probability") + theme_classic() -->
+<!-- grid.arrange(l_p.nRefEE_AICcmodavg[[1]],l_p.nRefEE_AICcmodavg[[2]],l_p.nRefEE_AICcmodavg[[3]], -->
+<!--              layout_matrix=rbind(rep(1,4), -->
+<!--                                  rep(1,4), -->
+<!--                                  rep(1,4), -->
+<!--                                  rep(1,4), -->
+<!--                                  c(2,2,3,3), -->
+<!--                                  c(2,2,3,3)) -->
+<!--              ) -->
+<!-- ``` -->
+
+<!-- __Figura 1.8__ Efeito predito de d e p na Probabilidade de não refutar segundo o modelo médio para MN==EE.  No painel superior a predição média, nos paineis inferiores o intervalo de confiança. -->
+
+
+<!-- ## 1.3 n_nRef subset:MN==EI   -->
+
+
+<!-- ```{r glmm quadratico n_nRef MNEI modelo cheio,include=FALSE,eval=FALSE,echo=TRUE} -->
+<!-- l_md <- vector("list",3) -->
+<!-- names(l_md) <- c("1|Site","d|Site","d + d^2|Site") -->
+<!-- l_md[[1]] <- glmer(cbind(n_nRef,100-n_nRef) ~ -->
+<!--                      ( p.z + I(p.z^2) ) * ( d.z + I(d.z^2) ) + -->
+<!--                      (1|SiteCode), -->
+<!--                    family = "binomial",data=filter(df_resultados,MN=="EI"), -->
+<!--                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- l_md[[2]] <- glmer(cbind(n_nRef,100-n_nRef) ~ -->
+<!--                      ( p.z + I(p.z^2) ) * ( d.z + I(d.z^2) ) + -->
+<!--                      (d.z|SiteCode), -->
+<!--                    family = "binomial",data=filter(df_resultados,MN=="EI"), -->
+<!--                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- l_md[[3]] <- glmer(cbind(n_nRef,100-n_nRef) ~ -->
+<!--                      ( p.z + I(p.z^2) ) * ( d.z + I(d.z^2) ) + -->
+<!--                      (d.z + I(d.z^2)|SiteCode), -->
+<!--                    family = "binomial",data=filter(df_resultados,MN=="EI"), -->
+<!--                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- ``` -->
+
+<!-- ```{r l_md_nRef.GLMM_EI,eval=FALSE} -->
+<!-- l_md_nRef.GLMM_EI <- l_md -->
+<!-- save(l_md_nRef.GLMM_EI,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md_nRef.GLMM_EI.Rdata") -->
+<!-- ``` -->
+
+
+
+<!-- __Tabela 1.3.1__ AICctab n_nRef MNEI   -->
+
+<!-- ```{r glmm quadratico n_nRef MNEI modelo cheio AICctab} -->
+<!-- load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md_nRef.GLMM_EI.Rdata") -->
+<!-- AICctab(l_md_nRef.GLMM_EI,weights=TRUE) -->
+<!-- ``` -->
+
+<!-- A função AICcmodavg::modavgPred aceita apenas a função de ligação canonica logito, então não irei comparar outras funções de ligação -->
+<!-- O modelo mais plausível considera um termo linear e quadrático para d na estrutura aletória. Segue seleção de variáveis. -->
+
+<!-- __Tabela 1.3.2__ R2 marginal e condicional n_nRef MNEI   -->
+
+
+<!-- ```{r r2mc nRefEI} -->
+<!-- r.squaredGLMM(l_md_nRef.GLMM_EI[["d + d^2|Site"]]) -->
+<!-- ``` -->
+
+
+<!-- ```{r fig 19 res quant glmm cheio MNEI} -->
+<!-- p_plot <- DHARMa::simulateResiduals(l_md_nRef.GLMM_EI[["d + d^2|Site"]],n=1000) -->
+<!-- plot(p_plot)   -->
+<!-- ``` -->
+
+<!-- __Figura 1.9__ Resíduos Quantílicos do glmm cheio mais plausível para MNEI    -->
+
+
+<!-- ```{r modelo global n_nRef e R2m/c MNEI, include=TRUE,echo=TRUE,cache=TRUE} -->
+<!-- # dados -->
+<!-- df_md <- filter(df_resultados,MN=="EI") -->
+<!-- # modelo global -->
+<!-- global_md <- glmer(cbind(n_nRef,100-n_nRef) ~ -->
+<!--                      ( p.z + I(p.z^2) ) * ( d.z + I(d.z^2) ) + -->
+<!--                      (d.z + I(d.z^2)|SiteCode), -->
+<!--                    family = "binomial",data=df_md, -->
+<!--                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)),na.action = "na.fail") -->
+<!-- ``` -->
+
+<!-- __Tabela 1.3.3__ AICctab n_nRef MNEI delta<7   -->
+
+
+
+<!-- ```{r modelo dredge AICctab nRefEI} -->
+<!-- dredge_glmmEI <- dredge(global_md,trace = FALSE,evaluate=TRUE) -->
+<!-- subset(dredge_glmmEI,delta<7) -->
+<!-- ``` -->
+
+
+
+<!-- ```{r model averaging EI MuMIn e AICcmodavg,message=FALSE,eval=FALSE} -->
+<!-- # todas as combinações de modelo do modelo cheio -->
+<!-- l_md.dredge_nRefEI <- lapply(dredge(global_md,trace = FALSE,evaluate=FALSE), eval) -->
+<!-- # Model Averaging for SiteCode predictions -->
+<!-- mdAvg_nRefEI__MuMIn <- model.avg(l_md.dredge_nRefEI) #,subset<2 -->
+<!-- save(mdAvg_nRefEI__MuMIn,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_nRefEI__MuMIn.Rdata") -->
+<!-- # Model Averaging for new data predictions -->
+<!-- df_pred <- expand.grid(SiteCode=levels(df_resultados$SiteCode)[1], -->
+<!--                        d.z=seq(min(df_resultados$d.z),max(df_resultados$d.z),length=40), -->
+<!--                        p.z=seq(min(df_resultados$p.z),max(df_resultados$p.z),length=200)) -->
+<!-- mdAvg_nRefEI__AICcmodavg <- AICcmodavg::modavgPred(l_md.dredge_nRefEI,newdata = df_pred) %>% -->
+<!--   cbind(df_pred) -->
+<!-- save(mdAvg_nRefEI__AICcmodavg,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_nRefEI__AICcmodavg.Rdata") -->
+<!-- ``` -->
+
+<!-- ##### Predito para cada Sítio -->
+
+<!-- Para avaliar o ajuste do modelo ao conjunto de dados utilizo funções do pacote MuMIn (REF) que permite calcular a predição do modelo médio para o conjunto original de dados.   -->
+
+
+<!-- ```{r glmm quadratico n_nRef MNEI selecao de variaveis, comment=FALSE, message=FALSE,warning=FALSE,results="hide",fig.width=8, fig.height=30} -->
+<!-- # Modelo Global -->
+<!-- load(file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_nRefEI__MuMIn.Rdata") -->
+<!-- # Predição -->
+<!-- df_md <- df_resultados %>% filter(MN=="EI") -->
+<!-- df_md$Pr_nRef <- predict(mdAvg_nRefEI__MuMIn,type="response")*100 -->
+<!-- # Gráfico -->
+<!-- df_md %<>% mutate(title = paste0(SiteCode," p=",round(p,3))) %>% arrange(p) -->
+<!-- df_md$title <- factor(df_md$title,levels = unique(df_md$title)) -->
+<!-- ggplot(df_md,aes(x=d_Lplot,y=n_nRef)) +  -->
+<!--   geom_point() + geom_line(aes(y=Pr_nRef),color="red") +  -->
+<!--   labs(x="Dispersão Média per capita / Lado da Área Amostrada", -->
+<!--        y="Número de SADs não Refutadas", -->
+<!--        title="Prob. Não Refutar uma SAD neutra MN=EI") + -->
+<!--   facet_wrap(~title,ncol=5) + theme_classic() -->
+<!-- ```   -->
+
+<!-- __Figura 1.10__ Predito por SiteCode a partir do modelo médio para MNEI.   -->
+
+
+
+
+<!-- ```{r fig 111 predito para novo conjunto de dados glmm nRefEI AICcmodavg} -->
+<!-- # dados -->
+<!-- ## modelo médio -->
+<!-- load(file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_nRefEI__AICcmodavg.Rdata") -->
+<!-- df_plot <- mdAvg_nRefEI__AICcmodavg -->
+<!-- # df_plot %>% names -->
+<!-- df_plot %<>% mutate(p = p.z * sd(df_resultados$p) + mean(df_resultados$p),d = d.z*sd(df_resultados$d) + mean(df_resultados$d)) -->
+
+
+<!-- l_p.nRefEI_AICcmodavg <- list() -->
+<!-- l_p.nRefEI_AICcmodavg[[1]] <- ggplot(df_plot,aes(x=p,y=d,fill=mod.avg.pred)) + -->
+<!--   geom_tile() + -->
+<!--   scale_fill_gradient2(limits = c(0,1),midpoint=0.5, low="red", high="blue",mid="green") + -->
+<!--   labs(title="Prob de não Refutar", -->
+<!--        fill="Probability") + theme_classic() -->
+<!-- l_p.nRefEI_AICcmodavg[[2]] <- ggplot(df_plot,aes(x=p,y=d,fill=lower.CL)) + -->
+<!--   geom_tile() + -->
+<!--   scale_fill_gradient2(limits = c(0,1),midpoint=0.5, low="red", high="blue",mid="green") + -->
+<!--   labs(title="Lower IC (5%)", -->
+<!--        fill="Probability") + theme_classic() -->
+<!-- l_p.nRefEI_AICcmodavg[[3]] <- ggplot(df_plot,aes(x=p,y=d,fill=upper.CL)) + -->
+<!--   geom_tile() + -->
+<!--   scale_fill_gradient2(limits = c(0,1),midpoint=0.5, low="red", high="blue",mid="green") + -->
+<!--   labs(title="Upper IC (95%)", -->
+<!--        fill="Probability") + theme_classic() -->
+<!-- grid.arrange(l_p.nRefEI_AICcmodavg[[1]],l_p.nRefEI_AICcmodavg[[2]],l_p.nRefEI_AICcmodavg[[3]], -->
+<!--              layout_matrix=rbind(rep(1,4), -->
+<!--                                  rep(1,4), -->
+<!--                                  rep(1,4), -->
+<!--                                  rep(1,4), -->
+<!--                                  c(2,2,3,3), -->
+<!--                                  c(2,2,3,3)) -->
+<!--              ) -->
+<!-- ``` -->
+
+<!-- __Figura 1.11__ Efeito predito de d e p na Probabilidade de não refutar segundo o modelo médio para MN==EE.  No painel superior a predição média, nos paineis inferiores o intervalo de confiança.   -->
+
+
+
+<!-- ## 1.4 Figura Final -->
+
+
+
+
+
+```{r figura final n_nRef }
+#############
+# dados
+## MNEE
+load(file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_nRefEE__AICcmodavg.Rdata")
+mdAvg_nRefEE__AICcmodavg$MN <- "EE"
+## MNEI
+load(file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_nRefEI__AICcmodavg.Rdata")
+mdAvg_nRefEI__AICcmodavg$MN <- "EI"
+## df comum
+df_plot <- rbind(mdAvg_nRefEE__AICcmodavg,mdAvg_nRefEI__AICcmodavg)
+df_plot %<>% mutate(p = p.z * sd(df_resultados$p) + mean(df_resultados$p),
+                    d = d.z*sd(df_resultados$d) + mean(df_resultados$d))
+## Gráficos
+l_p.nRefEE_AICcmodavg <- list()
+labels_IC <- c(lower.CL="IC 5%", upper.CL="IC 95%")
+## predição média para ambos modelos
+l_p.nRefEE_AICcmodavg[[1]] <- ggplot(df_plot,aes(x=p,y=d,fill=mod.avg.pred)) +
+  geom_tile() +
+  scale_fill_gradient2(limits = c(0,1),midpoint=0.5, low="red", high="blue",mid="green") +
+  labs(
+    # title="Probabilidade de Não Refutar",
+       fill="Probability") +
+  theme_classic() + facet_wrap(~MN,ncol=2) + theme(legend.position="top")
+## IC para MNEE
+df_plotEE <- df_plot %>% filter(MN=="EE") %>%
+  gather(key = IC_class ,value = IC_pred,lower.CL:upper.CL)
+l_p.nRefEE_AICcmodavg[[2]] <- ggplot(df_plotEE,aes(x=p,y=d,fill=IC_pred)) +
+  geom_tile() +
+  scale_fill_gradient2(limits = c(0,1),midpoint=0.5, low="red", high="blue",mid="green") +
+  theme_classic() + facet_wrap(~IC_class,ncol=2,labeller = labeller(IC_class = labels_IC)) + theme(legend.position='none')
+## IC para MNEI
+df_plotEI <- df_plot %>% filter(MN=="EI") %>%
+  gather(key = IC_class ,value = IC_pred,lower.CL:upper.CL)
+l_p.nRefEE_AICcmodavg[[3]] <- ggplot(df_plotEI,aes(x=p,y=d,fill=IC_pred)) +
+  geom_tile() +
+  scale_fill_gradient2(limits = c(0,1),midpoint=0.5, low="red", high="blue",mid="green") +
+  theme_classic() + facet_wrap(~IC_class,ncol=2,labeller = labeller(IC_class = labels_IC)) + theme(legend.position='none')
+## Arranjo dos gráficos
+grid.arrange(l_p.nRefEE_AICcmodavg[[1]],l_p.nRefEE_AICcmodavg[[2]],l_p.nRefEE_AICcmodavg[[3]],
+             layout_matrix=rbind(rep(1,4),
+                                 rep(1,4),
+                                 rep(1,4),
+                                 rep(1,4),
+                                 c(2,2,3,3),
+                                 c(2,2,3,3))
+             )
+
+
+```
+
+
+<!-- __Figura 1.12__ Probabilidade de não refutar uma SAD neutra em função do modelo neutro (EE e EI), proporção de cobertura vegetal (p) e distância média de dispersão (d) -->
+
+
+<!-- # 2 diff_S = (S_obs - S_MN)/S_obs -->
+
+__Padrão Geral__
+
+```{r preparacao dos dados 1,message=FALSE,eval=TRUE}
+# gráfico
+df_resultados %>% ggplot(aes(x=p,y=diff_S0,group=MN)) +
+  geom_abline(intercept = 0,slope = 0,col="blue") +
+  geom_point(aes(color=MN),alpha=0.3) +
+  scale_color_manual(values=c("#FF0000", "#000000")) +
+  labs(title="diff_S = (S_MN - S_obs)/S_obs",x="p",y="diff_S") +
+  facet_wrap(~k,ncol=5,scales="free") + theme_light()
+# # graficos
+# filter(df_resultados,MN=="EE") %>% select(diff_S0, p, d, Stotal, Ntotal) %>% ggpairs() + labs(title="MNEE")
+# do.call("grid.arrange",c(l_p,ncol=1))
+```
+
+__Figura 2.1__ diff_S (y-axis), p (x-axis).
+
+
+
+
+<!-- ## 2.1 MNEE -->
+
+
+
+```{r diff_S MNEE modelo cheio,echo=TRUE}
+l_md <- vector("list",9)
+names(l_md) <- c("1-k 1|Site","1-k I(1-k)|Site",
+                 "k 1|Site",
+                 "d 1|Site","d d|Site",
+                 "d/L 1|Site","d/L I(d/L)|Site",
+                 "1 1|Site",
+                 "1")
+df_md <- df_resultados %>% filter(MN=="EE")
+l_md[[1]] <- lmer(diff_S0 ~ (p.z + I(p.z^2)) * k_1.z + (1|SiteCode),
+                   data=df_md,na.action = "na.fail")
+l_md[[2]] <- lmer(diff_S0 ~ (p.z + I(p.z^2)) * k_1.z + (k_1.z|SiteCode),
+                   data=df_md,na.action = "na.fail")
+l_md[[3]] <- lmer(diff_S0 ~ (p.z + I(p.z^2)) * k + (1|SiteCode),
+                   data=df_md,na.action = "na.fail")
+l_md[[4]] <- lmer(diff_S0 ~ (p.z + I(p.z^2)) * d.z + (1|SiteCode),
+                   data=df_md,na.action = "na.fail")
+l_md[[5]] <- lmer(diff_S0 ~ (p.z + I(p.z^2)) * d.z + (d.z|SiteCode),
+                   data=df_md,na.action = "na.fail")
+l_md[[6]] <- lmer(diff_S0 ~ (p.z + I(p.z^2)) * d_Lplot.z + (1|SiteCode),
+                   data=df_md,na.action = "na.fail")
+l_md[[7]] <- lmer(diff_S0 ~ (p.z + I(p.z^2)) * d_Lplot.z + (d_Lplot.z|SiteCode),
+                   data=df_md,na.action = "na.fail")
+l_md[[8]] <- lmer(diff_S0 ~ 1 + (1|SiteCode),
+                   data=df_md,na.action = "na.fail")
+l_md[[9]] <- lm(diff_S0 ~ 1,
+                  data=df_md,na.action = "na.fail")
+AICctab(l_md,weights=T)
+```
+
+<!-- Alguns modelos utilizados para estimar diff_S apresentaram "singularidade" (estimativas não diferem de zero), dentre eles o único modelo plausível. Isso indica que modelo com a estrutura aleatória mais simples devem ser ajustados aos dados, assim vou descartar aqueles com inclinação para a variável de dispersão por Sítio. -->
+
+<!-- ```{r diff_S modelo cheio 2,echo=TRUE} -->
+<!-- l_md <- vector("list",6) -->
+<!-- names(l_md) <- c("1-k 1|Site", -->
+<!--                  "k 1|Site", -->
+<!--                  "d 1|Site", -->
+<!--                  "d/L 1|Site", -->
+<!--                  "1 1|Site", -->
+<!--                  "1") -->
+<!-- df_md <- df_resultados %>% filter(MN=="EE") -->
+<!-- l_md[[1]] <- lmer(diff_S0 ~ (p.z + I(p.z^2)) * k_1.z + (1|SiteCode), -->
+<!--                    data=df_md,na.action = "na.fail") -->
+<!-- l_md[[2]] <- lmer(diff_S0 ~ (p.z + I(p.z^2)) * k + (1|SiteCode), -->
+<!--                    data=df_md,na.action = "na.fail") -->
+<!-- l_md[[3]] <- lmer(diff_S0 ~ (p.z + I(p.z^2)) * d.z + (1|SiteCode), -->
+<!--                    data=df_md,na.action = "na.fail") -->
+<!-- l_md[[4]] <- lmer(diff_S0 ~ (p.z + I(p.z^2)) * d_Lplot.z + (1|SiteCode), -->
+<!--                    data=df_md,na.action = "na.fail") -->
+<!-- l_md[[5]] <- lmer(diff_S0 ~ 1 + (1|SiteCode), -->
+<!--                    data=df_md,na.action = "na.fail") -->
+<!-- l_md[[6]] <- lm(diff_S0 ~ 1, -->
+<!--                    data=df_md,na.action = "na.fail") -->
+<!-- AICctab(l_md,weights=T) -->
+<!-- ``` -->
+
+<!-- Nenhum destes modelos apresentou singularidade, o modelo nulo sem estrutura aleatória foi o único plausível. Segue gráfico diagnóstico:   -->
+
+
+<!-- ```{r graf diag modelo cheio mais plausivel diff_S MNEE,message=FALSE,warning=FALSE} -->
+<!-- p_plot <- simulateResiduals(l_md[["1"]],n = 1000) -->
+<!-- plot(p_plot) -->
+<!-- ``` -->
+
+<!-- __Figura 2.2__ Resíduos Quantílicos do modelo mais plausível para diff_S subset=MNEE (diff_S ~ 1) -->
+
+<!-- __Tabela 2.3__ Sumário do modelo mais plausível para diff_S MNEE   -->
+
+<!-- ```{r} -->
+<!-- summary(l_md[["1"]]) -->
+<!-- ``` -->
+
+<!-- ## MNEI   -->
+
+```{r padroes gerais diff S MNEI, warning=FALSE,message=FALSE}
+df_plot <- df_resultados %>% filter(MN=="EI")
+ggplot(df_plot,aes(x=d,y=diffS_mean)) +
+  geom_smooth() +
+  geom_point(alpha=0.3) 
+  # facet_wrap(~k,ncol=5,scales="free")
+```
+
+<!-- __Figura 2.3__ diffS_EI ~p*k   -->
+
+<!-- Vou iniciar apenas com as preditoras de interesse (p e variáveis de dispersão). Devido a clara ausência de simetria de diff_S desloquei a distribuição apenas para valores positivos (figura 2.3 primeiro quadro) e utilizarei distribuição Gamma para ajustar os modelos com função de ligação 'log'. -->
+
+```{r diff_S MNEI por sitio,fig.width=8, fig.height=30}
+df_plot <- df_resultados %>% filter(MN=="EI")
+df_plot %<>% mutate(title = paste0(SiteCode, " p=",round(p,digits = 3))) %>% arrange(p)
+df_plot$title <- factor(df_plot$title,levels = unique(df_plot$title))
+## por sítio de amostragem
+ggplot(df_plot,aes(x=d,y=diffS_mean)) +
+  geom_point() +
+  geom_smooth(method="loess",col="blue") + geom_smooth(method="lm",col="red") +
+  theme(legend.position="top") +
+  labs(title=" red = lm; blue = 'loess' ") +
+  facet_wrap(~title,ncol=5,scales="free")
+```
+
+<!-- __Figura 2.4__ diff_S por sítio de amostragem e d -->
+
+<!-- ### Seleção do Modelo cheio: GLMM -->
+
+<!-- ```{r modelo cheio diff_S MNEI, echo=TRUE,warning=TRUE,message=TRUE,eval=FALSE} -->
+<!-- df_md <- df_resultados %>% filter(MN=="EI") -->
+<!-- # df_md$diff_S %>% summary -->
+<!-- l_md <- vector("list",6) -->
+<!-- names(l_md) <- c("1|Site","d|Site", -->
+<!--                  "p2*k log", -->
+<!--                  "p2*d2 id 1|Site", -->
+<!--                  "p2*d2 id d|Site", -->
+<!--                  "p2*d2 id d2|Site") -->
+<!-- # modelos mínimos -->
+<!-- l_md[[1]] <- glmer(diff_S ~ p.z*d.z + (1|SiteCode), -->
+<!--                    data=df_md,family="Gamma"(link="log")) -->
+<!-- l_md[[2]] <- glmer(diff_S ~ p.z*d.z  + (d.z|SiteCode), -->
+<!--                    data=df_md,family="Gamma"(link="log")) -->
+<!-- # com p2 -->
+<!-- ## erro -->
+<!-- l_md[[3]] <- glmer(diff_S ~ (p+I(p.z^2))*k + (1|SiteCode), -->
+<!--                    data=df_md,family="Gamma"(link="log")) -->
+<!-- v_vars <- getME(l_md[[3]],c("theta","fixef")) -->
+<!-- l_md[[3]] <- update(l_md[[3]],start=v_vars,control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5))) -->
+<!-- l_md[[3]] <- glmer(diff_S ~ I(p.z^2)*k + (1|SiteCode), -->
+<!--                    data=df_md,family="Gamma"(link="log")) -->
+<!-- # com p2 e d2 -->
+<!-- ####################### -->
+<!-- # Model failed to converge with max|grad| = 0.00556207 (tol = 0.002, component 1)Model is nearly unidentifiable: very large eigenvalue -->
+<!-- #  - Rescale variables? -->
+<!-- l_md[[4]] <- glmer(diff_S ~ (p.z + I(p.z^2))*(d.z + I(d.z^2)) + (1|SiteCode), -->
+<!--                    data=df_md,family="Gamma"(link="log")) -->
+<!-- v_vars <- getME(l_md[[4]],c("theta","fixef")) -->
+<!-- l_md[[4]] <- update(l_md[[4]],start=v_vars,control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5))) -->
+<!-- ####################### -->
+<!-- ####################### -->
+<!-- # Model failed to converge with max|grad| = 0.0608783 (tol = 0.002, component 1)Model is nearly unidentifiable: very large eigenvalue -->
+<!-- #  - Rescale variables? -->
+<!-- l_md[[5]] <- glmer(diff_S ~ (p.z + I(p.z^2))*(d.z + I(d.z^2)) + (d.z|SiteCode), -->
+<!--                    data=df_md,family="Gamma"(link="log")) -->
+<!-- v_vars <- getME(l_md[[5]],c("theta","fixef")) -->
+<!-- l_md[[5]] <- update(l_md[[5]],start=v_vars,control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5))) -->
+<!-- ####################### -->
+<!-- # Model failed to converge with max|grad| = 0.336616 (tol = 0.002, component 1)Model is nearly unidentifiable: very large eigenvalue -->
+<!-- #  - Rescale variables? -->
+<!-- l_md[[6]] <- glmer(diff_S ~ (p.z + I(p.z^2))*(d.z + I(d.z^2)) + (d.z + I(d.z^2)|SiteCode), -->
+<!--                    data=df_md,family="Gamma"(link="log")) -->
+<!-- v_vars <- getME(l_md[[6]],c("theta","fixef")) -->
+<!-- l_md[[6]] <- update(l_md[[6]],start=v_vars,control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5))) -->
+<!-- ####################### -->
+<!-- ``` -->
+
+<!-- ```{r l_md.diffS_EI_glmm,eval=FALSE} -->
+<!-- l_md.diffS_EI_glmm <- l_md -->
+<!-- save(l_md.diffS_EI_glmm,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md_diffS_EI_glmm.Rdata") -->
+<!-- ``` -->
+
+<!-- ```{r AICctab l_md.diffS_EI_glmm} -->
+<!-- load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md_diffS_EI_glmm.Rdata") -->
+<!-- AICctab(l_md.diffS_EI_glmm,weights=TRUE) -->
+<!-- ``` -->
+
+
+<!-- Não foi possível ajustar os modelos com estrutura fixa mais complexa. Vou avaliar se GAMM oferecem melhor ajuste aos dados -->
+
+<!-- ### GAMM cheio -->
+
+<!-- ```{r diff_S MNEI GAMM cheio,eval=FALSE,echo=TRUE} -->
+<!-- l_md <- vector("list",4) -->
+<!-- names(l_md) <- c("tp by=k","cr by=k", -->
+<!--                  "tp ti","cr ti") -->
+<!-- l_md[[1]] <- gam(diff_S ~ s(p.z,by=k,bs="tp") +  -->
+<!--                    s(SiteCode,bs="re"), -->
+<!--                  data=df_md,family = "Gamma"(link="log")) -->
+<!-- l_md[[2]] <- gam(diff_S ~ s(p.z,by=k,bs="cr") +  -->
+<!--                    s(SiteCode,bs="re"), -->
+<!--                  data=df_md,family = "Gamma"(link="log")) -->
+<!-- l_md[[3]] <- gam(diff_S ~ s(p.z,bs="tp") + s(d.z,bs="tp") + ti(p.z,d.z,bs=c("tp","tp")) + -->
+<!--                    s(SiteCode,bs="re"), -->
+<!--                  data=df_md,family = "Gamma"(link="log")) -->
+<!-- l_md[[4]] <- gam(diff_S ~ s(p.z,bs="cr") + s(d.z,bs="cr") + ti(p.z,d.z,bs=c("cr","cr")) + -->
+<!--                    s(SiteCode,bs="re"), -->
+<!--                  data=df_md,family = "Gamma"(link="log")) -->
+<!-- ``` -->
+
+
+<!-- ```{r l_md.diff_S.EI__GAMM,eval=FALSE} -->
+<!-- l_md.diff_S.EI__GAMM <- l_md -->
+<!-- save(l_md.diff_S.EI__GAMM,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md_diff_S_EI__GAMM.Rdata") -->
+<!-- ``` -->
+
+
+<!-- ```{r AICctab modelos cheios diff_S EI GAMM} -->
+<!-- load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md_diff_S_EI__GAMM.Rdata") -->
+<!-- AICctab(l_md.diff_S.EI__GAMM,weights=TRUE) -->
+<!-- ``` -->
+
+
+<!-- O único modelo cheio plausível considera as variáveis p e d (um smoother para cada mais um tensor para ambas) e 1 intercepto por Sítio de Amostragem. -->
+
+
+<!-- ```{r gamm cheio selecionado diff_S MNEI, warning=FALSE,message=FALSE} -->
+<!-- appraise(l_md.diff_S.EI__GAMM[["cr ti"]]) -->
+<!-- ``` -->
+
+<!-- __Figura 2.5__ Gráficos Diagnostico do gamm cheio mais plausível para diff_S MN==EI -->
+
+<!-- De maneira geral o modelo esta fazendo um bom ajuste, contudo alguns sítios distoam do padrão geral dos dados. Há duas alternativas: i) possibilitar um smoother por sítio de amostragem com um parâmetro de penalização comum; ou ii) remover sítios outliers. -->
+
+<!-- ```{r update gamm cheio mais plausivel diff_S MNEI,eval=FALSE,echo=TRUE} -->
+<!-- l_md <- vector("list",2) -->
+<!-- names(l_md) <- c("1|Site","d|Site") -->
+<!-- l_md[[1]] <- gam(diff_S ~ s(p.z,bs="cr") + s(d.z,bs="cr") + ti(p.z,d.z,bs=c("cr","cr")) + -->
+<!--                    s(SiteCode,bs="re"), -->
+<!--                  data=df_md,family = "Gamma"(link="log")) -->
+<!-- l_md[[2]] <- gam(diff_S ~ s(p.z,bs="cr") + s(d.z,bs="cr") + ti(p.z,d.z,bs=c("cr","cr")) + -->
+<!--                    s(d.z,SiteCode,bs="fs",xt="cr"), -->
+<!--                  data=df_md,family = "Gamma"(link="log")) -->
+<!-- ``` -->
+
+
+<!-- ```{r l_md.diff_S.EI__GAMM2,eval=FALSE} -->
+<!-- l_md.diff_S.EI__GAMM2 <- l_md -->
+<!-- save(l_md.diff_S.EI__GAMM2,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md_diff_S_EI__GAMM2.Rdata") -->
+<!-- ``` -->
+
+
+
+<!-- ```{r AICctab gamm cheio diff_S MNEI 2} -->
+<!-- load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md_diff_S_EI__GAMM2.Rdata") -->
+<!-- AICctab(l_md.diff_S.EI__GAMM2) -->
+<!-- ``` -->
+
+<!-- ```{r graf diag gamm2 diff_S MNEI} -->
+<!-- gratia::appraise(l_md.diff_S.EI__GAMM2[["d|Site"]]) -->
+<!-- ``` -->
+
+<!-- __Figura 2.6__ Gráfico Diagnóstico gamm cheio com segunda estrutra aleatória diff_S MM==EI -->
+
+<!-- ```{r diff_S MNEI modelo cheio avaliacao,message=FALSE,warning=FALSE,results="hide"} -->
+<!-- gratia::draw(l_md.diff_S.EI__GAMM2[["d|Site"]]) -->
+<!-- ``` -->
+
+<!-- __Figura 2.7__ gratia::draw() gamm mais plausível com estrutura similar a (d|Site)   -->
+
+<!-- Este modelo apresenta problema de concurvidade. Assim vou refazer a comparação com configuração adequada:   -->
+
+<!-- ```{r updata gamm cheio mais plausível d Site,eval=FALSE,echo=TRUE} -->
+<!-- df_md <- filter(df_resultados,MN=="EI") -->
+<!-- md_gam.diff_S.EI__update <- gam(diff_S ~ s(p.z,bs="cr") + s(d.z,bs="cr") + ti(p.z,d.z,bs=c("cr","cr")) + -->
+<!--                    s(d.z,SiteCode,bs="fs",xt=list(bs="cp"), m=1), -->
+<!--                  data=df_md,family = "Gamma"(link="log")) -->
+<!-- ``` -->
+
+<!-- ```{r md_gam.diff_S.EI__update,eval=FALSE} -->
+<!-- save(md_gam.diff_S.EI__update,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/md_diff_S_EI__GAMM_update.Rdata") -->
+<!-- ``` -->
+
+
+<!-- ```{r draw update gamm cheio mais plausivel d Site} -->
+<!-- load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/md_diff_S_EI__GAMM_update.Rdata") -->
+<!-- l_md.diff_S.EI__GAMM2[[2]] <- md_gam.diff_S.EI__update -->
+<!-- gratia::draw(md_gam.diff_S.EI__update) -->
+<!-- ``` -->
+
+<!-- __Figura 2.8__ Update do modelo da figura 2.7 com o smoother da estrutura aleatória penalizada pela 1a derivada para diminuir a concurvidade (Perdersen et al. 2019)   -->
+
+<!-- O modelo diminuiu a concurvidade da estimativa. -->
+
+<!-- ```{r  diff_S MNEI gamm cheio segundo plausivel,message=FALSE,warning=FALSE,results="hide",eval=FALSE} -->
+<!-- gratia::appraise(md_gam.diff_S.EI__update) -->
+<!-- ``` -->
+
+<!-- ![](/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/appraise_gamm_diffS_EI_updata.png){ width=100% }   -->
+
+<!-- __Figura 2.9__ Appraise do gamm cheio atualizado (smoother de estrutura aleatória: m=1).   -->
+
+<!-- ### Remoção de Outliers -->
+
+<!-- Remoção sítios com observações fora do intervalo [-1.5;1.5] dos resíduos deviance.   -->
+
+<!-- ```{r outliers diffS_MNEI gamm,eval=FALSE,echo=TRUE} -->
+<!-- # dados completos -->
+<!-- df_md <- df_resultados %>% filter(MN=="EI") -->
+<!-- df_md$resDev <- residuals.gam(md_gam.diff_S.EI__update) -->
+<!-- # sítios considerados outliers -->
+<!-- v_SiteOut <- df_md %>% filter(resDev < -0.15 | resDev > 0.15) %>% .$SiteCode %>% unique -->
+<!-- # update da comparação -->
+<!-- l_md <- vector("list",2) -->
+<!-- names(l_md) <- c("1|Site","d|Site") -->
+<!-- l_md[[1]] <- gam(diff_S ~ s(p.z,bs="cr") + s(d.z,bs="cr") + ti(p.z,d.z,bs=c("cr","cr")) + -->
+<!--                    s(SiteCode,bs="re"), -->
+<!--                  data=filter(df_md,!(SiteCode %in% v_SiteOut)), -->
+<!--                  family = "Gamma"(link="log")) -->
+<!-- l_md[[2]] <- gam(diff_S ~ s(p.z,bs="cr") + s(d.z,bs="cr") + ti(p.z,d.z,bs=c("cr","cr")) + -->
+<!--                    s(d.z,SiteCode,bs="fs",xt=list(bs="cp"),m=1), -->
+<!--                  data=filter(df_md,!(SiteCode %in% v_SiteOut)), -->
+<!--                  family = "Gamma"(link="log")) -->
+<!-- ``` -->
+
+<!-- ```{r l_md.diff_S.EI__GAMM_sOut,eval=FALSE} -->
+<!-- l_md.diff_S.EI__GAMM_sOut <- l_md -->
+<!-- save(l_md.diff_S.EI__GAMM_sOut,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md_diff_S_EI__GAMM_sOut.Rdata") -->
+<!-- ``` -->
+
+
+<!-- ```{r AICctab gamm cheio sem outliers,eval=TRUE} -->
+<!-- load("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md_diff_S_EI__GAMM_sOut.Rdata") -->
+<!-- AICctab(l_md.diff_S.EI__GAMM_sOut,weights=TRUE) -->
+<!-- ``` -->
+
+<!-- ```{r appraise gamm diffS_EI sOut,eval=TRUE} -->
+<!-- gratia::appraise(l_md.diff_S.EI__GAMM_sOut[["d|Site"]]) -->
+<!-- ``` -->
+
+<!-- __Figura 2.10__ Gráficos diagnóstico do gamm cheio mais plausível sem outliers -->
+
+<!-- A remoção de outliers não melhorou o ajuste do modelo. -->
+
+<!-- ```{r graw gamm cheio diffS_EI sOut,eval=FALSE} -->
+<!-- gratia::draw(l_md.diff_S.EI__GAMM_sOut[["d|Site"]]) -->
+<!-- ``` -->
+
+<!-- ![](/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/draw_gamm_diffS_EIsOut_fig211.png){ width=100% } -->
+
+<!-- __Figura 2.11__ Efeitos estimados para o gamm cheio diffS_EI sOut -->
+
+<!-- ### Seleção de Variáveis -->
+
+<!-- ```{r gamm diffS_EI selecao de variaveis, eval=FALSE} -->
+<!-- # dados completos -->
+<!-- df_md <- df_resultados %>% filter(MN=="EI") -->
+<!-- df_md$resDev <- residuals.gam(md_gam.diff_S.EI__update) -->
+<!-- # sítios considerados outliers -->
+<!-- v_SiteOut <- df_md %>% filter(resDev < -0.15 | resDev > 0.15) %>% .$SiteCode %>% unique -->
+<!-- # update da comparação -->
+<!-- l_md <- vector("list",4) -->
+<!-- names(l_md) <- c("p + d + ti(p,d)","p + d","p","d") -->
+<!-- l_md[[1]] <- l_md.diff_S.EI__GAMM_sOut[["d|Site"]] -->
+<!-- l_md[[2]] <- gam(diff_S ~ s(p.z,bs="cr") + s(d.z,bs="cr") + -->
+<!--                    s(d.z,SiteCode,bs="fs",xt=list(bs="cp"),m=1), -->
+<!--                  data=filter(df_md,!(SiteCode %in% v_SiteOut)), -->
+<!--                  family = "Gamma"(link="log")) -->
+<!-- l_md[[3]] <- gam(diff_S ~ s(p.z,bs="cr") + -->
+<!--                    s(d.z,SiteCode,bs="fs",xt=list(bs="cp"),m=1), -->
+<!--                  data=filter(df_md,!(SiteCode %in% v_SiteOut)), -->
+<!--                  family = "Gamma"(link="log")) -->
+<!-- l_md[[4]] <- gam(diff_S ~ s(d.z,bs="cr") + -->
+<!--                    s(d.z,SiteCode,bs="fs",xt=list(bs="cp"),m=1), -->
+<!--                  data=filter(df_md,!(SiteCode %in% v_SiteOut)), -->
+<!--                  family = "Gamma"(link="log")) -->
+<!-- ``` -->
+
+<!-- ```{r l_md.diffS_EI_GAMM_selVars, eval=FALSE} -->
+<!-- l_md.diffS_EI_GAMM_selVars <- l_md -->
+<!-- save(l_md.diffS_EI_GAMM_selVars,file="/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md_diff_S_EI__GAMM_sOut.Rdata") -->
+<!-- ``` -->
+
+<!-- ```{r l_md.diffS_EI_GAMM_selVars AICctab,eval=FALSE} -->
+<!-- load("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md_diff_S_EI__GAMM_sOut.Rdata") -->
+<!-- AICctab(l_md.diffS_EI_GAMM_selVars,weights=TRUE) -->
+<!-- ``` -->
+
+
+<!-- ## Figura Final -->
+
+<!-- ```{r gamm diff_S predicao novo conjunto de dados,eval=FALSE} -->
+<!-- l_p <- list() -->
+<!-- # dados -->
+<!-- ## MNEE -->
+<!-- df_md <- df_resultados %>% filter(MN=="EE") -->
+<!-- md_diffS_EE <- lm(diff_S0 ~ 1,data=df_md) -->
+<!-- coef_diffS_EE <- summary(md_diffS_EE)$coef -->
+<!-- coef_diffS_EE[2] -->
+<!-- l_p[[1]] <- ggplot(df_md,aes(y=diff_S0,x="")) + geom_jitter() + stat_summary(fun.data = "mean_cl_boot", colour = "red") -->
+
+<!-- ## MNEI -->
+<!-- df_pred <- df_pred <- expand.grid(SiteCode=levels(df_resultados$SiteCode)[1], -->
+<!--                        d.z=seq(min(df_resultados$d.z),max(df_resultados$d.z),length=20), -->
+<!--                        p.z=seq(min(df_resultados$p.z),max(df_resultados$p.z),length=103)) -->
+<!-- df_pred <- cbind(df_pred, -->
+<!--                  predict(l_md.diff_S.EI__GAMM_sOut[["d|Site"]],df_pred,type="response",se.fit=TRUE)) %>%  -->
+<!--   mutate(p = p.z * sd(df_resultados$p) + mean(df_resultados$p), -->
+<!--          d = d.z * sd(df_resultados$d) + mean(df_resultados$d), -->
+<!--          fit_diff_S0 = fit - min(df_resultados$diff_S0) - 0.01, -->
+<!--          se.fit_diff_S0 = se.fit - min(df_resultados$diff_S0) - 0.01,) -->
+<!-- df_pred$fit_diff_S0 %>% summary -->
+<!-- l_p[[2]] <- ggplot(df_pred,aes(x=p,y=d,fill=fit)) + geom_tile() -->
+<!-- ``` -->
+
+
+<!-- # 3 U  -->
+
+<!-- ## Padrões Gerais   -->
+
+<!-- __figura 4.1 __ U ~ padrões gerais   -->
+
+
+<!-- ```{r padroes gerais U,warning=FALSE,message=FALSE} -->
+<!-- # graficos -->
+<!-- l_p <- vector("list",4) -->
+<!-- l_p[[1]] <- ggplot(df_resultados,aes(x=k,y=U_med)) + -->
+<!--   geom_point() + -->
+<!--   geom_line(aes(group=SiteCode)) + -->
+<!--   geom_boxplot(aes(group=k)) -->
+<!-- l_p[[2]] <- ggplot(df_resultados,aes(x=p,y=U_med)) + -->
+<!--   geom_point() + -->
+<!--   geom_smooth(method = "auto") + -->
+<!--   labs(y="") -->
+<!-- l_p[[3]] <- ggplot(df_resultados,aes(x=log(Stotal),y=U_med)) + -->
+<!--   geom_point() + -->
+<!--   geom_smooth(method = "auto") -->
+<!-- l_p[[4]] <- ggplot(df_resultados,aes(x=p,y=log(Stotal))) + -->
+<!--   geom_point() + -->
+<!--   geom_smooth(method="auto") -->
+<!-- do.call("grid.arrange",c(l_p,ncol=2)) -->
+<!-- ``` -->
+
+<!-- __Figura 4.2__ U ~ d (~SiteCode) -->
+
+<!-- ```{r figura 42 U d Site,fig.height=45,fig.width=8} -->
+<!-- df_plot <- df_resultados %>%  -->
+<!--   filter(MN=="EE") %>% -->
+<!--   mutate(title = paste0(SiteCode," p=",round(p,3))) %>% arrange(p) -->
+<!-- df_plot$title <- factor(df_plot$title,levels = unique(df_plot$title)) -->
+<!-- df_plot %>% ggplot(aes(x=d,y=U_med)) + -->
+<!--   geom_point(alpha=0.3) + theme_light() + -->
+<!--   facet_wrap(~title,ncol=4,scales="free") -->
+<!-- ``` -->
+
+
+<!-- ## GAMM -->
+
+```{r selecao de variavel de dispersao modelo cheio GAMM(U),eval=FALSE}
+ctrl <- list(nthreads=3) #número de cores para paralelizar
+l_md.U <- vector("list",length = 20)
+names(l_md.U) <- c("d/L id normal","d/L log normal", "d/L inverse normal", "d/L log gamma", "d/L inverse gamma",
+                   "1-k id normal","1-k log normal", "1-k inverse normal", "1-k log gamma", "1-k inverse gamma",
+                   "k id normal","k log normal", "k inverse normal", "k log gamma", "k inverse gamma",
+                   "d id normal","d log normal", "d inverse normal", "d log gamma", "d inverse gamma")
+# d/L
+l_md.U[[1]] <- gam(U_med ~ s(d_Lplot.z) + s(p.z) + ti(d_Lplot.z,p.z) +
+                  s(log_Stotal) +
+                  s(SiteCode,bs="re"),
+                family="gaussian",
+                data = df_resultados.U, method = "REML",control=ctrl)
+l_md.U[[2]] <- gam(U_med ~ s(d_Lplot.z) + s(p.z) + ti(d_Lplot.z,p.z) +
+                  s(log_Stotal) +
+                  s(SiteCode,bs="re"),
+                family=gaussian(link = "log"),
+                data = df_resultados.U, method = "REML",control=ctrl)
+l_md.U[[3]] <- gam(U_med ~ s(d_Lplot.z) + s(p.z) + ti(d_Lplot.z,p.z) +
+                  s(log_Stotal) +
+                  s(SiteCode,bs="re"),
+                family=gaussian(link = "inverse"),
+                data = df_resultados.U, method = "REML",control=ctrl)
+l_md.U[[4]] <- gam(U_med ~ s(d_Lplot.z) + s(p.z) + ti(d_Lplot.z,p.z) +
+                  s(log_Stotal) +
+                  s(SiteCode,bs="re"),
+                family=Gamma(link = "log"),
+                data = df_resultados.U, method = "REML",control=ctrl)
+l_md.U[[5]] <- gam(U_med ~ s(d_Lplot.z) + s(p.z) + ti(d_Lplot.z,p.z) +
+                  s(log_Stotal) +
+                  s(SiteCode,bs="re"),
+                family=Gamma(link = "inverse"),
+                data = df_resultados.U, method = "REML",control=ctrl)
+# k_1
+l_md.U[[6]] <- gam(U_med ~ s(k_1.z) + s(p.z) + ti(k_1.z,p.z) +
+                  s(log_Stotal) +
+                  s(SiteCode,bs="re"),
+                family="gaussian",
+                data = df_resultados.U, method = "REML",control=ctrl)
+l_md.U[[7]] <- gam(U_med ~ s(k_1.z) + s(p.z) + ti(k_1.z,p.z) +
+                  s(log_Stotal) +
+                  s(SiteCode,bs="re"),
+                family=gaussian(link = "log"),
+                data = df_resultados.U, method = "REML",control=ctrl)
+l_md.U[[8]] <- gam(U_med ~ s(k_1.z) + s(p.z) + ti(k_1.z,p.z) +
+                  s(log_Stotal) +
+                  s(SiteCode,bs="re"),
+                family=gaussian(link = "inverse"),
+                data = df_resultados.U, method = "REML",control=ctrl)
+l_md.U[[9]] <- gam(U_med ~ s(k_1.z) + s(p.z) + ti(k_1.z,p.z) +
+                  s(log_Stotal) +
+                  s(SiteCode,bs="re"),
+                family=Gamma(link = "log"),
+                data = df_resultados.U, method = "REML",control=ctrl)
+l_md.U[[10]] <- gam(U_med ~ s(k_1.z) + s(p.z) + ti(k_1.z,p.z) +
+                  s(log_Stotal) +
+                  s(SiteCode,bs="re"),
+                family=Gamma(link = "inverse"),
+                data = df_resultados.U, method = "REML",control=ctrl)
+# k.f
+l_md.U[[11]] <- gam(U_med ~ s(p.z,k,bs="fs") + k +
+                  s(log_Stotal) +
+                  s(SiteCode,bs="re"),
+                family="gaussian",
+                data = df_resultados.U, method = "REML",control=ctrl)
+l_md.U[[12]] <- gam(U_med ~ s(p.z,k,bs="fs") + k +
+                  s(log_Stotal) +
+                  s(SiteCode,bs="re"),
+                family=gaussian(link = "log"),
+                data = df_resultados.U, method = "REML",control=ctrl)
+l_md.U[[13]] <- gam(U_med ~ s(p.z,k,bs="fs") + k +
+                  s(log_Stotal) +
+                  s(SiteCode,bs="re"),
+                family=gaussian(link = "inverse"),
+                data = df_resultados.U, method = "REML",control=ctrl)
+l_md.U[[14]] <- gam(U_med ~ s(p.z,k,bs="fs") + k +
+                  s(log_Stotal) +
+                  s(SiteCode,bs="re"),
+                family=Gamma(link = "log"),
+                data = df_resultados.U, method = "REML",control=ctrl)
+l_md.U[[15]] <- gam(U_med ~ s(p.z,k,bs="fs") + k +
+                  s(log_Stotal) +
+                  s(SiteCode,bs="re"),
+                family=Gamma(link = "inverse"),
+                data = df_resultados.U, method = "REML",control=ctrl)
+# d
+l_md.U[[16]] <- gam(U_med ~ s(d.z) + s(p.z) + ti(d.z,p.z) +
+                  s(log_Stotal) +
+                  s(SiteCode,bs="re"),
+                family="gaussian",
+                data = df_resultados.U, method = "REML",control=ctrl)
+l_md.U[[17]] <- gam(U_med ~ s(d.z) + s(p.z) + ti(d.z,p.z) +
+                  s(log_Stotal) +
+                  s(SiteCode,bs="re"),
+                family=gaussian(link = "log"),
+                data = df_resultados.U, method = "REML",control=ctrl)
+l_md.U[[18]] <- gam(U_med ~ s(d.z) + s(p.z) + ti(d.z,p.z) +
+                  s(log_Stotal) +
+                  s(SiteCode,bs="re"),
+                family=gaussian(link = "inverse"),
+                data = df_resultados.U, method = "REML",control=ctrl)
+l_md.U[[19]] <- gam(U_med ~ s(d.z) + s(p.z) + ti(d.z,p.z) +
+                  s(log_Stotal) +
+                  s(SiteCode,bs="re"),
+                family=Gamma(link = "log"),
+                data = df_resultados.U, method = "REML",control=ctrl)
+l_md.U[[20]] <- gam(U_med ~ s(d.z) + s(p.z) + ti(d.z,p.z) +
+                  s(log_Stotal) +
+                  s(SiteCode,bs="re"),
+                family=Gamma(link = "inverse"),
+                data = df_resultados.U, method = "REML",control=ctrl)
+AICctab(l_md.U,weights=TRUE)
+l_md_U_selVar_disp_1Site <- l_md.U
+save(l_md_U_selVar_disp_1Site,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md_U_selVar_disp_1Site.Rdata")
+
+
+############### exemplo de código para estrutura aleatoria mais complexa
+<!-- # l_md[[3]] <- gam(U_med ~ s(d.z,bs="tp") + s(p.z,bs="tp") + ti(d.z,p.z,ns=c("tp","tp")) + -->
+<!-- #                   s(log_Stotal,bs="tp") + -->
+<!-- #                   s(d.z,by=SiteCode,bs="tp",m=1) -->
+<!-- #                   s(SiteCode,bs="re"), -->
+<!-- #                 family=gaussian(link = "log"), -->
+<!-- #                 data = df_resultados.U, method = "REML",control=ctrl) -->
+```
+
+
+<!-- ### Modelo Cheio: comparação estrutura aleatória -->
+
+<!-- Variável de dispersão: d (como para n_nRef) -->
+
+<!-- i) Na escala log a variável parece ser simetrica, então vou comparar a distribuição normal e gamma;     -->
+<!-- ii) É possível apresentar 3 estruturas: a) 1|Site; b) d|Site, penalizacao comum; c) d|Site, penalizacao por Site [que não vou incluir a priori pelo custo computacional]   -->
+<!-- iii) pelo menos 2 smoother type (tp,cr)   -->
+
+
+<!-- ```{r gamm cheio U_med,eval=FALSE} -->
+<!-- ctrl <- list(nthreads=3) -->
+<!-- l_md <- vector("list",8) -->
+<!-- names(l_md) <- c("tp normal 1|Site","tp normal d|Site","cr normal 1|Site","cr normal d|Site", -->
+<!--                  "tp gamma 1|Site","tp gamma d|Site","cr gamma 1|Site","cr gamma d|Site") -->
+<!-- ### Gaussian -->
+<!-- l_md[[1]] <- gam(U_med ~ s(d.z,bs="tp") + s(p.z,bs="tp") + ti(d.z,p.z,bs=c("tp","tp")) + -->
+<!--                   s(log_Stotal,bs="tp") + -->
+<!--                   s(SiteCode,bs="re"), -->
+<!--                 family=gaussian(link = "log"), -->
+<!--                 data = df_resultados.U, method = "REML",control=ctrl) -->
+<!-- l_md[[2]] <- gam(U_med ~ s(d.z,bs="tp") + s(p.z,bs="tp") + ti(d.z,p.z,bs=c("tp","tp")) + -->
+<!--                   s(log_Stotal,bs="tp") + -->
+<!--                   s(d.z,SiteCode,bs="fs",m=1,xt=list(bs="tp")), -->
+<!--                 family=gaussian(link = "log"), -->
+<!--                 data = df_resultados.U, method = "REML",control=ctrl) -->
+<!-- l_md[[3]] <- gam(U_med ~ s(d.z,bs="cr") + s(p.z,bs="cr") + ti(d.z,p.z,bs=c("cr","cr")) + -->
+<!--                   s(log_Stotal,bs="cr") + -->
+<!--                   s(SiteCode,bs="re"), -->
+<!--                 family=gaussian(link = "log"), -->
+<!--                 data = df_resultados.U, method = "REML",control=ctrl) -->
+<!-- l_md[[4]] <- gam(U_med ~ s(d.z,bs="cr") + s(p.z,bs="cr") + ti(d.z,p.z,bs=c("cr","cr")) + -->
+<!--                   s(log_Stotal,bs="cr") + -->
+<!--                   s(d.z,SiteCode,bs="fs",m=1,xt=list(bs="cr")), -->
+<!--                 family=gaussian(link = "log"), -->
+<!--                 data = df_resultados.U, method = "REML",control=ctrl) -->
+<!-- ### Gamma -->
+<!-- l_md[[5]] <- gam(U_med ~ s(d.z,bs="tp") + s(p.z,bs="tp") + ti(d.z,p.z,bs=c("tp","tp")) + -->
+<!--                   s(log_Stotal,bs="tp") + -->
+<!--                   s(SiteCode,bs="re"), -->
+<!--                 family=Gamma(link = "log"), -->
+<!--                 data = df_resultados.U, method = "REML",control=ctrl) -->
+<!-- l_md[[6]] <- gam(U_med ~ s(d.z,bs="tp") + s(p.z,bs="tp") + ti(d.z,p.z,bs=c("tp","tp")) + -->
+<!--                   s(log_Stotal,bs="tp") + -->
+<!--                   s(d.z,SiteCode,bs="fs",m=1,xt=list(bs="tp")), -->
+<!--                 family=Gamma(link = "log"), -->
+<!--                 data = df_resultados.U, method = "REML",control=ctrl) -->
+<!-- l_md[[7]] <- gam(U_med ~ s(d.z,bs="cr") + s(p.z,bs="cr") + ti(d.z,p.z,bs=c("cr","cr")) + -->
+<!--                   s(log_Stotal,bs="cr") + -->
+<!--                   s(SiteCode,bs="re"), -->
+<!--                 family=Gamma(link = "log"), -->
+<!--                 data = df_resultados.U, method = "REML",control=ctrl) -->
+<!-- l_md[[8]] <- gam(U_med ~ s(d.z,bs="cr") + s(p.z,bs="cr") + ti(d.z,p.z,bs=c("cr","cr")) + -->
+<!--                   s(log_Stotal,bs="cr") + -->
+<!--                   s(d.z,SiteCode,bs="fs",m=1,xt=list(bs="cr")), -->
+<!--                 family=Gamma(link = "log"), -->
+<!--                 data = df_resultados.U, method = "REML",control=ctrl) -->
+<!-- l_md_U_gammCheio <- l_md -->
+<!-- AICctab(l_md) -->
+<!-- save(l_md_U_gammCheio,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md_U_gammCheio.Rdata") -->
+<!-- ``` -->
+
+
+<!-- __Figura 4.3__ Graf Diag Gamm cheio mais plausível -->
+
+<!-- ```{r gamm cheio U_med graf diag}  -->
+<!-- load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md_U_gammCheio.Rdata") -->
+<!-- gratia::appraise(l_md_U_gammCheio[["cr gamma d|Site"]]) -->
+<!-- ``` -->
+
+
+
+
+<!-- # 4 Comparação n_nRef e diff_S -->
+
+<!-- __Figura 3.1__ Observado (pontos) e predito (linhas) para diffS e n_nRef (segunda linha no facet) em função de d*MN, por sítio de amostragem (primeira linha no facet). -->
+
+<!-- ```{r comparacao n_nRef e diff_S,fig.height=65,fig.width=11} -->
+<!-- # dados -->
+<!-- ## MN=="EI" -->
+<!-- ### gamm diffS -->
+<!-- load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/md_diff_S_EI__GAMM_update.Rdata") -->
+<!-- df_EI <- cbind(filter(df_resultados,MN=="EI"), -->
+<!--                  predict.gam(md_gam.diff_S.EI__update,type="response",se.fit=TRUE)) %>%  -->
+<!--   mutate(fit_diffS0 = fit + min(df_resultados$diff_S0) - 0.01) -->
+<!-- ### glmm nRef -->
+<!-- load(file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_nRefEI__MuMIn.Rdata") -->
+<!-- df_EI$Pr_nRef <- predict(mdAvg_nRefEI__MuMIn,type="response")*100 -->
+<!-- ## MN=="EI" -->
+<!-- ### gamm diffS -->
+<!-- md_diffS_EE <- lm(diff_S0 ~ 1,data=filter(df_resultados,MN=="EE")) -->
+<!-- df_EE <- filter(df_resultados,MN=="EE") %>%  -->
+<!--   mutate(fit_diffS0 = coef(md_diffS_EE)) -->
+<!-- ### glmm nRef -->
+<!-- load(file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_nRefEE__MuMIn.Rdata") -->
+<!-- df_EE$Pr_nRef <- predict(mdAvg_nRefEE__MuMIn,type="response")*100 -->
+<!-- ## conjunto completo -->
+<!-- df_plot <- rbind.fill(df_EE,df_EI) %>% -->
+<!--   mutate(title = paste0(SiteCode, " p=",round(p,digits = 3))) %>% arrange(p) -->
+<!-- df_plot$title <- factor(df_plot$title,levels = unique(df_plot$title)) -->
+<!-- df_plot <- rbind.fill( -->
+<!--   select(df_plot,title,d,MN,n_nRef,Pr_nRef) %>%  -->
+<!--     mutate(response_class = "nRef") %>%  -->
+<!--     rename(response_obs=n_nRef,fit_value=Pr_nRef), -->
+<!--   select(df_plot,title,d,MN,diff_S0,fit_diffS0) %>%  -->
+<!--     mutate(response_class = "diff_S") %>%  -->
+<!--     rename(response_obs=diff_S0,fit_value=fit_diffS0) -->
+<!-- ) -->
+<!-- # gráficos -->
+<!-- df_plot %>% #filter(title %in% unique(df_plot$title)[1:10]) %>%  -->
+<!--   ggplot(aes(x=d,y=response_obs,group=MN)) + -->
+<!--   geom_point(aes(color=MN),alpha=0.3) + -->
+<!--   geom_line(aes(y=fit_value,color=MN),alpha=0.3) + -->
+<!--   scale_color_manual(values=c("#FF0000", "#000000")) + -->
+<!--   facet_wrap(~title+response_class,ncol=6,scales="free") + labs(y="") + -->
+<!--   theme_light() + theme(legend.position="top") -->
+<!-- ``` -->
+
+
+
+
+<!-- __Figura 4.2__ |diffS| ~ n_nRef * k, subset=MNEI -->
+
+<!-- ```{r figura 32,fig.height=10,fig.width=7} -->
+<!-- # dados  ,fig.height=10 -->
+<!-- df_plot <- df_resultados %>% filter(MN=="EI") %>%  -->
+<!--   mutate(modulo_diffS = abs(diff_S0)) -->
+<!-- # graficos -->
+<!-- l_p <- list() -->
+<!-- l_p[[1]] <- ggplot(df_plot,aes(x=d,y=modulo_diffS)) +  -->
+<!--   # geom_boxplot(col="blue") + -->
+<!--   # geom_jitter(alpha=0.3) -->
+<!--   geom_point(alpha=0.3) + geom_smooth(method = "auto",se=FALSE,color="blue") -->
+<!-- l_p[[2]] <- ggplot(df_plot,aes(x=d,y=n_nRef)) +  -->
+<!--   # geom_boxplot(col="blue") + -->
+<!--   # geom_jitter(alpha=0.3) -->
+<!--   geom_point(alpha=0.3) + geom_smooth(method = "auto",se=FALSE,color="blue") -->
+<!-- l_p[[3]] <- df_plot %>%  -->
+<!--   mutate(logito_nRef = logit(n_nRef/100)) %>%  -->
+<!--   ggplot(aes(x=log(modulo_diffS),y=logito_nRef)) +  -->
+<!--   geom_smooth(method="lm",se=FALSE) + -->
+<!--   geom_point(alpha=0.3) + labs(title="logit( n_nRef/100 ) ~ log( |diffS| ) * k", -->
+<!--                                y="logit( n_nRef/100 )",x="log( |diffS| )") + -->
+<!--   facet_wrap(~k,ncol=4,scales="free") -->
+<!-- # do.call("grid.arrange",c(l_p,ncol=1)) -->
+<!-- grid.arrange(l_p[[1]],l_p[[2]],l_p[[3]], -->
+<!--              layout_matrix=rbind(c(1,2), -->
+<!--                                  c(3,3), -->
+<!--                                  c(3,3)) ) -->
+<!-- ``` -->
+
+
+
+<!-- __Figura 3.3__ n_nRef ~ |diffS| (~SiteCode), subset=MNEI -->
+
+<!-- ```{r figura 33,fig.width=8, fig.height=30} -->
+<!-- # dados -->
+<!-- df_plot1  <-  left_join(x=df_plot, -->
+<!--                        y=ddply(df_plot,"SiteCode",summarise,max_mod_diffS=max(modulo_diffS)), -->
+<!--                        by="SiteCode") %>%  -->
+<!--   arrange(max_mod_diffS) %>% -->
+<!--   mutate(title=paste0(SiteCode," max(|diffS|)=",round(max_mod_diffS,2) ) ) -->
+<!-- df_plot1$title <- factor(df_plot1$title,levels = unique(df_plot1$title)) -->
+<!-- # graficos -->
+<!-- df_plot1 %>% ggplot(aes(x=log(modulo_diffS),y=n_nRef)) + -->
+<!--   geom_point(alpha=0.3) + -->
+<!--   ylim(0,100) + theme_light() + labs(title="n_nRef ~ (log( |diffS| ) | SiteCode)") +  -->
+<!--   facet_wrap(~title,ncol=4,scales="free_y") -->
+<!-- ``` -->
+
+
+<!-- ## Comparação funções para o teste KS -->
+
+
+<!-- ```{r dados para auditoria , eval=FALSE} -->
+<!-- # dados brutos -->
+<!-- df_auditoria <- read.csv("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/df_raster_e_SAD_atualizados.csv", -->
+<!--                          header = TRUE,as.is = TRUE) -->
+<!-- df_SAD.replicas <- read.csv("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/resultados/df_replicas.csv", -->
+<!--                             header = TRUE,as.is = TRUE) -->
+<!-- df_SAD_e_paisagem <- left_join(x=df_SAD.replicas,y=select(df_auditoria,-c(SAD_obs.name,SiteCode)),by=c("ordem","refID")) -->
+<!-- # rank máximo -->
+<!-- registerDoMC(3) -->
+<!-- df_SAD_e_paisagem <- left_join(x=df_SAD_e_paisagem, -->
+<!--                                y=ddply(df_SAD_e_paisagem,c("SiteCode","k","MN"),function(X) max(c(X$S_SAD.predita,X$S_SAD.obs)),.parallel = TRUE), -->
+<!--                                by=c("SiteCode","k","MN")) -->
+<!-- df_SAD_e_paisagem %<>% rename(max_rank=V1) -->
+<!-- df_SAD_e_paisagem$SAD_MN.name <- gsub("./SADs_preditas/","/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/SADs_preditas/",df_SAD_e_paisagem$SAD_MN.name) -->
+<!-- # dados de congruência -->
+<!-- # level_k <- unique(as.character(df_SAD_e_paisagem$k)) -->
+<!-- # levels(df_SAD_e_paisagem$k)[19] <- "0.1" -->
+<!-- df_SAD_e_paisagem$k <- as.character(df_SAD_e_paisagem$k) -->
+<!-- df_SAD_e_paisagem$k[df_SAD_e_paisagem$k=="0.0999999999999999"] <- 0.1 -->
+<!-- df_SAD_e_paisagem$k <- factor(df_SAD_e_paisagem$k,levels=unique(df_SAD_e_paisagem$k)[c(19,20,18:1)]) -->
+<!-- df_SAD_e_paisagem$SiteCode <- factor(df_SAD_e_paisagem$SiteCode,levels=levels(df_resultados$SiteCode))  -->
+<!-- df_SAD_e_paisagem$MN <- factor(df_SAD_e_paisagem$MN,levels=levels(df_resultados$MN))  -->
+<!-- df_SAD_e_paisagem <- left_join(x=df_SAD_e_paisagem, -->
+<!--                                y=select(df_resultados,SiteCode,k,MN,n_nRef,modulo_diffS), -->
+<!--                                by=c("SiteCode","k","MN")) -->
+<!-- # auditoria valores de congruência -->
+<!-- registerDoMC(3) -->
+<!-- df_auditoria <- df_SAD_e_paisagem %>%   -->
+<!--   mutate(diffS0 = (S_SAD.predita-S_SAD.obs)/S_SAD.obs, -->
+<!--          mod_diffS.aud = abs(diffS0)) %>%  -->
+<!--   inner_join(x=ddply(.,c("SiteCode","k","MN"), -->
+<!--                      summarise,  -->
+<!--                      KS.D_mean = mean(KS.D), KS.D_sd = sd(KS.D),KS.p_mean = mean(KS.p), KS.p_sd = sd(KS.p), -->
+<!--                      S_MNmean = mean(S_SAD.predita),S_MNsd = sd(S_SAD.predita),S_obs=head(S_SAD.obs,1), -->
+<!--                       mod_diffSmean=mean(mod_diffS.aud),mod_diffSsd=sd(mod_diffS.aud), diffS0mean=mean(diffS0),diffS0sd=sd(diffS0), -->
+<!--                      .parallel = TRUE), -->
+<!--              y=ddply(.,c("SiteCode","k","MN"), -->
+<!--                      function(x) nrow(x[x$KS.p >= 0.05,]), -->
+<!--                      .parallel = TRUE), -->
+<!--              by=c("SiteCode","k","MN")) %>%  -->
+<!--   rename(nRef = V1) -->
+<!-- df_auditoria <- left_join(x=df_SAD_e_paisagem, -->
+<!--                           y=df_auditoria, -->
+<!--                           by=c("SiteCode","k","MN")) %>%  -->
+<!--   left_join(x=., -->
+<!--             y=distinct(select(df_resultados,SiteCode,p,k,d)), -->
+<!--             by=c("SiteCode","k")) %>%  -->
+<!--   mutate(string_main=paste0("k=",k," d=",round(d,3),"\n nRef=",n_nRef,"; |diffS|=",round(mod_diffSmean,3),"; rankMax=",max_rank), -->
+<!--          string_mtext=paste0(SiteCode," MN==",MN," p=",round(p,3)) ) -->
+<!-- #  -->
+<!-- levels_k <- df_auditoria$k %>% unique %>% as.numeric %>% sort() %>% as.character() -->
+<!-- df_auditoria$k <- factor(df_auditoria$k,levels=levels_k[20:1]) -->
+<!-- ``` -->
+
+
+<!-- ```{r teste KS bootstrap,eval=FALSE} -->
+<!-- # Dados -->
+<!-- df_testeKS <- df_auditoria %>%  -->
+<!--   select(SAD_obs.name,SAD_MN.name,MN,k,rep,ordem,refID,SiteCode,txt.name,S_obs,p,d) %>% -->
+<!--   group_by(SAD_obs.name) %>% nest -->
+<!-- df_testeKS$resultados <- vector("list",length = nrow(df_testeKS)) -->
+<!-- # rotina para a função -->
+<!-- registerDoMC(3) -->
+<!-- for(row_label in 1:nrow(df_testeKS)){ -->
+<!--   # i <- 1 -->
+<!--   df_ <- df_testeKS[row_label,] -->
+<!--   v_SAD.obs <- read.csv(df_$SAD_obs.name,header = TRUE,as.is = TRUE) %>%  -->
+<!--     filter(species.correct != "Mortas") %>%  -->
+<!--     .$N %>% sort() -->
+<!--   df_predicao <- as.data.frame(df_$data[[1]]) -->
+<!--   f_KSeS <- function(v_obs = v_SAD.obs,path_MN){ -->
+<!--     v_SAD.MN <- read.csv(file=path_MN,header = TRUE,as.is = TRUE)$SAD_predita -->
+<!--     teste <- ks_test(a=v_SAD.obs,b = v_SAD.MN,nboots = 3000)   -->
+<!--     a <- data.frame(D_KSboot=teste[1],p.valor_KSboot=teste[2]) -->
+<!--     a$S_SAD.predita <- length(v_SAD.predita) -->
+<!--     a$S_SAD.obs <- length(v_SAD.obs)  -->
+<!--     return(a) -->
+<!--    } -->
+<!--   df_testeKS$resultados[[row_label]] <- adply(df_predicao,1, -->
+<!--                                               function(X) f_testeParallel(path_MN = X$SAD_MN.name), -->
+<!--                                               .parallel = TRUE) -->
+<!-- } -->
+
+<!-- df_replicas <- df_testeKS %>% select(-data) %>% unnest(cols = c(resultados)) %>% as.data.frame() -->
+<!-- write.csv(df_replicas,file = "~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/resultados/df_replicas__2samples.csv",row.names = FALSE) -->
+<!-- ``` -->
+
+
+
+<!-- __Figura 3.4__ Comparação testes KS: pressupondo distribuição contínua (stats::ks.test) e por bootstrap (twosamples::ks_test)   -->
+
+<!-- ```{r figura 34 nRef KSboot, cache=TRUE} -->
+<!-- df_replicasBoot <- read.csv("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/resultados/df_replicas__2samples.csv", -->
+<!--                         header = TRUE,as.is = TRUE) -->
+<!-- registerDoMC(3) -->
+<!-- df_nRef.KSboot <- df_replicasBoot %>% ddply(c("SiteCode","k","MN"),summarise, -->
+<!--                                            D.boot_mean = mean(D_KSboot),D.boot_sd = sd(D_KSboot), -->
+<!--                                            p.valor.boot_mean = mean(p.valor_KSboot),p.valor.boot_sd = sd(p.valor_KSboot), -->
+<!--                                            n_nRef_boot=sum(p.valor_KSboot>=0.05), -->
+<!--                                            .parallel = TRUE) -->
+<!-- # comparação -->
+<!-- level_k <- unique(as.character(df_nRef.KSboot$k)) -->
+<!-- df_nRef.KSboot$k <- factor(as.character(df_nRef.KSboot$k),levels = level_k[20:1]) -->
+<!-- # levels(df_nRef.KSboot$k)[19] <- "0.1" -->
+<!-- df_ad <- inner_join(x=df_resultados, -->
+<!--                     y=df_nRef.KSboot, -->
+<!--                     by=c("SiteCode","k","MN")) -->
+<!-- # graficos diagnostico -->
+<!-- l_p <- list() -->
+<!-- l_p[[1]] <- df_ad %>% ggplot(aes(x=D_mean,y=D.boot_mean)) +  -->
+<!--   geom_point() +  -->
+<!--   labs(x="dist. cont.",y="bootstrap", title="Média Estatística D") -->
+<!-- l_p[[2]] <- df_ad %>% ggplot(aes(x=p.value_mean,y=p.valor.boot_mean)) +  -->
+<!--   geom_point() +  -->
+<!--   labs(x="dist. cont.",y="bootstrap", title="Média p-valor") -->
+<!-- l_p[[3]] <- df_ad %>% ggplot(aes(x=sqrt(D_var),y=D.boot_sd)) +  -->
+<!--   geom_point() +  -->
+<!--   labs(x="dist. cont.",y="bootstrap", title="sd Estatística D") -->
+<!-- l_p[[4]] <- df_ad %>% ggplot(aes(x=sqrt(p.value_var),y=p.valor.boot_sd)) +  -->
+<!--   geom_point() +  -->
+<!--   labs(x="dist. cont.",y="bootstrap", title="sd p-valor") -->
+<!-- do.call("grid.arrange",c(l_p,ncol=2)) -->
+<!-- ``` -->
+
+
+<!-- __figura 3.5__ número de SADs não refutadas: ks.test X ks_test   -->
+
+<!-- ```{r figura 35 nRef ks.test e ks_test} -->
+<!-- df_ad %>% ggplot(aes(x=n_nRef,y=n_nRef_boot,col=MN)) +  -->
+<!--   geom_abline(slope = 1,intercept = 0,col="blue") + -->
+<!--   geom_point(alpha=0.3) +  -->
+<!--   scale_color_manual(values=c("#FF0000", "#000000")) + -->
+<!--   facet_wrap(~k,ncol=4) -->
+<!-- ``` -->
+
+
+<!-- ## Visualização das SADs preditas e observadas -->
+
+<!-- ```{r painel de SADs, eval=FALSE} -->
+<!-- ### dados -->
+<!-- # dados brutos -->
+<!-- df_auditoria <- read.csv("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/df_raster_e_SAD_atualizados.csv", -->
+<!--                          header = TRUE,as.is = TRUE) -->
+<!-- df_SAD.replicas <- read.csv("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/resultados/df_replicas.csv", -->
+<!--                             header = TRUE,as.is = TRUE) -->
+<!-- df_SAD_e_paisagem <- left_join(x=df_SAD.replicas,y=select(df_auditoria,-c(SAD_obs.name,SiteCode)),by=c("ordem","refID")) -->
+<!-- # rank máximo -->
+<!-- registerDoMC(3) -->
+<!-- df_SAD_e_paisagem <- left_join(x=df_SAD_e_paisagem, -->
+<!--                                y=ddply(df_SAD_e_paisagem,c("SiteCode","k","MN"),function(X) max(c(X$S_SAD.predita,X$S_SAD.obs)),.parallel = TRUE), -->
+<!--                                by=c("SiteCode","k","MN")) -->
+<!-- df_SAD_e_paisagem %<>% rename(max_rank=V1) -->
+<!-- df_SAD_e_paisagem$SAD_MN.name <- gsub("./SADs_preditas/","/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/SADs_preditas/",df_SAD_e_paisagem$SAD_MN.name) -->
+<!-- ##  -->
+<!-- df_SAD_e_paisagem$SiteCode <- factor(df_SAD_e_paisagem$SiteCode)  -->
+<!-- df_SAD_e_paisagem$MN <- factor(df_SAD_e_paisagem$MN) -->
+<!-- levels_k <- unique(df_SAD_e_paisagem$k) %>% sort %>% as.character() -->
+<!-- df_SAD_e_paisagem$k <- factor(df_SAD_e_paisagem$k,levels = levels_k[20:1]) -->
+<!-- levels(df_SAD_e_paisagem$k)[19] <- "0.1" -->
+<!-- # -->
+<!-- df_ad$SiteCode <- factor(df_ad$SiteCode) -->
+<!-- df_ad$MN <- factor(df_ad$MN) -->
+<!-- df_auditoria <- left_join(x=df_SAD_e_paisagem, -->
+<!--                           y=select(df_ad,SiteCode,MN,k,d,p,n_nRef,n_nRef_boot), -->
+<!--                           by=c("SiteCode","MN","k")) -->
+<!-- df_auditoria %<>% -->
+<!--   mutate(string_main=paste0("k=",k," d=",round(d,3),"\n ks.test::nRef=",n_nRef," ks_test::nRef=",n_nRef_boot), -->
+<!--          string_mtext=paste0(SiteCode," MN==",MN," p=",round(p,3)) ) -->
+<!-- ### graficos -->
+<!-- for(s in 1:length(levels(df_auditoria$SiteCode))){ -->
+<!--   X <- df_auditoria %>% filter(SiteCode == levels(df_auditoria$SiteCode)[s]) -->
+<!--   v_SADobs <- read.csv(X[1,"SAD_obs.name"],header = TRUE)[,"N"] -->
+<!--   # MNEE -->
+<!--   df_ <- X %>% filter(MN=="EE") -->
+<!--   png(paste0("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/figuras/", -->
+<!--              levels(df_auditoria$SiteCode)[s],"_EE_SADs.png"), -->
+<!--       width = 980, height = 600) -->
+<!--   par(mfrow=c(4,5)) -->
+<!--   for(K in 1:length(levels(df_$k))){ -->
+<!--     df_k <- filter(df_,k==levels(df_$k)[K]) -->
+<!--     plot(rad(v_SADobs),main=head(df_k$string_main,1),cex=0.5, -->
+<!--          xlim=c(1,head(df_$max_rank,1))) -->
+<!--     for(p in 1:nrow(df_k)){ -->
+<!--       v_SAD_MN <- read.table(df_k[p,"SAD_MN.name"],header = TRUE,as.is = TRUE)$SAD_predita -->
+<!--       lines(rad(v_SAD_MN),type="l",col=rgb(0.25, 0.25, 0.25, 0.25)) -->
+<!--     } -->
+<!--     lines(rad(v_SADobs),pch = 19, col="red",cex=0.5,bg="black",type="b", -->
+<!--            main=head(df_k$string_main,1)) -->
+<!--   } -->
+<!--   dev.off() -->
+<!--   # MNEI -->
+<!--   df_ <- X %>% filter(MN=="EI") -->
+<!--   png(paste0("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/figuras/", -->
+<!--              levels(df_auditoria$SiteCode)[s],"_EI_SADs.png"), -->
+<!--       width = 980, height = 600) -->
+<!--   par(mfrow=c(4,5)) -->
+<!--   for(K in 1:length(levels(df_$k))){ -->
+<!--     df_k <- filter(df_,k==levels(df_$k)[K]) -->
+<!--     plot(rad(v_SADobs),main=head(df_k$string_main,1),cex=0.5, -->
+<!--          xlim=c(1,head(df_$max_rank,1))) -->
+<!--     for(p in 1:nrow(df_k)){ -->
+<!--       v_SAD_MN <- read.table(df_k[p,"SAD_MN.name"],header = TRUE,as.is = TRUE)$SAD_predita -->
+<!--       lines(rad(v_SAD_MN),type="l",col=rgb(0.25, 0.25, 0.25, 0.25)) -->
+<!--     } -->
+<!--     lines(rad(v_SADobs),pch = 19, col="red",cex=0.5,type="b", -->
+<!--            main=head(df_k$string_main,1)) -->
+<!--   } -->
+<!--   dev.off() -->
+<!-- } -->
+<!-- ``` -->
+
+
+
+
+<!-- Inspeção individual das SADs -->
+
+
+
+
+<!-- __Estratégia__   -->
+
+<!-- i) estrutura do tipo:   -->
+
+<!-- cbind(n_nRef,100-n_nRef) ~ log(modulo_diffS) * d + ( log(modulo_diffS) * d | SiteCode)   -->
+
+<!-- ii) expectativa:   -->
+
+<!-- a) esperavamos que se o teste é adequado então deve existir um erro de estimativa da riqueza máximo no qual a probabilidade de não se refutar uma SAD se torna muito diminuta.   -->
+<!-- b) e uma vez que não é suficiente apresentar boa estimativa da riqueza para apresentar boa congruência, então esperava que a nuvem de pontos pudesse ser aproximada por um triangulo retangulo com angulo reto na origem.  -->
+
+<!-- ```{r nRef por modulo_diffS md cheio,cache=TRUE} -->
+<!-- # para usar a escala log: -->
+<!-- l_md <- vector("list",5) -->
+<!-- names(l_md) <- c("log(modulo_diffS) * d.z | SiteCode", -->
+<!--                  "log(modulo_diffS) + d.z | SiteCode", -->
+<!--                  "log(modulo_diffS) | SiteCode", -->
+<!--                  "d.z | SiteCode", -->
+<!--                  "1 | SiteCode") -->
+<!-- l_md[[1]] <- glmer(cbind(n_nRef,100-n_nRef) ~ log_modulo_diffS.z * (d.z + I(d.z^2)) + ( log_modulo_diffS.z * (d.z + I(d.z^2)) | SiteCode), -->
+<!--                    family = "binomial", data=df_resultados.EI, -->
+<!--                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- l_md[[2]] <- glmer(cbind(n_nRef,100-n_nRef) ~ log_modulo_diffS.z * (d.z + I(d.z^2)) + ( log_modulo_diffS.z + (d.z + I(d.z^2)) | SiteCode), -->
+<!--                    family = "binomial", data=df_resultados.EI, -->
+<!--                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- l_md[[3]] <- glmer(cbind(n_nRef,100-n_nRef) ~ log_modulo_diffS.z * (d.z + I(d.z^2)) + ( log_modulo_diffS.z| SiteCode), -->
+<!--                    family = "binomial", data=df_resultados.EI, -->
+<!--                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- l_md[[4]] <- glmer(cbind(n_nRef,100-n_nRef) ~ log_modulo_diffS.z * (d.z + I(d.z^2)) + ( (d.z + I(d.z^2)) | SiteCode), -->
+<!--                    family = "binomial", data=df_resultados.EI, -->
+<!--                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- l_md[[5]] <- glmer(cbind(n_nRef,100-n_nRef) ~ log_modulo_diffS.z * (d.z + I(d.z^2)) + ( 1 | SiteCode), -->
+<!--                    family = "binomial", data=df_resultados.EI, -->
+<!--                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000))) -->
+<!-- AICctab(l_md,weights=TRUE) -->
+<!-- ``` -->
+
+<!-- ```{r figura 34 nRef por modulo_diffS diag,fig.height=25,fig.width=8} -->
+<!-- p_plot <- simulateResiduals(l_md[["log(modulo_diffS) * d.z | SiteCode"]],n = 1000) -->
+<!-- # plot(p_plot) -->
+<!-- df_plot <- df_resultados.EI %>%  -->
+<!--   select(SiteCode,n_nRef,log_modulo_diffS.z,d.z) %>%  -->
+<!--   mutate(quantile_res = p_plot$scaledResiduals, -->
+<!--          pearson_res = resid(l_md[["log(modulo_diffS) * d.z | SiteCode"]],type="pearson"), -->
+<!--          predict_ = predict(l_md[["log(modulo_diffS) * d.z | SiteCode"]])) -->
+<!-- df_plot %>%  -->
+<!--   ggplot(aes(x=predict_,y = pearson_res)) + -->
+<!--     geom_abline(intercept = 0,slope = 0,color="red") + -->
+<!--     geom_smooth(method = "auto",color="blue",se=FALSE) + -->
+<!--     geom_point(alpha=0.4) + -->
+<!--     facet_wrap(~SiteCode,ncol=4,scales="free") -->
+<!-- # df_resultados %>% filter(SiteCode == "MGlavr3") %>% summary -->
+<!-- ``` -->
+
+<!-- ```{r} -->
+<!-- # lme4::(l_md[["log(modulo_diffS) * d.z | SiteCode"]]) -->
+<!-- ``` -->
+
+<!-- # 5 Determinação da escala espacial da paisagem local -->
+
+<!-- __Figura 5.1_ log(S_obs) ~ p + offset(Ntotal)   -->
+
+<!-- ```{r df_se figura 51,eval=TRUE} -->
+<!-- # dados -->
+<!-- df_se <- read.csv("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/df_ScaleEffect.csv",header = TRUE,as.is = TRUE) -->
+<!-- df_se$raio_km <- factor(df_se$raio_km,levels = unique(df_se$raio_km)) -->
+<!-- # graficos exploratórios -->
+<!-- # l_p <- list() -->
+<!-- l_p[[1]] <- df_se %>% ggplot(aes(x=p,y=S_obs)) + -->
+<!--   geom_point(alpha=0.3,aes(size=Ntotal)) + -->
+<!--   facet_wrap(~raio_km,ncol=3) + theme(legend.position = "bottom") -->
+<!-- # l_p[[1]] -->
+<!-- # l_p[[2]] <- df_se %>% select(Ntotal) %>% distinct %>% ggplot(aes(x="",y=Ntotal)) +  -->
+<!-- #   geom_boxplot() +  -->
+<!-- #   geom_jitter() +  -->
+<!-- #   labs(x="") -->
+<!-- # l_p[[3]] <- df_se %>% select(S_obs) %>% distinct %>% ggplot(aes(x="",y=S_obs)) +  -->
+<!-- #   geom_boxplot() +  -->
+<!-- #   geom_jitter() +  -->
+<!-- #   labs(x="") -->
+<!-- ``` -->
+
+<!-- A média e variância de S_obs não apresenta valores próximos `r mean(df_se$S_obs)/var(df_se$S_obs)`, mostrando que os dados apresentam over-dispersion. Assim irei utilizar a distribuição binomial negativa com Ntotal como offset; como preditoras utilizo p e p^2: -->
+
+<!-- ```{r ajuste de modelos aos dados,echo=TRUE} -->
+<!-- library(MASS) -->
+<!-- f_glm.nb <- function(data_){ -->
+<!--   md_ <- glm.nb(S_obs ~ p + I(p^2) + offset(log(Ntotal)), data = data_) -->
+<!-- } -->
+<!-- registerDoMC(2) -->
+<!-- l_md <- dlply(df_se,"raio_km",f_glm.nb,.parallel = TRUE) -->
+<!-- # names(l_md) <- paste0("raio = ",levels(df_se$raio_km),"km") -->
+<!-- df_averageSE <- print(AICctab(l_md,weights=TRUE)) %>%  -->
+<!--   as.data.frame() -->
+<!-- ``` -->
+
+<!-- Explorei paisagens com raios que vão de 0.3 km até 12.0 km variando por 0.1 km. Para determinar qual a melhor escala vou utilizar a média dos raios ponderada pelo peso de evidência: -->
+
+<!-- ```{r} -->
+<!-- df_averageSE$raio_paisagem <- row.names(df_averageSE) %>% as.numeric() -->
+<!-- df_averageSE$weight <- as.numeric(as.character(df_averageSE$weight)) -->
+<!-- df_averageSE$dAICc <- as.numeric(as.character(df_averageSE$dAICc)) -->
+<!-- df_ <- df_averageSE %>% filter(dAICc<=2) -->
+<!-- raio_medio__delta2 <- weighted.mean(x = df_$raio_paisagem,w = df_$weight) -->
+<!-- raio_medio1__total <- weighted.mean(x = df_averageSE$raio_paisagem,w = df_averageSE$weight) -->
+<!-- ``` -->
+
+
+
+  #################################
+  
+  
+  ## 2.2 Subset=MNEE
+
+### Estudo GAMM: smoother type
+
+i) Antes de comparar os modelos cheios preciso avaliar smoother type mais para utilizar na GAMM;
+ii) Pelo observado nos dados (figuras 2.1 e 2.2) vou comparar dois smoother type: "tp" e "cr"
+iii) Para isso vou ajuster um smoother para d por Sítio de amostragem com um mesmo parâmetro de penalização, dessa maneira eu considero a variação por sítio de amostragem na variável d sem um elevado custo computacional.  
+
+
+```{r nRef MNEE estudo GAMM smoother type,echo=TRUE,eval=FALSE}
+# dados
+df_md <- df_resultados %>% filter(MN=="EE") %>% distinct()
+df_md <- rbind(mutate(df_md,model_class = "cr"),
+               mutate(df_md,model_class = "tp"))
+df_md$model_class <- factor(df_md$model_class)
+# função
+f_md <- function(dados){
+  model_class <- unique(dados$model_class)
+  if(model_class == "cr"){
+    md_ <- gam(cbind(n_nRef,100-n_nRef) ~ 
+                 s(p.z,bs="cr") + s(d.z,bs="cr") + ti(p.z,d.z,bs=c("cr","cr")) +
+                 s(d.z,SiteCode,bs="fs",xt=list(bs="cr"), m=1),
+                data = dados, family = "binomial")
+    
+  }else{
+    md_ <- gam(cbind(n_nRef,100-n_nRef) ~ 
+                 s(p.z,bs="tp") + s(d.z,bs="tp") + ti(p.z,d.z,bs=c("tp","tp")) +
+                 s(d.z,SiteCode,bs="fs",xt=list(bs="tp"), m=1),
+                data = dados, family = "binomial")
+    
+  }
+  return(md_)
+}
+registerDoMC(2)
+l_nRefEE_estudoGAMM <- dlply(df_md,"model_class",f_md,.parallel = TRUE)
+```
+
+
+```{r l_nRefEE_estudoGAMM, echo=FALSE, eval=FALSE}
+save(l_nRefEE_estudoGAMM,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_nRefEE_estudoGAMM.Rdata")
+```
+
+```{r AICctab ,eval=FALSE,echo=FALSE}
+load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_nRefEE_estudoGAMM.Rdata")
+AICctab(l_nRefEE_estudoGAMM,weights=TRUE)
+```
+
+
+
+### Comparação Modelos Cheios
+
+```{r comparacao modelos cheios nRefEE,echo=TRUE,eval=TRUE}
+# dados
+df_md <- df_resultados %>% filter(MN=="EE") %>% 
+  distinct() %>% 
+  mutate(rep = 1)
+df_md <- left_join(x=data.frame(rep=1,
+                                md_class=c("glmm d+d^2|Site",
+                                           "glmm d|Site",
+                                           "glmm 1|Site",
+                                           "gamm d|Site for each",
+                                           "gamm d|Site common",
+                                           "gamm 1|Site")),
+                   y=df_md,
+                   by="rep")
+# função de ajuste
+f_md <- function(dados){
+  md_class <- unique(dados$md_class)
+  if(md_class == "glmm d+d^2|Site"){
+    md_ <- glmer(cbind(n_nRef,100-n_nRef) ~ 
+                      (p.z + I(p.z^2)) * (d.z + I(d.z^2)) + 
+                      (d.z + I(d.z^2)|SiteCode),
+                 family = "binomial",data=dados,
+                 control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e6)),
+                 na.action = "na.fail")
+  }else if(md_class == "glmm d|Site"){
+    md_ <- glmer(cbind(n_nRef,100-n_nRef) ~ 
+                      (p.z + I(p.z^2)) * (d.z + I(d.z^2)) + 
+                      (d.z|SiteCode),
+                 family = "binomial",data=dados,
+                 control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e6)),
+                 na.action = "na.fail")
+  }else if(md_class == "glmm 1|Site"){
+    md_ <- glmer(cbind(n_nRef,100-n_nRef) ~ 
+                      (p.z + I(p.z^2)) * (d.z + I(d.z^2)) + 
+                      (1|SiteCode),
+                 family = "binomial",data=dados,
+                 control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e6)),
+                 na.action = "na.fail")
+  }else if(md_class == "gamm d|Site for each"){
+    md_ <- gam(cbind(n_nRef,100-n_nRef) ~ 
+                 s(p.z,bs="cr") + s(d.z,bs="cr") + ti(p.z,d.z,bs=c("cr","cr")) +
+                 s(SiteCode,bs="re") + s(d.z,by=SiteCode,bs="cr",m=1),
+                data = dados, family = "binomial")
+  }else if(md_class == "gamm d|Site common"){
+    md_ <- gam(cbind(n_nRef,100-n_nRef) ~ 
+                 s(p.z,bs="cr") + s(d.z,bs="cr") + ti(p.z,d.z,bs=c("cr","cr")) +
+                 s(d.z,SiteCode,bs="fs",xt=list(bs="cr"), m=1),
+                data = dados, family = "binomial")
+  }else{
+    md_ <- gam(cbind(n_nRef,100-n_nRef) ~ 
+                 s(p.z,bs="cr") + s(d.z,bs="cr") + ti(p.z,d.z,bs=c("cr","cr")) +
+                 s(SiteCode,bs="re"),
+                data = dados, family = "binomial")
+  }
+  return(md_)
+}
+```
+
+```{r dlply f md nRef EE, eval=FALSE,echo=TRUE}
+registerDoMC(3)
+l_nRefEE_mdCheio <- dlply(df_md,"md_class",f_md,.parallel = TRUE)
+```
+
+
+```{r save l_nRefEE_mdCheio, eval=FALSE}
+save(l_nRefEE_mdCheio,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_nRefEE_mdCheio.Rdata")
+```
+
+```{r AICctab l_nRefEE_mdCheio,echo=FALSE,eval=TRUE}
+load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_nRefEE_mdCheio.Rdata")
+AICctab(l_nRefEE_mdCheio,weights=TRUE)
+md_nRefEE1 <- l_nRefEE_mdCheio[["gamm d|Site for each"]]
+```
+
+
+#### Diagnostico modelo cheio
+
+__Figura 2.2.1__ gam.check(md_nRefEE1)
+
+
+```{r fig 221,eval=TRUE,echo=FALSE}
+par(mfrow=c(2,2))
+gam.check(md_nRefEE1)
+```
+  
+  
+__tabela 2.2.1__ Summary
+  
+```{r tabela 221,eval=TRUE,echo=FALSE}
+summary(md_nRefEE1)
+```
+
+
+
+
+__Figura 2.2.2__ Observado e predito pelo modelo cheio mais plausível  
+
+```{r fig 222 predito e observado por sitio md_nRefEE, echo=FALSE,eval=TRUE, fig.width=8, fig.height=30,message=FALSE}
+# dados
+df_plot <- df_resultados %>% filter(MN=="EE") %>% distinct()
+df_plot$nRef_predito <- predict.gam(md_nRefEE1,se.fit = TRUE,type="response")$fit*100
+df_plot$nRef_se <- predict.gam(md_nRefEE1,se.fit = TRUE,type="response")$se*100
+df_plot %<>%
+  mutate(title = paste0(SiteCode, " p=",round(p,digits = 3)),
+         yLower=nRef_predito-nRef_se,
+         yUpper=nRef_predito+nRef_se) %>% 
+  arrange(p)
+df_plot$title <- factor(df_plot$title,levels = unique(df_plot$title))
+# plot
+ggplot(df_plot,aes(x=d.z,y=n_nRef)) +
+  geom_ribbon(aes(ymin = yLower, ymax = yUpper),alpha=0.3,fill="blue") +
+  geom_point(alpha=0.3) +
+  geom_line(aes(y=nRef_predito),alpha=0.5,col="red") +
+  theme_classic() + labs(x="d(metros)",y="nRef(count)") + labs(title = "subset : MN==EE")+
+  facet_wrap(~title,ncol=6)
+```
+
+
+
+__Figura 2.2.3__ Diagnostico: avaliação do ajuste pelas preditoras lineares
+
+```{r fig 223,echo=FALSE,eval=TRUE,fig.height=5}
+#
+df_plot <- augment(md_nRefEE1) 
+df_plot1 <- df_plot %>% 
+  select(p.z,d.z,.fitted,.resid,.hat,.cooksd) %>% 
+  gather(key = preditora_class, value = preditora_value,p.z:d.z) %>% 
+  gather(key = var_diagnostico, value = var_value,.fitted:.cooksd)
+df_plot1$var_diagnostico <- factor(df_plot1$var_diagnostico,levels = unique(df_plot1$var_diagnostico))
+#
+f_p <- function(dados){
+  title_ <- unique(dados$var_diagnostico) %>% 
+    as.character()
+  p <- ggplot(dados,aes(x=preditora_value,y=var_value)) + 
+  geom_point(alpha=0.3) + 
+  geom_smooth(method = "loess",se=TRUE) + 
+  facet_wrap(~preditora_class,ncol=2,scales="free") +
+  labs(title = title_,x="",y="")
+}
+l_p <- dlply(df_plot1,.(var_diagnostico),f_p)
+# p_ <- ggplot(df_plot,aes(y=var_value)) + 
+#   # geom_jitter(alpha=0.3) +
+#   geom_boxplot() + 
+#   facet_wrap(~var_diagnostico,ncol=4,scales="free")
+do.call("grid.arrange",c(l_p,ncol=2))
+#
+# ggplot(df_plot,aes(x=p.z,y=.fitted)) + 
+#   geom_point(alpha=0.3) + 
+#   geom_smooth(method = "loess",se=TRUE) +
+#   scale_y_continuous(breaks = round(seq(min(df_plot$.fitted), max(df_plot$.fitted), by = 100),1))
+  # facet_wrap(~preditora_class,ncol=2,scales="free") +
+  # labs(title = title_,x="",y="")
+```
+
+
+```{r nRefEE candidatos outlier,eval=TRUE,echo=TRUE}
+v_sitesOut_nRefEE <- filter(df_plot,.fitted < -300 | .fitted > 380 | .cooksd > 2000) %>%
+  .$SiteCode %>% unique
+```
+
+```{r nRefEE possiveis sitios outliers,eval=TRUE,echo=FALSE,fig.width=4, fig.height=2}
+# dados
+df_plot <- df_resultados %>% filter(MN=="EE") %>% distinct()
+df_plot$nRef_predito <- predict.gam(md_nRefEE1,se.fit = TRUE,type="response")$fit*100
+df_plot$nRef_se <- predict.gam(md_nRefEE1,se.fit = TRUE,type="response")$se*100
+df_plot %<>%
+  mutate(title = paste0(SiteCode, " p=",round(p,digits = 3)),
+         yLower=nRef_predito-nRef_se,
+         yUpper=nRef_predito+nRef_se) %>% 
+  arrange(p)
+df_plot$title <- factor(df_plot$title,levels = unique(df_plot$title))
+df_plot %<>% filter(SiteCode %in% v_sitesOut_nRefEE)
+# plot
+ggplot(df_plot,aes(x=d.z,y=n_nRef)) +
+  geom_ribbon(aes(ymin = yLower, ymax = yUpper),alpha=0.3,fill="blue") +
+  geom_point(alpha=0.3) +
+  geom_line(aes(y=nRef_predito),alpha=0.5,col="red") +
+  theme_classic() + labs(x="d(metros)",y="nRef(count)") + labs(title = "subset : MN==EE, outliers?")+
+  facet_wrap(~title,ncol=3)
+```
+
+
+  
+#### Comparação Modelo Cheio sem outliers
+
+```{r nRefEE sem outliers md cheio,eval=FALSE,echo=TRUE}
+# sites outlier
+v_sitesOut_nRefEE <- filter(df_plot,.fitted < -300 | .fitted > 380 | .cooksd > 2000) %>%
+  .$SiteCode %>% unique
+# dados
+df_md <- df_resultados %>% filter(MN=="EE" & !(SiteCode %in% v_sitesOut_nRefEE)) %>% 
+  distinct() %>% 
+  mutate(rep = 1) 
+df_md <- left_join(x=data.frame(rep=1,
+                                md_class=c("glmm d+d^2|Site",
+                                           "glmm d|Site",
+                                           "glmm 1|Site",
+                                           "gamm d|Site for each",
+                                           "gamm d|Site common",
+                                           "gamm 1|Site")),
+                   y=df_md,
+                   by="rep")
+# ajuste modelos
+registerDoMC(3)
+l_nRefEE_mdCheio__sOut <- dlply(df_md,"md_class",f_md,.parallel = TRUE)
+```
+
+```{r save l_nRefEE_mdCheio__sOut,eval=FALSE,echo=FALSE}
+save(l_nRefEE_mdCheio__sOut,file = "~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_nRefEE_mdCheio__sOut.Rdata")
+```
+
+```{r AICctab l_nRefEE_mdCheio__sOut}
+load("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_nRefEE_mdCheio__sOut.Rdata")
+AICctab(l_nRefEE_mdCheio__sOut,weights=TRUE)
+```
+  
+    
+#### Diagnosticos modelo cheio sem outliers  
+
+__Figura 2.2.4__ Appraise(md_nRefEE_sOut)       
+      
+```{r md cheio sOut nRefEE,echo=FALSE,eval=TRUE}
+md_nRefEE_sOut <- l_nRefEE_mdCheio__sOut[["gamm d|Site for each"]]
+df_md <- df_resultados %>% filter(MN=="EE" & !(SiteCode %in% v_sitesOut_nRefEE))
+appraise(md_nRefEE_sOut)
+```
+  
+  
+<!-- __Figura 2.2.5__ Observado e predito pelo modelo cheio mais plausível   -->
+  
+```{r fig 225 predito e observado por sitio md_nRefEE, echo=FALSE,eval=FALSE, fig.width=8, fig.height=30,message=FALSE}
+# dados
+df_plot <- df_md
+df_plot$nRef_predito <- predict.gam(md_nRefEE_sOut,se.fit = TRUE,type="response")$fit*100
+df_plot$nRef_se <- predict.gam(md_nRefEE_sOut,se.fit = TRUE,type="response")$se*100
+df_plot %<>%
+  mutate(title = paste0(SiteCode, " p=",round(p,digits = 3)),
+         yLower=nRef_predito-nRef_se,
+         yUpper=nRef_predito+nRef_se) %>% 
+  arrange(p)
+df_plot$title <- factor(df_plot$title,levels = unique(df_plot$title))
+# plot
+ggplot(df_plot,aes(x=d.z,y=n_nRef)) +
+  geom_ribbon(aes(ymin = yLower, ymax = yUpper),alpha=0.3,fill="blue") +
+  geom_point(alpha=0.3) +
+  geom_line(aes(y=nRef_predito),alpha=0.5,col="red") +
+  theme_classic() + labs(x="d(metros)",y="nRef(count)") + labs(title = "subset : MN==EE")+
+  facet_wrap(~title,ncol=6)
+```
+
+
+__Figura 2.2.5__ Diagnostico: avaliação do ajuste pelas preditoras lineares
+
+```{r fig 225,echo=FALSE,eval=TRUE,fig.height=5}
+#
+df_plot <- augment(md_nRefEE_sOut) 
+df_plot1 <- df_plot %>% 
+  select(p.z,d.z,.fitted,.resid,.hat,.cooksd) %>% 
+  gather(key = preditora_class, value = preditora_value,p.z:d.z) %>% 
+  gather(key = var_diagnostico, value = var_value,.fitted:.cooksd)
+df_plot1$var_diagnostico <- factor(df_plot1$var_diagnostico,levels = unique(df_plot1$var_diagnostico))
+#
+f_p <- function(dados){
+  title_ <- unique(dados$var_diagnostico) %>% 
+    as.character()
+  p <- ggplot(dados,aes(x=preditora_value,y=var_value)) + 
+  geom_point(alpha=0.3) + 
+  geom_smooth(method = "loess",se=TRUE) + 
+  facet_wrap(~preditora_class,ncol=2,scales="free") +
+  labs(title = title_,x="",y="")
+}
+l_p <- dlply(df_plot1,.(var_diagnostico),f_p)
+# p_ <- ggplot(df_plot,aes(y=var_value)) + 
+#   # geom_jitter(alpha=0.3) +
+#   geom_boxplot() + 
+#   facet_wrap(~var_diagnostico,ncol=4,scales="free")
+do.call("grid.arrange",c(l_p,ncol=2))
+#
+# ggplot(df_plot,aes(x=p.z,y=.fitted)) + 
+#   geom_point(alpha=0.3) + 
+#   geom_smooth(method = "loess",se=TRUE) +
+#   scale_y_continuous(breaks = round(seq(min(df_plot$.fitted), max(df_plot$.fitted), by = 100),1))
+  # facet_wrap(~preditora_class,ncol=2,scales="free") +
+  # labs(title = title_,x="",y="")
+```
+  
+
+
+
+#######################################
+############## 22jul2020 ##############
+#######################################
+
+
+```{r}
+library(parallel)
+library(doMC)
+library(DHARMa)
+library(broom.mixed)
+library(gratia)
+library(MuMIn)
+library(mgcv)
+library(bbmle)
+library(lme4)
+library(AICcmodavg)
+library(merTools)
+library(magrittr)
+library(ggplotify)
+library(gridExtra)
+library(directlabels)
+library(ggplot2); theme_set(theme_classic())
+library(metR)
+library(tidyr)
+library(purrr)
+library(plyr)
+library(dplyr)
+```
+
+
+
+
+```{r dados,message=FALSE}
+### dados ###
+# leitura
+df_resultados <- read.csv(file="/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/simulacao_codigos_e_resultados/resultados/df_resultados.csv",
+                            header = TRUE,as.is=FALSE)[,1:13]
+# padronização
+level_k <- as.character(unique(sort(as.numeric(df_resultados$k),decreasing = TRUE)))
+df_resultados$k <- factor(df_resultados$k,levels = level_k)
+levels(df_resultados$k)[19] <- "0.1"
+# z score
+f_z <- function(x){
+  m <- base::mean(x,na.rm=FALSE)
+  sd <- sd(x,na.rm=FALSE)
+  output <- (x-m)/sd
+  return(output)
+} 
+# names(df_resultados)
+# str(df_resultados)
+df_resultados %<>% mutate(diffS_gamma = diffS_mean + min(diffS_mean)*(-1) + 0.01,
+                          modulo_diffS = abs(diffS_mean),
+                          log_Sobs=log(S_obs))
+
+df_resultados.z <- as.data.frame(apply(df_resultados[,c("p","Ntotal","log_Sobs","k_1","d_Lplot","d","modulo_diffS")],2,f_z))
+names(df_resultados.z) <- sapply(names(df_resultados.z), function(x) paste0(x,".z"))
+df_resultados %<>% cbind(.,df_resultados.z) %>%
+  dplyr::select(-k_1,-k_1.z)
+```
+
+
+
+
+1) quais os casos em que nRef>50 e |diffS|>0.25
+
+
+```{r}
+ggplot(df_resultados,aes(x=diffS_mean,y=n_nRef)) +
+  # coord_cartesian(expand = TRUE) +
+  # scale_y_continuous(c(0,0))+
+  geom_bin2d(bins=60) +
+  scale_fill_continuous(type = "viridis") +
+  geom_vline(xintercept = c(-0.25,0.25),color="red",alpha=0.7) +
+  labs(x="diffS",y="nRef") +
+  theme(legend.position = "top") +
+  theme_classic() +
+  facet_wrap(~MN,ncol=2,scales="free")
+
+```
+
+
+2) SADs
+
+```{r}
+### dados
+## SAD obs
+df_SAD.obs <- read.csv(file="/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/dados_para_iniciar_artigo/abundances.csv",
+                       header = TRUE,as.is = TRUE)
+df_SAD.obs %<>% filter(SiteCode %in% unique(df_resultados$SiteCode))
+# f_write <- function(df_){
+#   df_tWrite <- df_[,c("SiteCode","species.correct","N")]
+#   path_ <- paste0("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/SAD_observada/SADobs_",
+#                   df_tWrite$SiteCode[1],".csv")
+#   write.csv(df_tWrite,path_,row.names = FALSE)
+# }
+# registerDoMC(3)
+# d_ply(df_SAD.obs,"SiteCode",f_write,.parallel = TRUE)
+df_SAD.obs %<>% group_by(SiteCode) %>% nest %>% rename(SAD_obs=data)
+## SAD replica
+df_SADreplica <- Sys.glob("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/simulacao_codigos_e_resultados/SADs_preditas/*.csv") %>% 
+  gsub("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/simulacao_codigos_e_resultados/SADs_preditas/","",.) %>% 
+  gsub(".csv","",.) %>%  #gsub("_EI.csv","",.) %>%
+  adply(.,1,function(x) unname( unlist( strsplit(x,"_k",fixed = TRUE))),.id = NULL) %>% 
+  rename(SiteCode = V1,k = V2)
+df_SADreplica$MN <- adply(df_SADreplica$k,1,function(x) unname( unlist( strsplit(x,"_",fixed = TRUE))),.id = NULL)$V2
+df_SADreplica$k <- adply(df_SADreplica$k,1,function(x) unname( unlist( strsplit(x,"_",fixed = TRUE))),.id = NULL)$V1
+df_SADreplica$file_path <- Sys.glob("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/simulacao_codigos_e_resultados/SADs_preditas/*.csv")
+df_SADreplica %<>% group_by(SiteCode) %>% nest %>% rename(SAD_MN=data)
+## merge
+df_SADs <- inner_join(y=df_SADreplica,
+                      x=df_SAD.obs,
+                      by="SiteCode")
+```
+
+
+
