@@ -842,3 +842,41 @@ appraise(md_U.tp)
 ### Figura S.3 - legenda:
 
 Gráficos diagnósticos padrão do pacote "gratia" (REF). Na primeira linha e coluna há os quantils observados e esperados dos resíduos do tipo "deviance"; na segunda coluna e primeira linha há o gráfico de dispersão dos resíduos pelo preditor linear; na segunda linha e primeira coluna o histograma dos resíduos; e por último o observado contra o predito.
+
+
+
+## Para Discussão
+
+```{r parametros MNEI discusssao, message=FALSE,warning=FALSE}
+#########
+# Dados #
+#########
+df_U <- map_df(Sys.glob("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/simulacao_codigos_e_resultados/U/*.csv"), readr::read_csv)
+df_simulacao <-  inner_join(x=distinct(dplyr::select(df_U, SiteCode, k, Ntotal, S_obs, kernel_code, DA, d, p, txt.name)),
+                            y=ddply(df_U,c("SiteCode","k"),summarise,U_med = mean(U), U_var = var(U)),
+                            by=c("SiteCode","k"))
+# conversão de parâmetros
+df_simulacao %<>% 
+  mutate(J_M = 10404 * DA * p,
+         L_plot = sqrt( 10000 * (Ntotal/DA) ),
+         m = d * (1 - exp( -sqrt(2) * (L_plot/d) ) ) / ( sqrt(2) * L_plot ), #eq 4
+         m_ = m * p / ( 1 - (1-p)*m ),#eq 5
+         I =  m_ * (Ntotal-1)/(1-m_), #Etienne 2005
+         theta = U_med * ( J_M - 1 ) / (1-U_med) ) #Vallade & Houshmandzadeh (2003)
+
+############
+# Graficos #
+############
+l_p <- list()
+l_p[[1]] <- ggplot(df_simulacao,aes(x=p,y=m_)) + #,color=d
+  geom_smooth(method="loess",se=FALSE,alpha=0.3,color="red") +
+  geom_point(alpha=0.3)
+l_p[[2]] <- ggplot(df_simulacao,aes(x=p,y=theta)) + #,color=d
+  geom_smooth(method="loess",se=FALSE,alpha=0.3,color="red") +
+  geom_point(alpha=0.3)
+# l_p[[3]] <- ggplot(df_simulacao,aes(x=theta,y=m_,fill=U_med)) +
+#   geom_smooth(method="loess",se=FALSE) +
+#   geom_point()
+grid.arrange(grobs=l_p,ncol=2)
+```
+
