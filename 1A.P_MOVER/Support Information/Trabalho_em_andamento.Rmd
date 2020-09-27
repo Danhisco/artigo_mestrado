@@ -34,6 +34,8 @@ library(lme4) # pacote de criação dos modelos estatísticos
 library(bbmle)
 ```
 
+teste
+
 ## Seleção dos levantamentos fitossociológicos
 
 ### Seleção dos dados disponíveis
@@ -2787,14 +2789,6 @@ ggplot(df_resultados,aes(x=diffS_mean,y=n_nRef)) +
 df_SAD.obs <- read.csv(file="/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/dados_para_iniciar_artigo/abundances.csv",
                        header = TRUE,as.is = TRUE)
 df_SAD.obs %<>% filter(SiteCode %in% unique(df_resultados$SiteCode))
-# f_write <- function(df_){
-#   df_tWrite <- df_[,c("SiteCode","species.correct","N")]
-#   path_ <- paste0("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/SAD_observada/SADobs_",
-#                   df_tWrite$SiteCode[1],".csv")
-#   write.csv(df_tWrite,path_,row.names = FALSE)
-# }
-# registerDoMC(3)
-# d_ply(df_SAD.obs,"SiteCode",f_write,.parallel = TRUE)
 df_SAD.obs %<>% group_by(SiteCode) %>% nest %>% rename(SAD_obs=data)
 ## SAD replica
 df_SADreplica <- Sys.glob("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/simulacao_codigos_e_resultados/SADs_preditas/*.csv") %>% 
@@ -2810,6 +2804,14 @@ df_SADreplica %<>% group_by(SiteCode) %>% nest %>% rename(SAD_MN=data)
 df_SADs <- inner_join(y=df_SADreplica,
                       x=df_SAD.obs,
                       by="SiteCode")
+
+
+#####
+df <- df_SADreplica$SiteCode %>% table %>% as.data.frame()
+names(df) <- c("SiteCode","num_rep")
+df_SADreplica %>% filter(SiteCode == "MGuberl5")
+
+
 ```
 
 
