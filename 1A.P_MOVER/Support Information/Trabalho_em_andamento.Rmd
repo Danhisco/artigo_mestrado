@@ -34,7 +34,7 @@ library(lme4) # pacote de criação dos modelos estatísticos
 library(bbmle)
 ```
 
-teste
+teste2
 
 ## Seleção dos levantamentos fitossociológicos
 
