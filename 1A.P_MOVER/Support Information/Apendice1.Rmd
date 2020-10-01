@@ -682,10 +682,11 @@ f_tree.cover <- function(file_path){
 df_ <- df_simulacao %>% select(SiteCode,txt.name) %>% distinct()
 registerDoMC(2)
 df_$p <- aaply(df_$txt.name,1,f_tree.cover,.parallel = TRUE)
-df_simulacao <- left_join(x = df_simulacao,
+df_simulacao <- left_join(x = select(df_simulacao,-p),
                           y = select(df_,-txt.name),
                           by="SiteCode")
-
+# df_simulacao <- df_simulacao %>% select(-p.y)
+# names(df_simulacao)[8] <- "p"
 ```
 
 
@@ -771,7 +772,7 @@ func1 <- function(x,replicas=n_rep.U) {
   x$U <- NA
   x <- x[rep(1:dim(x)[1],each=replicas),]
 }
-df_simulacao$txt.name <- gsub("dados_brutos","simulacao",df_simulacao$txt.name)
+# df_simulacao$txt.name <- gsub("dados_brutos","simulacao",df_simulacao$txt.name)
 df_simulacao.U <- df_simulacao %>% func1()
 # simulacao
 # valores de k
@@ -797,8 +798,64 @@ for(a in 1:length(k_factor)){
   write.csv(df_simU,
             file=paste0("./U/","df_simU__k",k_factor[a],".csv"),row.names = FALSE)
 }
+
+
+###########################
+######## 10out2020 ########
+###########################
+registerDoMC(2)
+df_simU <- df_simulacao.U %>% filter(SiteCode == "MGuberl7") %>% as.data.frame()
+op <- options(digits.secs=6)
+funcao_imigracao <- function(i,df_temp=df_simU){
+  aviao <- list()
+  aviao <- dinamica_coalescente(U = 1.25e-06,
+                                S = df_temp[i,"S_obs"],
+                                N_simul = 1,
+                                seed = as.numeric(Sys.time()),
+                                disp_range = df_temp[i,"d"],
+                                disp_kernel = df_temp[i,"kernel_code"],
+                                landscape = df_temp[i,"txt.name"])
+  return(aviao$U_est)
+}
+replica.sim <- as.list(1:dim(df_simU)[1])
+sim.coal_U <- llply(.data = replica.sim, .fun = funcao_imigracao, .parallel = TRUE)
+df_simU[,"U"] <- unlist(sim.coal_U)
+write.csv(df_simU,
+          file=paste0("./U/","df_simU__k",k_factor[a],".csv"),row.names = FALSE)
 ```
-  
+
+1out2020
+
+# 0) Erro:
+./dinamica_coalescente: error while loading shared libraries: libgsl.so.19: cannot open shared object file: No such file or directory
+
+# 1) instalação da biblioteca
+sudo apt-get install libgsl-dev
+
+# 2) erro persiste; 
+
+# 3) procurando pelo arquivo 
+sudo find / -name "libgsl.so.*"
+# obtenho:
+find: ‘/run/user/1000/doc’: Permissão negada
+find: ‘/run/user/1000/gvfs’: Permissão negada
+/usr/lib/x86_64-linux-gnu/libgsl.so.23.1.0
+/usr/lib/x86_64-linux-gnu/libgsl.so.23
+# portanto não existe esta biblioteca mesmo depois de instalar
+
+# 4) refiz o arquivo do programa coalescente via 'make' e agora obtenho o erro:
+Erro: arquivo de dados contém 0 entradas, esperado 1
+- no código do programa coalescente há uma sessão sobre isso:
+if(! (landscape_file >> network->barrier[i])){
+            cout << "Erro: arquivo de dados contém " << i << " entradas, esperado " << network->N << endl;
+            exit(EXIT_FAILURE);
+
+# 5) o problema era que o arquivo de entrada na função não era do tipo charactere, ao inves era um tibble
+
+
+
+
+
   
   
 #### Janela de Código 9:
