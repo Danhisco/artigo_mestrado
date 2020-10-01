@@ -285,6 +285,17 @@ f_mat.tri <- function(png, abund){
 df_dados$png.name %<>% as.character
 registerDoMC(3)
 a_ply(df_dados,1,function(X) f_mat.tri(png = X$png.name,abund = X$Ntotal),.parallel = TRUE)
+
+###################################
+############## 1out20 #############
+###################################
+# esta paisagem não estava centrada na área amostral
+# faltava colunas
+f_mat.tri(png = df_dados$png.name[df_dados$SiteCode=="MGuberl7"],abund = df_dados$Ntotal[df_dados$SiteCode=="MGuberl7"])
+###################################
+############## 1out20 #############
+###################################
+
 ####################################
 ### e) NA remove
 ####################################
@@ -309,6 +320,17 @@ f_NA_zero <- function(path_){
 }
 registerDoMC(3)
 a_ply(df_auditoria$txt.name,1,f_NA_zero,.parallel = TRUE)
+
+###################################
+############## 1out20 #############
+###################################
+# esta paisagem não estava centrada na área amostral
+# faltava colunas
+f_NA_zero(path_ = df_auditoria$txt.name[df_auditoria$SiteCode == "MGuberl7"])
+
+###################################
+############## 1out20 #############
+###################################
 ```
 
         
@@ -422,10 +444,11 @@ Códigos usados para aglomerar o habitat da comunidade local:
 
 ```{r Janela de Código 4 _ conserto e descarte de rasters, eval=FALSE,echo=TRUE}
 v_Sites__conserto <- c("MGlavr6","MGlavr3")
+# v_Sites__conserto <- "MGuberl7"
 df_auditoria2 <- df_auditoria %>% filter(SiteCode %in% v_Sites__conserto)
 #########
 par(mar=c(0.2,0.2,1.2,0.2))
-i <- 2 #nrow = 5
+i <- 1 #nrow = 5
 N <- df_auditoria2$Ntotal[i]
 paisagem <- as.matrix(read.table(df_auditoria2$txt.name[i],header = TRUE,sep = " ",as.is = FALSE))
 # janela de observação:
@@ -473,8 +496,8 @@ janela_observao[(l_-n_):(l_+n_),(c_-n_):(c_+n_)] #  %>% image # habitat_local <-
 # habitat_local[habitat_local==1] %>% length() > rm_
 # para aqules com ponto central = 1
 # janela_observao[l_+1,c_] <- 1
-# exemplo: o ponto de inicío é [4,4] e o ponto l_,c_ é [3,3], portanto em termos de l_+1,c_+1:
-p_inicio <- c(l_+1,c_+1)
+# exemplo: o ponto de inicío é [4,4] e o ponto l_,c_ é [3,3], portanto l_+1,c_+1:
+p_inicio <- c(l_,c_)
 # correr pela ___ até o ponto:
 image(janela_observao)
 coordenada_ <- locator(1) %>% unlist()
@@ -482,7 +505,7 @@ l_ <- round(coordenada_[1]*nrow(janela_observao))
 c_ <- round(coordenada_[2]*ncol(janela_observao))
 n_ <- 2
 janela_observao[(l_-n_):(l_+n_),(c_-n_):(c_+n_)] # %>% image
-p_final <- c(l_+1,c_)
+p_final <- c(l_,c_)
 # trocando 1 -> 2
 p_rm_ <- janela_observao[p_inicio[1]:p_final[1],p_inicio[2]:p_final[2]] %>% length()
 # if
@@ -523,6 +546,7 @@ __Legenda :__ Sítios consertados
 
 ```{r figura 2 sitios consertados,eval=TRUE,echo=FALSE,fig.align='center',fig.height=2,cache=FALSE,eval=FALSE}
 df_auditoria2 <- df_auditoria %>% filter(SiteCode %in% v_Sites__conserto)
+df_auditoria2 <- df_auditoria %>% filter(SiteCode == "MGuberl7")
 par(mfrow=c(1,5))
 for(i in 1:nrow(df_auditoria2)){
 # i <- 1 #nrow = 9
@@ -537,6 +561,7 @@ c <- ceiling(dim(paisagem)[2]/2) # coluna central da paisagem
 janela_observao <- paisagem[(l-d):(l+d),(c-d):(c+d)]
 #visualização
 image(janela_observao,main=paste0(df_auditoria2$SiteCode[i]," N=",df_auditoria2$Ntotal[i]),col=terrain.colors(12,rev = TRUE),axes=FALSE)
+image(paisagem)
 }
 #
 
@@ -563,6 +588,9 @@ paisagem_txt <- as.matrix(read.table(df_auditoria$txt.name[df_auditoria$SiteCode
 #
 png_path <- df_auditoria$txt.name[df_auditoria$SiteCode == "MGuberl7"] %>% gsub(".txt",".png",.)
 png_file <- readImage(png_path)
+png_file %>% dim
+paisagem_txt %>% dim
+
 par(mfrow=c(1,2))
 image(paisagem_txt)
 image(png_file)
