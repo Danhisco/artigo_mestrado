@@ -957,4 +957,8 @@ grid.arrange(grobs=l_p,ncol=3)
 ```
 
 
-
+#### LEGENDA:
+##### a) Gráfico de dispersão 3D:   
+Pontos apresentam certo grau de transparência, são coloridos pelo valor de U_med que foi dividido em 9 classes (quanto mais escuro maior U_med).    
+##### b) Gráfico de dispersão 2D: 
+Gráficos das relações parciais entre as 3 variáveis 2 a 2. Os contornos são estimados por kernel em 2 dimensões segundo a densidade de pontos na área: quanto mais contornos maior a ocorrência de valores.
