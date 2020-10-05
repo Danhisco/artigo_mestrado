@@ -34,6 +34,8 @@ library(merTools)
 library(magrittr)
 library(ggplotify)
 library(gridExtra)
+library(scatterplot3d)
+library(RColorBrewer)
 library(cowplot)
 library(ggplot2); theme_set(theme_classic())
 library(metR)
@@ -164,7 +166,7 @@ df_plot %>%
                breaks=c(-0.6,-0.25,-0.01,0.25,0.75,1.5,2.5),color="black",alpha=0.3,linetype="dotdash") +
   ## média de diffS MN==EE
   geom_contour(aes(z=diffS),
-               breaks=df_predEE$fit,color="red",alpha=0.3,linetype="dotdash") +
+               breaks=df_predEE_diffS$fit,color="red",alpha=0.3,linetype="dotdash") +
   ## texto do contorno
   geom_text_contour(aes(z=diffS),stroke=0.2,
                     breaks = c(-0.6,-0.25,-0.01,0.25,0.75,1.5,2.5),
@@ -848,7 +850,7 @@ Gráficos diagnósticos padrão do pacote "gratia" (REF). Na primeira linha e co
 
 ## Para Discussão
 
-```{r parametros MNEI discusssao, message=FALSE,warning=FALSE}
+```{r parametros MNEI discusssao, message=FALSE,warning=FALSE,fig.width=10,fig.height=4}
 #########
 # Dados #
 #########
@@ -869,35 +871,90 @@ df_simulacao %<>%
 # Graficos #
 ############
 l_p <- list()
-l_p[[1]] <- ggplot(df_simulacao,aes(x=p,y=m_)) + #,color=d
+l_p[[1]] <- df_simulacao %>% mutate(legend = "m'") %>% 
+  ggplot(aes(x=p,y=m_)) + #,color=d
   geom_smooth(method="loess",se=FALSE,alpha=0.3,color="red") +
   geom_point(alpha=0.3) +
-  scale_y_continuous(trans='log10')
-l_p[[2]] <- ggplot(df_simulacao,aes(x=p,y=theta)) + #,color=d
+  scale_y_continuous(trans='log10') +
+  annotation_logticks(sides = "l") +
+  labs(y="") +
+  facet_wrap(~legend)
+l_p[[2]] <- df_simulacao %>% mutate(legend = "theta") %>% 
+  ggplot(aes(x=p,y=theta)) + #,color=d
   geom_smooth(method="loess",se=FALSE,alpha=0.3,color="red") +
   geom_point(alpha=0.3) +
-  scale_y_continuous(trans='log10')
-# l_p[[3]] <- ggplot(df_simulacao,aes(x=theta,y=m_,fill=U_med)) +
-#   geom_smooth(method="loess",se=FALSE) +
-#   geom_point()
-grid.arrange(grobs=l_p,ncol=2)
-```
-
-
-#### Qual a variação de área amostral de habitat / área de habitat paisagem local ~ p
-
-
-```{r area amostral / area paisagem por p}
-df_p <- df_resultados %>% mutate(ratio_J = Ntotal /(10404*DA*p)) 
-ggplot(df_p, aes(x=p,y=ratio_J)) +
+  scale_y_continuous(trans='log10') +
+  annotation_logticks(sides = "l") +
+  labs(y="") +
+  facet_wrap(~legend)
+l_p[[3]] <- df_resultados %>% mutate(ratio_J = Ntotal /(10404*DA*p),legend = "N_sample / N_landscape") %>%
+  ggplot(aes(x=p,y=ratio_J)) +
   geom_point(alpha = 1/10) +
   labs(x = "p",y="N_sample / N_landscape") +
-  scale_y_log10(breaks = trans_breaks("log10", function(x) 10^x),
-              labels = trans_format("log10", math_format(10^.x))) +
+  # scale_y_log10(breaks = trans_breaks("log10", function(x) 10^x),
+  #             labels = trans_format("log10", math_format(10^.x))) +
+  scale_y_continuous(trans='log10') +
   annotation_logticks(sides = "l") +
-  labs(x="p","Namostra / Npaisagem")
-
-
-ggplot(df_p,aes(x=p,y=d))+geom_point(alpha=0.3)
+  labs(y="") +
+  facet_wrap(~legend)
+grid.arrange(grobs=l_p,ncol=3)
 ```
+
+### MN==EE: nRef ~ U_med * p
+
+
+```{r}
+# 
+# ###
+# # 1)
+# library(lattice)
+# cloud(U_med ~ p * d, df_resultados)
+# # 2)
+# l_p <- df_resultados %>% 
+#   # filter(p<0.35 & d>5 & MN=="EE") %>%
+#   ggplot(aes(x=p,y=d)) +
+#   # geom_tile(aes(fill=n_nRef))
+#   geom_point(aes(color=U_med),alpha=0.8)
+#   # geom_smooth(method = "loess",color="red",alpha=0.7)
+# ggMarginal(l_p, type = "boxplot", fill="transparent",margins = "x")
+# # 3)
+plotclr <- brewer.pal(9,"PuBu") # get the colors
+colornum <- cut(rank(df_resultados$U_med[df_resultados$MN=="EE"]), 9, labels=FALSE)
+colcode <- plotclr[colornum]
+l_p <- list()
+# par(mfrow=c(1,3))
+l_p[[1]] <- with(filter(df_resultados,MN=="EE"),scatterplot3d(x=U_med,y=p,z=n_nRef,
+                                             angle=50,color=alpha(colcode,0.4),
+                                             main = "nRef ~ U_med * p",
+                                             pch=16,type="p",zlab = "nRef"))
+```
+
+```{r fig.width=9,fig.height=3}
+# par(mfrow=c(1,3))
+# plot(p ~ U_med, df_resultados,pch=16,col = alpha("black", 0.4),main="p ~ U_med")
+# plot(n_nRef ~ p, df_resultados,pch=16,col = alpha("black", 0.4),ylab="nRef",main="nRef ~ p")
+# plot(n_nRef ~ U_med, df_resultados,pch=16,col = alpha("black", 0.4),ylab="nRef",main="nRef ~ U_med")
+l_p <- list()
+l_p[[1]] <- ggplot(filter(df_resultados,MN=="EE"),aes(y=p,x=U_med)) +
+  geom_point(alpha=0.3) +
+  geom_density_2d(color="red") +
+  labs(x="U médio")
+  # stat_density_2d(aes(fill = ..level..), geom="polygon",alpha=0.5) +
+  # scale_fill_gradient(low="green", high="red")
+l_p[[2]] <- ggplot(filter(df_resultados,MN=="EE"),aes(y=n_nRef,x=p)) +
+  geom_point(alpha=0.3) +
+  geom_density_2d(color="red") +
+  labs(y="nRef")
+  # stat_density_2d(aes(fill = ..level..), geom="polygon",alpha=0.5) +
+  # scale_fill_gradient(low="green", high="red")
+l_p[[3]] <- ggplot(filter(df_resultados,MN=="EE"),aes(y=n_nRef,x=U_med)) +
+  geom_point(alpha=0.3) +
+  geom_density_2d(color="red") +
+  labs(y="nRef",x="U médio")
+  # stat_density_2d(aes(fill = ..level..), geom="polygon",alpha=0.5) +
+  # scale_fill_gradient(low="green", high="red")
+grid.arrange(grobs=l_p,ncol=3)
+```
+
+
 
