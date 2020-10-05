@@ -871,7 +871,7 @@ df_simulacao %<>%
 # Graficos #
 ############
 l_p <- list()
-l_p[[1]] <- df_simulacao %>% mutate(legend = "m'") %>% 
+l_p[[1]] <- df_simulacao %>% mutate(legend = "m'") %>%
   ggplot(aes(x=p,y=m_)) + #,color=d
   geom_smooth(method="loess",se=FALSE,alpha=0.3,color="red") +
   geom_point(alpha=0.3) +
@@ -879,7 +879,7 @@ l_p[[1]] <- df_simulacao %>% mutate(legend = "m'") %>%
   annotation_logticks(sides = "l") +
   labs(y="") +
   facet_wrap(~legend)
-l_p[[2]] <- df_simulacao %>% mutate(legend = "theta") %>% 
+l_p[[2]] <- df_simulacao %>% mutate(legend = "theta") %>%
   ggplot(aes(x=p,y=theta)) + #,color=d
   geom_smooth(method="loess",se=FALSE,alpha=0.3,color="red") +
   geom_point(alpha=0.3) +
@@ -925,8 +925,8 @@ l_p <- list()
 # par(mfrow=c(1,3))
 l_p[[1]] <- with(filter(df_resultados,MN=="EE"),scatterplot3d(x=U_med,y=p,z=n_nRef,
                                              angle=50,color=alpha(colcode,0.4),
-                                             main = "nRef ~ U_med * p",
-                                             pch=16,type="p",zlab = "nRef"))
+                                             main = "nRef ~ U médio * p",
+                                             pch=16,type="p",zlab = "nRef",xlab = "U médio"))
 ```
 
 ```{r fig.width=9,fig.height=3}
@@ -960,5 +960,5 @@ grid.arrange(grobs=l_p,ncol=3)
 #### LEGENDA:
 ##### a) Gráfico de dispersão 3D:   
 Pontos apresentam certo grau de transparência, são coloridos pelo valor de U_med que foi dividido em 9 classes (quanto mais escuro maior U_med).    
-##### b) Gráfico de dispersão 2D: 
-Gráficos das relações parciais entre as 3 variáveis 2 a 2. Os contornos são estimados por kernel em 2 dimensões segundo a densidade de pontos na área: quanto mais contornos maior a ocorrência de valores.
+##### b) Gráfico de dispersão 2D:    
+Gráficos das relações parciais entre as 3 variáveis 2 a 2. Os contornos são estimados por kernel em 2 dimensões segundo a densidade de pontos na área: quanto mais contornos maior a ocorrência de valores.   
