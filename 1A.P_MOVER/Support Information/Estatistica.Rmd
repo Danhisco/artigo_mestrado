@@ -2580,17 +2580,17 @@ f_md <- function(dados){
                  na.action = "na.fail")
   }else if(md_class == "gamm d|Site for each"){
     md_ <- gam(U_med ~
-                 s(p.z,bs="cr",k=10) + s(d.z,bs="cr",k=10) + ti(p.z,d.z,bs=c("cr","cr"),k=c(10,10)) +
-                 s(SiteCode,bs="re") + s(d.z,by=SiteCode,bs="cr",m=1,k=10),
+                 s(p.z,bs="tp",k=10) + s(d.z,bs="tp",k=10) + ti(p.z,d.z,bs=c("tp","tp"),k=c(10,10)) +
+                 s(SiteCode,bs="re") + s(d.z,by=SiteCode,bs="tp",m=1,k=10),
                 data = df_md, family = Gamma(link="log"),method="REML")
   }else if(md_class == "gamm d|Site common"){
     md_ <- gam(U_med ~
-                 s(p.z,bs="cr",k=10) + s(d.z,bs="cr",k=10) + ti(p.z,d.z,bs=c("cr","cr"),k=c(10,10)) +
-                 s(d.z,SiteCode,bs="fs",xt=list(bs="cr"), m=1,k=10),
+                 s(p.z,bs="tp",k=10) + s(d.z,bs="tp",k=10) + ti(p.z,d.z,bs=c("tp","tp"),k=c(10,10)) +
+                 s(d.z,SiteCode,bs="fs",xt=list(bs="tp"), m=1,k=10),
                 data = df_md, family = Gamma(link="log"),method="REML")
   }else{
     md_ <- gam(U_med ~
-                 s(p.z,bs="cr",k=10) + s(d.z,bs="cr",k=10) + ti(p.z,d.z,bs=c("cr","cr"),k=c(10,10)) +
+                 s(p.z,bs="tp",k=10) + s(d.z,bs="tp",k=10) + ti(p.z,d.z,bs=c("tp","tp"),k=c(10,10)) +
                  s(SiteCode,bs="re"),
                 data = df_md, family = Gamma(link="log"),method="REML")
   }
@@ -2600,13 +2600,20 @@ l_md.U_mdCheio <- dlply(df_md.class,"md_class",f_md)
 ```
 
 ```{r}
-save(l_md.U_mdCheio,file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_md.U_mdCheio_semSobs.Rdata")
+save(l_md.U_mdCheio,file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_md.U_mdCheio_semSobs_tp.Rdata")
 ```
 
 ```{r}
 load("~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_md.U_mdCheio_semSobs.Rdata")
 AICctab(l_md.U_mdCheio,weights=T)
 md_U <- l_md.U_mdCheio[["gamm d|Site for each"]]
+
+appraise(md_U)
+teste <- predict.gam(md_U,se.fit = TRUE)
+
+lapply(teste,summary)
+
+gam.check(md_U)
 ```
 
 
@@ -2663,6 +2670,12 @@ grid.arrange(grobs=l_p,ncol=2,top="deviance residual ~ continuous predictors")
 ```
 
 ### observado e predito por sítio de amostragem
+
+```{r}
+Cv[1:10,1:10]
+matrix(nus, nrow = length(beta), ncol = num_beta_vecs) %>% dim
+```
+
 
 ```{r U_med predito e observado para o modelo cheio,fig.width=8, fig.height=30,eval=FALSE}
 gamm <- md_U
@@ -2850,5 +2863,29 @@ ggplot(df_resultados,aes(x=diffS_mean,y=n_nRef)) +
   theme(legend.position = "top") +
   theme_classic() +
   facet_wrap(~MN,ncol=2,scales="free")
+```
+
+
+
+
+
+###############################################
+
+
+
+```{r}
+df_resultados %>% 
+  ggplot(aes(x=p,y=d)) +
+  coord_cartesian(expand = TRUE) +
+  geom_hex(bins = 60) +
+  scale_fill_continuous(type = "viridis") +
+  geom_smooth(method="loess")
+####
+df_resultados %>% 
+  ggplot(aes(x=d)) +
+  geom_histogram(bins = 60)
+df_resultados %>% 
+  ggplot(aes(x=p)) +
+  geom_histogram(bins = 60)
 ```
 
