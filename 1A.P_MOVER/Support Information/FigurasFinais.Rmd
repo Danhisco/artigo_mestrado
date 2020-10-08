@@ -79,7 +79,7 @@ df_resultados %<>% cbind(.,df_resultados.z) %>%
 
 descrição: logOR por d e p, com curva de nível para logOR == 0 (linha contínua e preta, alpha>=0.6); curvas de níveis para sinalizar diffS (linha pontilhadas e preta, alpha<=0.4), linha pontilhada vermelha e área rachurada em preto são média e intervalo de confiança de diffS(MN==EE). 
 
-```{r figura 2 logOR diffS,echo=FALSE,include=TRUE,fig.height=5,fig.width=12}
+```{r figura 2 logOR diffS,echo=FALSE,include=TRUE,fig.height=5,fig.width=12,message=FALSE,warning=FALSE}
 ################### diffS ##############################
 # EE
 df_md <- df_resultados %>% filter(MN=="EE") %>% distinct
@@ -850,6 +850,9 @@ Gráficos diagnósticos padrão do pacote "gratia" (REF). Na primeira linha e co
 
 ## Para Discussão
 
+
+### Parâmetros de MNEI
+
 ```{r parametros MNEI discusssao, message=FALSE,warning=FALSE,fig.width=10,fig.height=4}
 #########
 # Dados #
@@ -962,3 +965,43 @@ grid.arrange(grobs=l_p,ncol=3)
 Pontos apresentam certo grau de transparência, são coloridos pelo valor de U_med que foi dividido em 9 classes (quanto mais escuro maior U_med).    
 ##### b) Gráfico de dispersão 2D:    
 Gráficos das relações parciais entre as 3 variáveis 2 a 2. Os contornos são estimados por kernel em 2 dimensões segundo a densidade de pontos na área: quanto mais contornos maior a ocorrência de valores.   
+
+
+### Scatterplot3D de MNEE: nRef ~ p  * d 
+
+```{r}
+plotclr <- brewer.pal(9,"PuBu") # get the colors
+# colornum <- cut(rank(df_resultados$p[df_resultados$MN=="EE"]), 9, labels=FALSE)
+# colcode <- plotclr[colornum]
+l_p <- list()
+# par(mfrow=c(1,3))
+l_p[[1]] <- with(filter(df_resultados,MN=="EE"),
+                 scatterplot3d(x=p,y=d,z=n_nRef,
+                               angle=-60,color=alpha("black",0.4),
+                               # main = "nRef ~ U médio * p",
+                               pch=16,type="p",zlab = "nRef",
+                               zlim=c(0,100),xlim=c(0,1)))
+```
+
+```{r}
+l_p <- list()
+l_p[[1]] <- ggplot(filter(df_resultados,MN=="EE"),aes(y=p,x=d)) +
+  geom_point(alpha=0.3) +
+  geom_density_2d(color="red") 
+  # stat_density_2d(aes(fill = ..level..), geom="polygon",alpha=0.5) +
+  # scale_fill_gradient(low="green", high="red")
+l_p[[2]] <- ggplot(filter(df_resultados,MN=="EE"),aes(y=n_nRef,x=p)) +
+  geom_point(alpha=0.3) +
+  geom_density_2d(color="red") +
+  labs(y="nRef")
+  # stat_density_2d(aes(fill = ..level..), geom="polygon",alpha=0.5) +
+  # scale_fill_gradient(low="green", high="red")
+l_p[[3]] <- ggplot(filter(df_resultados,MN=="EE"),aes(y=n_nRef,x=d)) +
+  geom_point(alpha=0.3) +
+  geom_density_2d(color="red") +
+  labs(y="nRef")
+  # stat_density_2d(aes(fill = ..level..), geom="polygon",alpha=0.5) +
+  # scale_fill_gradient(low="green", high="red")
+grid.arrange(grobs=l_p,ncol=3)
+```
+
