@@ -35,6 +35,7 @@ library(magrittr)
 library(ggplotify)
 library(gridExtra)
 library(scatterplot3d)
+library(plotly)
 library(RColorBrewer)
 library(cowplot)
 library(ggplot2); theme_set(theme_classic())
@@ -890,9 +891,9 @@ l_p[[2]] <- df_simulacao %>% mutate(legend = "theta") %>%
   annotation_logticks(sides = "l") +
   labs(y="") +
   facet_wrap(~legend)
-l_p[[3]] <- df_resultados %>% mutate(ratio_J = Ntotal /(10404*DA*p),legend = "N_sample / N_landscape") %>%
+l_p[[3]] <- df_resultados %>% mutate(ratio_J = Ntotal /(10404*DA*p),legend = "N_sample / N_landscape") %>% select(p,ratio_J,SiteCode,legend) %>% unique %>% 
   ggplot(aes(x=p,y=ratio_J)) +
-  geom_point(alpha = 1/10) +
+  geom_point(alpha = 0.8) +
   labs(x = "p",y="N_sample / N_landscape") +
   # scale_y_log10(breaks = trans_breaks("log10", function(x) 10^x),
   #             labels = trans_format("log10", math_format(10^.x))) +
@@ -900,7 +901,18 @@ l_p[[3]] <- df_resultados %>% mutate(ratio_J = Ntotal /(10404*DA*p),legend = "N_
   annotation_logticks(sides = "l") +
   labs(y="") +
   facet_wrap(~legend)
-grid.arrange(grobs=l_p,ncol=3)
+l_p[[4]] <- df_resultados %>% select(p,DA,SiteCode) %>% unique %>% mutate(legend="DA(individuals / sample area)") %>% 
+  ggplot(aes(x=p,y=DA)) +
+  geom_point(alpha = 0.8) +
+  geom_smooth(method = "loess",se=F,color="red",alpha=0.7) +
+  # labs(x = "p",y="N_sample / N_landscape") +
+  # scale_y_log10(breaks = trans_breaks("log10", function(x) 10^x),
+                # labels = trans_format("log10", math_format(10^.x))) +
+  scale_y_continuous(trans='log10') +
+  annotation_logticks(sides = "l") +
+  # labs(y="") +
+  facet_wrap(~legend)
+grid.arrange(grobs=l_p,ncol=4)
 ```
 
 ### MN==EE: nRef ~ U_med * p
@@ -1044,41 +1056,54 @@ grid.arrange(grobs=l_p,ncol=3)
 ```
 
 
-```{r}
-library(plotly)
-
-mtcars$am[which(mtcars$am == 0)] <- 'Automatic'
-mtcars$am[which(mtcars$am == 1)] <- 'Manual'
-mtcars$am <- as.factor(mtcars$am)
-
-fig <- plot_ly(mtcars, x = ~wt, y = ~hp, z = ~qsec, color = ~am, colors = c('#BF382A', '#0C4B8E'))
-fig <- fig %>% add_markers()
-fig <- fig %>% layout(scene = list(xaxis = list(title = 'Weight'),
-                     yaxis = list(title = 'Gross horsepower'),
-                     zaxis = list(title = '1/4 mile time')))
-
-fig
-
+```{r, warning=F,message=F}
 df_resultados$factor_cong <- NA
-df_resultados[which(df_resultados$n_nRef>50 & abs(df_resultados$diffS_mean)<0.25),"factor_cong"] <- "OK"
-df_resultados[-which(df_resultados$n_nRef>50 & abs(df_resultados$diffS_mean)<0.25),"factor_cong"] <- "ruim"
+df_resultados[which(df_resultados$n_nRef>50 & abs(df_resultados$diffS_mean)<0.25),"factor_cong"] <- "nRef>50 & |diffS|>0.25"
+df_resultados[-which(df_resultados$n_nRef>50 & abs(df_resultados$diffS_mean)<0.25),"factor_cong"] <- "otherwise"
 df_resultados$factor_cong <- factor(df_resultados$factor_cong)
 l_p <- list()
 l_p[[1]] <- plot_ly(filter(df_resultados,MN=="EI"),
                     x = ~p, y = ~diffS_mean, z = ~n_nRef,
-                    color= ~factor_cong, colors = c('#BF382A', '#0C4B8E')) %>% 
+                    color= ~factor_cong, colors = c('#BF382A', '#0C4B8E'),
+                    ylim=range(df_resultados$diffS_mean)) %>% 
   add_markers() %>% 
   layout(scene=list(xaxis = list(title="p"),
                     yaxis = list(title="vies Sobs"),
                     zaxis = list(title="# SADs não refutadas")))
 l_p[[1]]
+```
 
-
-l_p[[1]] <- with(filter(df_resultados,MN=="EI"),
-                 scatterplot3d(y=diffS_mean,x=p,z=n_nRef,
-                               angle=-60,color=alpha("black",0.4),
-                               # main = "nRef ~ U médio * p",
-                               pch=16,type="p",zlab = "nRef",
-                               zlim=c(0,100),ylim=c(0,1)))
+```{r}
+df_plot <- df_resultados %>% 
+  mutate(J_M = 10404 * DA * p,
+         L_plot = sqrt( 10000 * (Ntotal/DA) ),
+         m = d * (1 - exp( -sqrt(2) * (L_plot/d) ) ) / ( sqrt(2) * L_plot ), #eq 4
+         m_ = m * p / ( 1 - (1-p)*m ),#eq 5
+         I =  m_ * (Ntotal-1)/(1-m_), #Etienne 2005
+         theta = U_med * ( J_M - 1 ) / (1-U_med) ) %>% 
+  filter(MN=="EI")
+df_plot$factor_p <- NA
+df_plot[df_plot$p>0.35,"factor_p"] <- "p > 0.35"
+df_plot[df_plot$p<0.35,"factor_p"] <- "p < 0.35"
+df_plot$factor_cong <- factor(df_plot$factor_cong)
+l_p[[2]] <- ggplot(df_plot,aes(y=m_,x=theta)) +
+  scale_x_continuous(trans = "log10") +
+  scale_y_continuous(trans = "log10") +
+  geom_point(alpha=0.3) + #,aes(color=factor_cong) 
+  geom_density_2d(color="red") +
+  # scale_color_manual(values=c('#BF382A', '#0C4B8E')) +
+  facet_grid(factor_cong~factor_p)
+l_p[[2]]
+# 
+# 
+# l_p[[3]] <- plot_ly(df_plot,
+#                     x = ~U_med, y = ~d, z = ~p) %>% 
+#   add_markers() %>% 
+#   layout(scene=list(xaxis = list(title="U_med"),
+#                     yaxis = list(title="d"),
+#                     zaxis = list(title="p")))
+# l_p[[3]]
+# 
+# plot(density(df_plot$p),xlim=c(0,1))
 ```
 
