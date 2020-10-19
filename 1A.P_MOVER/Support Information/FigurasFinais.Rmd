@@ -539,7 +539,7 @@ Histograma 2D do número de ocorrência por viés na riqueza estimada (diffS) e 
 
 ## Sessão Resultados
 
-```{r log OR fig 34,fig.width=8,fig.height=8}
+```{r log OR fig 33 log OR atualizado,fig.height=5,fig.width=12,warning=FALSE,message=FALSE}
 ################### Pr(nRef) ###################
 load("~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_mdPredict__nRef.Rdata")
 df_EE <- l_mdPredict[["EE"]]
@@ -612,7 +612,7 @@ l_p[[1]] <- ggplot(df_plot1,aes(x=p,y=d,fill=lower.logOR_EE.EI)) +
   stat_subset(aes(subset = lower.CL >= v_range[1] & lower.CL <= v_range[2]),
               alpha=0.5,color="black",size=0.3,shape=3) +
   facet_wrap(~legend1,ncol=1)
-df_plot1$legend2 <- "median"
+df_plot1$legend1 <- "median"
 l_p[[2]] <- ggplot(df_plot1,aes(x=p,y=d,fill=logOR_EE.EI)) +
   coord_cartesian(expand = FALSE) + 
   geom_tile() + theme_classic() +
@@ -663,74 +663,6 @@ l_p[[3]] <- ggplot(df_plot1,aes(x=p,y=d,fill=upper.logOR_EE.EI)) +
               alpha=0.5,color="black",size=0.3,shape=3) +
   facet_wrap(~legend1,ncol=1)
 grid.arrange(grobs=l_p,ncol=3)
-# 
-# labels_IC2 <- c(lower.logOR_EE.EI="IC 5%", upper.logOR_EE.EI="IC 95%")
-# df_ <- bind_rows(mutate(rename(df_plot1[,c("lower.logOR_EE.EI","KS_f_lower.logOR","p","d")],
-#                                logOR=lower.logOR_EE.EI,KS_f=KS_f_lower.logOR),
-#                         IC_class = "lower.logOR_EE.EI"),
-#                  mutate(rename(df_plot1[,c("upper.logOR_EE.EI","KS_f_upper.logOR","p","d")],
-#                                logOR=upper.logOR_EE.EI,KS_f=KS_f_upper.logOR),
-#                         IC_class = "upper.logOR_EE.EI"))
-# l_p[[2]] <- df_ %>%
-#   ggplot(aes(x=p,y=d,fill=logOR,z=logOR)) +
-#   coord_cartesian(expand = FALSE) + 
-#   geom_tile() + 
-#   theme_classic() +
-#   scale_fill_distiller(limits = c(v_limits[1],v_limits[2]),
-#                        palette = "Spectral") +
-#   theme(legend.position='none')  +
-#   facet_wrap(~IC_class,ncol=2,labeller = labeller(IC_class = labels_IC2)) +
-#   # stat_subset(aes(subset=is.na(KS_f)),shape=3,alpha=0.07) +
-#   geom_contour(aes(z=logOR),alpha=0.4, col="black",
-#                breaks = br) +
-#   geom_text_contour(aes(z=logOR),stroke=0.2,
-#                     breaks = br,
-#                     rotate = FALSE,
-#                     size=2.7)
-
-#### com rachurado
-# l_p[[3]] <- ggplot(df_plot1,aes(x=p,y=d,fill=logOR_EE.EI)) +
-#   coord_cartesian(expand = FALSE) + 
-#   geom_tile() + theme_classic() +
-#   scale_fill_distiller(limits = c(v_limits[1],v_limits[2]),
-#                        palette = "Spectral") +
-#   theme(legend.position="top",
-#         legend.title = element_blank()) +
-#   stat_subset(aes(subset=is.na(KS_f_logOR)),shape=3,alpha=0.1) +
-#   geom_contour(aes(z=logOR_EE.EI),alpha=0.3, col="black",
-#                breaks = br) +
-#   geom_text_contour(aes(z=logOR_EE.EI),stroke=0.2,
-#                     breaks = br,
-#                     rotate = FALSE,
-#                     size=2.7)
-# labels_IC2 <- c(lower.logOR_EE.EI="IC 5%", upper.logOR_EE.EI="IC 95%")
-# df_ <- bind_rows(mutate(rename(df_plot1[,c("lower.logOR_EE.EI","KS_f_lower.logOR","p","d")],
-#                                logOR=lower.logOR_EE.EI,KS_f=KS_f_lower.logOR),
-#                         IC_class = "lower.logOR_EE.EI"),
-#                  mutate(rename(df_plot1[,c("upper.logOR_EE.EI","KS_f_upper.logOR","p","d")],
-#                                logOR=upper.logOR_EE.EI,KS_f=KS_f_upper.logOR),
-#                         IC_class = "upper.logOR_EE.EI"))
-# l_p[[4]] <- df_ %>%
-#   ggplot(aes(x=p,y=d,fill=logOR,z=logOR)) +
-#   coord_cartesian(expand = FALSE) + 
-#   geom_tile() + 
-#   theme_classic() +
-#   scale_fill_distiller(limits = c(v_limits[1],v_limits[2]),
-#                        palette = "Spectral") +
-#   theme(legend.position='none')  +
-#   facet_wrap(~IC_class,ncol=2,labeller = labeller(IC_class = labels_IC2)) +
-#   stat_subset(aes(subset=is.na(KS_f)),shape=3,alpha=0.03) +
-#   geom_contour(aes(z=logOR),alpha=0.4, col="black",
-#                breaks = br) +
-#   geom_text_contour(aes(z=logOR),stroke=0.2,
-#                     breaks = br,
-#                     rotate = FALSE,
-#                     size=2.7)
-# ##### arrange
-# lay_mat <- rbind(c(1,3),
-#                  c(1,3),
-#                  c(2,4))
-# grid.arrange(grobs = l_p, layout_matrix = lay_mat,top="log Odds Ratio (EE/EI)")
 ```
 
 ### Figura 3.3 - legenda:
