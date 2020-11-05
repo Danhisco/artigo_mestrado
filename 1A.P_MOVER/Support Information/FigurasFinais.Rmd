@@ -1156,3 +1156,20 @@ l_p[[4]] <- plot_ly(filter(df_resultados,MN=="EE"),
 l_p[[4]]
 ```
 
+### Figuras Para Texto
+
+Quando nRef < 50 onde o ponto está no espaço (U,p,d)?
+
+```{r}
+df_plot <- df_resultados %>% filter(MN=="EE") %>% distinct()
+df_plot$factor_nRef <- "boa_cong"
+df_plot$factor_nRef[df_plot$n_nRef < 50] <- "nRef<50"
+
+plot_ly(df_plot,
+        x=~p,y=~d,z=~U_med,
+        color= ~factor_nRef, colors = c('#BF382A', '#0C4B8E')) %>% 
+  add_markers(opacity = 0.5)
+```
+
+
+Não há pontos com boa congruência (>50 SADs preditas não refutadas)
