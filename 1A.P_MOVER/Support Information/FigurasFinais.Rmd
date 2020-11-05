@@ -74,6 +74,12 @@ df_resultados %<>% cbind(.,df_resultados.z) %>%
   select(-k_1,-k_1.z)
 ```
 
+
+```{r}
+df_resultados$U_med %>% range
+```
+
+
 # Figura 1 - Sessão Material e Métodos
 
 # Figura 2 - Sessão de Resultados
@@ -856,7 +862,7 @@ Gráficos diagnósticos padrão do pacote "gratia" (REF). Na primeira linha e co
 
 ### Parâmetros de MNEI
 
-```{r parametros MNEI discusssao, message=FALSE,warning=FALSE,fig.width=10,fig.height=4}
+```{r parametros MNEI discusssao, message=FALSE,warning=FALSE,fig.width=12,fig.height=4}
 #########
 # Dados #
 #########
@@ -914,7 +920,7 @@ l_p[[4]] <- df_resultados %>% select(p,DA,SiteCode) %>% unique %>% mutate(legend
   annotation_logticks(sides = "l") +
   # labs(y="") +
   facet_wrap(~legend)
-grid.arrange(grobs=l_p,ncol=4)
+grid.arrange(grobs=l_p,ncol=3)
 ```
 
 ### MN==EE: nRef ~ U_med * p
@@ -936,13 +942,13 @@ grid.arrange(grobs=l_p,ncol=4)
 # ggMarginal(l_p, type = "boxplot", fill="transparent",margins = "x")
 # # 3)
 plotclr <- brewer.pal(9,"PuBu") # get the colors
-colornum <- cut(rank(df_resultados$U_med[df_resultados$MN=="EE"]), 9, labels=FALSE)
+colornum <- cut(rank(df_resultados$U_med[df_resultados$MN=="EI"]), 9, labels=FALSE)
 colcode <- plotclr[colornum]
 l_p <- list()
 # par(mfrow=c(1,3))
-l_p[[1]] <- with(filter(df_resultados,MN=="EE"),scatterplot3d(x=U_med,y=p,z=n_nRef,
+l_p[[1]] <- with(filter(df_resultados,MN=="EI"),scatterplot3d(x=U_med,y=d,z=n_nRef,
                                              angle=50,color=alpha(colcode,0.4),
-                                             main = "nRef ~ U médio * p",
+                                             # main = "nRef ~ U médio * p",
                                              pch=16,type="p",zlab = "nRef",xlab = "U médio"))
 ```
 
@@ -1089,7 +1095,7 @@ df_plot[df_plot$p>0.35,"factor_p"] <- "p > 0.35"
 df_plot[df_plot$p<0.35,"factor_p"] <- "p < 0.35"
 df_plot$factor_cong <- factor(df_plot$factor_cong)
 l_p[[2]] <- ggplot(df_plot,aes(y=m_,x=theta)) +
-  theme_classic() +
+  theme_bw() +
   scale_x_continuous(trans = "log10") +
   scale_y_continuous(trans = "log10") +
   geom_point(alpha=0.3) + #,aes(color=factor_cong) 
@@ -1097,7 +1103,7 @@ l_p[[2]] <- ggplot(df_plot,aes(y=m_,x=theta)) +
   # scale_color_manual(values=c('#BF382A', '#0C4B8E')) +
   facet_grid(factor_cong~factor_p)
 l_p[[2]]
-ggplotly(l_p[[2]], dynamicTicks = TRUE)
+# ggplotly(l_p[[2]], dynamicTicks = TRUE)
 # 
 # 
 # l_p[[3]] <- plot_ly(df_plot,
@@ -1109,5 +1115,44 @@ ggplotly(l_p[[2]], dynamicTicks = TRUE)
 # l_p[[3]]
 # 
 # plot(density(df_plot$p),xlim=c(0,1))
+```
+Para p > 0.35: onde a boa congruência de MNEI ocorre em distâncias intermediárias e quando os valores de theta são máximos para 
+
+```{r}
+l_p[[3]] <- ggplot(df_plot,aes(y=n_nRef,x=U_med,color=factor_cong)) +
+  theme_bw() +
+  # scale_x_continuous(trans = "log10") +
+  # scale_y_continuous(trans = "log10") +
+  geom_point(alpha=0.3) + #,aes(color=factor_cong) 
+  # geom_density_2d(color="red") +
+  scale_color_manual(values=c('#BF382A', '#0C4B8E'))
+  # facet_grid(factor_cong~factor_p)
+l_p[[3]]
+```
+
+
+
+
+
+```{r}
+l_p[[3]] <- plot_ly(filter(df_resultados,MN=="EI"),
+                    x = ~p, y = ~d, z = ~n_nRef,
+                    color= ~factor_cong, colors = c('#BF382A', '#0C4B8E')) %>% 
+                    # ylim=range(df_resultados$diffS_mean)) %>% 
+  add_markers(opacity = 0.5) %>% 
+  layout(scene=list(xaxis = list(title="p"),
+                    yaxis = list(title="d"),
+                    zaxis = list(title="nRef")))
+l_p[[3]]
+
+l_p[[4]] <- plot_ly(filter(df_resultados,MN=="EE"),
+                    x = ~p, y = ~d, z = ~n_nRef,
+                    color= ~factor_cong, colors = c('#BF382A', '#0C4B8E')) %>% 
+                    # ylim=range(df_resultados$diffS_mean)) %>% 
+  add_markers(opacity = 0.5) %>% 
+  layout(scene=list(xaxis = list(title="p"),
+                    yaxis = list(title="d"),
+                    zaxis = list(title="nRef")))
+l_p[[4]]
 ```
 
