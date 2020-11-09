@@ -1069,19 +1069,6 @@ df_resultados$factor_cong <- NA
 df_resultados[which(df_resultados$n_nRef>50 & abs(df_resultados$diffS_mean)<0.25),"factor_cong"] <- "nRef>50 & |diffS|>0.25"
 df_resultados[-which(df_resultados$n_nRef>50 & abs(df_resultados$diffS_mean)<0.25),"factor_cong"] <- "otherwise"
 df_resultados$factor_cong <- factor(df_resultados$factor_cong)
-l_p <- list()
-l_p[[1]] <- plot_ly(filter(df_resultados,MN=="EI"),
-                    x = ~p, y = ~diffS_mean, z = ~n_nRef,
-                    color= ~factor_cong, colors = c('#BF382A', '#0C4B8E'),
-                    ylim=range(df_resultados$diffS_mean)) %>% 
-  add_markers() %>% 
-  layout(scene=list(xaxis = list(title="p"),
-                    yaxis = list(title="vies Sobs"),
-                    zaxis = list(title="# SADs não refutadas")))
-l_p[[1]]
-```
-
-```{r}
 df_plot <- df_resultados %>% 
   mutate(J_M = 10404 * DA * p,
          L_plot = sqrt( 10000 * (Ntotal/DA) ),
@@ -1094,21 +1081,54 @@ df_plot$factor_p <- NA
 df_plot[df_plot$p>0.35,"factor_p"] <- "p > 0.35"
 df_plot[df_plot$p<0.35,"factor_p"] <- "p < 0.35"
 df_plot$factor_cong <- factor(df_plot$factor_cong)
-l_p[[2]] <- ggplot(df_plot,aes(y=m_,x=theta)) +
+l_p <- list()
+l_p[[1]] <- plot_ly(df_plot,
+                    x = ~p, y = ~d, z = ~U_med,
+                    color= ~factor_cong, colors = c('#BF382A', '#0C4B8E'),
+                    ylim=range(df_resultados$diffS_mean)) %>% 
+  add_markers() %>% 
+  layout(scene=list(xaxis = list(title="p"),
+                    yaxis = list(title="d"),
+                    zaxis = list(title="U")))
+# l_p[[1]]
+l_p[[2]] <- plot_ly(df_plot,
+                    x = ~p, y = ~theta, z = ~m_,
+                    color= ~factor_cong, colors = c('#BF382A', '#0C4B8E')) %>% 
+  add_markers() %>% 
+  layout(scene=list(xaxis = list(title="p"),
+                    yaxis = list(title="theta",type="log"),
+                    zaxis = list(title="m_",type="log")))
+l_p[[2]]
+df_plot %>% 
+  select(p,factor_cong,theta,m_) %>% 
+  gather(par_class,par_value,theta:m_) %>% 
+  ggplot(aes(x=p,y=par_value,color=factor_cong)) +
+  geom_point(alpha=0.8) +
+  # scale_x_continuous(trans = "log10") +
+  scale_y_continuous(trans = "log10") +
+  scale_color_manual(values=c('#BF382A', '#0C4B8E')) +
+  theme(legend.position="bottom") +
+  facet_wrap(~par_class,ncol=2,scales="free")
+```
+
+```{r}
+l_p[[2]] <- ggplot(df_plot,aes(y=m_,x=theta,color=factor_cong)) +
   theme_bw() +
   scale_x_continuous(trans = "log10") +
   scale_y_continuous(trans = "log10") +
-  geom_point(alpha=0.3) + #,aes(color=factor_cong) 
-  geom_density_2d(color="red") +
-  # scale_color_manual(values=c('#BF382A', '#0C4B8E')) +
-  facet_grid(factor_cong~factor_p)
+  geom_point(alpha=0.4) +
+  aes(color=factor_cong)  +
+  geom_density_2d(color="black",alpha=0.4) +
+  scale_color_manual(values=c('#BF382A', '#0C4B8E')) +
+  theme(legend.position = "bottom") +
+  facet_grid(~factor_p)
 l_p[[2]]
 # ggplotly(l_p[[2]], dynamicTicks = TRUE)
 # 
 # 
 # l_p[[3]] <- plot_ly(df_plot,
-#                     x = ~U_med, y = ~d, z = ~p) %>% 
-#   add_markers() %>% 
+#                     x = ~U_med, y = ~d, z = ~p) %>%
+#   add_markers() %>%
 #   layout(scene=list(xaxis = list(title="U_med"),
 #                     yaxis = list(title="d"),
 #                     zaxis = list(title="p")))
