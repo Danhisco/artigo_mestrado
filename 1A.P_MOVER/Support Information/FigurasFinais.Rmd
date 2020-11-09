@@ -1069,10 +1069,10 @@ df_resultados$factor_cong %>% levels
 
 ```{r, warning=F,message=F}
 df_resultados$factor_cong <- NA
-df_resultados[which(df_resultados$n_nRef>50 & abs(df_resultados$diffS_mean)<0.25),"factor_cong"] <- "nRef>50 & |diffS|>0.25"
+df_resultados[which(df_resultados$n_nRef>50 & abs(df_resultados$diffS_mean)<0.25),"factor_cong"] <- "good fit"
 df_resultados[-which(df_resultados$n_nRef>50 & abs(df_resultados$diffS_mean)<0.25),"factor_cong"] <- "false positive"
-df_resultados[which(df_resultados$diffS_mean>0.25),"factor_cong"] <- "overestimate S"
-df_resultados[which(df_resultados$diffS_mean<0.25),"factor_cong"] <- "underestimate S"
+df_resultados[which(df_resultados$diffS_mean>0.25 & df_resultados$factor_cong == "false positive"),"factor_cong"] <- "overestimate S"
+df_resultados[which(df_resultados$diffS_mean<0.25 & df_resultados$factor_cong == "false positive"),"factor_cong"] <- "underestimate S"
 df_resultados$factor_cong <- factor(df_resultados$factor_cong)
 df_plot <- df_resultados %>% 
   mutate(J_M = 10404 * DA * p,
@@ -1087,7 +1087,7 @@ df_plot[df_plot$p>0.35,"factor_p"] <- "p > 0.35"
 df_plot[df_plot$p<0.35,"factor_p"] <- "p < 0.35"
 df_plot$factor_cong <- factor(df_plot$factor_cong)
 
-colors_ <- c("#00b506","#ff0008","#e3d50b","#e3d50b")
+colors_ <- c("#00b506","#ff0008","#e3d50b") #,"#e3d50b"
 l_p <- list()
 # l_p[[1]] <- plot_ly(df_plot,
 #                     x = ~p, y = ~d, z = ~U_med,
@@ -1113,13 +1113,13 @@ df_plot %>%
   geom_point(alpha=0.8) +
   # scale_x_continuous(trans = "log10") +
   scale_y_continuous(trans = "log10") +
-  scale_color_manual(values=colors_) +
+  # scale_color_manual(values=colors_) +
   theme(legend.position="bottom") +
   facet_wrap(~par_class,ncol=2,scales="free")
 ```
 
 ```{r}
-l_p[[2]] <- ggplot(df_plot,aes(y=m_,x=theta)) + #,color=factor_cong
+l_p[[2]] <- ggplot(df_plot,aes(y=m_,x=theta)) + #
   theme_bw() +
   scale_x_continuous(trans = "log10") +
   scale_y_continuous(trans = "log10") +
@@ -1130,7 +1130,7 @@ l_p[[2]] <- ggplot(df_plot,aes(y=m_,x=theta)) + #,color=factor_cong
   theme(legend.position = "bottom") +
   facet_grid(factor_cong~factor_p)
 l_p[[2]]
-# ggplotly(l_p[[2]], dynamicTicks = TRUE)
+ggplotly(l_p[[2]])
 # 
 # 
 # l_p[[3]] <- plot_ly(df_plot,
