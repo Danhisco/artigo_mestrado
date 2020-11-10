@@ -1063,18 +1063,24 @@ l_p[[3]] <- ggplot(filter(df_resultados,MN=="EI"),aes(y=n_nRef,x=d)) +
 grid.arrange(grobs=l_p,ncol=3)
 ```
 ```{r}
-df_resultados$factor_cong %>% levels
+df_plot$factor_cong %>% levels
+df_plot[is.na(df_plot$factor_cong),]
+df_plot %>% filter(factor_cong == "false positive")
+
+df_plot[which(df_plot$n_nRef>50 & abs(df_plot$diffS_mean)<0.25),] # 
+df_plot[which(df_plot$n_nRef>50 & abs(df_plot$diffS_mean)<0.25),] # 
 ```
 
 
-```{r, warning=F,message=F}
-df_resultados$factor_cong <- NA
-df_resultados[which(df_resultados$n_nRef>50 & abs(df_resultados$diffS_mean)<0.25),"factor_cong"] <- "good fit"
-df_resultados[-which(df_resultados$n_nRef>50 & abs(df_resultados$diffS_mean)<0.25),"factor_cong"] <- "false positive"
-df_resultados[which(df_resultados$diffS_mean>0.25 & df_resultados$factor_cong == "false positive"),"factor_cong"] <- "overestimate S"
-df_resultados[which(df_resultados$diffS_mean<0.25 & df_resultados$factor_cong == "false positive"),"factor_cong"] <- "underestimate S"
-df_resultados$factor_cong <- factor(df_resultados$factor_cong)
-df_plot <- df_resultados %>% 
+```{r, warning=F,message=F,fig.width=10}
+df_plot <- filter(df_resultados,MN=="EI") %>% distinct()
+df_plot$factor_cong <- "refuted"
+df_plot[which(df_plot$n_nRef>=50 & abs(df_plot$diffS_mean)<=0.25),"factor_cong"] <- "good fit"
+df_plot[which(df_plot$diffS_mean>0.25),"factor_cong"] <- "overestimate S"
+df_plot[which(df_plot$diffS_mean< -0.25),"factor_cong"] <- "underestimate S"
+# df_plot[which(df_plot$n_nRef>50 & abs(df_plot$diffS_mean)>0.25),"factor_cong"] <- "false positive"
+df_plot$factor_cong <- factor(df_plot$factor_cong,levels=c("overestimate S","good fit","underestimate S","refuted"))
+df_plot <- df_plot %>% 
   mutate(J_M = 10404 * DA * p,
          L_plot = sqrt( 10000 * (Ntotal/DA) ),
          m = d * (1 - exp( -sqrt(2) * (L_plot/d) ) ) / ( sqrt(2) * L_plot ), #eq 4
@@ -1114,10 +1120,25 @@ l_p <- df_plot %>%
     geom_point(alpha=0.5) +
     scale_y_continuous(trans = "log10") +
     # ggtitle(label = head(df$legenda,n=1))
-    facet_wrap(~factor_cong,ncol=3)
+    facet_wrap(~factor_cong,nrow=1)
   })
 l_p[[1]] <- l_p[[1]] + labs(y="m'")
 l_p[[2]] <- l_p[[2]] + labs(y="theta")
+# names(l_p)
+grid.arrange(grobs=l_p,ncol=1)
+
+l_p <- df_plot %>% 
+  select(p,factor_cong,U_med,d) %>% 
+  gather(par_class,par_value,U_med:d) %>%
+  dlply("par_class",function(df){
+    ggplot(df,aes(x=p,y=par_value)) +
+    geom_point(alpha=0.5) +
+    # scale_y_continuous(trans = "log10") +
+    # ggtitle(label = head(df$legenda,n=1))
+    facet_wrap(~factor_cong,nrow=1)
+  })
+l_p[[1]] <- l_p[[1]] + labs(y="d")
+l_p[[2]] <- l_p[[2]] + labs(y="U")
 # names(l_p)
 grid.arrange(grobs=l_p,ncol=1)
 ```
