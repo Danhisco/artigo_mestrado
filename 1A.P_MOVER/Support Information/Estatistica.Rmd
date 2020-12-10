@@ -7,7 +7,7 @@ output:
     toc: true
     toc_depth: 5
 editor_options: 
-  chunk_output_type: inline
+  chunk_output_type: console
 ---
 
 <style>
@@ -2349,7 +2349,7 @@ l_p[[1]] <- ggplot(df_U,aes(x=k,y=U_med)) +
 l_p[[2]] <- ggplot(df_U,aes(x=p,y=U_med)) +
   geom_point(alpha=0.3) +
   geom_smooth(method = "loess",se = FALSE,color="red",alpha=0.5) +
-  facet_wrap(~k,ncol=5,scales = "free")
+  facet_wrap(~k,ncol=5)
 l_p[[3]] <- ggplot(df_U,aes(x=d,y=U_med)) +
   geom_point(alpha=0.3,aes(color=p)) +
   geom_smooth(method = "loess",se = FALSE,color="red",alpha=0.5)
@@ -2361,41 +2361,45 @@ grid.arrange(grobs=l_p,
 
 
 ```{r,eval=FALSE}
-ggplot(df_U,aes(x=df_U$U_med)) +
+ggplot(df_U,aes(x=U_med)) +
   geom_histogram(bins=60)  + labs(x="",title = "Estimated Speciation Rate (U)")
 ```
 
 
 __Figura 4.2__ Padrões gerais por Sítio de Amostragem
 
-```{r fig 42,eval=FALSE,echo=FALSE,fig.width=8, fig.height=27}
+```{r fig 42,eval=FALSE,echo=FALSE,fig.width=8, fig.height=27,warning=FALSE,message=FALSE}
 df_plot <- df_U %>%
   mutate(title = paste0(SiteCode," p=",round(p,3))) %>% arrange(p)
 df_plot$title <- factor(df_plot$title,levels = unique(df_plot$title))
-df_plot %>% ggplot(aes(x=d,y=U_med)) +
+df_plot %>% ggplot(aes(x=d,y=log(U_med))) +
   geom_smooth(method = "loess",se = FALSE,color="red",alpha=0.5) +
   geom_point(alpha=0.5) + 
-  facet_wrap(~title,ncol=5,scales="free")
+  facet_wrap(~title,ncol=5) #,scales="free"
 ```
 
-```{r eval=FALSE}
-df_resultados %>% ggplot(aes(x=log_Sobs,y=U_med)) +
-  geom_point() + geom_smooth(method="lm")
+```{r eval=FALSE,message=FALSE,warning=FALSE}
+df_U %>% ggplot(aes(x=log_Sobs,y=log(U_med))) +
+  geom_point() + geom_smooth(method="loess",se = FALSE)
 ```
   
 ## Efeito de log(Sobs)
 
+```{r}
+ggplot(df_U,aes(x=S_obs)) +
+  geom_histogram(bins=60)  + labs(x="",title = "Species Richness")
+```
 
 
 ```{r}
 df_md <- df_resultados %>% filter(MN=="EE") %>% distinct()
 glmer_U <- glmer(U_med ~ log_Sobs + (1|SiteCode),data=df_md,family = Gamma(link="log"))
-summary(glmer_U)
 ```
 
 ```{r}
 predict_y <- exp(fixef(glmer_U)[1] + fixef(glmer_U)[2] * df_md$log_Sobs)
 plot(predict_y ~ df_md$log_Sobs)
+# plot(glmer_U)
 ```
 
 
@@ -2416,7 +2420,7 @@ df_ranef %>%
   facet_wrap(~parameter_class,scales="free",ncol=3)
 ```
 
-```{r}
+```{r message=FALSE,warning=FALSE}
 df_pred <- cbind(glmer_U@frame,
                  predictInterval(glmer_U,type = "linear.prediction",level = 0.95))
 df_pred %>% mutate(fit_response = exp(fit)) %>% 
@@ -2494,6 +2498,7 @@ md_ <- gam(U_med ~ log_Sobs.z +
 # dados
 df_md <- df_resultados %>% filter(MN=="EE") %>% 
   distinct()
+df_md$U_med <- log(df_md$U_med)
 df_md.class <- data.frame(md_class=c("tp","cr","cc","ps","gp"))
 # função
 f_md <- function(model_class){
@@ -2539,6 +2544,7 @@ load("~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_md.U_gamEstu
 
 ```{r}
 AICctab(l_md.U_gamEstudo,weights=TRUE)
+md_U <- l_md.U_gamEstudo[["cr"]]
 ```
 
 
@@ -2611,7 +2617,7 @@ md_U <- l_md.U_mdCheio[["gamm d|Site for each"]]
 appraise(md_U)
 teste <- predict.gam(md_U,se.fit = TRUE)
 
-lapply(teste,summary)
+lapply(lapply(teste,exp),summary)
 
 gam.check(md_U)
 ```
@@ -2631,8 +2637,8 @@ l_md.U_comSobs <- l_md.U_mdCheio
 # l_md.U_comSobs %>% length()
 
 ## cr sem Sobs penalização comum 
-load(file="/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_md_U_gammCheio.Rdata")
-md_U.cr <- l_md_U_gammCheio[[8]]
+# load(file="/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_md_U_gammCheio.Rdata")
+# md_U.cr <- l_md_U_gammCheio[[8]]
 
 ## AICctab
 # AICctab(l_md.U_semSobs,weights=T)
@@ -2643,25 +2649,29 @@ md_U_comSobs<- l_md.U_comSobs[["gamm d|Site common"]]
 ## graf diag
 gratia::appraise(md_U_semSobs)
 gratia::appraise(md_U_comSobs)
-gratia::appraise(md_U.cr)
+# gratia::appraise(md_U.cr)
 
 
 ## summary
 summary(md_U_semSobs)
 summary(md_U_comSobs)
-summary(md_U.cr)
+# summary(md_U.cr)
 
 
 ## melhor modelo
-AICctab(md_U_semSobs,md_U_comSobs,md_U.cr,weights=TRUE)
+AICctab(md_U_semSobs,md_U_comSobs,weights=TRUE) #,md_U.cr
+```
+```{r}
+gratia::appraise(md_U_semSobs)
+gratia::appraise(md_U_comSobs)
 ```
 
 
 ```{r warning=FALSE,message=FALSE}
-df_diag <- augment(md_U)
+df_diag <- augment(md_U_semSobs)
 l_p <- list()
 l_p[[1]] <- ggplot(df_diag, aes(x=p.z,y=.resid)) +
-  geom_smooth(method="loess") +
+  geom_smooth(method="loess") +x
   geom_point(alpha=0.3)
 l_p[[2]] <- ggplot(df_diag, aes(x=d.z,y=.resid)) +
   geom_smooth(method="loess") +
