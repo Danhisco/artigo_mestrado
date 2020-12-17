@@ -2589,9 +2589,6 @@ E todos os itens da lista voltam em branco
 
 Mesmo sem paralelizar quando tudo acaba o Rstudio quebra usando o dlply
 
-Mesmo usando
-
-
 
 ```{r}
 l_md <- list()
@@ -2714,6 +2711,19 @@ gam.check(md_U)
 
 __comparação com e sem Sobs___
 
+```{r}
+## com Sobs
+load("~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_md_log10.U_gamEstudo.Rdata")
+md_U <- l_md_log10.U_gamEstudo[["cr"]]
+## sem Sobs
+md_U_sSobs <- gam(log10_U ~ 
+                 s(d.z,bs="cr",k=10) + s(p.z,bs="cr",k=10) + ti(d.z,p.z,bs=c("cr","cr"),k=c(10,10)) +
+                 s(SiteCode,bs="re") + s(d.z,by=SiteCode,bs="cr",m=1,k=10),
+                data = df_U, family=gaussian,method = "REML")
+```
+
+
+
 ```{r eval=FALSE}
 # dados
 ## sem Sobs
@@ -2750,6 +2760,7 @@ summary(md_U_comSobs)
 ## melhor modelo
 AICctab(md_U_semSobs,md_U_comSobs,weights=TRUE) #,md_U.cr
 ```
+
 ```{r}
 gratia::appraise(md_U_semSobs)
 gratia::appraise(md_U_comSobs)
@@ -2775,13 +2786,19 @@ Cv[1:10,1:10]
 matrix(nus, nrow = length(beta), ncol = num_beta_vecs) %>% dim
 ```
 
+Pré requisitos para obter a distribuição a posteriori
 
 ```{r U_med predito e observado para o modelo cheio,fig.width=8, fig.height=30,eval=FALSE}
 gamm <- md_U
+broom::augment(lm(c(1:100) ~ c(100:1))) %>% names
+lm(df_U$log10_U ~ gamm$y)
+
 # dados
-df_ <- broom::augment(gamm)
+# df_ <- broom::augment(gamm)
+df_ <- cbind(fit = gamm$fitted.values,
+             gamm$model)
 beta <- coef(gamm)
-V <- vcov(gamm)
+V <- vcov.gam(gamm)
 ##  simulação de parâmetros
 num_beta_vecs <- 10000
 Cv <- chol(V)
