@@ -72,6 +72,10 @@ df_resultados.z <- as.data.frame(apply(df_resultados[,c("p","Ntotal","log_Sobs",
 names(df_resultados.z) <- sapply(names(df_resultados.z), function(x) paste0(x,".z"))
 df_resultados %<>% cbind(.,df_resultados.z) %>% 
   select(-k_1,-k_1.z)
+###############
+df_U <- df_resultados %>% filter(MN=="EE") %>% distinct %>% 
+  mutate(log10_Sobs = log10(S_obs),
+         log10_U = log10(U_med))
 ```
 
 
@@ -2341,9 +2345,6 @@ __Figura 4.1__ Padrões Gerais
     
     
 ```{r U padroes gerais,eval=FALSE,echo=FALSE,fig.height=5,fig.width=10,warning=F,message=F}
-df_U <- df_resultados %>% filter(MN=="EE") %>% distinct %>% 
-  mutate(log10_Sobs = log10(S_obs),
-         log10_U = log10(U_med))
 l_p <- list()
 l_p[[1]] <- ggplot(df_U,aes(x=U_med)) +
   geom_histogram(bins=60)
@@ -2715,12 +2716,38 @@ __comparação com e sem Sobs___
 ## com Sobs
 load("~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_md_log10.U_gamEstudo.Rdata")
 md_U <- l_md_log10.U_gamEstudo[["cr"]]
+# save(md_U_sSobs,file = "~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/md_U_sSobs.Rdata")
 ## sem Sobs
-md_U_sSobs <- gam(log10_U ~ 
-                 s(d.z,bs="cr",k=10) + s(p.z,bs="cr",k=10) + ti(d.z,p.z,bs=c("cr","cr"),k=c(10,10)) +
+md_U_offset.Sobs <- gam(log10_U ~ offset(log10_Sobs) +
+                 s(d.z,bs="cr",k=10,m=1) + s(p.z,bs="cr",k=10,m=1) + ti(d.z,p.z,bs=c("cr","cr"),k=c(10,10),m=1) +
                  s(SiteCode,bs="re") + s(d.z,by=SiteCode,bs="cr",m=1,k=10),
                 data = df_U, family=gaussian,method = "REML")
+save(md_U_offset.Sobs,file = "~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/md_U_offset.Sobs.Rdata")
+## smoother por sitio compartilhando a mesma penalização de ajuste
+md_U_GS <- gam(log10_U ~ offset(log10_Sobs) +
+                 s(d.z,bs="cr",k=20,m=1) + s(p.z,bs="cr",k=20,m=1) + ti(d.z,p.z,bs=c("cr","cr"),k=c(20,20),m=1) +
+                 s(d.z,SiteCode,bs="fs",m=1,k=20,xt = list("cr")),
+                data = df_U, family=gaussian,method = "REML")
+save(md_U_GS,file = "~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/md_U_GS.Rdata")
+## smoother e penalização de ajuste por sítio: 
+# md_U_te <- gam(log10_U ~ offset(log10_Sobs) +
+#                           te(d.z,p.z,bs=c("cr","cr"),k=c(10,10),m=2) +
+#                           t2(d.z,p.z,SiteCode,bs=c("cr","cr","re"),k=c(10,10),m=1,full = TRUE),
+#                 data = df_U, family=gaussian,method = "REML")
+gratia::appraise(md_U_GS)
+
+
+AICctab(md_U,md_U_sSobs,weights=T)
+gratia::appraise(md_U_GS)
+summary(md_U_offset.Sobs)
+gratia::appraise(md_U)
 ```
+
+Não observo diferença nos gráficos diagnosticos, e na tabela de AIC os modelos estão empatados com uma pequena vantagem para o sem Sobs
+
+O modelo com offset apresenta o mesmo problema da matriz de covariância não ser positivamente definido
+
+vou mudar o modelo para ter um smoother por sítio compartilhando o mesmo penalizador de fit
 
 
 
@@ -2789,9 +2816,9 @@ matrix(nus, nrow = length(beta), ncol = num_beta_vecs) %>% dim
 Pré requisitos para obter a distribuição a posteriori
 
 ```{r U_med predito e observado para o modelo cheio,fig.width=8, fig.height=30,eval=FALSE}
-gamm <- md_U
-broom::augment(lm(c(1:100) ~ c(100:1))) %>% names
-lm(df_U$log10_U ~ gamm$y)
+gamm <- md_U_GS
+# broom::augment(lm(c(1:100) ~ c(100:1))) %>% names
+# lm(df_U$log10_U ~ gamm$y)
 
 # dados
 # df_ <- broom::augment(gamm)
