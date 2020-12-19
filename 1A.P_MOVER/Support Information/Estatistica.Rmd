@@ -28,6 +28,7 @@ library(doMC)
 library(DHARMa)
 library(broom.mixed)
 library(gratia)
+library(tidymv)
 library(MuMIn)
 library(mgcv)
 library(bbmle)
@@ -66,16 +67,19 @@ f_z <- function(x){
 # str(df_resultados)
 df_resultados %<>% mutate(diffS_gamma = diffS_mean + min(diffS_mean)*(-1) + 0.01,
                           modulo_diffS = abs(diffS_mean),
-                          log_Sobs=log(S_obs))
+                          log10_Sobs=log10(S_obs),
+                          log10_U = log10(U_med),
+                          log10_d = log10(d))
 
-df_resultados.z <- as.data.frame(apply(df_resultados[,c("p","Ntotal","log_Sobs","k_1","d_Lplot","d","modulo_diffS")],2,f_z))
+df_resultados.z <- as.data.frame(apply(df_resultados[,c("p","Ntotal","log10_Sobs","k_1","d_Lplot","d","log10_d","modulo_diffS")],2,f_z))
 names(df_resultados.z) <- sapply(names(df_resultados.z), function(x) paste0(x,".z"))
 df_resultados %<>% cbind(.,df_resultados.z) %>% 
   select(-k_1,-k_1.z)
 ###############
-df_U <- df_resultados %>% filter(MN=="EE") %>% distinct %>% 
-  mutate(log10_Sobs = log10(S_obs),
-         log10_U = log10(U_med))
+df_U <- df_resultados %>% filter(MN=="EE") %>% distinct 
+#%>% 
+  # mutate(log10_Sobs = log10(S_obs),
+         # log10_U = log10(U_med))
 ```
 
 
@@ -2376,7 +2380,7 @@ Figura 4.1: Taxa de chegada de ancestrais na paisagem (U_med); número de espéc
 
 __Figura 4.2__ Padrões gerais por Sítio de Amostragem: U_med
 
-```{r fig 42,eval=FALSE,echo=FALSE,fig.width=8, fig.height=27,warning=FALSE,message=FALSE}
+```{r fig 42,eval=FALSE,echo=FALSE,fig.width=8, fig.height=27,warning=FALSE,message=FALSE,include=FALSE,eval=FALSE}
 df_plot <- df_U %>%
   mutate(title = paste0(SiteCode," p=",round(p,3))) %>% arrange(p)
 df_plot$title <- factor(df_plot$title,levels = unique(df_plot$title))
@@ -2387,23 +2391,19 @@ df_plot %>% ggplot(aes(x=d,y=U_med)) +
 ```
 
 ```{r eval=FALSE,message=FALSE,warning=FALSE,fig.width=8, fig.height=27}
+,fig.width=8, fig.height=27
 df_plot <- df_U %>%
   mutate(title = paste0(SiteCode," p=",round(p,3))) %>% arrange(p)
 df_plot$title <- factor(df_plot$title,levels = unique(df_plot$title))
 df_plot %>% ggplot(aes(x=d,y=log10(U_med))) +
   geom_smooth(method = "loess",se = FALSE,color="red",alpha=0.5) +
   geom_point(alpha=0.5) + 
-  facet_wrap(~title,ncol=5)
+  facet_wrap(~title,ncol=5,top="log10(U) ~ d|Site~p")
 ```
 
 ## 4.1 - Efeito da Riqueza
 
 ```{r efeito da riqueza na taxa de chegada de especies raras lmer,eval=T,include=TRUE,echo=FALSE}
-# U_med na escala padrão
-lmer_U <- lmer(U_med ~ log10_Sobs + (1|SiteCode),data=df_U)
-summary(lmer_U)
-p_plot <- simulateResiduals(lmer_U)
-plot(p_plot)
 # U_med na escala log10
 lmer_log10U <- lmer(log10_U ~ log10_Sobs + (1|SiteCode),data=df_U)
 summary(lmer_log10U)
@@ -2518,15 +2518,17 @@ l_p[[2]] <- df_U %>%
   geom_point(alpha=0.3) + labs(x="Sobs",y="U",title="U = [10 ^ N(-4.175,0.05838)] * Sobs ^ 0.972")
 grid.arrange(grobs=l_p,ncol=2)
 ```
-
-## GAMMM
+relação entre proporção de cobertura vegetal e log10(Sobs)
 
 ```{r}
 df_md <- df_U %>% select(p,log10_Sobs) %>% distinct
 ggplot(df_md,aes(x=p,y=log10_Sobs)) + geom_point() + geom_smooth(method = "lm",formula=y~x)
 md_pSobs<- lm(log10_Sobs ~ p, data=df_md)
-plot(md_pSobs)
+summary(md_pSobs)
 ```
+
+
+## GAMMM
 
 
 ```{r}
@@ -2593,104 +2595,92 @@ Mesmo sem paralelizar quando tudo acaba o Rstudio quebra usando o dlply
 
 ```{r}
 l_md <- list()
-l_md[[1]] <- gam(log10_U ~ log10_Sobs +
+l_md[[1]] <- gam(log10_U ~ offset(log10_Sobs) +
                  s(d.z,bs="tp",k=10) + s(p.z,bs="tp",k=10) + ti(d.z,p.z,bs=c("tp","tp"),k=c(10,10)) +
-                 s(SiteCode,bs="re") + s(d.z,by=SiteCode,bs="tp",m=1,k=10),
+                 s(d.z,SiteCode,bs="fs",k=10,xt = list("tp")),
                 data = df_U, family=gaussian,method = "REML")
-l_md[[2]] <- gam(log10_U ~ log10_Sobs +
+l_md[[2]] <- gam(log10_U ~ offset(log10_Sobs) +
                  s(d.z,bs="cr",k=10) + s(p.z,bs="cr",k=10) + ti(d.z,p.z,bs=c("cr","cr"),k=c(10,10)) +
-                 s(SiteCode,bs="re") + s(d.z,by=SiteCode,bs="cr",m=1,k=10),
+                 s(d.z,SiteCode,bs="fs",k=10,xt = list("cr")),
                 data = df_U, family=gaussian,method = "REML")
-# l_md[[3]] <- gam(log10_U ~ log10_Sobs +
-#                  s(d.z,bs="cc",k=10) + s(p.z,bs="cc",k=10) + ti(d.z,p.z,bs=c("cc","cc"),k=c(10,10)) +
-#                  s(SiteCode,bs="re") + s(d.z,by=SiteCode,bs="cc",m=1,k=10),
+l_md[[3]] <- gam(log10_U ~ offset(log10_Sobs) +
+                 s(d.z,bs="cc",k=10) + s(p.z,bs="cc",k=10) + ti(d.z,p.z,bs=c("cc","cc"),k=c(10,10)) +
+                 s(d.z,SiteCode,bs="fs",k=10,xt = list("cc")),
+                data = df_U, family=gaussian,method = "REML")
+l_md[[4]] <- gam(log10_U ~ offset(log10_Sobs) +
+                 s(d.z,bs="ps",k=10) + s(p.z,bs="ps",k=10) + ti(d.z,p.z,bs=c("ps","ps"),k=c(10,10)) +
+                 s(d.z,SiteCode,bs="fs",k=10,xt = list("ps")),
+                data = df_U, family=gaussian,method = "REML")
+l_md[[5]] <- gam(log10_U ~ offset(log10_Sobs) +
+                 s(d.z,bs="gp",k=10) + s(p.z,bs="gp",k=10) + ti(d.z,p.z,bs=c("gp","gp"),k=c(10,10)) +
+                 s(d.z,SiteCode,bs="fs",k=10,xt = list("gp")),
+                data = df_U, family=gaussian,method = "REML")
+# l_md[[6]] <- gam(log10_U ~ offset(log10_Sobs) +
+#                  s(d.z,bs="ts",k=10) + s(p.z,bs="ts",k=10) + ti(d.z,p.z,bs=c("ts","ts"),k=c(10,10)) +
+#                  s(d.z,SiteCode,bs="fs",k=10,xt = list("ts")),
 #                 data = df_U, family=gaussian,method = "REML")
-# l_md[[4]] <- gam(log10_U ~ log10_Sobs +
-#                  s(d.z,bs="ps",k=10) + s(p.z,bs="ps",k=10) + ti(d.z,p.z,bs=c("ps","ps"),k=c(10,10)) +
-#                  s(SiteCode,bs="re") + s(d.z,by=SiteCode,bs="ps",m=1,k=10),
+# l_md[[7]] <- gam(log10_U ~ offset(log10_Sobs) +
+#                  s(d.z,bs="cs",k=10) + s(p.z,bs="cs",k=10) + ti(d.z,p.z,bs=c("cs","cs"),k=c(10,10)) +
+#                  s(d.z,SiteCode,bs="fs",k=10,xt = list("cs")),
 #                 data = df_U, family=gaussian,method = "REML")
-# l_md[[5]] <- gam(log10_U ~ log10_Sobs +
-#                  s(d.z,bs="gp",k=10) + s(p.z,bs="gp",k=10) + ti(d.z,p.z,bs=c("gp","gp"),k=c(10,10)) +
-#                  s(SiteCode,bs="re") + s(d.z,by=SiteCode,bs="gp",m=1,k=10),
-#                 data = df_U, family=gaussian,method = "REML")
-names(l_md) <- c("tp","cr") #,"cc","ps","gp" 
+names(l_md) <- c("tp","cr","cc","ps","gp")
+AICctab(l_md,weights=TRUE)
+# df_U %>% ggplot(aes(y=log10_U,x=log10(d))) + geom_point()
 ```
 
 
 
 ```{r save l_md.U_gamEstudo,eval=FALSE,echo=FALSE}
-l_md_log10.U_gamEstudo<- l_md
-save(l_md_log10.U_gamEstudo,file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_md_log10.U_gamEstudo.Rdata")
+l_md_log10_U <- l_md
+save(l_md_log10_U,file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_md_log10_U.Rdata")
 ```
 
 ```{r load l_md.U_gamEstudo,eval=TRUE,echo=FALSE}
 load("~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_md_log10.U_gamEstudo.Rdata")
+df_U %>% names
 ```
 
 ```{r}
-AICctab(l_md_log10.U_gamEstudo,weights=TRUE)
-md_U <- l_md_log10.U_gamEstudo[["cr"]]
-gratia::appraise(md_U)
-gam.check(md_U)
+l_md <- list()
+l_md[[1]] <- gam(log10_U ~ offset(log10_Sobs) +
+                 s(log10_d.z,bs="tp",k=10) + s(p.z,bs="tp",k=10) + ti(log10_d.z,p.z,bs=c("tp","tp"),k=c(10,10)) +
+                 s(log10_d.z,SiteCode,bs="fs",k=10,xt = list("tp")),
+                data = df_U, family=gaussian,method = "REML")
+l_md[[2]] <- gam(log10_U ~ offset(log10_Sobs) +
+                 s(log10_d.z,bs="cr",k=10) + s(p.z,bs="cr",k=10) + ti(log10_d.z,p.z,bs=c("cr","cr"),k=c(10,10)) +
+                 s(log10_d.z,SiteCode,bs="fs",k=10,xt = list("cr")),
+                data = df_U, family=gaussian,method = "REML")
+l_md[[3]] <- gam(log10_U ~ offset(log10_Sobs) +
+                 s(log10_d.z,bs="cc",k=10) + s(p.z,bs="cc",k=10) + ti(log10_d.z,p.z,bs=c("cc","cc"),k=c(10,10)) +
+                 s(log10_d.z,SiteCode,bs="fs",k=10,xt = list("cc")),
+                data = df_U, family=gaussian,method = "REML")
+l_md[[4]] <- gam(log10_U ~ offset(log10_Sobs) +
+                 s(log10_d.z,bs="ps",k=10) + s(p.z,bs="ps",k=10) + ti(log10_d.z,p.z,bs=c("ps","ps"),k=c(10,10)) +
+                 s(log10_d.z,SiteCode,bs="fs",k=10,xt = list("ps")),
+                data = df_U, family=gaussian,method = "REML")
+l_md[[5]] <- gam(log10_U ~ offset(log10_Sobs) +
+                 s(log10_d.z,bs="gp",k=10) + s(p.z,bs="gp",k=10) + ti(log10_d.z,p.z,bs=c("gp","gp"),k=c(10,10)) +
+                 s(log10_d.z,SiteCode,bs="fs",k=10,xt = list("gp")),
+                data = df_U, family=gaussian,method = "REML")
+# l_md[[6]] <- gam(log10_U ~ offset(log10_Sobs) +
+#                  s(d.z,bs="ts",k=10) + s(p.z,bs="ts",k=10) + ti(d.z,p.z,bs=c("ts","ts"),k=c(10,10)) +
+#                  s(d.z,SiteCode,bs="fs",k=10,xt = list("ts")),
+#                 data = df_U, family=gaussian,method = "REML")
+# l_md[[7]] <- gam(log10_U ~ offset(log10_Sobs) +
+#                  s(d.z,bs="cs",k=10) + s(p.z,bs="cs",k=10) + ti(d.z,p.z,bs=c("cs","cs"),k=c(10,10)) +
+#                  s(d.z,SiteCode,bs="fs",k=10,xt = list("cs")),
+#                 data = df_U, family=gaussian,method = "REML")
+names(l_md) <- c("tp","cr","cc","ps","gp")
+AICctab(l_md,weights=TRUE)
+# l_md_U_log10_dz <- l_md
+# save(l_md_U_log10_dz,file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_md_U_log10_dz.Rdata")
+# df_U %>% ggplot(aes(y=log10_U,x=log10(d))) + geom_point()
 ```
 
 
 Commit com os codigos para gamm nRef [referência]:
 97a682916fd0942c0c75ca44fb6c66857ec95706
 
-### Modelos Cheios: diagnostico e comparações
-
-```{r modelo cheio md_U,echo=TRUE,eval=FALSE}
-df_md <- df_resultados %>% filter(MN=="EE") %>% 
-  distinct()
-df_md.class <- data.frame(md_class=c("glmm 1|Site",
-                                     "gamm d|Site for each",
-                                     "gamm d|Site common",
-                                     "gamm 1|Site"))
-# função de ajuste
-f_md <- function(dados){
-  md_class <- unique(dados$md_class)
-  if(md_class == "glmm d+d^2|Site"){
-    md_ <- lmer(log10_U ~ 
-                   (p.z + I(p.z^2)) * (d.z + I(d.z^2)) + 
-                   (d.z + I(d.z^2)|SiteCode),
-                 data=df_U,
-                 control=lmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e6)),
-                 na.action = "na.fail")
-  }else if(md_class == "glmm d|Site"){
-    md_ <- lmer(log10_U ~ 
-                   (p.z + I(p.z^2)) * (d.z + I(d.z^2)) + 
-                   (d.z|SiteCode),
-                 data=df_U,
-                 control=lmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e6)),
-                 na.action = "na.fail")
-  }else if(md_class == "glmm 1|Site"){
-    md_ <- lmer(log10_U ~
-                   (p.z + I(p.z^2)) * (d.z + I(d.z^2)) + 
-                   (1|SiteCode),
-                 data=df_U,
-                 control=lmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e6)),
-                 na.action = "na.fail")
-  }else if(md_class == "gamm d|Site for each"){
-    md_ <- gam(log10_U ~
-                 s(p.z,bs="tp",k=10) + s(d.z,bs="tp",k=10) + ti(p.z,d.z,bs=c("tp","tp"),k=c(10,10)) +
-                 s(SiteCode,bs="re") + s(d.z,by=SiteCode,bs="tp",m=1,k=10),
-                data = df_U, family = gaussian,method="REML")
-  }else if(md_class == "gamm d|Site common"){
-    md_ <- gam(log10_U ~
-                 s(p.z,bs="tp",k=10) + s(d.z,bs="tp",k=10) + ti(p.z,d.z,bs=c("tp","tp"),k=c(10,10)) +
-                 s(d.z,SiteCode,bs="fs",xt=list(bs="tp"), m=1,k=10),
-                data = df_U, family = gaussian,method="REML")
-  }else{
-    md_ <- gam(log10_U ~
-                 s(p.z,bs="tp",k=10) + s(d.z,bs="tp",k=10) + ti(p.z,d.z,bs=c("tp","tp"),k=c(10,10)) +
-                 s(SiteCode,bs="re"),
-                data = df_U, family = gaussian,method="REML")
-  }
-  return(md_)
-}
-l_md.U_mdCheio <- dlply(df_U.class,"md_class",f_md)
-```
 
 ```{r}
 save(l_md.U_mdCheio,file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_md.U_mdCheio_semSobs_tp.Rdata")
@@ -2725,20 +2715,29 @@ md_U_offset.Sobs <- gam(log10_U ~ offset(log10_Sobs) +
 save(md_U_offset.Sobs,file = "~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/md_U_offset.Sobs.Rdata")
 ## smoother por sitio compartilhando a mesma penalização de ajuste
 md_U_GS <- gam(log10_U ~ offset(log10_Sobs) +
-                 s(d.z,bs="cr",k=20,m=1) + s(p.z,bs="cr",k=20,m=1) + ti(d.z,p.z,bs=c("cr","cr"),k=c(20,20),m=1) +
-                 s(d.z,SiteCode,bs="fs",m=1,k=20,xt = list("cr")),
+                 s(d.z,bs="cr",k=10,m=1) + s(p.z,bs="cr",k=10,m=1) + ti(d.z,p.z,bs=c("cr","cr"),k=c(10,10),m=1) +
+                 s(d.z,SiteCode,bs="fs",m=1,k=10,xt = list("cr")),
                 data = df_U, family=gaussian,method = "REML")
-save(md_U_GS,file = "~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/md_U_GS.Rdata")
+md_U_GS_logSobs <- gam(log10_U ~ log10_Sobs +
+                 s(d.z,bs="cr",k=10,m=1) + s(p.z,bs="cr",k=10,m=1) + ti(d.z,p.z,bs=c("cr","cr"),k=c(10,10),m=1) +
+                 s(d.z,SiteCode,bs="fs",m=1,k=10,xt = list("cr")),
+                data = df_U, family=gaussian,method = "REML")
+save(md_U_GS_k15,file = "~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/md_U_GS_k15.Rdata")
+load("~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/md_U_GS_k15.Rdata")
 ## smoother e penalização de ajuste por sítio: 
 # md_U_te <- gam(log10_U ~ offset(log10_Sobs) +
 #                           te(d.z,p.z,bs=c("cr","cr"),k=c(10,10),m=2) +
 #                           t2(d.z,p.z,SiteCode,bs=c("cr","cr","re"),k=c(10,10),m=1,full = TRUE),
 #                 data = df_U, family=gaussian,method = "REML")
-gratia::appraise(md_U_GS)
-
-
-AICctab(md_U,md_U_sSobs,weights=T)
-gratia::appraise(md_U_GS)
+gratia::appraise(md_U_GS_k15)
+###### tp
+md_U_GS_tp <- gam(log10_U ~ offset(log10_Sobs) +
+                 s(d.z,bs="tp",k=10,m=1) + s(p.z,bs="tp",k=10,m=1) + ti(d.z,p.z,bs=c("tp","tp"),k=c(10,10),m=1) +
+                 s(d.z,SiteCode,bs="fs",m=1,k=10,xt = list("tp")),
+                data = df_U, family=gaussian,method = "REML")
+save(md_U_GS_tp,file = "~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/md_U_GS_tp.Rdata")
+AICctab(md_U_GS_tp,md_U_GS,weights=T)
+gratia::appraise(md_U_GS_tp)
 summary(md_U_offset.Sobs)
 gratia::appraise(md_U)
 ```
@@ -2749,7 +2748,11 @@ O modelo com offset apresenta o mesmo problema da matriz de covariância não se
 
 vou mudar o modelo para ter um smoother por sítio compartilhando o mesmo penalizador de fit
 
+o modelo mais simples está dentro dos critérios para fazer o predito a posteriori
 
+O modelo final é mais plausível do que mantem o offset para log10(Sobs) com k=15; e sem offset para log10(Sobs), com o parametro estimado 
+
+Eu comparei este novo modelo com as
 
 ```{r eval=FALSE}
 # dados
@@ -2795,22 +2798,63 @@ gratia::appraise(md_U_comSobs)
 
 
 ```{r warning=FALSE,message=FALSE}
-df_diag <- augment(md_U)
+md_U <- md_U_GS_tp
+df_ <- cbind(cbind(data.frame(fit = md_U$fitted.values,
+                        residuals = md_U$residuals),
+             md_U_GS$model))
+
 l_p <- list()
-l_p[[1]] <- ggplot(df_diag, aes(x=p.z,y=.resid)) +
-  geom_smooth(method="loess") +x
-  geom_point(alpha=0.3)
-l_p[[2]] <- ggplot(df_diag, aes(x=d.z,y=.resid)) +
+l_p[[1]] <- ggplot(df_, aes(x=p.z,y=residuals)) +
   geom_smooth(method="loess") +
   geom_point(alpha=0.3)
-grid.arrange(grobs=l_p,ncol=2,top="deviance residual ~ continuous predictors")
+l_p[[2]] <- ggplot(df_, aes(x=d.z,y=residuals)) +
+  geom_smooth(method="loess") +
+  geom_point(alpha=0.3)
+l_p[[3]] <- ggplot(df_, aes(x=log10_U,y=fit)) +
+  geom_smooth(method="loess") +
+  geom_point(alpha=0.3)
+grid.arrange(grobs=l_p,ncol=3) #,top="deviance residual ~ continuous predictors"
 ```
+
+```{r predito por md_U_GS ,fig.width=9, fig.height=29}
+# dados
+# df_ <- rbind.fill(cbind(cbind(data.frame(fit = md_U_GS$fitted.values,
+#                                          residuals = md_U_GS$residuals,
+#                         model = "cr"),
+#              md_U_GS$model)),
+#              cbind(cbind(data.frame(fit = md_U_GS_tp$fitted.values,
+#                                     residuals = md_U_GS_tp$residuals,
+#                         model = "tp"),
+#              md_U_GS_tp$model)))
+load("~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_md_log10_U.Rdata")
+md_U <- l_md_log10_U[["cr"]]
+df_ <- cbind(cbind(data.frame(fit = md_U$fitted.values,
+                              residuals = md_U$residuals,
+                        model = "cr"),
+             md_U$model))
+# df_$model %>% table
+# variaveis para grafico
+df_plot <- inner_join(x=distinct(select(df_U,p,SiteCode)),
+                      y=df_,
+                      by="SiteCode") %>%
+  mutate(title = paste0(SiteCode," p=",round(p,3))) %>% arrange(p)
+df_plot$title <- factor(df_plot$title,levels = unique(df_plot$title))
+# gráfico
+df_plot %>% ggplot(aes(x=d.z,y=log10_U)) +
+  geom_point(alpha=0.5) + 
+  geom_line(aes(x=d.z,y=fit),color="red") + #
+  # scale_colour_manual(values=c("red", "blue")) +
+  theme(legend.position = "top") +
+  facet_wrap(~title,ncol=5,scales="free")
+```
+O modelo estava fazendo um bom ajuste, apesar na fase logito parece existir um problema de overfit que me parece relacionado com a função base
 
 ### observado e predito por sítio de amostragem
 
 ```{r}
 Cv[1:10,1:10]
 matrix(nus, nrow = length(beta), ncol = num_beta_vecs) %>% dim
+gam.check(md_U_GS)
 ```
 
 Pré requisitos para obter a distribuição a posteriori
