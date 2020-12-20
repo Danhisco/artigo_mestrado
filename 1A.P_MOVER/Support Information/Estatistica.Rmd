@@ -2531,6 +2531,10 @@ summary(md_pSobs)
 ## GAMMM
 
 
+
+
+
+
 ```{r}
 md_ <- gam(log10_U ~ log10_Sobs +
                  s(d.z,bs="cr",k=10) + s(p.z,bs="cr",k=10) + ti(d.z,p.z,bs=c("cr","cr"),k=c(10,10)) +
@@ -2670,10 +2674,16 @@ l_md[[5]] <- gam(log10_U ~ offset(log10_Sobs) +
 #                  s(d.z,bs="cs",k=10) + s(p.z,bs="cs",k=10) + ti(d.z,p.z,bs=c("cs","cs"),k=c(10,10)) +
 #                  s(d.z,SiteCode,bs="fs",k=10,xt = list("cs")),
 #                 data = df_U, family=gaussian,method = "REML")
-names(l_md) <- c("tp","cr","cc","ps","gp")
+
+names(l_md) <- c("tp","cr","cc","ps") #,"gp"
 AICctab(l_md,weights=TRUE)
-# l_md_U_log10_dz <- l_md
-# save(l_md_U_log10_dz,file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_md_U_log10_dz.Rdata")
+l_md_U_log10_dz <- l_md
+save(l_md_U_log10_dz,file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_md_U_log10_dz.Rdata")
+load("~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_md_U_log10_dz.Rdata")
+names(l_md_U_log10_dz) <- c("tp","cr","cc","ps") #,"gp"
+AICctab(l_md_U_log10_dz,weights=T)
+md_U <- l_md_U_log10_dz[["tp"]]
+summary(md_U)
 # df_U %>% ggplot(aes(y=log10_U,x=log10(d))) + geom_point()
 ```
 
@@ -2798,22 +2808,24 @@ gratia::appraise(md_U_comSobs)
 
 
 ```{r warning=FALSE,message=FALSE}
-md_U <- md_U_GS_tp
+# md_U <- md_U_GS_tp
 df_ <- cbind(cbind(data.frame(fit = md_U$fitted.values,
                         residuals = md_U$residuals),
-             md_U_GS$model))
+             md_U$model))
 
 l_p <- list()
 l_p[[1]] <- ggplot(df_, aes(x=p.z,y=residuals)) +
   geom_smooth(method="loess") +
   geom_point(alpha=0.3)
-l_p[[2]] <- ggplot(df_, aes(x=d.z,y=residuals)) +
+l_p[[2]] <- ggplot(df_, aes(x=log10_d.z,y=residuals)) +
   geom_smooth(method="loess") +
   geom_point(alpha=0.3)
 l_p[[3]] <- ggplot(df_, aes(x=log10_U,y=fit)) +
   geom_smooth(method="loess") +
   geom_point(alpha=0.3)
 grid.arrange(grobs=l_p,ncol=3) #,top="deviance residual ~ continuous predictors"
+
+gratia::appraise(md_U)
 ```
 
 ```{r predito por md_U_GS ,fig.width=9, fig.height=29}
@@ -2826,11 +2838,10 @@ grid.arrange(grobs=l_p,ncol=3) #,top="deviance residual ~ continuous predictors"
 #                                     residuals = md_U_GS_tp$residuals,
 #                         model = "tp"),
 #              md_U_GS_tp$model)))
-load("~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_md_log10_U.Rdata")
-md_U <- l_md_log10_U[["cr"]]
+# load("~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_md_log10_U.Rdata")
+# md_U <- l_md_log10_U[["cr"]]
 df_ <- cbind(cbind(data.frame(fit = md_U$fitted.values,
-                              residuals = md_U$residuals,
-                        model = "cr"),
+                              residuals = md_U$residuals),
              md_U$model))
 # df_$model %>% table
 # variaveis para grafico
@@ -2840,9 +2851,9 @@ df_plot <- inner_join(x=distinct(select(df_U,p,SiteCode)),
   mutate(title = paste0(SiteCode," p=",round(p,3))) %>% arrange(p)
 df_plot$title <- factor(df_plot$title,levels = unique(df_plot$title))
 # gráfico
-df_plot %>% ggplot(aes(x=d.z,y=log10_U)) +
+df_plot %>% ggplot(aes(x=log10_d.z,y=log10_U)) +
   geom_point(alpha=0.5) + 
-  geom_line(aes(x=d.z,y=fit),color="red") + #
+  geom_line(aes(x=log10_d.z,y=fit),color="red") + #
   # scale_colour_manual(values=c("red", "blue")) +
   theme(legend.position = "top") +
   facet_wrap(~title,ncol=5,scales="free")
@@ -2852,22 +2863,58 @@ O modelo estava fazendo um bom ajuste, apesar na fase logito parece existir um p
 ### observado e predito por sítio de amostragem
 
 ```{r}
-Cv[1:10,1:10]
-matrix(nus, nrow = length(beta), ncol = num_beta_vecs) %>% dim
-gam.check(md_U_GS)
+gratia::appraise(md_U)
 ```
 
 Pré requisitos para obter a distribuição a posteriori
 
+```{r}
+# dados gerais
+gamm <- md_U
+## dados para predição
+df_newdata <- expand.grid(SiteCode=levels(df_resultados$SiteCode)[1],
+                          log10_d.z=seq(min(df_U$log10_d.z),max(df_U$log10_d.z),length=40),
+                          p.z=seq(min(df_U$p.z),max(df_U$p.z),length=200),
+                          log10_Sobs = 0)
+df_newdata$predict <- predict(gamm, newdata = df_newdata, type = "response")
+df_newdata %<>% mutate(p = (p.z + mean(df_resultados$p)) * sd(df_resultados$p),
+                       log10_d = (log10_d.z + mean(df_resultados$log10_d)) * sd(df_resultados$log10_d),
+                       d = 10^(log10_d),
+                       U = 10^predict)
+
+ggplot(df_newdata,aes(x=p,y=d,fill=U)) +
+  coord_cartesian(expand = FALSE) + 
+  geom_tile() +
+  scale_fill_distiller(palette = "Spectral") +
+  theme_classic() + 
+  # facet_wrap(~IC_pred,ncol=1) +
+  # theme(legend.position=element_blank(),legend.title = element_blank()) +
+  geom_contour(aes(z=U),alpha=0.4, col="black",
+               breaks = round(quantile(df_newdata$U,probs = c(0.1,0.25,0.5,0.75,0.9)),5)) +
+  geom_text_contour(aes(z=U),stroke=0.2,
+                    breaks = round(quantile(df_newdata$U,probs = c(0.1,0.25,0.5,0.75,0.9)),5),
+                    rotate = FALSE,
+                    size=2.7)
+df_U %>% select(d,log10_d,log10_d.z) %>% summary
+df_newdata %>% select(d,log10_d,log10_d.z) %>% summary
+df_resultados %>% select(d,log10_d,log10_d.z) %>% summary
+```
+
+
+
 ```{r U_med predito e observado para o modelo cheio,fig.width=8, fig.height=30,eval=FALSE}
-gamm <- md_U_GS
+
 # broom::augment(lm(c(1:100) ~ c(100:1))) %>% names
 # lm(df_U$log10_U ~ gamm$y)
 
-# dados
-# df_ <- broom::augment(gamm)
-df_ <- cbind(fit = gamm$fitted.values,
-             gamm$model)
+# dados para predição
+df_newdata <- expand.grid(SiteCode=levels(df_resultados$SiteCode)[1],
+                          log10_d.z=seq(min(df_U$log10_d.z),max(df_U$log10_d.z),length=40),
+                          p.z=seq(min(df_U$p.z),max(df_U$p.z),length=200),
+                          log10_Sobs = 0)
+v_predict <- predict(gamm, newdata = df_newdata, type = "response")
+
+
 beta <- coef(gamm)
 V <- vcov.gam(gamm)
 ##  simulação de parâmetros
@@ -2882,13 +2929,15 @@ predict_link <- matrix_lprediction %*% beta_sims
 df_pred <- t(apply(predict_link,1,function(X) quantile(X,probs = c(0.05,0.50,0.95)))) %>% 
   as.data.frame()
 names(df_pred) <- c("IClower","median","ICupper")
-df_plot <- cbind(df_,df_pred) %>% 
-  mutate(fit = exp(median),
-         lower = exp(IClower),
-         upper = exp(ICupper),
-         fit_predict = exp(.fitted),
-         p = p.z * sd(df_resultados$p) + mean(df_resultados$p),
-         d = d.z * sd(df_resultados$d) + mean(df_resultados$d))
+df_plot <- cbind(df_,df_pred) 
+# %>% 
+  # mutate(
+    # fit = exp(median),
+    #      lower = exp(IClower),
+    #      upper = exp(ICupper),
+    #      fit_predict = exp(.fitted),
+         # p = p.z * sd(df_resultados$p) + mean(df_resultados$p),
+         # d = d.z * sd(df_resultados$d) + mean(df_resultados$d))
 # df_ %>% summary
 # grafico
 # grafico
