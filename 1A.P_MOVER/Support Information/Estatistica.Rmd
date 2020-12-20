@@ -7,7 +7,7 @@ output:
     toc: true
     toc_depth: 5
 editor_options: 
-  chunk_output_type: console
+  chunk_output_type: inline
 ---
 
 <style>
@@ -2458,7 +2458,7 @@ df_pred <- cbind(lmer_U@frame,
                  predictInterval(lmer_U,type = "linear.prediction",level = 0.95))
 df_pred %>% #mutate(fit_response = exp(fit)) %>% 
   ggplot(aes(x=log10_U,y=fit)) +
-  geom_point(alpha=0.3)+
+  geom_point(alpha=0.3) +
   geom_abline(intercept = 0,slope = 1,color="red") +
   geom_smooth(method = "lm",se = FALSE,color="blue",formula = y~0+x) + #,aes(group=SiteCode),alpha=0.3,size=0.2
   geom_smooth(method = "loess",se=TRUE,color="green",formula = y~0+x) +
@@ -2474,7 +2474,7 @@ MuMIn::r.squaredGLMM(lmer_U)
 
 __bootstrap da predição__
 
-```{r fig.width=10,fig.height=4}
+```{r fig.width=10,fig.height=6,fig.width=8}
 #new data
 df_newdat <- expand.grid(SiteCode=df_U$SiteCode[1], 
                          log10_Sobs = seq(min(df_U$log10_Sobs),max(df_U$log10_Sobs), length=150))
@@ -2509,14 +2509,15 @@ l_p[[1]] <- df_U %>%
   geom_ribbon(aes(y = mean, ymin=IC.low, ymax=IC.upp), data=df_newdat, fill="grey15", alpha=0.5) +
   geom_ribbon(aes(y=mean, ymin=IC.low.fixed, ymax=IC.upp.fixed), data=df_newdat, fill="white", alpha=0.5) +
   geom_line(aes(x=log10_Sobs, y=mean.fixed), data=df_newdat,color="red") +
-  geom_point(alpha=0.3) + labs(x="log10(Sobs)",y="log10(U)",title="log10(U) = N(-4.175,0.05838) + 0.972*log10(Sobs)")
-l_p[[2]] <- df_U %>% 
-  ggplot(aes(x=10^log10_Sobs,y=U_med)) + 
-  geom_ribbon(aes(y = std_mean, ymin=std_IC.low, ymax=std_IC.upp), data=df_newdat, fill="grey15", alpha=0.5) +
-  geom_ribbon(aes(y=std_mean, ymin=std_IC.low.fixed, ymax=std_IC.upp.fixed), data=df_newdat, fill="white", alpha=0.5) +
-  geom_line(aes(x=10^log10_Sobs, y=std_mean.fixed), data=df_newdat,color="red") +
-  geom_point(alpha=0.3) + labs(x="Sobs",y="U",title="U = [10 ^ N(-4.175,0.05838)] * Sobs ^ 0.972")
-grid.arrange(grobs=l_p,ncol=2)
+  geom_point(alpha=0.3) + labs(x="log10(Sobs)",y="log10(U)",title="log10(U) = N(-4.175,0.05838) + 0.971*log10(Sobs)")
+l_p[[1]]
+# l_p[[2]] <- df_U %>% 
+#   ggplot(aes(x=10^log10_Sobs,y=U_med)) + 
+#   geom_ribbon(aes(y = std_mean, ymin=std_IC.low, ymax=std_IC.upp), data=df_newdat, fill="grey15", alpha=0.5) +
+#   geom_ribbon(aes(y=std_mean, ymin=std_IC.low.fixed, ymax=std_IC.upp.fixed), data=df_newdat, fill="white", alpha=0.5) +
+#   geom_line(aes(x=10^log10_Sobs, y=std_mean.fixed), data=df_newdat,color="red") +
+#   geom_point(alpha=0.3) + labs(x="Sobs",y="U",title="U = [10 ^ N(-4.175,0.05838)] * Sobs ^ 0.971")
+# grid.arrange(grobs=l_p,ncol=2)
 ```
 relação entre proporção de cobertura vegetal e log10(Sobs)
 
@@ -2530,71 +2531,26 @@ summary(md_pSobs)
 
 ## GAMMM
 
+Seguindo Pedersen et al. 2019:
+há duas possibilidades que nos interessam: um smoother por sítio de amostragem com uma mesma penalização; e um smoother e penalização por sítio de amostragem.
 
+Na ideia de se obter o modelo estatístico suficiente, irei inicar com a primeira opção: um smoother por sítio de amostragem com uma mesma penalização  
 
 
 
 
 ```{r}
-md_ <- gam(log10_U ~ log10_Sobs +
-                 s(d.z,bs="cr",k=10) + s(p.z,bs="cr",k=10) + ti(d.z,p.z,bs=c("cr","cr"),k=c(10,10)) +
-                 s(SiteCode,bs="re") + s(d.z,by=SiteCode,bs="cr",m=1,k=10),
-                data = df_U, family = gaussian,method = "REML")
-gratia::appraise(md_)
+l_md_U_GI <- list()
+l_md_U_GI[[1]] <- gam(log10_U ~ offset(log10_Sobs) +
+                 s(log10_d.z,bs="tp",k=10) + s(p.z,bs="tp",k=10) + ti(log10_d.z,p.z,bs=c("tp","tp"),k=c(10,10)) +
+                 s(SiteCode,bs="re") + s(log10_d.z,by=SiteCode,bs="tp",m=1,k=10),
+                data = df_U, family=gaussian,method = "REML")
+l_md_U_GI[[2]] <- gam(log10_U ~ offset(log10_Sobs) +
+                 s(log10_d.z,bs="cr",k=10) + s(p.z,bs="cr",k=10) + ti(log10_d.z,p.z,bs=c("cr","cr"),k=c(10,10)) +
+                 s(SiteCode,bs="re") + s(log10_d.z,by=SiteCode,bs="cr",m=1,k=10),
+                data = df_U, family=gaussian,method = "REML")
+AICctab(l_md_U_GI,weights=TRUE)
 ```
-
-
-
-
-```{r nRef MNEE estudo GAMM smoother type,echo=TRUE,eval=FALSE}
-# dados
-# df_md <- df_resultados %>% filter(MN=="EE") %>% 
-#   distinct()
-# df_md$U_med <- log(df_md$U_med)
-df_md.class <- data.frame(md_class=c("tp","cr","cc","ps","gp"))
-# função
-f_md <- function(model_class){
-  model_class <- unique(model_class$md_class)
-  if(model_class == "tp"){
-    md_ <- gam(log10_U ~ log10_Sobs +
-                 s(d.z,bs="tp",k=10) + s(p.z,bs="tp",k=10) + ti(d.z,p.z,bs=c("tp","tp"),k=c(10,10)) +
-                 s(SiteCode,bs="re") + s(d.z,by=SiteCode,bs="tp",m=1,k=10),
-                data = df_U, family=gaussian,method = "REML")
-  }else if(model_class == "cr"){
-    md_ <- gam(log10_U ~ log10_Sobs +
-                 s(d.z,bs="cr",k=10) + s(p.z,bs="cr",k=10) + ti(d.z,p.z,bs=c("cr","cr"),k=c(10,10)) +
-                 s(SiteCode,bs="re") + s(d.z,by=SiteCode,bs="cr",m=1,k=10),
-                data = df_U, family=gaussian,method = "REML")
-  }else if(model_class == "cc"){
-    md_ <- gam(log10_U ~ log10_Sobs +
-                 s(d.z,bs="cc",k=10) + s(p.z,bs="cc",k=10) + ti(d.z,p.z,bs=c("cc","cc"),k=c(10,10)) +
-                 s(SiteCode,bs="re") + s(d.z,by=SiteCode,bs="cc",m=1,k=10),
-                data = df_U, family=gaussian,method = "REML")
-  }else if(model_class == "ps"){
-    md_ <- gam(log10_U ~ log10_Sobs +
-                 s(d.z,bs="ps",k=10) + s(p.z,bs="ps",k=10) + ti(d.z,p.z,bs=c("ps","ps"),k=c(10,10)) +
-                 s(SiteCode,bs="re") + s(d.z,by=SiteCode,bs="ps",m=1,k=10),
-                data = df_U, family=gaussian,method = "REML")
-  }else{
-      md_ <- gam(log10_U ~ log10_Sobs +
-                 s(d.z,bs="gp",k=10) + s(p.z,bs="gp",k=10) + ti(d.z,p.z,bs=c("gp","gp"),k=c(10,10)) +
-                 s(SiteCode,bs="re") + s(d.z,by=SiteCode,bs="gp",m=1,k=10),
-                data = df_U, family=gaussian,method = "REML")
-  }
-  return(md_)
-}
-# registerDoMC(2)
-l_md.U_gamEstudo <- dlply(df_md.class,"md_class",f_md)
-```
-
-Se paralelizar acusa um aviso:
-Warning message:
-In mclapply(argsList, FUN, mc.preschedule = preschedule, mc.set.seed = set.seed,  :
-  scheduled cores 1, 2 did not deliver results, all values of the jobs will be affected
-
-E todos os itens da lista voltam em branco
-
-Mesmo sem paralelizar quando tudo acaba o Rstudio quebra usando o dlply
 
 
 ```{r}
@@ -2913,8 +2869,6 @@ df_newdata <- expand.grid(SiteCode=levels(df_resultados$SiteCode)[1],
                           p.z=seq(min(df_U$p.z),max(df_U$p.z),length=200),
                           log10_Sobs = 0)
 v_predict <- predict(gamm, newdata = df_newdata, type = "response")
-
-
 beta <- coef(gamm)
 V <- vcov.gam(gamm)
 ##  simulação de parâmetros
