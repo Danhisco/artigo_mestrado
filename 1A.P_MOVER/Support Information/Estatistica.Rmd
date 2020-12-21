@@ -7,7 +7,7 @@ output:
     toc: true
     toc_depth: 5
 editor_options: 
-  chunk_output_type: inline
+  chunk_output_type: console
 ---
 
 <style>
@@ -21,6 +21,8 @@ knitr::opts_chunk$set(echo = TRUE, tidy = FALSE, include = TRUE, warning = FALSE
 # setwd("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/")
 knitr::opts_knit$set(root.dir = "/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/simulacao_codigos_e_resultados")
 ```
+
+setwd("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/simulacao_codigos_e_resultados")
 
 ```{r pacotes,eval=TRUE,echo=TRUE,warning=FALSE,message=FALSE}
 library(parallel)
@@ -2731,7 +2733,34 @@ df_plot %>% ggplot(aes(x=log10_d.z,y=log10_U)) +
   theme(legend.position = "top") +
   facet_wrap(~title,ncol=5,scales="free")
 ```
-Ainda há muitos problemas na fase de patamares
+Ainda há muitos problemas na fase de patamares, vou tentar ajustar um modelo com penalização por sitio de amostragem
+
+```{r}
+lmer_U <- lmer(log10_U ~ log10_Sobs + (1|SiteCode),data=df_U)
+beta_log10_Sobs <- fixef(lmer_U)[2] %>% as.numeric() %>% round(.,digits = 3)
+md_U_GI <- gam(log10_U ~ offset(beta_log10_Sobs*log10_Sobs) +
+                 s(log10_d.z,bs="tp",k=10,m=2) + s(p.z,bs="tp",k=8) + ti(log10_d.z,p.z,bs=c("tp","tp"),k=c(10,8),m=2) +
+                 s(SiteCode,bs="re") + s(log10_d.z,by=SiteCode,bs="tp",m=2,k=10),
+                data = df_U, family=gaussian,method = "REML")
+save(md_U_GI,file = "~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/md_U_GI.Rdata")
+```
+
+Meu computador não possível memória suficiente para rodar esse modelo. Vou voltar uma casa e tentar e trocar a função de base do modelo anterior para 'cr'
+
+```{r}
+beta_log10_Sobs <- fixef(lmer_U)[2] %>% as.numeric() %>% round(.,digits = 3)
+l_md <- list()
+l_md[[1]] <- md_U
+l_md[[2]] <- gam(log10_U ~ offset(beta_log10_Sobs*log10_Sobs) +
+                   s(log10_d.z,bs="cr",k=15) + s(p.z,bs="tp",k=10) + ti(log10_d.z,p.z,bs=c("cr","tp"),k=c(15,10)) +
+                   s(log10_d.z,SiteCode,bs="fs",k=15,xt = list("cr")),
+                 data = df_U, family=gaussian,method = "REML")
+names(l_md) <- c("tp","cr")
+# AICctab(l_md)
+l_md_U_k15_comparacao <- l_md 
+save(l_md_U_k15_comparacao,file = "~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_md_U_k15_comparacao.Rdata")
+```
+
 
 
 
@@ -2767,6 +2796,7 @@ ggplot(df_newdata,aes(x=p,y=d,fill=U)) +
   geom_contour(aes(z=U),alpha=0.4, col="black",
                breaks = round(quantile(df_newdata$U,probs = c(0.1,0.25,0.5,0.75,0.9)),5)) +
   geom_text_contour(aes(z=U),stroke=0.2,
+                    
                     breaks = round(quantile(df_newdata$U,probs = c(0.1,0.25,0.5,0.75,0.9)),5),
                     rotate = FALSE,
                     size=2.7)
