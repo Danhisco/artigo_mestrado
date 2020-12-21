@@ -83,9 +83,20 @@ df_U <- df_resultados %>% filter(MN=="EE") %>% distinct
 ```
 
 
+# 0 - Relação Riqueza na área amostral ~ Proporção de Cobertura vegetal na paisagem local
+
+```{r}
+df_md <- df_resultados %>% filter(MN=="EE",k=="0.05") %>% distinct()
+md_ <- glm.nb(S_obs ~ p + I(p^2) + offset(log(Ntotal)), data = data_)
+```
 
 
 # 1 - Variables
+
+
+<!-- Commit com os codigos para gamm nRef [referência]: -->
+<!-- 97a682916fd0942c0c75ca44fb6c66857ec95706 -->
+
 
 __table 1:__
 Variáveis utilizadas na descrição estatística
@@ -2529,238 +2540,120 @@ summary(md_pSobs)
 ```
 
 
+
+
 ## GAMMM
 
 Seguindo Pedersen et al. 2019:
 há duas possibilidades que nos interessam: um smoother por sítio de amostragem com uma mesma penalização; e um smoother e penalização por sítio de amostragem.
 
-Na ideia de se obter o modelo estatístico suficiente, irei inicar com a primeira opção: um smoother por sítio de amostragem com uma mesma penalização  
+Inicio a modelagem pressupondo GAMM com smoother por sítio de amostragem com uma mesma penalização, offset(beta * log10(Sobs)) e distância média de dispersão na escala padrão
 
 
 
-
-```{r}
-l_md_U_GI <- list()
-l_md_U_GI[[1]] <- gam(log10_U ~ offset(log10_Sobs) +
-                 s(log10_d.z,bs="tp",k=10) + s(p.z,bs="tp",k=10) + ti(log10_d.z,p.z,bs=c("tp","tp"),k=c(10,10)) +
-                 s(SiteCode,bs="re") + s(log10_d.z,by=SiteCode,bs="tp",m=1,k=10),
-                data = df_U, family=gaussian,method = "REML")
-l_md_U_GI[[2]] <- gam(log10_U ~ offset(log10_Sobs) +
-                 s(log10_d.z,bs="cr",k=10) + s(p.z,bs="cr",k=10) + ti(log10_d.z,p.z,bs=c("cr","cr"),k=c(10,10)) +
-                 s(SiteCode,bs="re") + s(log10_d.z,by=SiteCode,bs="cr",m=1,k=10),
-                data = df_U, family=gaussian,method = "REML")
-AICctab(l_md_U_GI,weights=TRUE)
-```
-
-
-```{r}
+```{r gamm U 1, eval=FALSE, echo=TRUE}
+beta_log10_Sobs <- fixef(lmer_U)[2] %>% as.numeric() %>% round(.,digits = 3)
 l_md <- list()
-l_md[[1]] <- gam(log10_U ~ offset(log10_Sobs) +
+l_md[[1]] <- gam(log10_U ~ offset(beta_log10_Sobs*log10_Sobs) +
                  s(d.z,bs="tp",k=10) + s(p.z,bs="tp",k=10) + ti(d.z,p.z,bs=c("tp","tp"),k=c(10,10)) +
                  s(d.z,SiteCode,bs="fs",k=10,xt = list("tp")),
                 data = df_U, family=gaussian,method = "REML")
-l_md[[2]] <- gam(log10_U ~ offset(log10_Sobs) +
+l_md[[2]] <- gam(log10_U ~ offset(beta_log10_Sobs*log10_Sobs) +
                  s(d.z,bs="cr",k=10) + s(p.z,bs="cr",k=10) + ti(d.z,p.z,bs=c("cr","cr"),k=c(10,10)) +
                  s(d.z,SiteCode,bs="fs",k=10,xt = list("cr")),
                 data = df_U, family=gaussian,method = "REML")
-l_md[[3]] <- gam(log10_U ~ offset(log10_Sobs) +
-                 s(d.z,bs="cc",k=10) + s(p.z,bs="cc",k=10) + ti(d.z,p.z,bs=c("cc","cc"),k=c(10,10)) +
-                 s(d.z,SiteCode,bs="fs",k=10,xt = list("cc")),
-                data = df_U, family=gaussian,method = "REML")
-l_md[[4]] <- gam(log10_U ~ offset(log10_Sobs) +
-                 s(d.z,bs="ps",k=10) + s(p.z,bs="ps",k=10) + ti(d.z,p.z,bs=c("ps","ps"),k=c(10,10)) +
-                 s(d.z,SiteCode,bs="fs",k=10,xt = list("ps")),
-                data = df_U, family=gaussian,method = "REML")
-l_md[[5]] <- gam(log10_U ~ offset(log10_Sobs) +
-                 s(d.z,bs="gp",k=10) + s(p.z,bs="gp",k=10) + ti(d.z,p.z,bs=c("gp","gp"),k=c(10,10)) +
-                 s(d.z,SiteCode,bs="fs",k=10,xt = list("gp")),
-                data = df_U, family=gaussian,method = "REML")
-# l_md[[6]] <- gam(log10_U ~ offset(log10_Sobs) +
-#                  s(d.z,bs="ts",k=10) + s(p.z,bs="ts",k=10) + ti(d.z,p.z,bs=c("ts","ts"),k=c(10,10)) +
-#                  s(d.z,SiteCode,bs="fs",k=10,xt = list("ts")),
-#                 data = df_U, family=gaussian,method = "REML")
-# l_md[[7]] <- gam(log10_U ~ offset(log10_Sobs) +
-#                  s(d.z,bs="cs",k=10) + s(p.z,bs="cs",k=10) + ti(d.z,p.z,bs=c("cs","cs"),k=c(10,10)) +
-#                  s(d.z,SiteCode,bs="fs",k=10,xt = list("cs")),
-#                 data = df_U, family=gaussian,method = "REML")
-names(l_md) <- c("tp","cr","cc","ps","gp")
-AICctab(l_md,weights=TRUE)
-# df_U %>% ggplot(aes(y=log10_U,x=log10(d))) + geom_point()
 ```
 
-
-
 ```{r save l_md.U_gamEstudo,eval=FALSE,echo=FALSE}
+names(l_md) <- c("tp","cr") #,"cc","ps","gp"
 l_md_log10_U <- l_md
 save(l_md_log10_U,file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_md_log10_U.Rdata")
 ```
 
 ```{r load l_md.U_gamEstudo,eval=TRUE,echo=FALSE}
-load("~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_md_log10.U_gamEstudo.Rdata")
-df_U %>% names
+load("~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_md_log10_U.Rdata")
+# l_md <- l_md_log10_U[1:2]
+AICctab(l_md)
+# df_U %>% names
+```
+Para a variável d na escala padrão a base 'cr' é a única plausível
+
+```{r predito por md_U d escala padrao ,fig.width=9, fig.height=29}
+# dados
+md_U <- l_md_log10_U[["cr"]]
+df_ <- cbind(cbind(data.frame(fit = md_U$fitted.values,
+                              residuals = md_U$residuals),
+             md_U$model))
+# variaveis para grafico
+df_plot <- inner_join(x=distinct(select(df_U,p,SiteCode)),
+                      y=df_,
+                      by="SiteCode") %>%
+  mutate(title = paste0(SiteCode," p=",round(p,3))) %>% arrange(p)
+df_plot$title <- factor(df_plot$title,levels = unique(df_plot$title))
+# gráfico
+df_plot %>% ggplot(aes(x=d.z,y=log10_U)) +
+  geom_point(alpha=0.5) + 
+  geom_line(aes(x=d.z,y=fit),color="red") + #
+  # scale_colour_manual(values=c("red", "blue")) +
+  theme(legend.position = "top") +
+  facet_wrap(~title,ncol=5,scales="free")
 ```
 
-```{r}
+na escala padrão, os valores baixos de d.z, que ocorrem nos percentis elevados (e.g.0.99), são muito próximos entre si e aqueles em valores mais altos mais espaçados. Isso pq o kernel de dispersão é exponencial. Uma maneira de ponderar este efeito é transformando a variável d para a escala log:
+
+```{r echo=TRUE,eval=FALSE}
+beta_log10_Sobs <- fixef(lmer_U)[2] %>% as.numeric() %>% round(.,digits = 3)
 l_md <- list()
-l_md[[1]] <- gam(log10_U ~ offset(log10_Sobs) +
+l_md[[1]] <- gam(log10_U ~ offset(beta_log10_Sobs*log10_Sobs) +
                  s(log10_d.z,bs="tp",k=10) + s(p.z,bs="tp",k=10) + ti(log10_d.z,p.z,bs=c("tp","tp"),k=c(10,10)) +
                  s(log10_d.z,SiteCode,bs="fs",k=10,xt = list("tp")),
                 data = df_U, family=gaussian,method = "REML")
-l_md[[2]] <- gam(log10_U ~ offset(log10_Sobs) +
+l_md[[2]] <- gam(log10_U ~ offset(beta_log10_Sobs*log10_Sobs) +
                  s(log10_d.z,bs="cr",k=10) + s(p.z,bs="cr",k=10) + ti(log10_d.z,p.z,bs=c("cr","cr"),k=c(10,10)) +
                  s(log10_d.z,SiteCode,bs="fs",k=10,xt = list("cr")),
                 data = df_U, family=gaussian,method = "REML")
-l_md[[3]] <- gam(log10_U ~ offset(log10_Sobs) +
-                 s(log10_d.z,bs="cc",k=10) + s(p.z,bs="cc",k=10) + ti(log10_d.z,p.z,bs=c("cc","cc"),k=c(10,10)) +
-                 s(log10_d.z,SiteCode,bs="fs",k=10,xt = list("cc")),
-                data = df_U, family=gaussian,method = "REML")
-l_md[[4]] <- gam(log10_U ~ offset(log10_Sobs) +
-                 s(log10_d.z,bs="ps",k=10) + s(p.z,bs="ps",k=10) + ti(log10_d.z,p.z,bs=c("ps","ps"),k=c(10,10)) +
-                 s(log10_d.z,SiteCode,bs="fs",k=10,xt = list("ps")),
-                data = df_U, family=gaussian,method = "REML")
-l_md[[5]] <- gam(log10_U ~ offset(log10_Sobs) +
-                 s(log10_d.z,bs="gp",k=10) + s(p.z,bs="gp",k=10) + ti(log10_d.z,p.z,bs=c("gp","gp"),k=c(10,10)) +
-                 s(log10_d.z,SiteCode,bs="fs",k=10,xt = list("gp")),
-                data = df_U, family=gaussian,method = "REML")
-# l_md[[6]] <- gam(log10_U ~ offset(log10_Sobs) +
-#                  s(d.z,bs="ts",k=10) + s(p.z,bs="ts",k=10) + ti(d.z,p.z,bs=c("ts","ts"),k=c(10,10)) +
-#                  s(d.z,SiteCode,bs="fs",k=10,xt = list("ts")),
-#                 data = df_U, family=gaussian,method = "REML")
-# l_md[[7]] <- gam(log10_U ~ offset(log10_Sobs) +
-#                  s(d.z,bs="cs",k=10) + s(p.z,bs="cs",k=10) + ti(d.z,p.z,bs=c("cs","cs"),k=c(10,10)) +
-#                  s(d.z,SiteCode,bs="fs",k=10,xt = list("cs")),
-#                 data = df_U, family=gaussian,method = "REML")
+```
 
-names(l_md) <- c("tp","cr","cc","ps") #,"gp"
-AICctab(l_md,weights=TRUE)
+```{r}
+names(l_md) <- c("tp","cr") #,"cc","ps","gp"
 l_md_U_log10_dz <- l_md
 save(l_md_U_log10_dz,file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_md_U_log10_dz.Rdata")
+```
+
+```{r}
 load("~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_md_U_log10_dz.Rdata")
-names(l_md_U_log10_dz) <- c("tp","cr","cc","ps") #,"gp"
-AICctab(l_md_U_log10_dz,weights=T)
-md_U <- l_md_U_log10_dz[["tp"]]
-summary(md_U)
-# df_U %>% ggplot(aes(y=log10_U,x=log10(d))) + geom_point()
+AICctab(l_md_U_log10_dz,weights=TRUE)
 ```
+para a variável log10(d) o mais plausível é a função de base 'tp' 
 
-
-Commit com os codigos para gamm nRef [referência]:
-97a682916fd0942c0c75ca44fb6c66857ec95706
-
-
-```{r}
-save(l_md.U_mdCheio,file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_md.U_mdCheio_semSobs_tp.Rdata")
-```
-
-```{r}
-load("~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_md.U_mdCheio_semSobs.Rdata")
-AICctab(l_md.U_mdCheio,weights=T)
-md_U <- l_md.U_mdCheio[["gamm d|Site for each"]]
-
-appraise(md_U)
-teste <- predict.gam(md_U,se.fit = TRUE)
-
-lapply(lapply(teste,exp),summary)
-
-gam.check(md_U)
-```
-
-
-__comparação com e sem Sobs___
-
-```{r}
-## com Sobs
-load("~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_md_log10.U_gamEstudo.Rdata")
-md_U <- l_md_log10.U_gamEstudo[["cr"]]
-# save(md_U_sSobs,file = "~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/md_U_sSobs.Rdata")
-## sem Sobs
-md_U_offset.Sobs <- gam(log10_U ~ offset(log10_Sobs) +
-                 s(d.z,bs="cr",k=10,m=1) + s(p.z,bs="cr",k=10,m=1) + ti(d.z,p.z,bs=c("cr","cr"),k=c(10,10),m=1) +
-                 s(SiteCode,bs="re") + s(d.z,by=SiteCode,bs="cr",m=1,k=10),
-                data = df_U, family=gaussian,method = "REML")
-save(md_U_offset.Sobs,file = "~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/md_U_offset.Sobs.Rdata")
-## smoother por sitio compartilhando a mesma penalização de ajuste
-md_U_GS <- gam(log10_U ~ offset(log10_Sobs) +
-                 s(d.z,bs="cr",k=10,m=1) + s(p.z,bs="cr",k=10,m=1) + ti(d.z,p.z,bs=c("cr","cr"),k=c(10,10),m=1) +
-                 s(d.z,SiteCode,bs="fs",m=1,k=10,xt = list("cr")),
-                data = df_U, family=gaussian,method = "REML")
-md_U_GS_logSobs <- gam(log10_U ~ log10_Sobs +
-                 s(d.z,bs="cr",k=10,m=1) + s(p.z,bs="cr",k=10,m=1) + ti(d.z,p.z,bs=c("cr","cr"),k=c(10,10),m=1) +
-                 s(d.z,SiteCode,bs="fs",m=1,k=10,xt = list("cr")),
-                data = df_U, family=gaussian,method = "REML")
-save(md_U_GS_k15,file = "~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/md_U_GS_k15.Rdata")
-load("~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/md_U_GS_k15.Rdata")
-## smoother e penalização de ajuste por sítio: 
-# md_U_te <- gam(log10_U ~ offset(log10_Sobs) +
-#                           te(d.z,p.z,bs=c("cr","cr"),k=c(10,10),m=2) +
-#                           t2(d.z,p.z,SiteCode,bs=c("cr","cr","re"),k=c(10,10),m=1,full = TRUE),
-#                 data = df_U, family=gaussian,method = "REML")
-gratia::appraise(md_U_GS_k15)
-###### tp
-md_U_GS_tp <- gam(log10_U ~ offset(log10_Sobs) +
-                 s(d.z,bs="tp",k=10,m=1) + s(p.z,bs="tp",k=10,m=1) + ti(d.z,p.z,bs=c("tp","tp"),k=c(10,10),m=1) +
-                 s(d.z,SiteCode,bs="fs",m=1,k=10,xt = list("tp")),
-                data = df_U, family=gaussian,method = "REML")
-save(md_U_GS_tp,file = "~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/md_U_GS_tp.Rdata")
-AICctab(md_U_GS_tp,md_U_GS,weights=T)
-gratia::appraise(md_U_GS_tp)
-summary(md_U_offset.Sobs)
-gratia::appraise(md_U)
-```
-
-Não observo diferença nos gráficos diagnosticos, e na tabela de AIC os modelos estão empatados com uma pequena vantagem para o sem Sobs
-
-O modelo com offset apresenta o mesmo problema da matriz de covariância não ser positivamente definido
-
-vou mudar o modelo para ter um smoother por sítio compartilhando o mesmo penalizador de fit
-
-o modelo mais simples está dentro dos critérios para fazer o predito a posteriori
-
-O modelo final é mais plausível do que mantem o offset para log10(Sobs) com k=15; e sem offset para log10(Sobs), com o parametro estimado 
-
-Eu comparei este novo modelo com as
-
-```{r eval=FALSE}
+```{r md_U escala d na escala log10, eval=TRUE,echo=FALSE,fig.width=9, fig.height=29}
 # dados
-## sem Sobs
-load(file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_md.U_mdCheio_semSobs.Rdata")
-l_md.U_semSobs <- l_md.U_mdCheio
-# l_md.U_semSobs %>% length()
-## com Sobs
-load(file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_md.U_mdCheio.Rdata")
-l_md.U_comSobs <- l_md.U_mdCheio
-# l_md.U_comSobs %>% length()
-
-## cr sem Sobs penalização comum 
-# load(file="/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_md_U_gammCheio.Rdata")
-# md_U.cr <- l_md_U_gammCheio[[8]]
-
-## AICctab
-# AICctab(l_md.U_semSobs,weights=T)
-md_U_semSobs<- l_md.U_semSobs[["gamm d|Site common"]]
-# AICctab(l_md.U_comSobs,weights=T)
-md_U_comSobs<- l_md.U_comSobs[["gamm d|Site common"]]
-
-## graf diag
-gratia::appraise(md_U_semSobs)
-gratia::appraise(md_U_comSobs)
-# gratia::appraise(md_U.cr)
-
-
-## summary
-summary(md_U_semSobs)
-summary(md_U_comSobs)
-# summary(md_U.cr)
-
-
-## melhor modelo
-AICctab(md_U_semSobs,md_U_comSobs,weights=TRUE) #,md_U.cr
+md_U <- l_md_U_log10_dz[["tp"]]
+df_ <- cbind(cbind(data.frame(fit = md_U$fitted.values,
+                              residuals = md_U$residuals),
+             md_U$model))
+# variaveis para grafico
+df_plot <- inner_join(x=distinct(select(df_U,p,SiteCode)),
+                      y=df_,
+                      by="SiteCode") %>%
+  mutate(title = paste0(SiteCode," p=",round(p,3))) %>% arrange(p)
+df_plot$title <- factor(df_plot$title,levels = unique(df_plot$title))
+# gráfico
+df_plot %>% ggplot(aes(x=log10_d.z,y=log10_U)) +
+  geom_point(alpha=0.5) + 
+  geom_line(aes(x=log10_d.z,y=fit),color="red") + #
+  # scale_colour_manual(values=c("red", "blue")) +
+  theme(legend.position = "top") +
+  facet_wrap(~title,ncol=5,scales="free")
 ```
+
+A transformação da variável d pela transformação log permitiu reduzir o overfit na região de transição entre patamares nos valores baixos do preditor continuo. Porém em alguns casos ainda há overfit. Um possivel problema é o número de funções base:
 
 ```{r}
-gratia::appraise(md_U_semSobs)
-gratia::appraise(md_U_comSobs)
+gam.check(md_U)
+summary(md_U)
 ```
+o gam.check sugere que aumentar o número de funções base para s(log10_d.z)
 
 
 ```{r warning=FALSE,message=FALSE}
@@ -2779,10 +2672,34 @@ l_p[[2]] <- ggplot(df_, aes(x=log10_d.z,y=residuals)) +
 l_p[[3]] <- ggplot(df_, aes(x=log10_U,y=fit)) +
   geom_smooth(method="loess") +
   geom_point(alpha=0.3)
-grid.arrange(grobs=l_p,ncol=3) #,top="deviance residual ~ continuous predictors"
-
+grid.arrange(grobs=l_p,ncol=3, top="deviance residual and fit ~ observed") #,top="deviance residual ~ continuous predictors"
 gratia::appraise(md_U)
 ```
+Talvez se aumentar o número de funções de base possa ser possível obter melhor ajuste:
+
+```{r}
+beta_log10_Sobs <- fixef(lmer_U)[2] %>% as.numeric() %>% round(.,digits = 3)
+l_md <- list()
+l_md[[1]] <- md_U
+l_md[[2]] <- gam(log10_U ~ offset(beta_log10_Sobs*log10_Sobs) +
+                   s(log10_d.z,bs="tp",k=15) + s(p.z,bs="tp",k=10) + ti(log10_d.z,p.z,bs=c("tp","tp"),k=c(15,10)) +
+                   s(log10_d.z,SiteCode,bs="fs",k=15,xt = list("tp")),
+                 data = df_U, family=gaussian,method = "REML")
+names(l_md) <- c("k=10","k=15")
+# AICctab(l_md)
+l_md_U_k15 <- l_md 
+save(l_md_U_k15,file = "~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_md_U_k15.Rdata")
+# summary(l_md_U_k15[["k=15"]])
+# gam.check(l_md_U_k15[["k=15"]])
+```
+
+```{r}
+load("~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_md_U_k15.Rdata")
+AICctab(l_md_U_k15)
+md_U <- l_md_U_k15[["k=15"]]
+```
+
+
 
 ```{r predito por md_U_GS ,fig.width=9, fig.height=29}
 # dados
@@ -2814,7 +2731,9 @@ df_plot %>% ggplot(aes(x=log10_d.z,y=log10_U)) +
   theme(legend.position = "top") +
   facet_wrap(~title,ncol=5,scales="free")
 ```
-O modelo estava fazendo um bom ajuste, apesar na fase logito parece existir um problema de overfit que me parece relacionado com a função base
+Ainda há muitos problemas na fase de patamares
+
+
 
 ### observado e predito por sítio de amostragem
 
