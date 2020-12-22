@@ -7,7 +7,7 @@ output:
     toc: true
     toc_depth: 5
 editor_options: 
-  chunk_output_type: console
+  chunk_output_type: inline
 ---
 
 <style>
@@ -2684,15 +2684,17 @@ beta_log10_Sobs <- fixef(lmer_U)[2] %>% as.numeric() %>% round(.,digits = 3)
 l_md <- list()
 l_md[[1]] <- md_U
 l_md[[2]] <- gam(log10_U ~ offset(beta_log10_Sobs*log10_Sobs) +
-                   s(log10_d.z,bs="tp",k=15) + s(p.z,bs="tp",k=10) + ti(log10_d.z,p.z,bs=c("tp","tp"),k=c(15,10)) +
-                   s(log10_d.z,SiteCode,bs="fs",k=15,xt = list("tp")),
+                   s(log10_d.z,bs="cr",k=18) + s(p.z,bs="cr",k=10) + ti(log10_d.z,p.z,bs=c("cr","cr"),k=c(15,10)) +
+                   s(log10_d.z,SiteCode,bs="fs",k=15,xt = list("cr"),m=1),
                  data = df_U, family=gaussian,method = "REML")
-names(l_md) <- c("k=10","k=15")
-# AICctab(l_md)
+names(l_md) <- c("k=15","k=18")
+AICctab(l_md,weights=T)
+md_U <- l_md[[1]]
 l_md_U_k15 <- l_md 
 save(l_md_U_k15,file = "~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_md_U_k15.Rdata")
+save(md_U,file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/md_U_k15_cr.Rdata")
 # summary(l_md_U_k15[["k=15"]])
-# gam.check(l_md_U_k15[["k=15"]])
+gam.check(md_U)
 ```
 
 ```{r}
@@ -2726,9 +2728,9 @@ df_plot <- inner_join(x=distinct(select(df_U,p,SiteCode)),
   mutate(title = paste0(SiteCode," p=",round(p,3))) %>% arrange(p)
 df_plot$title <- factor(df_plot$title,levels = unique(df_plot$title))
 # gráfico
-df_plot %>% ggplot(aes(x=log10_d.z,y=log10_U)) +
+df_plot %>% ggplot(aes(x=d.z,y=log10_U)) + #log10_
   geom_point(alpha=0.5) + 
-  geom_line(aes(x=log10_d.z,y=fit),color="red") + #
+  geom_line(aes(x=d.z,y=fit),color="red") + #log10_
   # scale_colour_manual(values=c("red", "blue")) +
   theme(legend.position = "top") +
   facet_wrap(~title,ncol=5,scales="free")
@@ -2745,7 +2747,8 @@ md_U_GI <- gam(log10_U ~ offset(beta_log10_Sobs*log10_Sobs) +
 save(md_U_GI,file = "~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/md_U_GI.Rdata")
 ```
 
-Meu computador não possível memória suficiente para rodar esse modelo. Vou voltar uma casa e tentar e trocar a função de base do modelo anterior para 'cr'
+Meu computador não possível memória suficiente para rodar esse modelo. Vou voltar uma casa e trocar a função de base do modelo anterior para 'cr'
+
 
 ```{r}
 beta_log10_Sobs <- fixef(lmer_U)[2] %>% as.numeric() %>% round(.,digits = 3)
@@ -2756,11 +2759,36 @@ l_md[[2]] <- gam(log10_U ~ offset(beta_log10_Sobs*log10_Sobs) +
                    s(log10_d.z,SiteCode,bs="fs",k=15,xt = list("cr")),
                  data = df_U, family=gaussian,method = "REML")
 names(l_md) <- c("tp","cr")
-# AICctab(l_md)
+AICctab(l_md,weights=T)
 l_md_U_k15_comparacao <- l_md 
 save(l_md_U_k15_comparacao,file = "~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_md_U_k15_comparacao.Rdata")
 ```
 
+O modelo tp é o único plausível. Acredito que com a atual abordagem de GAM para todo o conjunto de dados, o gráfico anterior será o melhor ajuste que irei obter.
+
+Por final vou comparar os melhores gams para a variável de dispersão per capita 
+
+```{r}
+l_md <- list()
+l_md[[1]] <- md_U
+l_md[[2]] <- gam(log10_U ~ offset(beta_log10_Sobs*log10_Sobs) +
+                   s(d.z,bs="cr",k=18) + s(p.z,bs="cr",k=10) + ti(d.z,p.z,bs=c("cr","cr"),k=c(15,10)) +
+                   s(d.z,SiteCode,bs="fs",k=15,xt = list("cr"),m=1),
+                 data = df_U, family=gaussian,method = "REML")
+names(l_md) <- c("log10(d)","d")
+AICctab(l_md,weights=T)
+md_U <- l_md[[2]]
+gratia::appraise(md_U)
+gratia::appraise(l_md[["log10(d)"]])
+# df_ <- cbind(data.frame(fitado = l_md[["d"]]$fitted.values,
+#                         residuo = l_md[["d"]]$residuals),
+#              l_md[["d"]]$model)
+# df_ %>% ggplot(aes(x=d.z,y=residuo)) +
+#   geom_point()
+md_U <- l_md[[2]]
+gam.check(l_md[["log10(d)"]])
+gam.check(l_md[["d"]])
+```
 
 
 
@@ -2768,41 +2796,72 @@ save(l_md_U_k15_comparacao,file = "~/Documentos/artigo_mestrado/1A.P_MOVER/Suppo
 
 ```{r}
 gratia::appraise(md_U)
+
+
+model.frame(md_U) # , data = newdata, na.action = na.act
+eval(model.frame(md_U, data = df_newdata, na.action = "na.act"), parent.frame())
 ```
 
 Pré requisitos para obter a distribuição a posteriori
 
-```{r}
+```{r fig.width=8}
 # dados gerais
-gamm <- md_U
+gamm <- l_md[[2]]
 ## dados para predição
 df_newdata <- expand.grid(SiteCode=levels(df_resultados$SiteCode)[1],
-                          log10_d.z=seq(min(df_U$log10_d.z),max(df_U$log10_d.z),length=40),
+                          # d=seq(min(df_U$d),max(df_U$d),length=40),
+                          d.z=seq(min(df_U$d.z),max(df_U$d.z),length=40),
                           p.z=seq(min(df_U$p.z),max(df_U$p.z),length=200),
-                          log10_Sobs = 0)
-df_newdata$predict <- predict(gamm, newdata = df_newdata, type = "response")
-df_newdata %<>% mutate(p = (p.z + mean(df_resultados$p)) * sd(df_resultados$p),
-                       log10_d = (log10_d.z + mean(df_resultados$log10_d)) * sd(df_resultados$log10_d),
-                       d = 10^(log10_d),
-                       U = 10^predict)
-
-ggplot(df_newdata,aes(x=p,y=d,fill=U)) +
+                          log10_Sobs=0)
+df_newdata$predito <- predict(gamm, type = "response",newdata=df_newdata,newdata.guaranteed=TRUE)
+df_newdata %<>% mutate(p = p.z*sd(df_resultados$p) + mean(df_resultados$p),
+                       d = d.z*sd(df_resultados$d) + mean(df_resultados$d),
+                       U = 10^predito)
+# plots
+l_p <- list()
+l_p[[1]] <- ggplot(df_newdata,aes(x=p,y=d,fill=U)) +
   coord_cartesian(expand = FALSE) + 
   geom_tile() +
   scale_fill_distiller(palette = "Spectral") +
-  theme_classic() + 
+  theme_classic() + labs(title = "mais plausível (basis=cr)") +
   # facet_wrap(~IC_pred,ncol=1) +
-  # theme(legend.position=element_blank(),legend.title = element_blank()) +
+  theme(legend.position="bottom",legend.title = element_blank()) +
   geom_contour(aes(z=U),alpha=0.4, col="black",
                breaks = round(quantile(df_newdata$U,probs = c(0.1,0.25,0.5,0.75,0.9)),5)) +
-  geom_text_contour(aes(z=U),stroke=0.2,
-                    
-                    breaks = round(quantile(df_newdata$U,probs = c(0.1,0.25,0.5,0.75,0.9)),5),
+  geom_text_contour(aes(z=U),stroke0.2,
+                    breaks = format(quantile(df_newdata$U,probs = c(0.1,0.25,0.5,0.75,0.9)),scientific=TRUE),
                     rotate = FALSE,
                     size=2.7)
-df_U %>% select(d,log10_d,log10_d.z) %>% summary
-df_newdata %>% select(d,log10_d,log10_d.z) %>% summary
-df_resultados %>% select(d,log10_d,log10_d.z) %>% summary
+  # dados gerais
+gamm <- l_md[[1]]
+## dados para predição
+df_newdata <- expand.grid(SiteCode=levels(df_resultados$SiteCode)[1],
+                          d=seq(min(df_U$d),max(df_U$d),length=40),
+                          # d.z=seq(min(df_U$d.z),max(df_U$d.z),length=40),
+                          p.z=seq(min(df_U$p.z),max(df_U$p.z),length=200),
+                          log10_Sobs=0) %>% 
+  mutate(log10_d0 = log10(d),
+         log10_d.z = (log10_d0-mean(df_resultados$log10_d))/sd(df_resultados$log10_d) )
+df_newdata$predito <- predict(gamm, type = "response",newdata=df_newdata,newdata.guaranteed=TRUE)
+df_newdata %<>% mutate(p = p.z*sd(df_resultados$p) + mean(df_resultados$p),
+                       log10_d = log10_d.z*sd(df_resultados$log10_d) + mean(df_resultados$log10_d),
+                       d = 10^log10_d,
+                       U = 10^predito)
+# plots
+l_p[[2]] <- ggplot(df_newdata,aes(x=p,y=d,fill=U)) +
+  coord_cartesian(expand = FALSE) + 
+  geom_tile() +
+  scale_fill_distiller(palette = "Spectral") +
+  theme_classic() + labs(title = "menos plausível (basis=tp)") +
+  # facet_wrap(~IC_pred,ncol=1) +
+  theme(legend.position="bottom",legend.title = element_blank()) +
+  geom_contour(aes(z=U),alpha=0.4, col="black",
+               breaks = round(quantile(df_newdata$U,probs = c(0.1,0.25,0.5,0.75,0.9)),5)) #+
+  # geom_text_contour(aes(z=U),stroke=0.2,
+                    # breaks = format(round(quantile(df_newdata$U,probs = c(0.1,0.25,0.5,0.75,0.9)),5),scientific=TRUE),
+                    # rotate = FALSE,
+                    # size=2.7)
+grid.arrange(grobs=l_p,ncol=2)
 ```
 
 
