@@ -112,7 +112,7 @@ knitr::kable(df_variaveis,caption = "Variables") %>%
 ```
 
   
-    
+^    
 __Figure 1__ Possible Predictor Variables  
   
     
@@ -2796,8 +2796,6 @@ gam.check(l_md[["d"]])
 
 ```{r}
 gratia::appraise(md_U)
-
-
 model.frame(md_U) # , data = newdata, na.action = na.act
 eval(model.frame(md_U, data = df_newdata, na.action = "na.act"), parent.frame())
 ```
@@ -2865,20 +2863,28 @@ grid.arrange(grobs=l_p,ncol=2)
 ```
 
 
+Prosigo com o modelo mais plausivel
+
+```{r}
+load("~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/md_U_k15_cr.Rdata")
+```
+
+### predito
+
+The following code was adapted from Gavin Simpson (2016) blog post [acessado em abril de 2020]:  
+  https://fromthebottomoftheheap.net/2016/12/15/simultaneous-interval-revisited/ 
+  https://mikl.dk/post/2019-prediction-intervals-for-gam/
 
 ```{r U_med predito e observado para o modelo cheio,fig.width=8, fig.height=30,eval=FALSE}
-
-# broom::augment(lm(c(1:100) ~ c(100:1))) %>% names
-# lm(df_U$log10_U ~ gamm$y)
-
-# dados para predição
+# novo conjunto de dados
 df_newdata <- expand.grid(SiteCode=levels(df_resultados$SiteCode)[1],
-                          log10_d.z=seq(min(df_U$log10_d.z),max(df_U$log10_d.z),length=40),
+                          # d=seq(min(df_U$d),max(df_U$d),length=40),
+                          d.z=seq(min(df_U$d.z),max(df_U$d.z),length=40),
                           p.z=seq(min(df_U$p.z),max(df_U$p.z),length=200),
-                          log10_Sobs = 0)
-v_predict <- predict(gamm, newdata = df_newdata, type = "response")
-beta <- coef(gamm)
-V <- vcov.gam(gamm)
+                          log10_Sobs=0)
+df_newdata$predito <- predict(md_U, type = "response",newdata=df_newdata,newdata.guaranteed=TRUE)
+beta <- coef(md_U)
+V <- vcov.gam(md_U)
 ##  simulação de parâmetros
 num_beta_vecs <- 10000
 Cv <- chol(V)
@@ -2886,70 +2892,18 @@ set.seed(1)
 nus <- rnorm(num_beta_vecs * length(beta))
 beta_sims <- beta + t(Cv) %*% matrix(nus, nrow = length(beta), ncol = num_beta_vecs)
 # dim(beta_sims)
-matrix_lprediction <- predict(gamm,type="lpmatrix") 
+matrix_lprediction <- predict(md_U,type="lpmatrix",newdata=df_newdata,newdata.guaranteed=TRUE) 
 predict_link <- matrix_lprediction %*% beta_sims
 df_pred <- t(apply(predict_link,1,function(X) quantile(X,probs = c(0.05,0.50,0.95)))) %>% 
   as.data.frame()
 names(df_pred) <- c("IClower","median","ICupper")
-df_plot <- cbind(df_,df_pred) 
-# %>% 
-  # mutate(
-    # fit = exp(median),
-    #      lower = exp(IClower),
-    #      upper = exp(ICupper),
-    #      fit_predict = exp(.fitted),
-         # p = p.z * sd(df_resultados$p) + mean(df_resultados$p),
-         # d = d.z * sd(df_resultados$d) + mean(df_resultados$d))
-# df_ %>% summary
 # grafico
-# grafico
-df_plot %<>% mutate(title = paste0(SiteCode," p=",round(p,3))) %>% arrange(p)
-df_plot$title <- factor(df_plot$title,levels = unique(df_plot$title))
-ggplot(df_plot,aes(x=d,y=U_med)) +
-  geom_point(alpha=0.4) +
-  geom_ribbon(aes(ymin=lower,ymax=upper),alpha=0.3,fill="blue") +
-  geom_line(aes(y=fit),color="red",alpha=0.6) +
-  # geom_ribbon(aes(ymin=fit_response - 1.96 * se.fit_response,
-  #                 ymax=fit_response + 1.96 * se.fit_response),
-  #             color="blue",alpha=0.4) +
-  labs(title="U; gam(bs=cr)") +
-  facet_wrap(~title,ncol=5,scales = "free")
+df_plot_U <- cbind(df_newdata,df_pred) 
+df_plot_U %<>% mutate(p = p.z*sd(df_resultados$p) + mean(df_resultados$p),
+                    d = d.z*sd(df_resultados$d) + mean(df_resultados$d),
+                    U = 10^predito)
+read.csv(df_plot_U,file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/df_plot_U.Rdata")
 ```
-
-
-### predito
-
-The following code was adapted from Gavin Simpson (2016) blog post [acessado em abril de 2020]:  
-  https://fromthebottomoftheheap.net/2016/12/15/simultaneous-interval-revisited/ 
-  https://mikl.dk/post/2019-prediction-intervals-for-gam/
-  
-
-<!-- ##################################################### -->
-<!-- ##################################################### -->
-<!-- ##################################################### -->
-<!-- # ggplot(df_plot,aes(x=p,y=d,fill=lower)) + -->
-<!-- #   coord_cartesian(expand = FALSE) +  -->
-<!-- #   geom_tile() + -->
-<!-- #   scale_fill_distiller(palette = "Spectral") + -->
-<!-- #   labs(title="Especiation rate to obtain the observed species richness at equilibrium") + -->
-<!-- #   theme_classic() +  -->
-<!-- #   facet_wrap(~variable,ncol=1) + -->
-<!-- #   theme(legend.position="top",legend.title = element_blank()) #+ -->
-<!-- #   # geom_contour(aes(z=upper),alpha=0.4, col="black", -->
-<!-- #   #              breaks = round(quantile(df_plot$fit,probs = c(0.1,0.25,0.5,0.75,0.9)),5) ) + -->
-<!-- #   # geom_text_contour(aes(z=upper),stroke=0.2, -->
-<!-- #   #                   breaks = formatC(quantile(df_plot$fit,probs = c(0.1,0.25,0.5,0.75,0.9)),format = "e", digits = 3), -->
-<!-- #   #                   rotate = FALSE, -->
-<!-- #   #                   size=3) -->
-<!-- # df_plot %>% -->
-<!-- #   gather(key=estimates_class,value=estimates_value,fit:upper) %>% -->
-<!-- #   ggplot(aes(x=.$estimates_value)) + geom_histogram(bins=60) + facet_wrap(~estimates_class,ncol=3,scales="free") -->
-<!-- # summary(do.call("c",df_plot[,8:10])) -->
-
-<!-- ##################################################### -->
-<!-- ##################################################### -->
-<!-- ##################################################### -->
-
 
 
 ```{r figura final gam U df para predicao, eval=FALSE,echo=TRUE}
@@ -3041,12 +2995,118 @@ l_p[[3]] <- ggplot(df_plot,aes(x=p,y=d,fill=upper)) +
 grid.arrange(grobs=l_p,ncol=3,top="Speciation Rate")
 ```
 
+## LMM
+
+### 1o) comparar estruturas aleatórias e variáveis de dispersão:
+
+```{r}
+# offset
+lmer_U <- lmer(log10_U ~ log10_Sobs + (1|SiteCode),data=df_U)
+beta_log10_Sobs <- fixef(lmer_U)[2] %>% as.numeric() %>% round(.,digits = 3)
+# modelos
+l_md <- list()
+l_md[[1]] <- lmer(log10_U ~ offset(beta_log10_Sobs * log10_Sobs) + 
+                      (p.z + I(p.z^2)) * (d.z + I(d.z^2) + I(d.z^3)) + 
+                      (d.z + I(d.z^2) + I(d.z^3)|SiteCode),
+                 data=df_U,
+                 na.action = "na.fail")
+l_md[[2]] <- lmer(log10_U ~ offset(beta_log10_Sobs * log10_Sobs) + 
+                      (p.z + I(p.z^2)) * (d.z + I(d.z^2) + I(d.z^3)) + 
+                      (d.z + I(d.z^2)|SiteCode),
+                 data=df_U,
+                 na.action = "na.fail")
+l_md[[3]] <- lmer(log10_U ~ offset(beta_log10_Sobs * log10_Sobs) + 
+                      (p.z + I(p.z^2)) * (d.z + I(d.z^2) + I(d.z^3)) + 
+                      (d.z|SiteCode),
+                 data=df_U,
+                 na.action = "na.fail")
+l_md[[4]] <- lmer(log10_U ~ offset(beta_log10_Sobs * log10_Sobs) + 
+                      (p.z + I(p.z^2)) * (d.z + I(d.z^2) + I(d.z^3)) + 
+                      (1|SiteCode),
+                 data=df_U,
+                 na.action = "na.fail")
+l_md[[5]] <- lmer(log10_U ~ offset(beta_log10_Sobs * log10_Sobs) + 
+                      (p.z + I(p.z^2)) * (log10_d.z + I(log10_d.z^2) + I(log10_d.z^3)) + 
+                      (log10_d.z + I(log10_d.z^2) + I(log10_d.z^3)|SiteCode),
+                 data=df_U,
+                 na.action = "na.fail")
+v_star <- getME(l_md[[5]],c("theta","fixef"))
+l_md[[5]] <- update(l_md[[5]],start=v_star)
+l_md[[6]] <- lmer(log10_U ~ offset(beta_log10_Sobs * log10_Sobs) + 
+                      (p.z + I(p.z^2)) * (log10_d.z + I(log10_d.z^2) + I(log10_d.z^3)) + 
+                      (log10_d.z + I(log10_d.z^2)|SiteCode),
+                 data=df_U,
+                 na.action = "na.fail")
+v_star <- getME(l_md[[6]],c("theta","fixef"))
+l_md[[6]] <- update(l_md[[6]],start=v_star)
+l_md[[7]] <- lmer(log10_U ~ offset(beta_log10_Sobs * log10_Sobs) + 
+                      (p.z + I(p.z^2)) * (log10_d.z + I(log10_d.z^2) + I(log10_d.z^3)) + 
+                      (log10_d.z|SiteCode),
+                 data=df_U,
+                 na.action = "na.fail")
+l_md[[8]] <- lmer(log10_U ~ offset(beta_log10_Sobs * log10_Sobs) + 
+                      (p.z + I(p.z^2)) * (log10_d.z + I(log10_d.z^2) + I(log10_d.z^3)) + 
+                      (1|SiteCode),
+                 data=df_U,
+                 na.action = "na.fail")
+names(l_md) <- c("d ^3|Site",
+                 "d ^2|Site",
+                 "d ^1|Site",
+                 "d 1|Site",
+                 "log10(d) ^3|Site",
+                 "log10(d) ^2|Site",
+                 "log10(d) ^1|Site",
+                 "log10(d) 1|Site")
+AICctab(l_md,weights=TRUE)
+```
+
+```{r}
+md_U <- l_md[["log10(d) ^3|Site"]]
+summary(md_U)
+```
+```{r}
+p_plot <- DHARMa::simulateResiduals(md_U,n=1000)
+plot(p_plot)
+```
+
+```{r}
+df_ranef <- ranef(md_U)$SiteCode 
+df_ranef$SiteCode <- row.names(df_ranef)
+row.names(df_ranef) <- NULL
+df_ranef %>% 
+  gather(key = parameter_class,value = parameter_value, -SiteCode) %>% 
+  ggplot(aes(sample=parameter_value)) + 
+  stat_qq(alpha=0.3) + stat_qq_line(alpha=0.3,col="red") +
+  facet_wrap(~parameter_class,scales="free",ncol=2)
+
+```
+
+```{r}
+  # dados
+df_md <- md_U@frame
+df_md$observado <- df_md$log10_U
+df_md$predito <- predict(md_U,type="response")
+# graficos
+ggplot(df_md,aes(x=observado,y=predito)) +
+  geom_point(alpha=0.3) +
+  geom_smooth(method = "lm",aes(group=SiteCode),se=FALSE,alpha=0.3,color="blue") +
+  geom_abline(slope = 1,intercept = 0,col="red",alpha=0.8,size=1)
+```
+
+```{r}
+# todas as combinações de modelo do modelo cheio
+# registerDoMC(3)
+lmer(formula = log10_U ~ I(log10_d.z^2) + (log10_d.z + I(log10_d.z^2) + 
+    I(log10_d.z^3) | SiteCode) + offset(beta_log10_Sobs * log10_Sobs), 
+    data = df_U, na.action = "na.fail")
 
 
+l_call.md <- dredge(md_U,trace = FALSE,evaluate=FALSE,fixed = "offset(beta_log10_Sobs * log10_Sobs)")
+l_md.dredge_U <- llply(dredge(md_U,trace = FALSE,evaluate=FALSE,fixed = "offset(beta_log10_Sobs * log10_Sobs)"), eval) #,.parallel = TRUE
+teste <- laply(dredge(md_U,trace = FALSE,evaluate=FALSE,fixed = "offset(beta_log10_Sobs * log10_Sobs)"), eval) #,.parallel = TRUE
 
-
-
-
+save(l_md.dredge_U,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md.dredge_U.Rdata")
+```
 
 
 ## 5 Congruência entre nRef e diffS:
