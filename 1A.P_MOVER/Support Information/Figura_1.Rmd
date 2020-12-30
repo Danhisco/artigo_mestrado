@@ -1,0 +1,124 @@
+---
+title: "Figura_1"
+author: "Danilo Pereira Mori"
+date: "30/12/2020"
+output: pdf_document
+classoption: landscape
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, tidy = FALSE, include = TRUE, warning = FALSE,cache = TRUE,message=FALSE,eval=TRUE)
+```
+
+```{r pacotes}
+library(scales)
+library(mgcv)
+library(bbmle)
+library(lme4)
+library(merTools)
+library(magrittr)
+library(ggplotify)
+library(gridExtra)
+library(scatterplot3d)
+library(plotly)
+library(RColorBrewer)
+library(cowplot)
+library(ggplot2); theme_set(theme_classic())
+library(metR)
+library(tidyr)
+library(purrr)
+library(plyr)
+library(dplyr)
+```
+
+```{r dados,message=FALSE}
+### dados ###
+# leitura
+df_resultados <- read.csv(file="/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/simulacao_codigos_e_resultados/resultados/df_resultados.csv",
+                            header = TRUE,as.is=FALSE)[,1:13]
+# padronização
+level_k <- as.character(unique(sort(as.numeric(df_resultados$k),decreasing = TRUE)))
+df_resultados$k <- factor(df_resultados$k,levels = level_k)
+levels(df_resultados$k)[19] <- "0.1"
+# z score
+f_z <- function(x){
+  m <- base::mean(x,na.rm=FALSE)
+  sd <- sd(x,na.rm=FALSE)
+  output <- (x-m)/sd
+  return(output)
+} 
+# names(df_resultados)
+# str(df_resultados)
+df_resultados %<>% mutate(diffS_gamma = diffS_mean + min(diffS_mean)*(-1) + 0.01,
+                          modulo_diffS = abs(diffS_mean),
+                          log_Sobs=log(S_obs))
+
+df_resultados.z <- as.data.frame(apply(df_resultados[,c("p","Ntotal","log_Sobs","k_1","d_Lplot","d","modulo_diffS")],2,f_z))
+names(df_resultados.z) <- sapply(names(df_resultados.z), function(x) paste0(x,".z"))
+df_resultados %<>% cbind(.,df_resultados.z) %>% 
+  select(-k_1,-k_1.z)
+```
+
+
+```{r}
+############# A e B: 
+# dados
+## MNEE
+load(file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_nRefEE__AICcmodavg.Rdata")
+mdAvg_nRefEE__AICcmodavg$MN <- "EE"
+## MNEI
+load(file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_nRefEI__AICcmodavg.Rdata")
+mdAvg_nRefEI__AICcmodavg$MN <- "EI"
+## df comum
+df_plot <- rbind(mdAvg_nRefEE__AICcmodavg,mdAvg_nRefEI__AICcmodavg)
+df_plot %<>% mutate(p = p.z * sd(df_resultados$p) + mean(df_resultados$p),
+                    d = d.z*sd(df_resultados$d) + mean(df_resultados$d))
+## Gráficos
+l_p <- list()
+labels_IC <- c(lower.CL="quantile 5%", upper.CL="quantile 95%")
+labels_median <- c(EE="IC 5%", upper.CL="IC 95%")
+### SENM Spatially-Explicit Neutral Model
+df_plotEE <- df_plot %>% filter(MN=="EE") %>% mutate(label_ = "median")
+l_p[[1]] <- ggplot(df_plotEE,aes(x=p,y=d,fill=mod.avg.pred)) +
+  geom_tile() +
+  scale_fill_gradient2(limits = c(0,1),midpoint=0.5, high="red", low="blue",mid="green") +
+  labs(fill="") +
+  coord_cartesian(expand = FALSE) +
+  theme_classic() + facet_wrap(~label_, ncol=1) + theme(legend.position = "bottom")
+v_legend <- get_legend(l_p[[1]])
+l_p[[1]] <- l_p[[1]] + theme(legend.position="none")
+df_plotEE %<>% gather(key = IC_class ,value = IC_pred,lower.CL:upper.CL)
+l_p[[2]] <- ggplot(df_plotEE,aes(x=p,y=d,fill=IC_pred)) +
+  geom_tile() +
+  scale_fill_gradient2(limits = c(0,1),midpoint=0.5, high="red", low="blue",mid="green") +
+  labs(fill="") +
+  coord_cartesian(expand = FALSE) +
+  theme_classic() + facet_wrap(~IC_class,ncol=2,labeller = labeller(IC_class = labels_IC)) + theme(legend.position="none")
+a_SENM <- plot_grid(l_p[[1]],l_p[[2]],ncol=1,rel_heights=c(2, 1.35))
+l_p[[3]] <- ggdraw() + draw_label("SENM")
+a_SENM <- plot_grid(l_p[[3]],a_SENM,ncol=1,rel_heights=c(0.1, 1))
+### SINM Spatially-Explicit Neutral Model
+df_plotEI <- df_plot %>% filter(MN=="EI") %>% mutate(label_ = "median")
+l_p[[1]] <- ggplot(df_plotEI,aes(x=p,y=d,fill=mod.avg.pred)) +
+  geom_tile() +
+  scale_fill_gradient2(limits = c(0,1),midpoint=0.5, high="red", low="blue",mid="green") +
+  labs(fill="") +
+  coord_cartesian(expand = FALSE) +
+  theme_classic() + facet_wrap(~label_, ncol=1) + theme(legend.position="none")
+df_plotEI %<>% gather(key = IC_class ,value = IC_pred,lower.CL:upper.CL)
+l_p[[2]] <- ggplot(df_plotEI,aes(x=p,y=d,fill=IC_pred)) +
+  geom_tile() +
+  scale_fill_gradient2(limits = c(0,1),midpoint=0.5, high="red", low="blue",mid="green") +
+  labs(fill="") +
+  coord_cartesian(expand = FALSE) +
+  theme_classic() + facet_wrap(~IC_class,ncol=2,labeller = labeller(IC_class = labels_IC)) + theme(legend.position="none")
+b_SINM <- plot_grid(l_p[[1]],l_p[[2]],ncol=1,rel_heights=c(2, 1.35))
+l_p[[3]] <- ggdraw() + draw_label("SINM")
+b_SINM <- plot_grid(l_p[[3]],b_SINM,ncol=1,rel_heights=c(0.1, 1))
+### Probability of not refuting a predicted SAD
+l_p[[1]] <- ggdraw() + draw_label("Prob. not refuting a predicted SAD")
+a_prob_of_not_refuting <- plot_grid(a_SENM,b_SINM,ncol=2)
+a_prob_of_not_refuting <- plot_grid(l_p[[1]],a_prob_of_not_refuting,v_legend,ncol=1,rel_heights = c(0.1,1,0.1))
+a_prob_of_not_refuting
+```
+
