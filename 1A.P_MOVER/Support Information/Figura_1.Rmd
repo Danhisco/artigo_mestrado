@@ -11,6 +11,7 @@ knitr::opts_chunk$set(echo = FALSE, tidy = FALSE, include = TRUE, warning = FALS
 ```
 
 ```{r pacotes}
+library(ggsci)
 library(scales)
 library(mgcv)
 library(bbmle)
@@ -61,7 +62,7 @@ df_resultados %<>% cbind(.,df_resultados.z) %>%
 
 
 ```{r}
-############# A e B: 
+############# A: 
 # dados
 ## MNEE
 load(file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_nRefEE__AICcmodavg.Rdata")
@@ -81,16 +82,20 @@ labels_median <- c(EE="IC 5%", upper.CL="IC 95%")
 df_plotEE <- df_plot %>% filter(MN=="EE") %>% mutate(label_ = "median")
 l_p[[1]] <- ggplot(df_plotEE,aes(x=p,y=d,fill=mod.avg.pred)) +
   geom_tile() +
-  scale_fill_gradient2(limits = c(0,1),midpoint=0.5, high="red", low="blue",mid="green") +
-  labs(fill="") +
+  # scale_fill_gradient2(limits = c(0,1),midpoint=0.5, high="#800000", low="#000080",mid="#7CFC00") +
+  # scale_fill_continuous(type = "viridis") +
+  # scale_fill_gsea() +
+  scale_fill_distiller(palette = "Spectral") +
+  labs(fill="Prob. of not refuting a predicted SAD") +
   coord_cartesian(expand = FALSE) +
+  scale_y_continuous(breaks = seq(0,20,by=4)) +
   theme_classic() + facet_wrap(~label_, ncol=1) + theme(legend.position = "bottom")
 v_legend <- get_legend(l_p[[1]])
 l_p[[1]] <- l_p[[1]] + theme(legend.position="none")
 df_plotEE %<>% gather(key = IC_class ,value = IC_pred,lower.CL:upper.CL)
 l_p[[2]] <- ggplot(df_plotEE,aes(x=p,y=d,fill=IC_pred)) +
   geom_tile() +
-  scale_fill_gradient2(limits = c(0,1),midpoint=0.5, high="red", low="blue",mid="green") +
+  scale_fill_gradient2(limits = c(0,1),midpoint=0.5, high="red", low="blue",mid="black") +
   labs(fill="") +
   coord_cartesian(expand = FALSE) +
   theme_classic() + facet_wrap(~IC_class,ncol=2,labeller = labeller(IC_class = labels_IC)) + theme(legend.position="none")
@@ -101,7 +106,7 @@ a_SENM <- plot_grid(l_p[[3]],a_SENM,ncol=1,rel_heights=c(0.1, 1))
 df_plotEI <- df_plot %>% filter(MN=="EI") %>% mutate(label_ = "median")
 l_p[[1]] <- ggplot(df_plotEI,aes(x=p,y=d,fill=mod.avg.pred)) +
   geom_tile() +
-  scale_fill_gradient2(limits = c(0,1),midpoint=0.5, high="red", low="blue",mid="green") +
+  scale_fill_gradient2(limits = c(0,1),midpoint=0.5, high="red", low="blue",mid="black") +
   labs(fill="") +
   coord_cartesian(expand = FALSE) +
   theme_classic() + facet_wrap(~label_, ncol=1) + theme(legend.position="none")
@@ -116,9 +121,11 @@ b_SINM <- plot_grid(l_p[[1]],l_p[[2]],ncol=1,rel_heights=c(2, 1.35))
 l_p[[3]] <- ggdraw() + draw_label("SINM")
 b_SINM <- plot_grid(l_p[[3]],b_SINM,ncol=1,rel_heights=c(0.1, 1))
 ### Probability of not refuting a predicted SAD
-l_p[[1]] <- ggdraw() + draw_label("Prob. not refuting a predicted SAD")
+# l_p[[1]] <- ggdraw() + draw_label("Prob. of not refuting a predicted SAD")
 a_prob_of_not_refuting <- plot_grid(a_SENM,b_SINM,ncol=2)
-a_prob_of_not_refuting <- plot_grid(l_p[[1]],a_prob_of_not_refuting,v_legend,ncol=1,rel_heights = c(0.1,1,0.1))
+a_prob_of_not_refuting <- plot_grid(v_legend,a_prob_of_not_refuting,ncol=1,rel_heights = c(0.15,1))
 a_prob_of_not_refuting
+############# B:
+
 ```
 
