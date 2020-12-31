@@ -89,10 +89,6 @@ l_p[[1]] <- ggplot(df_plotEE,aes(x=p,y=d,fill=mod.avg.pred)) +
   scale_fill_distiller(palette = "Spectral") +
   geom_contour(aes(z=mod.avg.pred),alpha=0.2, col="black",
                breaks = v_breaks) +
-  # geom_text_contour(aes(z=mod.avg.pred),stroke=0.2,
-  #                   breaks = v_breaks,
-  #                   rotate = FALSE,
-  #                   size=3) +
   labs(fill="") +
   coord_cartesian(expand = FALSE) +
   scale_y_continuous(breaks = seq(0,20,by=4)) +
@@ -107,8 +103,12 @@ l_p[[2]] <- ggplot(df_plotEE,aes(x=p,y=d,fill=IC_pred)) +
   geom_tile() +
   # scale_fill_gradient2(limits = c(0,1),midpoint=0.5, high="red", low="blue",mid="black") +
   scale_fill_distiller(palette = "Spectral") +
+  geom_contour(aes(z=IC_pred),alpha=0.2, col="black",
+               breaks = v_breaks) +
   labs(fill="") +
   coord_cartesian(expand = FALSE) +
+  scale_y_continuous(breaks = seq(0,20,by=4)) +
+  scale_x_continuous(breaks = seq(0.10,0.90,by=0.20)) +
   theme_classic() + facet_wrap(~IC_class,ncol=2,labeller = labeller(IC_class = labels_IC)) + theme(legend.position="none")
 a_SENM <- plot_grid(l_p[[1]],l_p[[2]],ncol=1,rel_heights=c(2, 1.35))
 l_p[[3]] <- ggdraw() + draw_label("SENM")
@@ -119,16 +119,24 @@ l_p[[1]] <- ggplot(df_plotEI,aes(x=p,y=d,fill=mod.avg.pred)) +
   geom_tile() +
   # scale_fill_gradient2(limits = c(0,1),midpoint=0.5, high="red", low="blue",mid="black") +
   scale_fill_distiller(palette = "Spectral") +
+  geom_contour(aes(z=mod.avg.pred),alpha=0.2, col="black",
+               breaks = v_breaks) +
   labs(fill="") +
   coord_cartesian(expand = FALSE) +
+  scale_y_continuous(breaks = seq(0,20,by=4)) +
+  scale_x_continuous(breaks = seq(0.05,0.95,by=0.10)) +
   theme_classic() + facet_wrap(~label_, ncol=1) + theme(legend.position="none")
 df_plotEI %<>% gather(key = IC_class ,value = IC_pred,lower.CL:upper.CL)
 l_p[[2]] <- ggplot(df_plotEI,aes(x=p,y=d,fill=IC_pred)) +
   geom_tile() +
   # scale_fill_gradient2(limits = c(0,1),midpoint=0.5, high="red", low="blue",mid="green") +
   scale_fill_distiller(palette = "Spectral") +
+  geom_contour(aes(z=IC_pred),alpha=0.2, col="black",
+               breaks = v_breaks) +
   labs(fill="") +
   coord_cartesian(expand = FALSE) +
+  scale_y_continuous(breaks = seq(0,20,by=4)) +
+  scale_x_continuous(breaks = seq(0.10,0.90,by=0.20)) +
   theme_classic() + facet_wrap(~IC_class,ncol=2,labeller = labeller(IC_class = labels_IC)) + theme(legend.position="none")
 b_SINM <- plot_grid(l_p[[1]],l_p[[2]],ncol=1,rel_heights=c(2, 1.35))
 l_p[[3]] <- ggdraw() + draw_label("SINM")
