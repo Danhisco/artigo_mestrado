@@ -78,24 +78,35 @@ df_plot %<>% mutate(p = p.z * sd(df_resultados$p) + mean(df_resultados$p),
 l_p <- list()
 labels_IC <- c(lower.CL="quantile 5%", upper.CL="quantile 95%")
 labels_median <- c(EE="IC 5%", upper.CL="IC 95%")
+v_breaks <- c(0.25,0.50,0.75)
 ### SENM Spatially-Explicit Neutral Model
 df_plotEE <- df_plot %>% filter(MN=="EE") %>% mutate(label_ = "median")
 l_p[[1]] <- ggplot(df_plotEE,aes(x=p,y=d,fill=mod.avg.pred)) +
   geom_tile() +
   # scale_fill_gradient2(limits = c(0,1),midpoint=0.5, high="#800000", low="#000080",mid="#7CFC00") +
-  # scale_fill_continuous(type = "viridis") +
+  # scale_fill_continuous() +
   # scale_fill_gsea() +
   scale_fill_distiller(palette = "Spectral") +
-  labs(fill="Prob. of not refuting a predicted SAD") +
+  geom_contour(aes(z=mod.avg.pred),alpha=0.2, col="black",
+               breaks = v_breaks) +
+  # geom_text_contour(aes(z=mod.avg.pred),stroke=0.2,
+  #                   breaks = v_breaks,
+  #                   rotate = FALSE,
+  #                   size=3) +
+  labs(fill="") +
   coord_cartesian(expand = FALSE) +
   scale_y_continuous(breaks = seq(0,20,by=4)) +
+  scale_x_continuous(breaks = seq(0.05,0.95,by=0.10)) +
+  # guides(fill=guide_legend(title.theme = element_text(size=15,face="bold"),
+                           # title = "Prob. of not refuting a predicted SAD")) +
   theme_classic() + facet_wrap(~label_, ncol=1) + theme(legend.position = "bottom")
 v_legend <- get_legend(l_p[[1]])
 l_p[[1]] <- l_p[[1]] + theme(legend.position="none")
 df_plotEE %<>% gather(key = IC_class ,value = IC_pred,lower.CL:upper.CL)
 l_p[[2]] <- ggplot(df_plotEE,aes(x=p,y=d,fill=IC_pred)) +
   geom_tile() +
-  scale_fill_gradient2(limits = c(0,1),midpoint=0.5, high="red", low="blue",mid="black") +
+  # scale_fill_gradient2(limits = c(0,1),midpoint=0.5, high="red", low="blue",mid="black") +
+  scale_fill_distiller(palette = "Spectral") +
   labs(fill="") +
   coord_cartesian(expand = FALSE) +
   theme_classic() + facet_wrap(~IC_class,ncol=2,labeller = labeller(IC_class = labels_IC)) + theme(legend.position="none")
@@ -106,14 +117,16 @@ a_SENM <- plot_grid(l_p[[3]],a_SENM,ncol=1,rel_heights=c(0.1, 1))
 df_plotEI <- df_plot %>% filter(MN=="EI") %>% mutate(label_ = "median")
 l_p[[1]] <- ggplot(df_plotEI,aes(x=p,y=d,fill=mod.avg.pred)) +
   geom_tile() +
-  scale_fill_gradient2(limits = c(0,1),midpoint=0.5, high="red", low="blue",mid="black") +
+  # scale_fill_gradient2(limits = c(0,1),midpoint=0.5, high="red", low="blue",mid="black") +
+  scale_fill_distiller(palette = "Spectral") +
   labs(fill="") +
   coord_cartesian(expand = FALSE) +
   theme_classic() + facet_wrap(~label_, ncol=1) + theme(legend.position="none")
 df_plotEI %<>% gather(key = IC_class ,value = IC_pred,lower.CL:upper.CL)
 l_p[[2]] <- ggplot(df_plotEI,aes(x=p,y=d,fill=IC_pred)) +
   geom_tile() +
-  scale_fill_gradient2(limits = c(0,1),midpoint=0.5, high="red", low="blue",mid="green") +
+  # scale_fill_gradient2(limits = c(0,1),midpoint=0.5, high="red", low="blue",mid="green") +
+  scale_fill_distiller(palette = "Spectral") +
   labs(fill="") +
   coord_cartesian(expand = FALSE) +
   theme_classic() + facet_wrap(~IC_class,ncol=2,labeller = labeller(IC_class = labels_IC)) + theme(legend.position="none")
@@ -121,9 +134,12 @@ b_SINM <- plot_grid(l_p[[1]],l_p[[2]],ncol=1,rel_heights=c(2, 1.35))
 l_p[[3]] <- ggdraw() + draw_label("SINM")
 b_SINM <- plot_grid(l_p[[3]],b_SINM,ncol=1,rel_heights=c(0.1, 1))
 ### Probability of not refuting a predicted SAD
-# l_p[[1]] <- ggdraw() + draw_label("Prob. of not refuting a predicted SAD")
+l_p[[1]] <- ggdraw() + 
+  draw_label("Prob. of not refuting a predicted SAD",size=18,fontface ="bold") + 
+  theme(plot.margin = unit(c(0,0,0,0), "lines"))
+title <- plot_grid(l_p[[1]],NULL,v_legend,ncol=3,rel_widths = c(1,-0.25,0.50))
 a_prob_of_not_refuting <- plot_grid(a_SENM,b_SINM,ncol=2)
-a_prob_of_not_refuting <- plot_grid(v_legend,a_prob_of_not_refuting,ncol=1,rel_heights = c(0.15,1))
+a_prob_of_not_refuting <- plot_grid(title,a_prob_of_not_refuting,ncol=1,rel_heights = c(0.15,1))
 a_prob_of_not_refuting
 ############# B:
 
