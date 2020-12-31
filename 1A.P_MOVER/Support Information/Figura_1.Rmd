@@ -110,9 +110,9 @@ l_p[[2]] <- ggplot(df_plotEE,aes(x=p,y=d,fill=IC_pred)) +
   scale_y_continuous(breaks = seq(0,20,by=4)) +
   scale_x_continuous(breaks = seq(0.10,0.90,by=0.20)) +
   theme_classic() + facet_wrap(~IC_class,ncol=2,labeller = labeller(IC_class = labels_IC)) + theme(legend.position="none")
-a_SENM <- plot_grid(l_p[[1]],l_p[[2]],ncol=1,rel_heights=c(2, 1.35))
+a_SENM <- plot_grid(l_p[[1]],NULL,l_p[[2]],ncol=1,rel_heights=c(2,-0.15,1.35))
 l_p[[3]] <- ggdraw() + draw_label("SENM")
-a_SENM <- plot_grid(l_p[[3]],a_SENM,ncol=1,rel_heights=c(0.1, 1))
+a_SENM <- plot_grid(l_p[[3]],NULL,a_SENM,ncol=1,rel_heights=c(0.1,-0.10,1))
 ### SINM Spatially-Explicit Neutral Model
 df_plotEI <- df_plot %>% filter(MN=="EI") %>% mutate(label_ = "median")
 l_p[[1]] <- ggplot(df_plotEI,aes(x=p,y=d,fill=mod.avg.pred)) +
@@ -121,7 +121,6 @@ l_p[[1]] <- ggplot(df_plotEI,aes(x=p,y=d,fill=mod.avg.pred)) +
   scale_fill_distiller(palette = "Spectral") +
   geom_contour(aes(z=mod.avg.pred),alpha=0.2, col="black",
                breaks = v_breaks) +
-  labs(fill="") +
   coord_cartesian(expand = FALSE) +
   scale_y_continuous(breaks = seq(0,20,by=4)) +
   scale_x_continuous(breaks = seq(0.05,0.95,by=0.10)) +
@@ -150,6 +149,65 @@ a_prob_of_not_refuting <- plot_grid(a_SENM,b_SINM,ncol=2)
 a_prob_of_not_refuting <- plot_grid(title,a_prob_of_not_refuting,ncol=1,rel_heights = c(0.15,1))
 a_prob_of_not_refuting
 ############# B:
-
+## dados
+v_titulo <- "bias in estimated species richness"
+# EE
+df_md <- df_resultados %>% filter(MN=="EE") %>% distinct
+md_diffS.EE <- lmer(diffS_mean ~ 1 + (1|SiteCode),data=df_md,na.action = "na.fail")
+df_predEE <- predictInterval(md_diffS.EE,level = 0.95) %>% 
+  apply(., 2, mean) %>% t %>% as.data.frame()
+# EI
+load(file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_diffS_EI__AICcmodavg.Rdata")
+df_plot <- mdAvg_diffS_EI__AICcmodavg
+df_plot %<>% 
+  mutate(p = p.z * sd(df_resultados$p) + mean(df_resultados$p),
+         d = d.z*sd(df_resultados$d) + mean(df_resultados$d))
+## gráficos
+v_range <- df_predEE[,3:2] %>% as.numeric() %>% unname()
+v_limits <- df_plot %>% select(mod.avg.pred,upper.CL,lower.CL) %>% as.matrix %>% as.vector %>% range
+l_p <- list()
+df_plot$label <- "median"
+l_p[[1]] <- ggplot(df_plot,aes(x=p,y=d,fill=mod.avg.pred,z=mod.avg.pred)) +
+  geom_tile() +
+  coord_cartesian(expand = FALSE) +
+  scale_fill_gradient2(midpoint=0, low="blue", high="red",mid="green",limits=v_limits) +#,
+                       # breaks=c(-0.6,0,1,2,3)) + # guide = guide_legend(label.theme = element_text(angle=90))
+  # guides(fill = guide_colourbar(label.theme = element_text(angle = 90,size=7))) +
+  stat_subset(aes(subset = mod.avg.pred >= v_range[1] & mod.avg.pred <= v_range[2]),
+              alpha=0.5,color="black",size=0.1) +
+  geom_contour(breaks=c(-0.25,0.25),color="black",alpha=0.5) +
+  geom_contour(breaks=df_predEE$fit,color="red",alpha=0.5) +
+  # geom_text_contour(aes(z=mod.avg.pred),stroke=0.2,
+  #                   breaks = c(-0.25,0.25),
+  #                   rotate = FALSE,
+  #                   size=2.7) +
+  theme_classic() + 
+  scale_y_continuous(breaks = seq(0,20,by=4)) +
+  scale_x_continuous(breaks = seq(0.05,0.95,by=0.10)) +
+  theme(legend.position="top") + labs(fill="") +
+  facet_wrap(~label,ncol=1)
+v_legend <- get_legend(l_p[[1]])
+l_p[[1]] <- l_p[[1]] + theme(legend.position="none")
+labels_IC <- c(lower.CL="quantile 5%", upper.CL="quantile 95%")
+l_p[[2]] <- df_plot %>% 
+  gather(key="IC_class",value="IC_pred",lower.CL:upper.CL) %>% 
+  ggplot(aes(x=p,y=d,fill=IC_pred,z=IC_pred)) +
+  geom_tile() +
+  coord_cartesian(expand = FALSE) +
+  scale_fill_gradient2(midpoint=0, low="blue", high="red",mid="green",limits=v_limits) +
+  stat_subset(aes(subset = IC_pred >= v_range[1] & IC_pred <= v_range[2]),
+              alpha=0.5,color="black",size=0.1) +
+  geom_contour(breaks=c(-0.25,0.25),color="black",alpha=0.5) +
+  geom_contour(breaks=df_predEE$fit,color="red",alpha=0.5) +
+  # geom_text_contour(aes(z=IC_pred),stroke=0.2,
+  #                   breaks = c(-0.6,-0.25,0.25,0.75,1.5,2.5),
+  #                   rotate = FALSE,
+  #                   size=2.7) +
+  theme_classic() + 
+  scale_y_continuous(breaks = seq(0,20,by=4)) +
+  scale_x_continuous(breaks = seq(0.10,0.90,by=0.20)) +
+  theme(legend.position='none') +
+  facet_wrap(~IC_class,ncol=2,labeller = labeller(IC_class = labels_IC))
+b_bias_richness <- plot_grid(plotlist = l_p,ncol=1,rel_heights=c(2, 1.35))
 ```
 
