@@ -1,0 +1,334 @@
+---
+title: "Support Information"
+author: "Mori, Danilo"
+date: "25/05/2020"
+output: 
+  html_document:
+    toc: true
+    toc_depth: 5
+editor_options: 
+  chunk_output_type: inline
+---
+<style>
+body {
+text-align: justify}
+</style>
+
+```{r setup, include=TRUE,echo=FALSE}
+knitr::opts_chunk$set(echo = FALSE, tidy = FALSE, include = TRUE, warning = FALSE,cache = TRUE,message=FALSE,eval=TRUE)
+setwd("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/simulacao_codigos_e_resultados")
+knitr::opts_knit$set(root.dir = "/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/simulacao_codigos_e_resultados")
+```
+
+```{r pacotes,eval=TRUE,echo=TRUE,warning=FALSE,message=FALSE}
+library(raster)
+library(scales)
+library(parallel)
+library(doMC)
+library(DHARMa)
+library(broom.mixed)
+library(gratia)
+library(mgcv)
+library(bbmle)
+library(lme4)
+library(merTools)
+library(magrittr)
+library(ggplotify)
+library(gridExtra)
+library(scatterplot3d)
+library(plotly)
+library(RColorBrewer)
+library(cowplot)
+library(ggplot2); theme_set(theme_classic())
+library(metR)
+library(tidyr)
+library(purrr)
+library(plyr)
+library(dplyr)
+```
+
+```{r}
+### dados ###
+# leitura
+df_resultados <- read.csv(file="/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/simulacao_codigos_e_resultados/resultados/df_resultados.csv",
+                            header = TRUE,as.is=FALSE)[,1:13]
+# padronização
+level_k <- as.character(unique(sort(as.numeric(df_resultados$k),decreasing = TRUE)))
+df_resultados$k <- factor(df_resultados$k,levels = level_k)
+levels(df_resultados$k)[19] <- "0.1"
+# z score
+f_z <- function(x){
+  m <- base::mean(x,na.rm=FALSE)
+  sd <- sd(x,na.rm=FALSE)
+  output <- (x-m)/sd
+  return(output)
+} 
+df_resultados %<>% mutate(diffS_gamma = diffS_mean + min(diffS_mean)*(-1) + 0.01,
+                          modulo_diffS = abs(diffS_mean),
+                          log_Sobs=log(S_obs))
+df_resultados.z <- as.data.frame(apply(df_resultados[,c("p","Ntotal","log_Sobs","k_1","d_Lplot","d","modulo_diffS")],2,f_z))
+names(df_resultados.z) <- sapply(names(df_resultados.z), function(x) paste0(x,".z"))
+df_resultados %<>% cbind(.,df_resultados.z) %>% 
+  select(-k_1,-k_1.z)
+```
+
+## Dados
+
+### Trabalhos pré-selecionados
+
+Filtramos trabalhos fitossociológicos que amostraram pelo menos 1 ha de  área contígua de floresta onde todos os indivíduos arbóreos com diâmetro à altura do peito igual ou superior a 4,8 cm foram identificados no nível de espécie ou morfoespécie. Utilizamos mapas de cobertura vegetal do ano de 2000 (imagens do Landsat-8, Hansen et al. 2013). Pressupomos que o mapa de cobertura vegetal é um bom proxy da estrutura de paisagem no momento em que o trabalho fitossociológico foi realizado. Esse pressuposto é válido para a maioria dos trabalhos fitossociológicos posteriores ao ano de 2000, quando a taxa de desmatamento manteve-se baixa ao longo de toda a Mata Atlântica [REF, Lima et al. 2015]. Para minimizar possíveis problemas com diferenças nas taxas de desmatamento entre regiões da Mata Atlântica, consideramos diferentes anos como critérios de seleção para os inventários florestais: para os estados do Rio de Janeira (RJ) e Rio Grande do Sul (RS), onde as taxas de desmatamento diminuíram antes, consideramos trabalhos realizados até o ano de 1990 ou superior; para Bahia (BA), Goiás (GO) e Mato Grosso do Sul (MS) consideramos os trabalhos realizados até o ano de 2000 ou superior; e para as demais regiões o ano de 1995 (Lima et al. 2015). Exceções a esse critério ocorreram quando trabalhos foram feitos antes do ano de 2000, mas foram realizados em grandes áreas de regiões protegidas (>1000ha) ou em antigos campi universitários, no qual foram incluídos na base de dados. Trabalhos feitos até o ano de 2000 em regiões com alta taxa de desmatamento foram desconsiderados.
+
+### Figura SI 1:
+DESCRIÇÃO: áreas amostradas na Floresta Atlântica  
+    
+  
+### Scale of Effect
+  
+Utilizamos mapas de cobertura vegetal com resolução de 30x30m, onde cada pixel contém a porcentagem de vegetação com altura superior a 5 metros (Hansen et al. 2013 - Material Suplementar). Para cada classe de metade do lado foi ajustado um glm binomial negativo com a função glm.nb do pacote MASS (Venables & Ripley 2002) onde a preditora proporção de cobertura vegetal na paisagem teve um termo linear e quadrático (Apêndice 1: Janela de Código 2). Ao todo foram utilizadas 117 recortes de paisagem de 0.42 km de meio lado até 12.00 km de meio lado.  
+
+```{r}
+df_dados.brutos <- read.csv("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/dados_para_iniciar_artigo/df_dados_disponiveis.csv",
+                     header = TRUE,as.is = TRUE)
+df_dados.brutos$tif.name <- gsub("/home/danilo/Documentos/Doutorado/artigo_mestrado/paisagens_atualizadas",
+                                 "/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/dados_para_iniciar_artigo/paisagens_atualizadas",
+                                 df_dados.brutos$tif.name)
+# df_dados <- filter(df_dados.brutos,SiteCode %in% df_plot$SiteCode)
+### filtro geral
+df_1ofiltro <- df_dados.brutos %>% filter(method=="parcelas" &
+                                         grepl("*contiguous*",arrangement) & 
+                                        effort_ha>=1 &
+                                         grepl("*yes*",status) & 
+                                         grepl("ok*",status_diagnostico) &
+                                         grepl("Atlantic_Forest*",domain) &
+                                        dbh_cutoff %in% c("PBH>=15.0cm","PBH>=15.7cm",
+                                                          "DBH>=5.0cm","DGH>=5.0cm","DBH>5.0cm",
+                                                          "DBH>=4.8cm",
+                                                          "DBH>=5.0cm&H>300cm","DBH>=5.0cm&H>500cm", 
+                                                          "DGH30>=5.0cm"))
+### filtro universidades e campi
+df_filtro.UC <- df_1ofiltro %>% 
+  filter(UC_area_ha >= 1000 | 
+         Unidade_de_conservacao %in% c("UC Protecao Integral","universities and research centers"))
+### filtro estados
+df_filtro.estate <- filter(df_1ofiltro,state %in% c("RJ","RS") & year >= 1990)
+df_filtro.estate %<>% rbind(.,filter(df_1ofiltro,state %in% c("BA","GO","MS") & year >= 2000))
+df_filtro.estate %<>% rbind(.,filter(df_1ofiltro,!(state %in% c("BA","GO","MS","RJ","RS")) & year >= 1995))
+### unindo e salvando
+df_dados <- rbind(df_filtro.UC,df_filtro.estate) %>% 
+  distinct()
+
+```
+  
+  
+```{r janela de codigo 2 _ scale of effect, echo=TRUE,results="hide",eval=TRUE,cache=TRUE}
+# dados brutos
+df_se <- left_join(y=df_dados,
+                   x=expand.grid(SiteCode = df_dados$SiteCode,
+                                 raio_km = c(seq(sqrt(max(df_dados$effort_ha)*0.01)+0.1,
+                                               12,by = 0.1),12) ),
+                   by="SiteCode") %>% 
+  group_by(tif.name) %>% nest()
+df_se$resultado <- vector("list",length = nrow(df_se))
+# rotina
+registerDoMC(2)
+for(i in 1:nrow(df_se)){
+  # raster de paisagem (landsat8 Hansen et al. 2013)
+  raster_ <- raster(df_se$tif.name[i])
+  mat_raster <- matrix(data = getValues(raster_)/100)
+  dim(mat_raster) <- dim(raster_)[1:2]
+  # função para o calculo da cobertura da paisagem local
+  f_p <- function(raio_KM){
+    # 1 pixel = 30x30m
+    # raio = metade do lado da paisagem local
+    raio_pixels <- round(raio_KM * 1000 / 30)
+    raio_max <- nrow(mat_raster)/2
+    local_land <- mat_raster[(raio_max+1-raio_pixels):(raio_max+raio_pixels),
+                             (raio_max+1-raio_pixels):(raio_max+raio_pixels)]
+    # proporção de cobertura vegetal
+    v_p <- sum(local_land,na.rm = NULL)/length(local_land)
+    # para cada raio pedido há a proporção de cobertura calculada e o raio efetivo que depende do tamanho do pixel
+    df_ <- data.frame(p=v_p,raio_efetivo.KM=raio_pixels*30/1000)
+    return(df_)
+  }
+  # dados para a f_p
+  df_se$resultado[i][[1]] <- adply(df_se$data[i][[1]]$raio_km,1,f_p,.id = NULL,.parallel = TRUE)
+}
+# dados por raio
+df_se %<>% unnest(cols = c(data,resultado)) %>% as.data.frame()
+# ajuste de modelos aos dados
+library(MASS)
+f_glm.nb <- function(data_){
+  md_ <- glm.nb(S_obs ~ p + I(p^2) + offset(log(Ntotal)), data = data_)
+}
+registerDoMC(3)
+l_md <- dlply(df_se,"raio_km",f_glm.nb,.parallel = TRUE)
+# média ponderada dos raios pelo peso de evidência
+df_averageSE <- print(AICctab(l_md,weights=TRUE)) %>% 
+  as.data.frame()
+df_averageSE$raio_paisagem <- row.names(df_averageSE) %>% as.numeric()
+df_averageSE$weight <- as.numeric(as.character(df_averageSE$weight))
+df_averageSE$dAICc <- as.numeric(as.character(df_averageSE$dAICc))
+```
+
+
+### Figura SI 2  
+  
+```{r}
+raio_medio <- round(weighted.mean(x = df_averageSE$raio_paisagem,w = df_averageSE$weight),1)
+df_averageSE %>% ggplot(aes(x=raio_paisagem,y=weight)) +
+  geom_line() +geom_vline(xintercept = raio_medio,color="red",alpha=0.4) +
+  labs(x="metade do lado da paisagem local (km)",y="peso de evidência") +
+  coord_cartesian(xlim = c(0,12),ylim = c(0,0.025)) +
+  scale_x_continuous(breaks = round(seq(0.42,12,length=10),2)) +
+  scale_y_continuous(breaks = round(seq(min(df_averageSE$weight),max(df_averageSE$weight),length=5),5))
+```
+#### Legenda Figura SI 2:
+__Figura SI 2__ Peso de evidência pela metade do lado da paisagem local. A linha vermelha marca a metade o lado da paisagem local usado para delimitar a extensão espacial da paisagem local; está linha corresponde a média das metade do lado da paisagem local ponderada pelo peso de evidência.   
+  
+    
+### Tratamento dos mapas de cobertura vegetal
+
+Para simular o algoritmo do modelo neutro espacialmente explícito é necessário um raster de paisagem com três classes de células: 1 - habitat disponível na paisagem; 2- habitat disponível na comunidade local; e 3 - não habitat (matriz). Ajustamos a resolução da paisagem para ser igual DA * Alandscape   (DA = densidade de indivíduos observada na área amostral; Alandscape = área da paisagem (10404 ha) ). Se a porcentagem de cobertura vegetal no pixel foi igual ou superior a 70% consideramos como habitat, caso contrário matrix. Aproximamos a comunidade local por uma área com número de  quadrículas equivalente ao número de árvores na área amostrada. Para compor esta área, as quadrículas foram acrescentadas uma a uma de foram que formasse um polígono que melhor aproxima um quadrado  (Apêndice 1: Janela de Código 3). Para algumas paisagens é possível obter a forma de um quadrado, porém para outras a configuração espacial impõem formas idiossincráticas (Apêndice 1: Figura 1). Aproveitamos as paisagens quando foi possível aglomerar os pixels de habitat da comunidade local (Apêndice 1: Janela de Código 4 e Figura 2), porém se não houve hábitat aglomerado suficiente a paisagem foi descartada (1 caso). Assim 103 paisagens foram usados.
+  
+    
+## Parametrização  
+  
+    
+### Taxa de colonização estimada  
+
+#### efeito da riqueza observada  
+  
+  
+__bootstrap da predição__  
+  
+```{r fig.width=10,fig.height=6,fig.width=8}
+#new data
+df_newdat <- expand.grid(SiteCode=df_U$SiteCode[1], 
+                         log10_Sobs = seq(min(df_U$log10_Sobs),max(df_U$log10_Sobs), length=150))
+## Passo 2: crie as função que devem ser calculadas dos modelos a cada simulação
+## Previstos por efeitos fixos e aleatórios
+f1 <- function(.) predict(., newdata=df_newdat)
+## Previstos por efeitos fixos (argumento re.form=~0)
+f2 <- function(.) predict(., newdata=df_newdat, re.form=~0)
+## Os dois bootstraps. Ajuste o argumento ncpus para o numero de cores de seu computador
+b3 <- bootMer(lmer_U, FUN = f1, nsim=1000, parallel="multicore", ncpus=2)
+b4 <- bootMer(lmer_U, FUN = f2, nsim=1000, parallel="multicore", ncpus=2)
+## calcula as médias e intervalos de confiança quantílicos para cada combinação de preditoras
+## no novo conjunto de dados
+df_newdat$mean <- apply(b3$t,2,mean)
+df_newdat$IC.low <- apply(b3$t,2,quantile, 0.025)
+df_newdat$IC.upp <- apply(b3$t,2,quantile, 0.975)
+df_newdat$mean.fixed <- apply(b4$t,2,mean)
+df_newdat$IC.low.fixed <- apply(b4$t,2,quantile, 0.025)
+df_newdat$IC.upp.fixed <- apply(b4$t,2,quantile, 0.975)
+df_newdat %<>% mutate(std_mean = 10^(mean),
+                      std_IC.low = 10^(IC.low),
+                      std_IC.upp = 10^(IC.upp),
+                      std_mean.fixed = 10^(mean.fixed),
+                      std_IC.low.fixed = 10^(IC.low),
+                      std_IC.upp.fixed = 10^(IC.upp.fixed))
+
+## graficos
+l_p <- list()
+# summary(lmer_U)
+l_p[[1]] <- df_U %>% 
+  ggplot(aes(x=log10_Sobs,y=log10_U)) + 
+  geom_ribbon(aes(y = mean, ymin=IC.low, ymax=IC.upp), data=df_newdat, fill="grey15", alpha=0.5) +
+  geom_ribbon(aes(y=mean, ymin=IC.low.fixed, ymax=IC.upp.fixed), data=df_newdat, fill="white", alpha=0.5) +
+  geom_line(aes(x=log10_Sobs, y=mean.fixed), data=df_newdat,color="red") +
+  geom_point(alpha=0.3) + labs(x="log10(Sobs)",y="log10(U)",title="log10(U) = N(-4.175,0.05838) + 0.971*log10(Sobs)")
+l_p[[1]]
+# l_p[[2]] <- df_U %>% 
+#   ggplot(aes(x=10^log10_Sobs,y=U_med)) + 
+#   geom_ribbon(aes(y = std_mean, ymin=std_IC.low, ymax=std_IC.upp), data=df_newdat, fill="grey15", alpha=0.5) +
+#   geom_ribbon(aes(y=std_mean, ymin=std_IC.low.fixed, ymax=std_IC.upp.fixed), data=df_newdat, fill="white", alpha=0.5) +
+#   geom_line(aes(x=10^log10_Sobs, y=std_mean.fixed), data=df_newdat,color="red") +
+#   geom_point(alpha=0.3) + labs(x="Sobs",y="U",title="U = [10 ^ N(-4.175,0.05838)] * Sobs ^ 0.971")
+# grid.arrange(grobs=l_p,ncol=2)
+```
+
+
+### Conservação de parâmetros
+
+```{r, warning=F,message=F,fig.width=9,fig.height=6}
+df_plot <- filter(df_resultados,MN=="EI") %>% distinct()
+df_plot$factor_cong <- "refuted"
+df_plot[which(df_plot$n_nRef>=50 & abs(df_plot$diffS_mean)<=0.25),"factor_cong"] <- "good fit"
+df_plot[which(df_plot$diffS_mean>0.25),"factor_cong"] <- "overestimate S"
+df_plot[which(df_plot$diffS_mean< -0.25),"factor_cong"] <- "underestimate S"
+df_plot$factor_cong <- factor(df_plot$factor_cong,levels=c("overestimate S","good fit","underestimate S","refuted"))
+df_plot <- df_plot %>% 
+  mutate(J_M = 10404 * DA * p,
+         L_plot = sqrt( 10000 * (Ntotal/DA) ),
+         m = d * (1 - exp( -sqrt(2) * (L_plot/d) ) ) / ( sqrt(2) * L_plot ), #eq 4
+         m_ = m * p / ( 1 - (1-p)*m ),#eq 5
+         I =  m_ * (Ntotal-1)/(1-m_), #Etienne 2005
+         theta = U_med * ( J_M - 1 ) / (1-U_med) ) %>% 
+  filter(MN=="EI")
+df_plot$factor_p <- NA
+df_plot[df_plot$p>0.35,"factor_p"] <- "p > 0.35"
+df_plot[df_plot$p<0.35,"factor_p"] <- "p < 0.35"
+df_plot$factor_cong <- factor(df_plot$factor_cong)
+colors_ <- c("#00b506","#ff0008","#e3d50b") #,"#e3d50b"
+l_p <- list()
+l_p[[1]] <- ggplot(df_plot,aes(x=d,y=m_)) +
+  geom_point(alpha=0.3) +
+  geom_smooth(method = "loess",se=FALSE,color="red",alpha=0.7) +
+  scale_y_continuous(trans = "log10") +
+  labs(y="m'")
+l_p[[2]] <- ggplot(df_plot,aes(x=U_med,y=theta)) +
+  geom_point(alpha=0.3) +
+  geom_smooth(method = "loess",se=FALSE,color="red",alpha=0.7) +
+  scale_y_continuous(trans = "log10") + ylab(expression(theta)) +xlab("U")
+l_p[[3]] <- ggplot(df_plot,aes(x=p,y=m_)) +
+  geom_point(alpha=0.3) +
+  geom_smooth(method = "loess",se=FALSE,color="red",alpha=0.7) +
+  scale_y_continuous(trans = "log10") +
+  labs(y="m'")
+l_p[[4]] <- ggplot(df_plot,aes(x=p,y=theta)) +
+  geom_point(alpha=0.3) +
+  geom_smooth(method = "loess",se=FALSE,color="red",alpha=0.7) +
+  scale_y_continuous(trans = "log10") + ylab(expression(theta))
+grid.arrange(grobs=l_p,ncol=2)
+```
+
+## Pressupostos adequados para modelar a SAD amostrada em paisagens fragmentadas
+  
+    
+### Figura SI 7: J/Jm ~ p  
+
+```{r}
+df_resultados %>% mutate(ratio_J = Ntotal /(10404*DA*p),legend = "N sample / N landscape") %>% select(p,ratio_J,SiteCode,legend) %>% unique %>% 
+  ggplot(aes(x=p,y=ratio_J)) +
+  geom_point(alpha = 0.8) +
+  labs(x = "p",y="N_sample / N_landscape") +
+  # scale_y_log10(breaks = trans_breaks("log10", function(x) 10^x),
+  #             labels = trans_format("log10", math_format(10^.x))) +
+  scale_y_continuous(trans='log10') +
+  annotation_logticks(sides = "l") +
+  labs(y="") +
+  facet_wrap(~legend)
+```
+
+### Figura SI 8: 
+
+```{r}
+# df_plot %>% names
+l_p <- list()
+l_p[[1]] <- df_plot %>% filter(factor_cong == "good fit") %>% 
+  ggplot(aes(x=theta,y=I)) +
+  geom_point(alpha=0.3) +
+  scale_y_continuous(trans = "log10") + 
+  scale_x_continuous(trans = "log10") + 
+  xlab(expression(theta)) + ylab("I") +
+  facet_wrap(~factor_p,ncol=2)
+l_p[[2]] <- df_plot %>% filter(factor_cong != "good fit") %>% 
+  ggplot(aes(x=theta,y=I)) +
+  geom_point(alpha=0.3) +
+  scale_y_continuous(trans = "log10") + 
+  scale_x_continuous(trans = "log10") + 
+  xlab(expression(theta)) + ylab("I") +
+  facet_wrap(~factor_p,ncol=2)
+grid.arrange(grobs=l_p,ncol=1)
+```
+
