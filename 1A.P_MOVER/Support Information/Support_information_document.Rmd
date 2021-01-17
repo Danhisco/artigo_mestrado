@@ -332,3 +332,35 @@ l_p[[2]] <- df_plot %>% filter(factor_cong != "good fit") %>%
 grid.arrange(grobs=l_p,ncol=1)
 ```
 
+```{r}
+df_plot1 <- read.csv("~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/df_pred_congEE-EI.csv")
+df_plot2 <- cbind(df_plot1 %>%
+                    select(p:upper.logOR_EE.EI) %>% 
+                    gather(logOR_class, logOR_value, logOR_EE.EI:upper.logOR_EE.EI),
+                  df_plot1 %>% 
+                    select(mod.avg.pred,lower.CL,upper.CL) %>% 
+                    gather(diffS_class, diffS_value, mod.avg.pred:upper.CL)
+                  )
+f_factor <- function(DF){
+  logOR <- DF$logOR_value
+  diffS <- DF$diffS_value
+  if(logOR<1 & logOR>0 & abs(diffS)<=0.25){
+    cong <- "EE = EI"
+  }else if(logOR<=0 & abs(diffS)<=0.25){
+    cong <- "EE < EI"
+  }else if(diffS>0.25){
+    cong <- "overestimate"
+  }else{
+    cong <- "underestimate"
+  }
+  return(cong)
+}
+registerDoMC(2)
+df_plot2 <- adply(df_plot2,1,f_factor,.parallel = TRUE)
+df_plot2 %>% ggplot(aes(x=p,y=d)) +
+  geom_point() +
+  facet_wrap(~V1,ncol=2)
+
+
+
+```
