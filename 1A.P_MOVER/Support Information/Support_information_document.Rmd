@@ -350,8 +350,10 @@ f_factor <- function(DF){
     cong <- "EE < EI"
   }else if(diffS>0.25){
     cong <- "overestimate"
-  }else{
+  }else if(diffS<0.25){
     cong <- "underestimate"
+  } else{
+    cong <- "refuted"
   }
   return(cong)
 }
@@ -360,7 +362,46 @@ df_plot2 <- adply(df_plot2,1,f_factor,.parallel = TRUE)
 df_plot2 %>% ggplot(aes(x=p,y=d)) +
   geom_point() +
   facet_wrap(~V1,ncol=2)
-
-
+df_plot2 %>% filter(V1 == "EE = EI" & p>=0.35) %>% .$d %>% range
+df_plot2 %>% filter(V1 == "EE < EI") %>% .$d %>% range
 
 ```
+
+```{r}
+f_factor <- function(DF){
+  logOR <- DF$logOR_value
+  diffS <- DF$diffS_value
+  if(logOR<1 & logOR>0 & abs(diffS)<=0.25){
+    cong <- "EE = EI"
+  }else if(logOR<=0 & abs(diffS)<=0.25){
+    cong <- "EE < EI"
+  }else if(diffS>0.25){
+    cong <- "overestimate"
+  }else{
+    cong <- "underestimate"
+  }
+  return(cong)
+}
+
+
+
+df_plot <- filter(df_resultados,MN=="EI") %>% distinct()
+df_plot$factor_cong <- "refuted"
+df_plot[which(df_plot$n_nRef>=50 & abs(df_plot$diffS_mean)<=0.25),"factor_cong"] <- "good fit"
+df_plot[which(df_plot$diffS_mean>0.25),"factor_cong"] <- "overestimate S"
+df_plot[which(df_plot$diffS_mean< -0.25),"factor_cong"] <- "underestimate S"
+df_plot$factor_cong <- factor(df_plot$factor_cong,levels=c("overestimate S","good fit","underestimate S","refuted"))
+df_plot <- df_plot %>% 
+  mutate(J_M = 10404 * DA * p,
+         L_plot = sqrt( 10000 * (Ntotal/DA) ),
+         m = d * (1 - exp( -sqrt(2) * (L_plot/d) ) ) / ( sqrt(2) * L_plot ), #eq 4
+         m_ = m * p / ( 1 - (1-p)*m ),#eq 5
+         I =  m_ * (Ntotal-1)/(1-m_), #Etienne 2005
+         theta = U_med * ( J_M - 1 ) / (1-U_med) ) %>% 
+  filter(MN=="EI")
+df_plot$factor_p <- NA
+df_plot[df_plot$p>0.35,"factor_p"] <- "p > 0.35"
+df_plot[df_plot$p<0.35,"factor_p"] <- "p < 0.35"
+df_plot$factor_cong <- factor(df_plot$factor_cong)
+```
+
