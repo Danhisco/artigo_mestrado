@@ -367,13 +367,13 @@ f_factor <- function(DF){
   logOR <- DF$logOR
   diffS <- DF$diffS_mean
   if(logOR<1 & logOR>0 & abs(diffS)<=0.25){
-    cong <- "EE = EI"
+    cong <- "SS = SI"
   }else if(logOR<=0 & abs(diffS)<=0.25){
-    cong <- "EE < EI"
+    cong <- "SS < SI"
   }else if(diffS>0.25){
-    cong <- "EI overestimate S"
+    cong <- "SI overestimates S"
   }else if(diffS<0.25){
-    cong <- "EI underestimate S"
+    cong <- "SI underestimates S"
   } else{
     cong <- "refuted"
   }
@@ -403,7 +403,7 @@ df_plot1 %>% ggplot(aes(x=theta,y=I)) +
   labs(color="") + facet_wrap(~V1) + xlab(expression(theta))
 # grid.arrange(grobs=l_p,ncol=2)
 ```
-
+Figura SI 8: Número fundamental da imigração (I) pelo número fundamental da biodiversidade na paisagem (theta); a linha azul é uma regressão linear simples. SS = modelo neutro espacialmente explícito; SI = modelo neutro espacialmente implícito. Categorias de congruência: SS < SI, se log odds ratio de não refutar uma SAD predita pelo SS em relação SI (logOR) menor ou igual à 0 e o módulo do viés da riqueza estimada (|diffS|) for menor ou igual à 0.25; SS = SI, se 0<logOR<1 e |diffS|<=0.25; SI overestimates S if diffS > 0.25; e SI underestimates S if diffS < 0.25.
 
 
 ```{r}
