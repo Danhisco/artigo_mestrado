@@ -329,8 +329,82 @@ l_p[[2]] <- df_plot %>% filter(factor_cong != "good fit") %>%
   scale_x_continuous(trans = "log10") + 
   xlab(expression(theta)) + ylab("I") +
   facet_wrap(~factor_p,ncol=2)
-grid.arrange(grobs=l_p,ncol=1)
+# grid.arrange(grobs=l_p,ncol=1)
+df_plot %>% ggplot(aes(x=theta,y=I, color=factor_cong)) +
+  scale_y_continuous(trans = "log10") + 
+  scale_x_continuous(trans = "log10") +
+  geom_point(alpha=0.3)
 ```
+
+```{r}
+## dados ##
+#
+df_plot <- df_resultados %>% 
+  select(SiteCode, MN, k, n_nRef, diffS_mean) %>% 
+  mutate(resposta = n_nRef)
+df_plot$resposta[df_plot$resposta==0] <- 0.01
+df_plot$resposta[df_plot$resposta==100] <- 0.99
+#
+df_plot %<>% inner_join(x=select(filter(.,MN=="EE"),-c(diffS_mean,MN,n_nRef)),
+                        y=select(filter(.,MN=="EI"),-MN),
+                        by=c("SiteCode","k")) %>%
+  mutate(logOR_EE = log( (resposta.x/100)/(1-(resposta.x/100)) ),
+         logOR_EI = log( (resposta.y/100)/(1-(resposta.y/100)) ),
+         logOR = logOR_EE - logOR_EI)
+#
+df_plot <- inner_join(x=df_plot,
+                      y=select(filter(df_resultados,MN=="EE"),
+                               SiteCode,k,p,d,Ntotal,DA,U_med),
+                      by=c("SiteCode","k")) %>% 
+  mutate(J_M = 10404 * DA * p,
+         L_plot = sqrt( 10000 * (Ntotal/DA) ),
+         m = d * (1 - exp( -sqrt(2) * (L_plot/d) ) ) / ( sqrt(2) * L_plot ), #eq 4
+         m_ = m * p / ( 1 - (1-p)*m ),#eq 5
+         I =  m_ * (Ntotal-1)/(1-m_), #Etienne 2005
+         theta = U_med * ( J_M - 1 ) / (1-U_med))
+# function to categorize
+f_factor <- function(DF){
+  logOR <- DF$logOR
+  diffS <- DF$diffS_mean
+  if(logOR<1 & logOR>0 & abs(diffS)<=0.25){
+    cong <- "EE = EI"
+  }else if(logOR<=0 & abs(diffS)<=0.25){
+    cong <- "EE < EI"
+  }else if(diffS>0.25){
+    cong <- "EI overestimate S"
+  }else if(diffS<0.25){
+    cong <- "EI underestimate S"
+  } else{
+    cong <- "refuted"
+  }
+  return(cong)
+}
+registerDoMC(2)
+df_plot1 <- adply(df_plot,1,f_factor,.parallel = TRUE)
+# df_plot1$V1 %>% unique
+#
+## grafico
+#
+# l_p <- list()
+# l_p[[1]] <- df_plot1 %>% ggplot(aes(x=theta,y=I, color=V1)) +
+#   scale_y_continuous(trans = "log10") + 
+#   scale_x_continuous(trans = "log10") +
+#   geom_point(alpha=0.5) +
+#   geom_smooth(aes(group=V1),method="lm",se=F) +
+#   theme(legend.position = "top") +
+  # labs(color="")
+# l_p[[2]] <- 
+df_plot1 %>% ggplot(aes(x=theta,y=I)) +
+  scale_y_continuous(trans = "log10") + 
+  scale_x_continuous(trans = "log10") +
+  geom_smooth(method="lm",se=F,alpha=0.7) +
+  geom_point(alpha=0.3) +
+  theme(legend.position = "top") +
+  labs(color="") + facet_wrap(~V1) + xlab(expression(theta))
+# grid.arrange(grobs=l_p,ncol=2)
+```
+
+
 
 ```{r}
 df_plot1 <- read.csv("~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/df_pred_congEE-EI.csv")
@@ -359,6 +433,7 @@ f_factor <- function(DF){
 }
 registerDoMC(2)
 df_plot2 <- adply(df_plot2,1,f_factor,.parallel = TRUE)
+df_plot2$V1 %>% unique
 df_plot2 %>% ggplot(aes(x=p,y=d)) +
   geom_point() +
   facet_wrap(~V1,ncol=2)
