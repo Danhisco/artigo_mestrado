@@ -1945,7 +1945,10 @@ AICctab(l_md_diffS,weights=T)
 __Tabela 3.2.1__ Coeficientes de determinação condicional e marginal
 
 ```{r}
-md_diffS <- l_md_diffS[["1 1|Site"]]
+# md_diffS <- l_md_diffS[["1 1|Site"]]
+df_dados <- df_resultados %>% filter(MN=="EI") %>% distinct()
+md_diffS <- lmer(diffS_mean ~ 1 + (1|SiteCode), 
+                 data=df_dados,na.action = "na.fail")
 MuMIn::r.squaredGLMM(md_diffS)
 ```
 
@@ -2089,6 +2092,14 @@ allFit(l_md_diffS[["d d|Site"]],maxfun = 1e5, parallel = 'multicore', ncpus = 3)
 ############################
 l_md <- l_md_diffS[c(1,3)]
 AICctab(l_md,weights=TRUE)
+```
+
+```{r}
+md_ <- lmer(diffS_mean ~ 
+                  (p.z + I(p.z^2)) * (d.z + I(d.z^2)) + 
+                  (d.z|SiteCode),
+                   data=df_dados, na.action = "na.fail")
+MuMIn::r.squaredGLMM(md_)
 ```
 
 
@@ -2871,9 +2882,10 @@ load("~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/md_U_k15_cr.Rd
 
 ### predito
 
-The following code was adapted from Gavin Simpson (2016) blog post [acessado em abril de 2020]:  
+The following code was adapted from:  
   https://fromthebottomoftheheap.net/2016/12/15/simultaneous-interval-revisited/ 
   https://mikl.dk/post/2019-prediction-intervals-for-gam/
+  https://www.r-bloggers.com/2019/08/prediction-intervals-for-generalized-additive-models-gams/
 
 ```{r U_med predito e observado para o modelo cheio,fig.width=8, fig.height=30,eval=FALSE}
 # novo conjunto de dados
@@ -2898,53 +2910,21 @@ df_pred <- t(apply(predict_link,1,function(X) quantile(X,probs = c(0.05,0.50,0.9
   as.data.frame()
 names(df_pred) <- c("IClower","median","ICupper")
 # grafico
-df_plot_U <- cbind(df_newdata,df_pred) 
+df_plot_U <- cbind(df_newdata,df_pred)
 df_plot_U %<>% mutate(p = p.z*sd(df_resultados$p) + mean(df_resultados$p),
-                    d = d.z*sd(df_resultados$d) + mean(df_resultados$d),
-                    U = 10^predito)
-read.csv(df_plot_U,file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/df_plot_U.Rdata")
-```
-
-
-```{r figura final gam U df para predicao, eval=FALSE,echo=TRUE}
-# dados
-## sem Sobs
-load(file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_md.U_mdCheio_semSobs.Rdata")
-gamm <- l_md.U_mdCheio[["gamm d|Site common"]]
-# rotina para obter o intervalo de confiabilidade
-## objetos do modelo estimado
-beta <- coef(gamm)
-V <- vcov(gamm)
-##  simulação de parâmetros
-num_beta_vecs <- 10000
-Cv <- chol(V)
-set.seed(as.numeric(Sys.time()))
-nus <- rnorm(num_beta_vecs * length(beta))
-beta_sims <- beta + t(Cv) %*% matrix(nus, nrow = length(beta), ncol = num_beta_vecs)
-# dim(beta_sims)
-## para novo conjunto de dados
-df <- expand.grid(SiteCode=levels(df_resultados$SiteCode)[1],
-                  d.z=seq(min(df_resultados$d.z),max(df_resultados$d.z),length=40),
-                  p.z=seq(min(df_resultados$p.z),max(df_resultados$p.z),length=200))
-matrix_lprediction <- predict(gamm,newdata=df,type="lpmatrix") 
-predict_link <- matrix_lprediction %*% beta_sims
-df_pred <- t(apply(predict_link,1,function(X) quantile(X,probs = c(0.05,0.50,0.95)))) %>% 
-  as.data.frame()
-names(df_pred) <- c("IClower","median","ICupper")
-df_plot <- cbind(df,df_pred) %>% 
-  mutate(fit = exp(median),
-         lower = exp(IClower),
-         upper = exp(ICupper),
-         p = p.z * sd(df_resultados$p) + mean(df_resultados$p),
-         d = d.z * sd(df_resultados$d) + mean(df_resultados$d))
-write.csv(df_plot,file = "~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/df_plotPredU_sSobs.csv",row.names = FALSE)
+                      d = d.z*sd(df_resultados$d) + mean(df_resultados$d),
+                      fit = 10^median,
+                      lower = 10^IClower,
+                      upper = 10^ICupper)
+write.csv(df_plot_U,file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/df_plot_U.Rdata",row.names = FALSE)
 ```
 
 
 ```{r U predito, fig.height=6,fig.width=13.5}
 # dados
-df_plot <- read.csv("~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/df_plotPredU.csv",
-                    header = TRUE,as.is = TRUE)
+df_plot <- read.csv("~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/df_plot_U.Rdata",
+                      header = TRUE,as.is = TRUE)
+apply(df_plot[,c("fit","lower","upper")],2,function(X) formatC(X,format="e")) %>% summary
 ## graficos
 l_p <- list()
 # 
@@ -2974,7 +2954,7 @@ l_p[[2]] <- ggplot(df_plot,aes(x=p,y=d,fill=fit)) +
   geom_contour(aes(z=fit),alpha=0.4, col="black",
                breaks = round(quantile(df_plot$fit,probs = c(0.1,0.25,0.5,0.75,0.9)),5) ) +
   geom_text_contour(aes(z=fit),stroke=0.2,
-                    breaks = formatC(quantile(df_plot$fit,probs = c(0.1,0.25,0.5,0.75,0.9)),format = "e", digits = 3),
+                    breaks = round(quantile(df_plot$fit,probs = c(0.1,0.25,0.5,0.75,0.9)),5),
                     rotate = FALSE,
                     size=3)
 #
@@ -2992,7 +2972,7 @@ l_p[[3]] <- ggplot(df_plot,aes(x=p,y=d,fill=upper)) +
                     breaks = round(quantile(df_plot$upper,probs = c(0.1,0.25,0.5,0.75,0.9)),5),
                     rotate = FALSE,
                     size=2.7)
-grid.arrange(grobs=l_p,ncol=3,top="Speciation Rate")
+grid.arrange(grobs=l_p,ncol=3,top="taxa de colonização de novas espécies na paisagem necessária para manter a riqueza na área amostral")
 ```
 
 ## LMM
