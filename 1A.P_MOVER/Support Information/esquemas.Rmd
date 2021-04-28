@@ -3,6 +3,8 @@ title: "Esquemas"
 author: "Danilo Pereira Mori"
 date: "27/04/2021"
 output: pdf_document
+editor_options: 
+  chunk_output_type: inline
 ---
 
 # Função de Dispersão Inflada
@@ -15,6 +17,8 @@ O sorteio de parentesco na simulação coalescente ocorre pelo sorteio independe
 library(rmutil)
 library(lamW)
 library(tidyverse)
+library(plyr)
+library(magrittr)
 df_resultados <- read.csv(file="/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/simulacao_codigos_e_resultados/resultados/df_resultados.csv",
                             header = TRUE,as.is=FALSE)[,1:13]
 range_d <- df_resultados$d %>% range
@@ -24,18 +28,21 @@ range_d <- df_resultados$d %>% range
 ## distância média de dispersão per capita
 ## probabilidade de parentesco
 
-x=expand.grid(SiteCode = df_dados$SiteCode,
-                                 raio_km = c(seq(sqrt(max(df_dados$effort_ha)*0.01)+0.1,
-                                               12,by = 0.1),12) )
-df_plot <- expand.grid(distance = seq(0,100,by = 0.1),
-                       sd = seq(round(range_d[1],digits = 1), 20, by = 2.5))
-df_plot$density <- sapply(df_plot$)
-
-df_plot <- data.frame(distance = seq(0,100,by = 0.1),
-                      sd = seq(round(range_d[1],digits = 1), 20, by = 2.5))
-                      
-                      density = dlaplace(y=seq(0,100,by = 0.1),s=2/sqrt(2)))
-ggplot(df_plot,aes(x=distance,y=density)) + 
-  geom_line()
+# dados brutos
+distance <- seq(-100,100,by = 0.1)
+sd <- seq(round(range_d[1],digits = 1), 20, by = 2)
+# função
+f_dlaplace_range <- function(sd,eixo_x=distance) dlaplace(y=eixo_x,s=sd/sqrt(2))
+# dados para gráfico
+df_plot <- adply(sd,1,f_dlaplace_range,.id = NULL) %>% t %>% as.data.frame()
+names(df_plot) <- as.character(sd)
+df_plot$distance <- distance
+rownames(df_plot) <- NULL
+df_plot %<>% gather(sd, probability, -distance)
+df_plot$sd <- as.numeric(df_plot$sd)
+# plot
+ggplot(df_plot,aes(x=distance,y=probability,color=sd,group=sd)) + 
+  geom_line() +
+  coord_cartesian(xlim = c(-10,10))
 ```
 
