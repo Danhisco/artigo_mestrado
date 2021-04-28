@@ -1,0 +1,41 @@
+---
+title: "Esquemas"
+author: "Danilo Pereira Mori"
+date: "27/04/2021"
+output: pdf_document
+---
+
+# Função de Dispersão Inflada
+
+A massa de probabilidade de uma unidade de matrix ser sorteada como parental é redistribuída para as unidades de habitat remanescente, proporcionalmente à massa de probabilidade descrita pela função de dispersão para aquela distância média de dispersão. A massa de probabilidade redistribuída aumenta quanto mais próximo o habitat vago da matrix, maior a proporção de matrix e menor a limitação de dispersão per capita. 
+
+O sorteio de parentesco na simulação coalescente ocorre pelo sorteio independente de duas distribuições de LaPlace ortogonais. Para exemplificar vou considerar uma distribuição exponencial com origem no habitat vago e seguindo apenas em um sentido para o infinito. 
+
+```{r}
+library(rmutil)
+library(lamW)
+library(tidyverse)
+df_resultados <- read.csv(file="/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/simulacao_codigos_e_resultados/resultados/df_resultados.csv",
+                            header = TRUE,as.is=FALSE)[,1:13]
+range_d <- df_resultados$d %>% range
+# p = 1 (no habitat loss)
+#
+# tabela com duas colunas: 
+## distância média de dispersão per capita
+## probabilidade de parentesco
+
+x=expand.grid(SiteCode = df_dados$SiteCode,
+                                 raio_km = c(seq(sqrt(max(df_dados$effort_ha)*0.01)+0.1,
+                                               12,by = 0.1),12) )
+df_plot <- expand.grid(distance = seq(0,100,by = 0.1),
+                       sd = seq(round(range_d[1],digits = 1), 20, by = 2.5))
+df_plot$density <- sapply(df_plot$)
+
+df_plot <- data.frame(distance = seq(0,100,by = 0.1),
+                      sd = seq(round(range_d[1],digits = 1), 20, by = 2.5))
+                      
+                      density = dlaplace(y=seq(0,100,by = 0.1),s=2/sqrt(2)))
+ggplot(df_plot,aes(x=distance,y=density)) + 
+  geom_line()
+```
+
