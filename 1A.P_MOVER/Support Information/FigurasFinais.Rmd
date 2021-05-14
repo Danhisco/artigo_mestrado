@@ -76,7 +76,12 @@ df_resultados %<>% cbind(.,df_resultados.z) %>%
 
 
 ```{r}
-df_resultados$U_med %>% range
+df_resultados %>% 
+  filter(MN == "EE" & k == "0.99" & p<=0.35) %>% 
+  select(SiteCode, p , S_obs, Ntotal) 
+#%>% 
+ # summary
+
 ```
 
 
@@ -579,16 +584,13 @@ df_plot1 <- inner_join(x=select(df_plot,
                                 logOR_EE.EI,lower.logOR_EE.EI,upper.logOR_EE.EI,
                                 p,d),
                        by=c("p","d"))
+write.csv(df_plot1,
+          row.names = FALSE,
+          file = "~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/df_pred_congEE-EI.csv")
 v_limits <- df_plot1 %>% 
   select(logOR_EE.EI:upper.logOR_EE.EI) %>% as.matrix %>% as.vector %>% range
 v_limits <- c(v_limits,mean(df_plot1$logOR_EE.EI))
 v_range <- df_predEE[,3:2] %>% as.numeric() %>% unname()
-# df_plot1 %<>% mutate(KS_f_logOR = NA, KS_f_lower.logOR = NA, KS_f_upper.logOR = NA)
-# for(i in 12:14){
-#   df_plot1[,i] <- ifelse(abs(df_plot1[,i-11]) > 0.25 & 
-#                            df_plot1[,i-6] >0.5, 
-#                          NA,"yes") %>% as.factor()
-# }
 ############# gráficos #############
 l_p <- list()
 br <- c(0,1)
@@ -1225,4 +1227,85 @@ plot_ly(df_plot,
         color= ~factor_nRef, colors = c('#BF382A', '#0C4B8E')) %>% 
   add_markers(opacity = 0.5)
 ```
+
+
+
+
+
+
+##### Relação entre 
+
+
+```{r figura X n_nRef diffS MNEI p<0.35 e d>5}
+v_ <- df_resultados %>% 
+  filter(p<=0.35 & d>5, MN == "EE") %>%
+  .$diffS_mean %>% range
+l_p <- vector("list")
+l_p[[1]] <- df_resultados %>% 
+  filter(p<=0.35 & d>5, MN == "EI",n_nRef>=50) %>% 
+  ggplot(aes(x=diffS_mean,y = n_nRef)) +
+  geom_point(alpha=0.4) + 
+  geom_vline(xintercept = c(-0.25,0.25),alpha=0.6) + geom_vline(xintercept = v_,color="red",alpha=0.6) +
+  # geom_hline(yintercept = 50) +
+  labs(x="diff(S,Sobs)/Sobs",y="# non refuted SADs KS boot test")
+v_2 <- df_resultados %>% 
+  filter(p<=0.35 & d>5, MN == "EI",n_nRef>=50) %>% 
+  select(SiteCode, S_obs) %>% unique %>% 
+  .$S_obs %>% quantile(.,probs = c(5,25,50,75,95)/100) %>% unname
+v_3 <- df_resultados %>% 
+  filter(p<=0.35 & d>5, MN == "EI",n_nRef>=50) %>% .$diffS_mean %>% quantile
+l_p[[2]] <- df_resultados %>% 
+  filter(p<=0.35 & d>5, MN == "EI",n_nRef>=50) %>% 
+  ggplot(aes(y=diffS_mean,x=S_obs)) +
+  geom_smooth(method="loess",se=FALSE,formula = "y ~ x",alpha=0.6,color="blue") +
+  geom_point(alpha=0.4) +
+  geom_hline(yintercept = c(-0.25,0.25),alpha=0.6) + geom_hline(yintercept = v_,color="red",alpha=0.6) +
+  scale_x_continuous(breaks = v_2) +
+  labs(y="diff(S,Sobs)/Sobs",x="Sobs") #+
+  # theme(axis.text.x = element_text(angle=60,vjust = 1, hjust=1))
+# grid.arrange(grobs=l_p,ncol=2,top="SINM, p < 0.35 & d > 5 m")
+l_p[[1]] + labs(title = "SINM, p < 0.35 & d > 5 m")
+```
+Figura X. Ajuste entre SADs preditas pelo modelo espacialmente implícito (SINM) quando a distância média de dispersão per capita (d) > 5 metros e a SAD observada em paisagens com proporção de cobertura vegetal (p) < 0.35. A figura mostra apenas os casos em que o número de SADs não refutadas no teste Kolmogorov-Smirnov bootstrap (# non refuted SADs KS boot test) é maior do 50 em 100 SADs preditas. O par de linhas em preto marcam o critério de tolerância para o viés no número de espécies predita por SINM (diff(S,Sobs)/Sobs). O par de linhas em vermelho marca a amplitude de valores estimados pelo modelo espacialmente explícito (SENM) para o viés no número de espécies predito. Painel da direita: # non refuted SADs KS boot test e diff(S,Sobs)/Sobs. Cerca de 47% das ocorrências estão abaixo do piso do critério de tolerância; e mais de 63% estão abaixo do menor viés para SENM (tabela X). Cerca de 17% estão acima do piso do critério de tolerância; e mais de 31% estão acima do maior viés para SENM (tabela X).
+
+```{r tabela x}
+install.packages("gt")
+df_plot <- df_resultados %>% 
+  filter(p<=0.35 & d>5, MN == "EI" & n_nRef>50) %>%
+  mutate(
+    f_fit1 = case_when(
+      diffS_mean < -0.25 ~ "under -0.25",
+      diffS_mean > 0.25 ~ "over 0.25",
+      TRUE ~ "within criteria"),
+    f_fit2 = case_when(
+      diffS_mean < v_[1] ~ "under min(SENM)",
+      diffS_mean > v_[2] ~ "over max(SENM)",
+      TRUE ~ "within criteria range(SENM)"))
+f_table <- function(x){
+  return_ <- 100*table(x) / length(x)
+  return_ <- round(return_,2)
+  return_ <- as.data.frame(return_)
+  names(return_) <- c("factor","freq")
+  return(return_)
+}
+df_plot %<>% 
+  select(diffS_mean,f_fit1,f_fit2) %>% 
+  gather(.,key=fit_class,value=fit_value,-diffS_mean) %>% #filter(fit_class =="f_congruencia2") %>% .$fit_value
+  ddply(.,"fit_class",function(X) f_table(x=X$fit_value))
+df_plot
+# df_plot[c(2,5),"freq"] %>% diff
+# df_plot[c(1,4),"freq"] %>% diff
+```
+
+
+e para SADs observadas em paisagens com proporção vegetal (p) < 0.35 quando a distância média de dispersão per capita (d) > 5 metros
+
+
+Painel da Direita. 
+
+Número de SADs preditas pelo modelo espacialmente implícito (SINM) não refutadas no teste Kolmogorov-Smirnov bootstrap (eixo y) e o viés no número de espécies predito (eixo x). A figura mostra apenas os casos em que o número de SADs não refutadas é maior do 50 em 100 SADs preditas. O par de linhas verticais em preto marcam o critério de tolerância para o viés no número de espécies predita por SINM. O par de linhas verticais em vermelho marca a amplitude de valores estimados pelo modelo espacialmente explícito (SENM). Cerca de 47% das ocorrências estão abaixo do piso do critério de tolerância; e mais de 63% estão abaixo do menor viés para SENM (tabela X). Cerca de 17% estão acima do piso do critério de tolerância; e mais de 31% estão acima do maior viés para SENM (tabela X). 
+Esses resultados indicam que há uma tendência da SAD predita por SINM subestimar o número de espécies
+
+A maior parte das ocorrências se encontram abaixo do piso do critério de tolerância ()
+
 
