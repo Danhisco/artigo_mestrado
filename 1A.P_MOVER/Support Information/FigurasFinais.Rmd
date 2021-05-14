@@ -1269,7 +1269,6 @@ l_p[[1]] + labs(title = "SINM, p < 0.35 & d > 5 m")
 Figura X. Ajuste entre SADs preditas pelo modelo espacialmente implícito (SINM) quando a distância média de dispersão per capita (d) > 5 metros e a SAD observada em paisagens com proporção de cobertura vegetal (p) < 0.35. A figura mostra apenas os casos em que o número de SADs não refutadas no teste Kolmogorov-Smirnov bootstrap (# non refuted SADs KS boot test) é maior do 50 em 100 SADs preditas. O par de linhas em preto marcam o critério de tolerância para o viés no número de espécies predita por SINM (diff(S,Sobs)/Sobs). O par de linhas em vermelho marca a amplitude de valores estimados pelo modelo espacialmente explícito (SENM) para o viés no número de espécies predito. Painel da direita: # non refuted SADs KS boot test e diff(S,Sobs)/Sobs. Cerca de 47% das ocorrências estão abaixo do piso do critério de tolerância; e mais de 63% estão abaixo do menor viés para SENM (tabela X). Cerca de 17% estão acima do piso do critério de tolerância; e mais de 31% estão acima do maior viés para SENM (tabela X).
 
 ```{r tabela x}
-install.packages("gt")
 df_plot <- df_resultados %>% 
   filter(p<=0.35 & d>5, MN == "EI" & n_nRef>50) %>%
   mutate(
@@ -1280,7 +1279,7 @@ df_plot <- df_resultados %>%
     f_fit2 = case_when(
       diffS_mean < v_[1] ~ "under min(SENM)",
       diffS_mean > v_[2] ~ "over max(SENM)",
-      TRUE ~ "within criteria range(SENM)"))
+      TRUE ~ "within range(SENM)"))
 f_table <- function(x){
   return_ <- 100*table(x) / length(x)
   return_ <- round(return_,2)
@@ -1292,7 +1291,7 @@ df_plot %<>%
   select(diffS_mean,f_fit1,f_fit2) %>% 
   gather(.,key=fit_class,value=fit_value,-diffS_mean) %>% #filter(fit_class =="f_congruencia2") %>% .$fit_value
   ddply(.,"fit_class",function(X) f_table(x=X$fit_value))
-df_plot
+df_plot %>% select(-fit_class) %>% gt::gt()
 # df_plot[c(2,5),"freq"] %>% diff
 # df_plot[c(1,4),"freq"] %>% diff
 ```
