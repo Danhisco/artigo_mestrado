@@ -118,7 +118,8 @@ df_dados <- rbind(df_filtro.UC,df_filtro.estate) %>%
   distinct()
 
 ```
-  
+
+
   
 ```{r janela de codigo 2 _ scale of effect, echo=TRUE,results="hide",eval=TRUE,cache=TRUE}
 # dados brutos
@@ -248,7 +249,7 @@ l_p[[1]]
 ```
 
 
-### Conservação de parâmetros
+### Conversão de parâmetros
 
 ```{r, warning=F,message=F,fig.width=9,fig.height=6}
 df_plot <- filter(df_resultados,MN=="EI") %>% distinct()
@@ -478,5 +479,33 @@ df_plot$factor_p <- NA
 df_plot[df_plot$p>0.35,"factor_p"] <- "p > 0.35"
 df_plot[df_plot$p<0.35,"factor_p"] <- "p < 0.35"
 df_plot$factor_cong <- factor(df_plot$factor_cong)
+```
+
+
+### Tabela com os dados dos sítios de amostragem
+
+```{r}
+df_dadosTreeCo <- read.csv(file="/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/dados_para_iniciar_artigo/references_TreeCo.csv",
+                          as.is = TRUE,header =T, na.strings = c("","NA")) %>%
+  filter(SiteCode %in% unique(df_resultados$SiteCode)) %>% 
+  mutate(ID = NA) %>% 
+   dplyr::select(ID,state,SiteCode,year_data,year,effort_ha,
+                 S,N,
+                 lat,long,lat_correct,long_correct,
+                 Unidade_de_conservacao,UC_area_ha,frag_area,forest_size,
+                 forest_type,forest_succession,
+                 Reference)
+df_dadosTreeCo$ID <- 1:nrow(df_dadosTreeCo)
+df_dadosTreeCo[!complete.cases(df_dadosTreeCo[,c("lat_correct","long_correct")]),c("lat_correct","long_correct")] <- df_dadosTreeCo[!complete.cases(df_dadosTreeCo[,c("lat_correct","long_correct")]),c("lat","long")]
+df_dadosTreeCo[is.na(df_dadosTreeCo$year_data),"year_data"] <- df_dadosTreeCo[is.na(df_dadosTreeCo$year_data),"year"] 
+#
+df_tabelaSitios <- df_dadosTreeCo %>% 
+  select(ID,state,SiteCode,year_data,effort_ha,
+         S,N,
+         lat_correct,long_correct,
+         Unidade_de_conservacao,UC_area_ha,frag_area,forest_size,
+         forest_type,forest_succession)
+df_referenciasSitios <- df_dadosTreeCo %>% 
+  select(ID,Reference)
 ```
 
