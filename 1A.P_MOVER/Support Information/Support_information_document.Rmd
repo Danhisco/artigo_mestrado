@@ -493,9 +493,11 @@ df_dadosTreeCo <- read.csv(file="/home/danilo/Documentos/artigo_mestrado/1A.P_MO
                  S,N,
                  lat,long,lat_correct,long_correct,
                  Unidade_de_conservacao,UC_area_ha,frag_area,forest_size,
-                 forest_type,forest_succession,
-                 Reference)
+                 forest_disturbance,forest_succession,
+                 Reference,refID)
 df_dadosTreeCo$ID <- 1:nrow(df_dadosTreeCo)
+####
+## 
 df_dadosTreeCo[!complete.cases(df_dadosTreeCo[,c("lat_correct","long_correct")]),c("lat_correct","long_correct")] <- df_dadosTreeCo[!complete.cases(df_dadosTreeCo[,c("lat_correct","long_correct")]),c("lat","long")]
 df_dadosTreeCo[is.na(df_dadosTreeCo$year_data),"year_data"] <- df_dadosTreeCo[is.na(df_dadosTreeCo$year_data),"year"] 
 #
@@ -504,8 +506,79 @@ df_tabelaSitios <- df_dadosTreeCo %>%
          S,N,
          lat_correct,long_correct,
          Unidade_de_conservacao,UC_area_ha,frag_area,forest_size,
-         forest_type,forest_succession)
+         forest_disturbance,forest_succession)
 df_referenciasSitios <- df_dadosTreeCo %>% 
-  select(ID,Reference)
+  select(ID,refID,Reference)
+#
+# write.csv(df_referenciasSitios,
+#           file = "/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/dados_auxiliares/df_referenciaSitios.csv",
+#           row.names = FALSE)
+# df_tabelaSitios %>% str
+```
+
+
+
+
+```{r Sitios de amostragem forest age e uso do solo, fig.height=4,fig.width=10}
+# dados
+# df_tabelaSitios$Unidade_de_conservacao %>% unique
+df_tabelaSitios$Unidade_de_conservacao[is.na(df_tabelaSitios$Unidade_de_conservacao)] <- "no info"
+df_tabelaSitios$Unidade_de_conservacao[df_tabelaSitios$Unidade_de_conservacao=="UC Protecao Integral"] <- "UC 1"
+df_tabelaSitios$Unidade_de_conservacao[df_tabelaSitios$Unidade_de_conservacao=="UC Uso Sustentavel"] <- "UC 2"
+df_tabelaSitios$Unidade_de_conservacao[df_tabelaSitios$Unidade_de_conservacao=="private_in_APA"] <- "priv. APA"
+df_tabelaSitios$Unidade_de_conservacao[df_tabelaSitios$Unidade_de_conservacao=="private"] <- "priv."
+df_tabelaSitios$Unidade_de_conservacao[df_tabelaSitios$Unidade_de_conservacao=="universities and research centers"] <- "edu. & research"
+df_tabelaSitios$Unidade_de_conservacao <- factor(df_tabelaSitios$Unidade_de_conservacao,
+                                                 levels = c("no info",
+                                                            "priv.",
+                                                            "priv. APA",
+                                                            "edu. & research",
+                                                            "UC 2",
+                                                            "UC 1"))
+# df_tabelaSitios$forest_succession %>% table
+df_tabelaSitios$forest_succession[df_tabelaSitios$forest_succession=="primary"] <- ">=80 y"
+df_tabelaSitios$forest_succession[df_tabelaSitios$forest_succession=="primary/secondary"] <- "[50;80[ y"
+df_tabelaSitios$forest_succession[df_tabelaSitios$forest_succession=="secondary"] <- "[20;50[ y"
+df_tabelaSitios$forest_succession[df_tabelaSitios$forest_succession=="capoeira"] <- "<20 y"
+df_tabelaSitios$forest_succession <- factor(df_tabelaSitios$forest_succession,
+                                            levels = c("<20 y",
+                                                       "[20;50[ y",
+                                                       "[50;80[ y",
+                                                       ">=80 y"
+                                                       ))
+#
+l_p <- list()
+l_p[[1]] <- df_tabelaSitios %>% 
+  select(Unidade_de_conservacao,forest_succession) %>% 
+  table %>% as.data.frame() %>% 
+  ggplot(aes(x=Unidade_de_conservacao,y=forest_succession,fill=Freq)) +
+  geom_tile() +
+  geom_text(aes(x=Unidade_de_conservacao,y=forest_succession,label=Freq)) +
+  labs(x="land use",y="Time since last perturbation") +
+  theme(legend.position = "none")
+l_p[[2]] <- df_tabelaSitios %>% 
+  mutate(frag_area = as.numeric(frag_area)) %>%  
+  ggplot(aes(x=forest_succession,y=frag_area)) +
+  scale_y_continuous(trans = "log10") +
+  geom_boxplot() +
+  geom_jitter() + 
+  theme(legend.position = "none",
+        panel.grid = element_blank(),
+        axis.title.y = element_blank(),
+        axis.text.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        axis.line.y = element_blank()) +
+  labs(y="Forest Frag. Size (ha)")+
+  coord_flip()
+grid.arrange(grobs=l_p,ncol=2,top="Sample Site Context",
+             layout_matrix = rbind(c(1,1,1,1,2,2,2)))
+```
+O trabalho sem info de unidade de conservação fica em uma área que parece ser loteamento, no trabalho original tem uma imagem (que bate com o google earth) e mostra que essa área está em área de borda.
+
+```{r}
+# df_tabelaSitios %>% str
+df_tabelaSitios %>% 
+  filter(Unidade_de_conservacao %in% c("UC Protecao Integral","universities and research centers")) %>% 
+  .$UC_area_ha
 ```
 
