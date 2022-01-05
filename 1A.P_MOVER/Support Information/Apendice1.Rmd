@@ -7,7 +7,7 @@ output:
     toc: true
     toc_depth: 5
 editor_options: 
-  chunk_output_type: console
+  chunk_output_type: inline
 ---
 
 <style>
@@ -44,8 +44,6 @@ library(dplyr)
 select <- dplyr::select
 ```
 
-  
-
 
 ```{r preparacao dos dados, echo=FALSE,eval=FALSE, include=FALSE}
 ## SAD obs
@@ -65,13 +63,13 @@ df_SAD.obs %<>%
 
 ## tif
 df_tif <- Sys.glob("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/dados_para_iniciar_artigo/paisagens_atualizadas/*.tif") %>% 
-  gsub("/home/danilo/Documentos/Doutorado/artigo_mestrado/paisagens_atualizadas/","",.) %>%
+  gsub("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/dados_para_iniciar_artigo/paisagens_atualizadas/","",.) %>%
   adply(.,1,function(x) unname( unlist( strsplit(x, "_NA_", fixed = TRUE) ) ),.id = NULL) %>% 
   mutate(refID = gsub("ref","",V1),ordem=gsub(".tif","",V2)) %>% dplyr::select(refID,ordem) 
 df_tif$tif.name <- Sys.glob("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/dados_para_iniciar_artigo/paisagens_atualizadas/*.tif") #%>% #caminho dos .tif
 ## references
 # df_references %>% names
-df_references <- read.csv(file="/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/dados_brutos/references - TreeCo.csv",
+df_references <- read.csv(file="/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/dados_para_iniciar_artigo/references - TreeCo.csv",
                           as.is = TRUE,header =T, na.strings = c("","NA")) %>%
    dplyr::select(SiteCode,refID,status,ordem,status_diagnostico,confiabilidade,method,state,arrangement,samples,effort_ha,dbh_cutoff,UC_area_ha, Unidade_de_conservacao,frag_area,forest_size,domain,forest_type,forest_subtype,forest_succession,forest_age,year_data,year)
 ## merge
@@ -83,7 +81,7 @@ df_dados <- inner_join(x = inner_join(x = df_references,
                        y = df_tif, 
                        by = c("ordem","refID"))
 write.csv(df_dados,
-          "/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/dados_brutos/df_dados_disponiveis.csv",
+          "/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/dados_para_iniciar_artigo/df_dados_disponiveis.csv",
           row.names = FALSE)
 ```
 
@@ -122,6 +120,10 @@ df_dados <- rbind(df_filtro.UC,df_filtro.estate) %>%
 df_dados$tif.name <- gsub("/home/danilo/Documentos/Doutorado/artigo_mestrado/paisagens_atualizadas",
                           "/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/dados_para_iniciar_artigo/paisagens_atualizadas", 
                           df_dados$tif.name)
+### escrever os dados na tabela SI 1
+write.csv(select(df_dados),
+          "/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/resultados_e_SI/tabelaSI1.csv",
+          row.names = FALSE)
 ```
 
 
@@ -137,7 +139,11 @@ Procedimento do efeito de escala:
 a) calculo de p para cada valor de raio;  
 b) ajuste de glm.nb para cada conjunto de dados;  
 c) média ponderada pelo peso de evidência da comparação de todos os glm.nb ajustados.  
-  
+
+```{r}
+tail(seq(0.42,12,by=0.1))
+```
+
   
 ```{r janela de codigo 2 _ scale of effect, echo=TRUE,results="hide",eval=TRUE,cache=TRUE}
 # dados brutos
@@ -158,11 +164,14 @@ for(i in 1:nrow(df_se)){
   # função para o calculo da cobertura da paisagem local
   f_p <- function(raio_KM){
     # 1 pixel = 30x30m
+    # raio = metade do lado da paisagem local
     raio_pixels <- round(raio_KM * 1000 / 30)
     raio_max <- nrow(mat_raster)/2
     local_land <- mat_raster[(raio_max+1-raio_pixels):(raio_max+raio_pixels),
                              (raio_max+1-raio_pixels):(raio_max+raio_pixels)]
+    # proporção de cobertura vegetal
     v_p <- sum(local_land,na.rm = NULL)/length(local_land)
+    # para cada raio pedido há a proporção de cobertura calculada e o raio efetivo que depende do tamanho do pixel
     df_ <- data.frame(p=v_p,raio_efetivo.KM=raio_pixels*30/1000)
     return(df_)
   }
@@ -772,8 +781,13 @@ func1 <- function(x,replicas=n_rep.U) {
   x$U <- NA
   x <- x[rep(1:dim(x)[1],each=replicas),]
 }
-# df_simulacao$txt.name <- gsub("dados_brutos","simulacao",df_simulacao$txt.name)
+# nomes
+df_simulacao$txt.name <- gsub("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/",
+                              "/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/dados_para_iniciar_artigo/",
+                              df_simulacao$txt.name)
 df_simulacao.U <- df_simulacao %>% func1()
+
+####################
 # simulacao
 # valores de k
 k_factor <- unique(df_simulacao.U$k)
@@ -803,7 +817,6 @@ for(a in 1:length(k_factor)){
 ###########################
 ######## 10out2020 ########
 ###########################
-registerDoMC(2)
 df_simU <- df_simulacao.U %>% filter(SiteCode == "MGuberl7") %>% as.data.frame()
 op <- options(digits.secs=6)
 funcao_imigracao <- function(i,df_temp=df_simU){
@@ -818,10 +831,10 @@ funcao_imigracao <- function(i,df_temp=df_simU){
   return(aviao$U_est)
 }
 replica.sim <- as.list(1:dim(df_simU)[1])
+registerDoMC(2)
 sim.coal_U <- llply(.data = replica.sim, .fun = funcao_imigracao, .parallel = TRUE)
 df_simU[,"U"] <- unlist(sim.coal_U)
-write.csv(df_simU,
-          file=paste0("./U/","df_simU__k",k_factor[a],".csv"),row.names = FALSE)
+df_simU_MGuberl7 <- df_simU
 ```
 
 1out2020
@@ -852,11 +865,8 @@ if(! (landscape_file >> network->barrier[i])){
 
 # 5) o problema era que o arquivo de entrada na função não era do tipo charactere, ao inves era um tibble
 
+# 6) estas 200 simulações foram rápidas de se fazer
 
-
-
-
-  
   
 #### Janela de Código 9:
 Conversão de Parâmetros:
@@ -868,6 +878,21 @@ df_U <- map_df(Sys.glob("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/simu
 df_simulacao <-  inner_join(x=distinct(dplyr::select(df_U, SiteCode, k, Ntotal, S_obs, kernel_code, DA, d, p, txt.name)),
                             y=ddply(df_U,c("SiteCode","k"),summarise,U_med = mean(U), U_var = var(U)),
                             by=c("SiteCode","k"))
+############################
+######## 10out2020 #########
+############################
+df_pMudar <- df_simulacao %>% filter(SiteCode == "MGuberl7") %>% 
+  select(-U_med, -U_var)
+df_novo <- inner_join(x=distinct(dplyr::select(df_pMudar, SiteCode, k, Ntotal, S_obs, kernel_code, DA, d, p, txt.name)),
+                            y=ddply(df_simU_MGuberl7,c("SiteCode","k"),summarise,U_med = mean(U), U_var = var(U)),
+                            by=c("SiteCode","k"))
+# df_pMudar <- df_simulacao %>% filter(SiteCode == "MGuberl7")
+# plot(df_novo$U_var ~ df_pMudar$U_var)
+# 
+df_simulacao <- rbind.fill(filter(df_simulacao,SiteCode != "MGuberl7"),df_novo)
+############################
+######## 10out2020 #########
+############################
 # conversão de parâmetros
 df_simulacao %<>% 
   mutate(J_M = 10404 * DA * p,
@@ -879,6 +904,7 @@ df_simulacao %<>%
 n_rep.SAD <- 100
 # arrumar diretorio
 df_simulacao$txt.name <- gsub("/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao","/artigo_mestrado/1A.P_MOVER/dados_para_iniciar_artigo",df_simulacao$txt.name)
+write.csv(df_simulacao,file = "/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/simulacao_codigos_e_resultados/df_simulacao.csv",row.names = FALSE)
 ```
 
 
@@ -921,14 +947,6 @@ grid.arrange(l_p[[1]],l_p[[2]],l_p[[3]],l_p[[4]],l_p[[5]],
 #### Janela de Código 10:
 SAD predita MNEE:
 
-```{r}
-X[,"txt.name"]
-paisagem <- as.matrix(read.table(X[,"txt.name"],header = TRUE,sep = " ",as.is = FALSE))
-image
-```
-
-
-
 
 ```{r janela de codigo 10}
 f_simulacao <- function(i,df_=df_simulacao){
@@ -944,7 +962,7 @@ f_simulacao <- function(i,df_=df_simulacao){
                               .id = "replica")
   df_SAD.replica %<>% 
     mutate(SiteCode = X$SiteCode, MN = "EE", k = X$k)
-  path.file <- paste0("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao_codigos_e_resultados/SADs_preditas/",
+  path.file <- paste0("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/simulacao_codigos_e_resultados/SADs_preditas/",
                       X[,"SiteCode"],
                       "_k",X[,"k"],
                       "_EE.csv")
@@ -956,11 +974,14 @@ registerDoMC(2)
 simulacao <- as.list(1:dim(df_simulacao)[1])
 l_ply(simulacao,f_simulacao,.parallel = TRUE)
 ```
-  
+
+Inicio da simulação: 14h38  
+
+A janela de código a seguir foi necessário quando fiz uma simulação e não foi possível conclui-la por falta de espaço
 
 ```{r para compensar a falta de espaco durante a simulacao, eval=FALSE,echo=FALSE}
-df_SADreplicas <- Sys.glob("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/SADs_preditas/*.csv") %>% 
-  gsub("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/SADs_preditas/","",.) %>% 
+df_SADreplicas <- Sys.glob("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/simulacao_codigos_e_resultados/SADs_preditas/*.csv") %>% 
+  gsub("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/simulacao_codigos_e_resultados/SADs_preditas/","",.) %>% 
   gsub("_EE.csv","",.) %>% 
   adply(.,1,function(x) unname( unlist( strsplit(x,"_k",fixed = TRUE))),.id = NULL) %>% 
   rename(SiteCode = V1,k = V2)
@@ -979,9 +1000,13 @@ df_simulacaoDenovo <- anti_join(x=df_simulacao,
 
 ###
 
+paisagem <- read.table(X[,"txt.name"]) %>% as.matrix
+image(paisagem)
+
+
 f_simulacao <- function(i,df_=df_simulacaoDenovo){
-  X <- df_simulacao %>% as.data.frame() %>% filter(SiteCode == "MGvico16" & k == 0.75)
-  X <- df_[i,]
+  # X <- df_simulacao %>% as.data.frame() %>% filter(SiteCode == "MGvico16" & k == 0.75)
+  X <- df_[1,]
   mat_sim <- dinamica_coalescente(U = X[,"U_med"],
                                   S = 0,
                                   N_simul = n_rep.SAD,
@@ -993,7 +1018,7 @@ f_simulacao <- function(i,df_=df_simulacaoDenovo){
                               .id = "replica")
   df_SAD.replica %<>% 
     mutate(SiteCode = X$SiteCode, MN = "EE", k = X$k)
-  path.file <- paste0("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/SADs_preditas/",
+  path.file <- paste0("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/simulacao_codigos_e_resultados/SADs_preditas/",
                       X[,"SiteCode"],
                       "_k",X[,"k"],
                       "_EE.csv")
