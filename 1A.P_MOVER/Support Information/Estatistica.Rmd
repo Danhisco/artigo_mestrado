@@ -136,6 +136,19 @@ layout_mat <- rbind(c(1,1,1,2,2,2),
 grid.arrange(l_p[[1]],l_p[[2]],l_p[[3]],l_p[[4]],l_p[[5]],top="Possible Predictor Variables",layout_matrix=layout_mat)
 ```
 
+```{r}
+l_p <- list()
+l_p[[1]] <- df_resultados %>% filter(MN == "EE") %>% select(SiteCode,k,d,DA) %>% mutate(k_cont = as.numeric(as.character(k))) %>% 
+  ggplot(aes(x=k,y=d,color=DA)) +
+  geom_boxplot(aes(x=k,y=d)) +
+  geom_point()
+l_p[[2]] <- df_resultados %>% filter(MN == "EE") %>% select(SiteCode,k,d,DA) %>% mutate(k_cont = as.numeric(as.character(k))) %>% 
+  ggplot(aes(x=k,y=d,color=DA)) +
+  geom_point() +
+  geom_boxplot(aes(x=k,y=d)) +
+  scale_y_continuous(trans = "log")
+grid.arrange(grobs=l_p,ncol=2)
+```
 
   
 # 2 - Number of unrefuted SADs
@@ -1946,10 +1959,13 @@ __Tabela 3.2.1__ Coeficientes de determinação condicional e marginal
 
 ```{r}
 # md_diffS <- l_md_diffS[["1 1|Site"]]
-df_dados <- df_resultados %>% filter(MN=="EI") %>% distinct()
+df_dados <- df_resultados %>% filter(MN=="EE") %>% distinct()
+df_dados$diffS_mean %>% range %>% round(.,4)
 md_diffS <- lmer(diffS_mean ~ 1 + (1|SiteCode), 
                  data=df_dados,na.action = "na.fail")
 MuMIn::r.squaredGLMM(md_diffS)
+# [,2] %>% round(.,4) %>% as.numeric %>% .*100
+summary(md_diffS)
 ```
 
 
@@ -2099,7 +2115,8 @@ md_ <- lmer(diffS_mean ~
                   (p.z + I(p.z^2)) * (d.z + I(d.z^2)) + 
                   (d.z|SiteCode),
                    data=df_dados, na.action = "na.fail")
-MuMIn::r.squaredGLMM(md_)
+a <- MuMIn::r.squaredGLMM(md_) %>% as.matrix
+a[1,2] %>% as.numeric %>% round(.,4)
 ```
 
 
