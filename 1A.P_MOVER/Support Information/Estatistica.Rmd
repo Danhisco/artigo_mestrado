@@ -7,7 +7,7 @@ output:
     toc: true
     toc_depth: 5
 editor_options: 
-  chunk_output_type: inline
+  chunk_output_type: console
 ---
 
 <style>
@@ -136,7 +136,7 @@ layout_mat <- rbind(c(1,1,1,2,2,2),
 grid.arrange(l_p[[1]],l_p[[2]],l_p[[3]],l_p[[4]],l_p[[5]],top="Possible Predictor Variables",layout_matrix=layout_mat)
 ```
 
-```{r}
+```{r fig.width=12,fig.height=5}
 l_p <- list()
 l_p[[1]] <- df_resultados %>% filter(MN == "EE") %>% select(SiteCode,k,d,DA) %>% mutate(k_cont = as.numeric(as.character(k))) %>% 
   ggplot(aes(x=k,y=d,color=DA)) +
@@ -144,11 +144,112 @@ l_p[[1]] <- df_resultados %>% filter(MN == "EE") %>% select(SiteCode,k,d,DA) %>%
   geom_point()
 l_p[[2]] <- df_resultados %>% filter(MN == "EE") %>% select(SiteCode,k,d,DA) %>% mutate(k_cont = as.numeric(as.character(k))) %>% 
   ggplot(aes(x=k,y=d,color=DA)) +
-  geom_point() +
   geom_boxplot(aes(x=k,y=d)) +
-  scale_y_continuous(trans = "log")
+  geom_point() +
+  scale_y_continuous(trans = "log") +
+  theme(legend.position='none')
 grid.arrange(grobs=l_p,ncol=2)
 ```
+
+```{r}
+df_resultados %<>% 
+  mutate(J_M = 10404 * DA * p,
+         L_plot = sqrt( 10000 * (Ntotal/DA) ),
+         m = d * (1 - exp( -sqrt(2) * (L_plot/d) ) ) / ( sqrt(2) * L_plot ), #eq 4
+         m_ = m * p / ( 1 - (1-p)*m ),#eq 5
+         I =  m_ * (Ntotal-1)/(1-m_), #Etienne 2005
+         theta = U_med * ( J_M - 1 ) / (1-U_med) ) #Vallade & Houshmandzadeh (2003)
+l_p <- list()
+l_p[[1]] <- df_resultados %>% 
+  ggplot(aes(U_med,theta,color=p)) +
+  geom_point()
+l_p[[2]] <- df_resultados %>% 
+  ggplot(aes(U_med,theta,color=p)) +
+  geom_point() +
+  scale_y_continuous(trans = "log") +
+  theme(legend.position = "none")
+l_p[[3]] <- df_resultados %>% 
+  ggplot(aes(d,m_,color=p)) +
+  geom_point()
+l_p[[4]] <- df_resultados %>% 
+  ggplot(aes(d,m_,color=p)) +
+  geom_point() +
+  scale_y_continuous(trans = "log") +
+  theme(legend.position = "none")
+grid.arrange(grobs=l_p,ncol=2)
+```
+
+```{r}
+l_p <- list()
+l_p[[1]] <- df_resultados %>% filter(d>=5 & p>0.35) %>%
+  ggplot(aes(x="",y= m_ ) ) +
+  geom_jitter() +
+  geom_boxplot() +
+  scale_y_continuous(breaks=(df_resultados %>% filter(d>=5 & p>0.35) %>% .$m_ %>% summary() %>% as.vector() %>% round(.,4))) +
+  labs(y="m'") +
+  ggtitle(label="p>0.35 e d>5 metros") +
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank(),
+        plot.title = element_text(hjust = 0.5))
+v_ratioJ <- df_resultados %>% 
+  mutate(ratio_J = 100 *(Ntotal /(10404*DA*p))) %>% filter(p<=0.35) %>% .$ratio_J %>% summary %>% as.vector %>% round(.,4) 
+l_p[[2]] <- df_resultados %>% 
+  mutate(ratio_J = 100 *(Ntotal /(10404*DA*p)),legend = "N sample / N landscape") %>% 
+  select(p,ratio_J,SiteCode,legend) %>% 
+  unique %>% 
+  ggplot(aes(x=p,y=ratio_J)) +
+  geom_point(alpha = 0.8) +
+  geom_vline(xintercept = 0.35) +
+  labs(x = "p",y="") +
+  scale_y_continuous(breaks=v_ratioJ[-4],trans="log10") +
+  ggtitle("100 * (N_sample / N_landscape)") +
+  theme(plot.title = element_text(hjust = 0.5))
+grid.arrange(grobs=l_p,ncol=2)
+```
+
+
+
+```{r}
+df_resultados %>% 
+  ggplot(aes(p,d)) +
+  geom_point()
+df_resultados %>% 
+  ggplot(aes(p,DA)) +
+  geom_point()
+```
+```{r}
+eixo_x <- 0.5
+eixo_y <- 3
+ggplot() +
+  geom_segment(aes(x = 0, y = eixo_y, xend = 0, yend = -eixo_y),
+                  arrow = arrow(length = unit(0.3, "cm"))) +
+  geom_segment(aes(x = 0, y = -eixo_y, xend = 0, yend = eixo_y),
+                  arrow = arrow(length = unit(0.3, "cm"))) +
+  geom_segment(aes(x = eixo_x, y = 0, xend = -eixo_x, yend = 0),
+                  arrow = arrow(length = unit(0.3, "cm"))) +
+  geom_segment(aes(x = -eixo_x, y = 0, xend = eixo_x, yend = 0),
+                  arrow = arrow(length = unit(0.3, "cm"))) +
+  geom_rect(aes(xmin = -0.25, xmax = 0.25, ymin = -3, ymax = 1),fill="darkolivegreen4",alpha=0.6) +
+  annotate("text",x=0.1, y=3.1, label="Log OR") +
+  annotate("text",x=eixo_x-0.01, y=0.25, label="diff S") +
+  geom_segment(aes(x = -0.01, y = 1, xend = 0.01, yend = 1)) +
+  annotate("text",x=0.02, y=1.1, label="1") +
+  geom_segment(aes(x = -0.25, y = -0.1, xend = -0.25, yend = 0.1)) +
+  annotate("text",x=-0.28, y=0.5, label="-0.25") +
+  geom_segment(aes(x = 0.25, y = -0.1, xend = 0.25, yend = 0.1)) +
+  annotate("text",x=0.28, y=0.5, label="0.25") +
+  labs(title = "SAD predita por MNEI >= MNEE na área sombreada") +
+  theme(legend.position = "none",
+        axis.title = element_blank(),
+        axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        axis.line.x.bottom = element_blank(),
+        axis.line.y.left = element_blank(),
+        plot.title = element_text(hjust = 0.5))
+
+```
+
 
   
 # 2 - Number of unrefuted SADs
