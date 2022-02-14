@@ -72,7 +72,7 @@ df_resultados %<>% cbind(.,df_resultados.z) %>%
   select(-k_1,-k_1.z)
 ```
 
-## Dados
+## Dados ##
 
 ### Trabalhos pré-selecionados
 
@@ -493,34 +493,25 @@ df_dadosTreeCo <- read.csv(file="/home/danilo/Documentos/artigo_mestrado/1A.P_MO
                  S,N,
                  lat,long,lat_correct,long_correct,
                  Unidade_de_conservacao,UC_area_ha,frag_area,forest_size,
-                 forest_disturbance,forest_succession,
+                 forest_disturbance,forest_succession,forest_age,
                  Reference,refID)
 df_dadosTreeCo$ID <- 1:nrow(df_dadosTreeCo)
 ####
 ## 
 df_dadosTreeCo[!complete.cases(df_dadosTreeCo[,c("lat_correct","long_correct")]),c("lat_correct","long_correct")] <- df_dadosTreeCo[!complete.cases(df_dadosTreeCo[,c("lat_correct","long_correct")]),c("lat","long")]
 df_dadosTreeCo[is.na(df_dadosTreeCo$year_data),"year_data"] <- df_dadosTreeCo[is.na(df_dadosTreeCo$year_data),"year"] 
+df_dadosTreeCo$year_data[df_dadosTreeCo$year_data=="2012_2013"] <- "2012.5"
 #
 df_tabelaSitios <- df_dadosTreeCo %>% 
   select(ID,state,SiteCode,year_data,effort_ha,
          S,N,
          lat_correct,long_correct,
          Unidade_de_conservacao,UC_area_ha,frag_area,forest_size,
-         forest_disturbance,forest_succession)
-df_referenciasSitios <- df_dadosTreeCo %>% 
-  select(ID,refID,Reference)
-#
-# write.csv(df_referenciasSitios,
-#           file = "/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/dados_auxiliares/df_referenciaSitios.csv",
-#           row.names = FALSE)
-# df_tabelaSitios %>% str
-```
-
-
-
-
-```{r Sitios de amostragem forest age e uso do solo, fig.height=4,fig.width=10}
-# dados
+         # forest_disturbance,
+         forest_succession,forest_age)
+col_index <- c("year_data","effort_ha","S","N","UC_area_ha","frag_area","forest_size","forest_age")
+df_tabelaSitios[,col_index] <- sapply(df_tabelaSitios[,col_index],as.numeric)
+## Fatores
 # df_tabelaSitios$Unidade_de_conservacao %>% unique
 df_tabelaSitios$Unidade_de_conservacao[is.na(df_tabelaSitios$Unidade_de_conservacao)] <- "no info"
 df_tabelaSitios$Unidade_de_conservacao[df_tabelaSitios$Unidade_de_conservacao=="UC Protecao Integral"] <- "UC 1"
@@ -536,49 +527,112 @@ df_tabelaSitios$Unidade_de_conservacao <- factor(df_tabelaSitios$Unidade_de_cons
                                                             "UC 2",
                                                             "UC 1"))
 # df_tabelaSitios$forest_succession %>% table
-df_tabelaSitios$forest_succession[df_tabelaSitios$forest_succession=="primary"] <- ">=80 y"
-df_tabelaSitios$forest_succession[df_tabelaSitios$forest_succession=="primary/secondary"] <- "[50;80[ y"
-df_tabelaSitios$forest_succession[df_tabelaSitios$forest_succession=="secondary"] <- "[20;50[ y"
-df_tabelaSitios$forest_succession[df_tabelaSitios$forest_succession=="capoeira"] <- "<20 y"
+# sensu Lima et al. 2020 Nat. Com. 
+df_tabelaSitios$forest_succession[df_tabelaSitios$forest_succession=="primary"] <- "low" 
+df_tabelaSitios$forest_succession[df_tabelaSitios$forest_succession=="primary/secondary"] <- "medium"
+df_tabelaSitios$forest_succession[df_tabelaSitios$forest_succession=="secondary"] <- "high"
+df_tabelaSitios$forest_succession[df_tabelaSitios$forest_succession=="capoeira"] <- "high"
 df_tabelaSitios$forest_succession <- factor(df_tabelaSitios$forest_succession,
-                                            levels = c("<20 y",
-                                                       "[20;50[ y",
-                                                       "[50;80[ y",
-                                                       ">=80 y"
-                                                       ))
+                                            levels = c("high",
+                                                       "medium",
+                                                       "low"))
+df_tabelaSitios <- rename(df_tabelaSitios,forest_disturbance = forest_succession)
+## salvar
+write.csv(df_tabelaSitios,
+          file="/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/dados_auxiliares/df_tabelaSitios.csv",
+          row.names = FALSE)
+
+#
+df_referenciasSitios <- df_dadosTreeCo %>% 
+  select(ID,refID,Reference)
+# df_tabelaSitios %>% str
+#
+write.csv(df_referenciasSitios,
+          file = "/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/dados_auxiliares/df_referenciaSitios.csv",
+          row.names = FALSE)
+```
+
+
+
+```{r Sitios de amostragem forest age e uso do solo, fig.height=5,fig.width=13}
+df_tabelaSitios <- read.csv("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/dados_auxiliares/df_tabelaSitios.csv",
+                            header=T,as.is = F)
+df_tabelaSitios$forest_disturbance <- factor(df_tabelaSitios$forest_disturbance,
+                                             levels=c("high","medium","low"))
+df_tabelaSitios$Unidade_de_conservacao <- factor(df_tabelaSitios$Unidade_de_conservacao,
+                                                 levels = c("no info","priv.","priv. APA","edu. & research","UC 2","UC 1"))
 #
 l_p <- list()
 l_p[[1]] <- df_tabelaSitios %>% 
-  select(Unidade_de_conservacao,forest_succession) %>% 
+  select(Unidade_de_conservacao,forest_disturbance) %>% 
   table %>% as.data.frame() %>% 
-  ggplot(aes(x=Unidade_de_conservacao,y=forest_succession,fill=Freq)) +
+  ggplot(aes(x=Unidade_de_conservacao,y=forest_disturbance,fill=Freq)) +
   geom_tile() +
-  geom_text(aes(x=Unidade_de_conservacao,y=forest_succession,label=Freq)) +
-  labs(x="land use",y="Time since last perturbation") +
+  geom_text(aes(x=Unidade_de_conservacao,y=forest_disturbance,label=Freq)) +
+  labs(x="Conserv. Status",y="Forest Disturbance") +
   theme(legend.position = "none")
-l_p[[2]] <- df_tabelaSitios %>% 
-  mutate(frag_area = as.numeric(frag_area)) %>%  
-  ggplot(aes(x=forest_succession,y=frag_area)) +
-  scale_y_continuous(trans = "log10") +
-  geom_boxplot() +
-  geom_jitter() + 
-  theme(legend.position = "none",
-        panel.grid = element_blank(),
-        axis.title.y = element_blank(),
-        axis.text.y = element_blank(),
-        axis.ticks.y = element_blank(),
-        axis.line.y = element_blank()) +
-  labs(y="Forest Frag. Size (ha)")+
-  coord_flip()
+# l_p[[2]] <- df_tabelaSitios %>% 
+#   ggplot(aes(x=forest_succession,y=frag_area)) +
+#   scale_y_continuous(trans = "log10") +
+#   geom_boxplot() +
+#   geom_jitter() + 
+#   theme(legend.position = "none",
+#         panel.grid = element_blank(),
+#         axis.title.y = element_blank(),
+#         axis.text.y = element_blank(),
+#         axis.ticks.y = element_blank(),
+#         axis.line.y = element_blank()) +
+#   labs(y="Forest Frag. Size (ha)")+
+#   coord_flip()
+l_p[[2]] <- df_resultados %>% 
+  select(SiteCode, p) %>% 
+  unique %>% 
+  inner_join(x=.,
+             y=df_tabelaSitios,
+             by="SiteCode") %>% 
+  ggplot(aes(x=frag_area,y=p,shape=forest_disturbance,color=Unidade_de_conservacao)) +
+  geom_vline(xintercept = 10404,color="darkgreen",alpha=0.5)+
+  geom_point(size=4,alpha=0.8) +
+  scale_shape_manual(values = c(49:51)) +
+  scale_x_continuous(trans = "log10") + 
+  geom_smooth(method = "loess",se=F) +
+  scale_color_brewer(palette="Dark2") +
+  # theme_dark() +
+  labs(shape="Forest disturbance",color="Conserv. Status",x="Fragment area (ha)",y="Forest cover(%)")
 grid.arrange(grobs=l_p,ncol=2,top="Sample Site Context",
-             layout_matrix = rbind(c(1,1,1,1,2,2,2)))
+             layout_matrix = rbind(c(1,1,1,2,2,2,2)))
 ```
 O trabalho sem info de unidade de conservação fica em uma área que parece ser loteamento, no trabalho original tem uma imagem (que bate com o google earth) e mostra que essa área está em área de borda.
 
+
+- a paisagem é centrada no sítio de amostragem e o sítio de amostragem não é centrado no fragmento
+- a forma do fragmento pode ter diferentes formatos e não apenas um aglomerado de habitat
+
 ```{r}
-# df_tabelaSitios %>% str
-df_tabelaSitios %>% 
-  filter(Unidade_de_conservacao %in% c("UC Protecao Integral","universities and research centers")) %>% 
-  .$UC_area_ha
+df_resultados %>% 
+  select(SiteCode, p) %>% 
+  unique %>% 
+  inner_join(x=.,
+             y=df_tabelaSitios,
+             by="SiteCode") %>%
+  ggplot(aes(x=forest_disturbance,y=p)) +
+  geom_boxplot() +
+  geom_jitter()
 ```
+
+```{r}
+df_tabelaSitios %>% 
+  ggplot(aes(y=year_data,x="")) +
+  geom_boxplot() +
+  geom_hline(yintercept = 2005,color="red") +
+  geom_jitter()
+```
+
+
+
+
+
+
+
+
 
