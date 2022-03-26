@@ -1,0 +1,45 @@
+---
+title: "Piloto de MNEE em paisagens de 4x4km2"
+author: ""
+date: '2022-03-19'
+output: 
+  html_document:
+    toc: true
+    toc_depth: 5
+editor_options: 
+  chunk_output_type: inline
+---
+
+<style>
+body {
+text-align: justify}
+</style>
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, tidy = FALSE, include = TRUE, warning = FALSE,cache = TRUE,message=FALSE,eval=FALSE)
+knitr::opts_knit$set(root.dir = "/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/dados_para_iniciar_artigo")
+setwd("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/dados_para_iniciar_artigo")
+```
+
+```{r pacotes,eval=TRUE,include=TRUE}
+library(sads)
+library(ggpubr)
+library(imager)
+library(OpenImageR)
+library(cowplot)
+library(twosamples)
+library(doMC)
+library(raster)
+library(GUILDS)
+library(bbmle)
+library(magrittr)
+library(gridExtra)
+library(ggplot2)
+library(readr)
+library(purrr)
+library(stringr)
+library(tidyr)
+library(plyr)
+library(dplyr)
+select <- dplyr::select
+```
