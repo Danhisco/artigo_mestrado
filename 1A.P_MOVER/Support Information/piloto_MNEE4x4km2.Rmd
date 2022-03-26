@@ -16,12 +16,12 @@ text-align: justify}
 </style>
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, tidy = FALSE, include = TRUE, warning = FALSE,cache = TRUE,message=FALSE,eval=FALSE)
-knitr::opts_knit$set(root.dir = "/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/dados_para_iniciar_artigo")
-setwd("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/dados_para_iniciar_artigo")
+knitr::opts_chunk$set(echo = TRUE, tidy = FALSE, include = TRUE, warning = FALSE,cache = TRUE,message=FALSE,eval=TRUE)
+knitr::opts_knit$set(root.dir = "/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/")
+setwd("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/")
 ```
 
-```{r pacotes,eval=TRUE,include=TRUE}
+```{r pacotes}
 library(sads)
 library(ggpubr)
 library(imager)
@@ -44,6 +44,32 @@ library(dplyr)
 select <- dplyr::select
 ```
 
+
+## Plano do Piloto
+
+- amostrar 30 sítios ao longo do gradiente de cobertura vegetal. - FEITO  
+
+- trabalhar no raster dos sítios amostrados. - PRÓXIMO  
+
+- organizar as pastas e revisar a funcionalidade do programa coalescente (simulação coalescente).  
+
+- 1o sub-piloto: estimar a taxa U  
+
+- 2o sub-piloto: predizer as SADs  
+
+- calcular a diferença entre as respostas atuais e anteriores  
+
+- descrever a diferença por um modelo gaussiano misto  
+
+- Estudo das equações de conversão de parâmetros: validar com uma simulação espacialmente explícita:  
+
+1) fazer a estimativa de m para os sítios amostrados a partir de uma simulação espacialmente explícita que desconsidera a perda de habitat (referência).  
+
+2) calcular a taxa m’ usando a proposta do Coutinho e minha (olhar e-mail do encaminhamento 1) e usando a que eu fiz (pretendo implementar usando integração de Monte Carlo).  
+
+- Simular as SADs preditas por MNEI (eu fiz uma primeira pesquisa, e a fórmula de amostragem de Etienne 2005 está mais atualizado no pacote GUILDS ao invés do pacote untb).   
+
+### Sortear sítios ao longo do gradiente de cobertura vegetal 
 
 ```{r dados,message=FALSE}
 ### dados ###
@@ -73,12 +99,16 @@ df_resultados %<>% cbind(.,df_resultados.z) %>%
   select(-k_1,-k_1.z)
 ```
 
-Plano:
-1) amostrar 30 pontos de uma uniforme de 0 a 1
-2) subtrair, para cada ponto sorteado em 1, a proporção de cobertura vegetal observada (coluna 'p')
-3) selecionar, para cada ponto sorteado em 1, aquele que obteve menor diferença em 2
+Plano:  
+  
+1) amostrar 30 pontos de uma uniforme de 0 a 1  
 
-```{r}
+2) subtrair, para cada ponto sorteado em 1, a proporção de cobertura vegetal observada (coluna 'p')  
+
+3) selecionar, para cada ponto sorteado em 1, aquele que obteve menor diferença em 2  
+
+
+```{r df_piloto e grafico de p S}
 f_random_byVar <- function(x = df_resultados,
                            column_name = "p", 
                            n_sample = 30, 
@@ -100,9 +130,13 @@ f_random_byVar <- function(x = df_resultados,
   return(df_return)
 }
 df_piloto <- f_random_byVar(x=df_resultados)
+write.csv(df_piloto,file = "df_piloto.csv",row.names = FALSE)
 # gráficos exploratóritos
-# df_piloto %>% 
-#   ggplot(aes(x=p,y=S_obs)) + geom_point()
+df_piloto %>%
+  ggplot(aes(x=p,y=S_obs)) + 
+  geom_point() +
+  ggtitle(label="Sítios Sorteados") +
+  labs(x="% Tree cover (p)",y="Species Richness")
 ```
 
 
