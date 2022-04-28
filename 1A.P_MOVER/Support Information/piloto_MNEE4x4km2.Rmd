@@ -103,7 +103,37 @@ df_resultados %<>% cbind(.,df_resultados.z) %>%
 
 ```{r gráficos}
 df_S1 <- read.csv("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/resultados_e_SI/tabelaSI1.csv",
-                  header = TRUE)
+                  header = TRUE) %>% 
+  mutate(year_plot = ifelse(is.na(year_data),year,year_data))
+df_S1$year_plot[df_S1$year_plot=="2012_2013"] <- "2012.5"
+df_S1$year_plot <- as.numeric(df_S1$year_plot)
+### Filtros usados
+### filtro universidades e campi
+df_filtro.UC <- df_1ofiltro %>% 
+  filter(UC_area_ha >= 1000 | 
+         Unidade_de_conservacao %in% c("UC Protecao Integral","universities and research centers"))
+### filtro estados
+df_filtro.estate <- filter(df_1ofiltro,state %in% c("RJ","RS") & year >= 1990)
+df_filtro.estate %<>% rbind(.,filter(df_1ofiltro,state %in% c("BA","GO","MS") & year >= 2000))
+df_filtro.estate %<>% rbind(.,filter(df_1ofiltro,!(state %in% c("BA","GO","MS","RJ","RS")) & year >= 1995))
+
+df_S1$site_category <- NA
+df_S1$site_category[df_S1$UC_area_ha>=1000 | 
+                      df_S1$Unidade_de_conservacao %in% 
+                      c("UC Protecao Integral","universities and research centers")] <- 1
+df_S1$site_category[df_S1$state %in% c("RJ","RS") & 
+                      df_S1$year >= 1990] <- 2
+df_S1$site_category[df_S1$state %in% c("BA","GO","MS") & 
+                      df_S1$year >= 2000] <- 3
+df_S1$site_category[!(df_S1$state %in% c("BA","GO","MS","RJ","RS")) & 
+                      df_S1$year >= 1995] <- 4
+df_S1 %>% 
+  mutate(site_category = factor(site_category)) %>% 
+  ggplot(aes(x=year_plot,y=site_category)) +
+  geom_vline(xintercept = 2000,color="red") +
+  geom_boxplot() +
+  geom_jitter()
+df_S1 %>% arrange(year_plot) %>% select(year_plot,UC_area_ha,state)
 ```
 
 
