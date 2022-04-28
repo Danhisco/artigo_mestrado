@@ -99,6 +99,16 @@ df_resultados %<>% cbind(.,df_resultados.z) %>%
   select(-k_1,-k_1.z)
 ```
 
+# Ap Final BIE 5770
+
+```{r gráficos}
+df_S1 <- read.csv("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/resultados_e_SI/tabelaSI1.csv",
+                  header = TRUE)
+```
+
+
+# Piloto
+
 Plano:  
   
 1) amostrar 30 pontos de uma uniforme de 0 a 1  
