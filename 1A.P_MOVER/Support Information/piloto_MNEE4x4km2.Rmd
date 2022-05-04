@@ -102,6 +102,29 @@ df_resultados %<>% cbind(.,df_resultados.z) %>%
 # Ap Final BIE 5770
 
 ```{r gráficos}
+#
+df_SADs.disponiveis <- read.csv(
+  "/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/dados_para_iniciar_artigo/df_SADs_disponiveis.csv",
+  header =T)
+df_SADs.disponiveis %<>% 
+  filter(method=="parcelas" &
+           grepl("*contiguous*",arrangement) & 
+           effort_ha>=1 &
+           grepl("*yes*",status) & 
+           grepl("ok*",status_diagnostico) &
+           grepl("Atlantic_Forest*",domain) &
+           dbh_cutoff %in% c("PBH>=15.0cm","PBH>=15.7cm",
+                             "DBH>=5.0cm","DGH>=5.0cm","DBH>5.0cm",
+                             "DBH>=4.8cm",
+                             "DBH>=5.0cm&H>300cm","DBH>=5.0cm&H>500cm", 
+                             "DGH30>=5.0cm")
+         )
+# df_SADs.disponiveis %>%
+#   select(status_diagnostico:effort_ha) %>% 
+#   select(-c(state,samples))
+
+
+## dados disponíveis: usando landsat8 (ano referência 2000)
 df_S1 <- read.csv("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/resultados_e_SI/tabelaSI1.csv",
                   header = TRUE) %>% 
   mutate(year_plot = ifelse(is.na(year_data),year,year_data))
@@ -109,14 +132,13 @@ df_S1$year_plot[df_S1$year_plot=="2012_2013"] <- "2012.5"
 df_S1$year_plot <- as.numeric(df_S1$year_plot)
 ### Filtros usados
 ### filtro universidades e campi
-df_filtro.UC <- df_1ofiltro %>% 
-  filter(UC_area_ha >= 1000 | 
-         Unidade_de_conservacao %in% c("UC Protecao Integral","universities and research centers"))
-### filtro estados
-df_filtro.estate <- filter(df_1ofiltro,state %in% c("RJ","RS") & year >= 1990)
-df_filtro.estate %<>% rbind(.,filter(df_1ofiltro,state %in% c("BA","GO","MS") & year >= 2000))
-df_filtro.estate %<>% rbind(.,filter(df_1ofiltro,!(state %in% c("BA","GO","MS","RJ","RS")) & year >= 1995))
-
+# df_filtro.UC <- df_1ofiltro %>% 
+#   filter(UC_area_ha >= 1000 | 
+#          Unidade_de_conservacao %in% c("UC Protecao Integral","universities and research centers"))
+# ### filtro estados
+# df_filtro.estate <- filter(df_1ofiltro,state %in% c("RJ","RS") & year >= 1990)
+# df_filtro.estate %<>% rbind(.,filter(df_1ofiltro,state %in% c("BA","GO","MS") & year >= 2000))
+# df_filtro.estate %<>% rbind(.,filter(df_1ofiltro,!(state %in% c("BA","GO","MS","RJ","RS")) & year >= 1995))
 df_S1$site_category <- NA
 df_S1$site_category[df_S1$UC_area_ha>=1000 | 
                       df_S1$Unidade_de_conservacao %in% 
@@ -127,13 +149,47 @@ df_S1$site_category[df_S1$state %in% c("BA","GO","MS") &
                       df_S1$year >= 2000] <- 3
 df_S1$site_category[!(df_S1$state %in% c("BA","GO","MS","RJ","RS")) & 
                       df_S1$year >= 1995] <- 4
-df_S1 %>% 
+df_S1 %>%
   mutate(site_category = factor(site_category)) %>% 
-  ggplot(aes(x=year_plot,y=site_category)) +
-  geom_vline(xintercept = 2000,color="red") +
-  geom_boxplot() +
-  geom_jitter()
-df_S1 %>% arrange(year_plot) %>% select(year_plot,UC_area_ha,state)
+  ggplot(aes(x=year_plot,y=site_category,shape=site_category)) +
+  # geom_vline(xintercept = 2000,color="red") + # versão 1
+  geom_vline(aes(xintercept = year_plot),color="red",alpha=0.3) + # versão 2
+  # geom_boxplot() +
+  geom_jitter() +
+  labs(shape="Categorias:",
+       y="categoria inventário florestal",
+       x="ano inventário florestal",
+       title= "104 inventários dentro dos critérios (de 109 confiáveis)") +
+  scale_shape_discrete(breaks=c("1","2","3","4"),
+                       labels=c("todas as idades: \nUC Prot. Int. | Univ. | UC>=1000 ha",
+                                "RJ e RS >= 1990",
+                                "BA, GO e MS >= 2000",
+                                "outros estados Brasil >= 1995")) +
+  theme(axis.text.y=element_blank(),
+        axis.ticks.y=element_blank())
+# df_S1 %>% arrange(year_plot) %>% select(year_plot,UC_area_ha,state)
+```
+```{r}
+df_S2 <- read.csv("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/resultados_e_SI/tabelaSI2.csv",
+                  header = TRUE) %>% 
+  mutate(year_plot = ifelse(is.na(year_data),year,year_data))
+df_S2$year_plot[df_S1$year_plot=="2012_2013"] <- "2012.5"
+df_S2$year_plot <- as.numeric(df_S1$year_plot)
+df_S2$site_category <- "1"
+df_S2 %>%
+  mutate(site_category = factor(site_category)) %>% 
+  ggplot(aes(x=year_plot,y=site_category,shape=site_category)) +
+  geom_vline(aes(xintercept = year_plot),color="red",alpha=0.6) + # versão 2
+  # geom_boxplot() +
+  geom_jitter() +
+  labs(shape="Critérios de Seleção:",
+       y="",
+       x="ano inventário florestal",
+       title= "109 inventários com SAD e coordenada confiáveis") +
+  scale_shape_discrete(breaks="1",
+                       labels="- Atlantic Forest \n- DBH >= 5.0cm \n- plot >= 1ha") +
+  theme(axis.text.y=element_blank(),
+        axis.ticks.y=element_blank())
 ```
 
 
