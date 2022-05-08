@@ -173,8 +173,8 @@ df_S1 %>%
 df_S2 <- read.csv("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/resultados_e_SI/tabelaSI2.csv",
                   header = TRUE) %>% 
   mutate(year_plot = ifelse(is.na(year_data),year,year_data))
-df_S2$year_plot[df_S1$year_plot=="2012_2013"] <- "2012.5"
-df_S2$year_plot <- as.numeric(df_S1$year_plot)
+df_S2$year_plot[df_S2$year_plot=="2012_2013"] <- "2012.5"
+df_S2$year_plot <- as.numeric(df_S2$year_plot)
 df_S2$site_category <- "1"
 df_S2 %>%
   mutate(site_category = factor(site_category)) %>% 
@@ -182,16 +182,17 @@ df_S2 %>%
   geom_vline(aes(xintercept = year_plot),color="red",alpha=0.6) + # versão 2
   # geom_boxplot() +
   geom_jitter() +
-  labs(shape="Critérios de Seleção:",
+  labs(shape="",
        y="",
        x="ano inventário florestal",
        title= "109 inventários com SAD e coordenada confiáveis") +
-  scale_shape_discrete(breaks="1",
-                       labels="- Atlantic Forest \n- DBH >= 5.0cm \n- plot >= 1ha") +
+  scale_shape_discrete(breaks="") +
+                       # labels="- Atlantic Forest \n- DBH >= 5.0cm \n- plot >= 1ha") +
   theme(axis.text.y=element_blank(),
         axis.ticks.y=element_blank())
 ```
 
+# Ap Final BIE 5770
 
 # Piloto
 
@@ -241,7 +242,13 @@ df_piloto %>%
   labs(x="% Tree cover (p)",y="Species Richness")
 ```
 
+NOTA :: Mapas de cobertura vegetal para os trabalhos pilotos
 
+É suficiente recortar os atuais mapas de 10x10km2 para mapas de 4x4km2,
+pois sempre é aplicado uma função que impõe que a densidade de pixels é igual à densidade de indivíduos na área amostral. 
+Portanto, posso pular o trabalho com os mapas de cobertura vegetal e apenas fazer o recorte. Porém, como se estima
+o recorte certo? Todos tem as mesmas dimensões, mas mudam na resolução. Podemos usar uma regra de três simples
+aplicada ao número de colunas e linhas: se x colunas correspondem à 10km quanto corresponde à 4? 
 
 #### Análise de Escala de Efeito:
 
