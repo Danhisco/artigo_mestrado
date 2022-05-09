@@ -338,4 +338,32 @@ df_averageSE %>%
   theme_classic()
 ```
 
-  O raio médio = `r raio_medio` e portanto o lado da paisagem é de `r 2*raio_medio`km e área total de 1713.96 hectares
+O raio médio = `r raio_medio` (2.07) e portanto o lado da paisagem é de `r 2*raio_medio`km e área total de 1713.96 hectares  
+  
+O lado anterior é de 10.2x10.2, o lado atual é 4.14x4.14.
+
+```{r recorte das paisagens para piloto,echo=FALSE}
+df_piloto <- read.csv(file="df_piloto.csv", header = TRUE)
+df_sims <- read.csv("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/simulacao_codigos_e_resultados/df_simulacao.csv",
+                    header = TRUE) %>% 
+  filter(SiteCode %in% unique(df_piloto$SiteCode)) %>% 
+  select(!(J_M:theta))
+
+f_tree.cover <- function(file_path){
+  mat_paisagem <- read.table(file=file_path,sep=" ",header=TRUE)
+  tree.cover <- as.vector(mat_paisagem)
+  tree.cover <- tree.cover[!is.na(tree.cover)]
+  p <- 1 - length(tree.cover[tree.cover==0])/length(tree.cover)
+  return(p)
+}
+# estudo funcao
+file_path <- df_sims$txt.name[1]
+mat_paisagem <- read.table(file=file_path,sep=" ",header=TRUE) %>% 
+  as.matrix
+# image(mat_paisagem)
+dim(mat_paisagem)[1]
+
+
+```
+  
+
