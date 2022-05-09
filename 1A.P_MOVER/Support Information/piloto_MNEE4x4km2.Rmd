@@ -361,9 +361,15 @@ file_path <- df_sims$txt.name[1]
 mat_paisagem <- read.table(file=file_path,sep=" ",header=TRUE) %>% 
   as.matrix
 # image(mat_paisagem)
-dim(mat_paisagem)[1]
+v_dim_novo <- dim(mat_paisagem) - round(dim(mat_paisagem) * (4.14/10.2),0)
+v_dim <- dim(mat_paisagem)
 
-
+mat_paisagem_output <- mat_paisagem[floor(v_dim_novo[1]/2):(v_dim[1]-1-ceiling(v_dim_novo[1]/2)),
+                                    floor(v_dim_novo[2]/2):(v_dim[2]-1-ceiling(v_dim_novo[2]/2))]
+# mat_paisagem_output %>% dim
+# c(floor(v_dim_novo[1]/2):(v_dim[1]-ceiling(v_dim_novo[1]/2))) %>% length()
+image(mat_paisagem,main="10.2x10.2km2")
+image(mat_paisagem_output,main="4.14x4.14km2")
 ```
   
 
