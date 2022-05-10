@@ -99,7 +99,7 @@ df_resultados %<>% cbind(.,df_resultados.z) %>%
   select(-k_1,-k_1.z)
 ```
 
-# Ap Final BIE 5770
+# Ap Final BIE 5770: inicio
 
 ```{r gráficos}
 #
@@ -192,7 +192,7 @@ df_S2 %>%
         axis.ticks.y=element_blank())
 ```
 
-# Ap Final BIE 5770
+# Ap Final BIE 5770: final
 
 # Piloto
 
@@ -347,7 +347,8 @@ df_piloto <- read.csv(file="/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/S
 df_sims <- read.csv("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/simulacao_codigos_e_resultados/df_simulacao.csv",
                     header = TRUE) %>% 
   filter(SiteCode %in% unique(df_piloto$SiteCode)) %>% 
-  select(!(U_med:theta))
+  select(!(J_M:theta))
+names(df_sims)[10:11] <- paste0(names(df_sims)[10:11],"_10x10")
 # estudo funcao
 # file_path <- df_sims$txt.name[3]
 f_recorte <- function(file_path){
@@ -370,16 +371,10 @@ f_recorte <- function(file_path){
 # image(mat_paisagem)
 df_ <- df_sims %>% filter(k==0.05)
 df_$p2 <- aaply(df_$txt.name,1,f_recorte)
-# 
-# 
-# # mat_paisagem_output %>% dim
-# # c(floor(v_dim_novo[1]/2):(v_dim[1]-ceiling(v_dim_novo[1]/2))) %>% length()
-# image(mat_paisagem,main="10.2x10.2km2")
-# image(mat_paisagem_output,main="4.14x4.14km2")
-df_ %>% 
-  ggplot(aes(x=p,y=p2)) +
-  geom_abline(slope = 1,intercept = 0,color="red",alpha=0.6) +
-  geom_point()
+# df_ %>% 
+#   ggplot(aes(x=p,y=p2)) +
+#   geom_abline(slope = 1,intercept = 0,color="red",alpha=0.6) +
+#   geom_point()
 ###
 df_sims <- left_join(x=df_sims,
                      y=select(df_,SiteCode,p2),
@@ -388,7 +383,9 @@ df_sims <- left_join(x=df_sims,
          txt.name = gsub("dados_para_iniciar_artigo",
                         "piloto_MNEE_4x4km",
                         txt.name_antigo))
-
+write.csv(df_sims,
+          file="/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/df_piloto.csv",
+          row.names=FALSE)
 ```
   
 ```{r janela de codigo 7,echo=TRUE,eval=TRUE}
@@ -463,7 +460,7 @@ Estimativa de U
 
 
 
-```{r janela de codigo 8}
+```{r simulacao U}
 # replicas
 n_rep.U <- 10
 func1 <- function(x,replicas=n_rep.U) {
@@ -500,4 +497,26 @@ for(a in 1:length(k_factor)){
 }
 ```
 
-A simulação ocorreu entre 19h58 e 21h11, totalizando 1h13. Se considerarmos 103 sítios, serão 5h45. Pras SADS eu estimo que seja fique 54h49, 2.27 dias.  
+A simulação ocorreu entre 19h58 e 21h11, totalizando 1h13. Se considerarmos 103 sítios, serão 5h45. Pras SADS eu estimo que seja fique 54h49, 2.27 dias.
+
+```{r comparacao }
+df_U <- map_df(Sys.glob("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x4km/U/*.csv"), read_csv)
+df_Umed <- df_U %>% 
+  ddply(.variables = c("SiteCode","k"),summarise,
+        U_med = mean(U),
+        U_var = var(U))
+df_sims <- read.csv(file = "/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/df_piloto.csv",
+                    header = TRUE)
+df_Umed <- left_join(x=df_sims,y=df_Umed,by=c("SiteCode","k")) %>% 
+  mutate(diff_Umed = U_med - U_med_10x10)
+l_p <- list()
+l_p[[1]] <- df_Umed %>% 
+  ggplot(aes(x=U_med_10x10,y=U_med)) +
+  geom_abline(intercept = 0,slope = 1,color="red",alpha=0.6) +
+  geom_point()
+l_p[[2]] <- df_Umed %>% 
+  ggplot(aes(x="",y=diff_Umed)) +
+  geom_jitter()
+grid.arrange(grobs=l_p,ncol=2)
+```
+
