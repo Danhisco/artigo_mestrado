@@ -7,7 +7,7 @@ output:
     toc: true
     toc_depth: 5
 editor_options: 
-  chunk_output_type: inline
+  chunk_output_type: console
 ---
 
 <style>
@@ -18,7 +18,7 @@ text-align: justify}
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, tidy = FALSE, include = TRUE, warning = FALSE,cache = TRUE,message=FALSE,eval=TRUE)
 knitr::opts_knit$set(root.dir = "/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/")
-setwd("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/")
+setwd("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x4km/")
 ```
 
 ```{r pacotes,warning=F}
@@ -343,33 +343,161 @@ O raio médio = `r raio_medio` (2.07) e portanto o lado da paisagem é de `r 2*r
 O lado anterior é de 10.2x10.2, o lado atual é 4.14x4.14.
 
 ```{r recorte das paisagens para piloto,echo=FALSE}
-df_piloto <- read.csv(file="df_piloto.csv", header = TRUE)
+df_piloto <- read.csv(file="/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/df_piloto.csv", header = TRUE)
 df_sims <- read.csv("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/simulacao_codigos_e_resultados/df_simulacao.csv",
                     header = TRUE) %>% 
   filter(SiteCode %in% unique(df_piloto$SiteCode)) %>% 
-  select(!(J_M:theta))
-
-f_tree.cover <- function(file_path){
-  mat_paisagem <- read.table(file=file_path,sep=" ",header=TRUE)
-  tree.cover <- as.vector(mat_paisagem)
-  tree.cover <- tree.cover[!is.na(tree.cover)]
+  select(!(U_med:theta))
+# estudo funcao
+# file_path <- df_sims$txt.name[3]
+f_recorte <- function(file_path){
+  mat_paisagem <- read.table(file=file_path,sep=" ",header=TRUE) %>% 
+    as.matrix
+  v_dim_novo <- dim(mat_paisagem) - round(dim(mat_paisagem) * (4.14/10.2),0)
+  v_dim <- dim(mat_paisagem)
+  mat_paisagem_output <- mat_paisagem[floor(v_dim_novo[1]/2):(v_dim[1]-1-ceiling(v_dim_novo[1]/2)),
+                                      floor(v_dim_novo[2]/2):(v_dim[2]-1-ceiling(v_dim_novo[2]/2))]
+  write.table(mat_paisagem_output,
+              file=gsub("dados_para_iniciar_artigo",
+                        "piloto_MNEE_4x4km",
+                        file_path),
+              sep=" ", 
+              row.names = FALSE,col.names = FALSE)
+  tree.cover <- as.vector(mat_paisagem_output)
   p <- 1 - length(tree.cover[tree.cover==0])/length(tree.cover)
   return(p)
 }
-# estudo funcao
-file_path <- df_sims$txt.name[1]
-mat_paisagem <- read.table(file=file_path,sep=" ",header=TRUE) %>% 
-  as.matrix
 # image(mat_paisagem)
-v_dim_novo <- dim(mat_paisagem) - round(dim(mat_paisagem) * (4.14/10.2),0)
-v_dim <- dim(mat_paisagem)
+df_ <- df_sims %>% filter(k==0.05)
+df_$p2 <- aaply(df_$txt.name,1,f_recorte)
+# 
+# 
+# # mat_paisagem_output %>% dim
+# # c(floor(v_dim_novo[1]/2):(v_dim[1]-ceiling(v_dim_novo[1]/2))) %>% length()
+# image(mat_paisagem,main="10.2x10.2km2")
+# image(mat_paisagem_output,main="4.14x4.14km2")
+df_ %>% 
+  ggplot(aes(x=p,y=p2)) +
+  geom_abline(slope = 1,intercept = 0,color="red",alpha=0.6) +
+  geom_point()
+###
+df_sims <- left_join(x=df_sims,
+                     y=select(df_,SiteCode,p2),
+                     by="SiteCode") %>% 
+  mutate(txt.name_antigo = txt.name,
+         txt.name = gsub("dados_para_iniciar_artigo",
+                        "piloto_MNEE_4x4km",
+                        txt.name_antigo))
 
-mat_paisagem_output <- mat_paisagem[floor(v_dim_novo[1]/2):(v_dim[1]-1-ceiling(v_dim_novo[1]/2)),
-                                    floor(v_dim_novo[2]/2):(v_dim[2]-1-ceiling(v_dim_novo[2]/2))]
-# mat_paisagem_output %>% dim
-# c(floor(v_dim_novo[1]/2):(v_dim[1]-ceiling(v_dim_novo[1]/2))) %>% length()
-image(mat_paisagem,main="10.2x10.2km2")
-image(mat_paisagem_output,main="4.14x4.14km2")
 ```
   
+```{r janela de codigo 7,echo=TRUE,eval=TRUE}
+dinamica_coalescente <- function(U, S=0, N_simul, seed, disp_range, disp_kernel, landscape){
+  # Runs coalescent simulations for a given heterogeneous landscape
+  #
+  # Parameters:
+  # U: speciation rate
+  # S: observed richness (integer) - used to fit the value of U, or set to
+  #       0 (default) if that is not desired
+  # N_simul: number of simulations
+  # seed: seed of the RNG (an integer)
+  # disp_range: width of the dispersal kernel
+  # disp_kernel: an integer corresponding to the type of dispersal kernel. One of
+  #               0: uniform
+  #               1: normal
+  #               2: Laplacian
+  # landscape: either a filename containing the landscape data, or a
+  #   bidimensional R array or matrix.
+  #   TODO: describe the format of the input - trinary matrix)
+  #
+  # Returns:
+  # r: an array of dimension N_simul x landscape dimensions, that is, each
+  #   r[i.,] is a bidimensional array of the same shape as the landscape.
+  #   Each site is labeled according to the identity of the species occupying
+  #   that site.
+  # U_est: estimated speciation rate. This is returned only if input parameter S > 0
+  if (is.character(landscape)){
+    l <- as.matrix(read.table(landscape))
+    infile <- landscape
+    land_dims <- dim(l)
+  } else {
+    land_dims <- dim(landscape)
+    infile <- tempfile()
+    # input file *must* be clean: no comments, headers or anything
+    write.table(landscape, infile, col.names=F, row.names=F)
+  }
+  outfile <- tempfile()
+  repeat {
+    system(paste('./dinamica_coalescente', land_dims[1], land_dims[2], U, S, N_simul,
+                 seed, disp_range, disp_kernel, infile, outfile))
+    if (file.exists(outfile) || S == 0)
+      break
+    U <- U/10.
+    print(paste("Decreasing value of U to", U))
+    # set some lowest boundary here so simulations don't take forever
+    if (U < 1e-20){
+      print("Richness value too low, giving up...")
+      return(NULL)
+    }
+  }
+  r <- as.matrix(read.table(outfile))
+  # transpose each grid, as output is written along lines but R reads it along columns
+  # TODO: I thought I got it right, but it was wrong... please DO re-check
+  #r <- aperm(r, c(1,3,2))
 
+  # recover estimated speciation rate
+  if (S > 0){
+    out_con <- file(outfile)
+    U_line <- strsplit(readLines(out_con, 2)[2], ' ')[[1]]
+    close(out_con)
+    U_est <- as.double(U_line[length(U_line)])
+    return(list(r = r, U_est = U_est))
+  }
+  return(r)
+}
+```
+
+
+#### Janela de Código 8:
+Estimativa de U
+
+
+
+```{r janela de codigo 8}
+# replicas
+n_rep.U <- 10
+func1 <- function(x,replicas=n_rep.U) {
+  x$U <- NA
+  x <- x[rep(1:dim(x)[1],each=replicas),]
+}
+# nomes
+df_simulacao.U <- df_sims %>% func1()
+####################
+# simulacao
+## objetos necessarios
+# system(paste0("mkdir ",getwd(),"/U")) # pasta para armazenar os data.frames, só faz uma vez
+k_factor <- unique(df_simulacao.U$k) # dividi as simulações por blocos de cenário de limitação
+registerDoMC(3)
+for(a in 1:length(k_factor)){
+  df_simU <- df_simulacao.U %>% dplyr::filter(k == k_factor[a])
+  op <- options(digits.secs=6)
+  funcao_imigracao <- function(i,df_temp=df_simU){
+    aviao <- list()
+    aviao <- dinamica_coalescente(U = 1.25e-06,
+                                  S = df_temp[i,"S_obs"],
+                                  N_simul = 1,
+                                  seed = as.numeric(Sys.time()),
+                                  disp_range = df_temp[i,"d"],
+                                  disp_kernel = df_temp[i,"kernel_code"],
+                                  landscape = df_temp[i,"txt.name"])
+    return(aviao$U_est)
+  }
+  replica.sim <- as.list(1:dim(df_simU)[1])
+  sim.coal_U <- llply(.data = replica.sim, .fun = funcao_imigracao, .parallel = TRUE)
+  df_simU[,"U"] <- unlist(sim.coal_U)
+  write.csv(df_simU,
+            file=paste0("./U/","df_simU__k",k_factor[a],".csv"),row.names = FALSE)
+}
+```
+
+A simulação ocorreu entre 19h58 e 21h11, totalizando 1h13. Se considerarmos 103 sítios, serão 5h45. Pras SADS eu estimo que seja fique 54h49, 2.27 dias.  
