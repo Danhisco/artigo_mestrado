@@ -342,6 +342,8 @@ O raio médio = `r raio_medio` (2.07) e portanto o lado da paisagem é de `r 2*r
   
 O lado anterior é de 10.2x10.2, o lado atual é 4.14x4.14.
 
+#### Recorte para 4x4km2
+
 ```{r recorte das paisagens para piloto,echo=FALSE}
 df_piloto <- read.csv(file="/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/df_piloto.csv", header = TRUE)
 df_sims <- read.csv("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/simulacao_codigos_e_resultados/df_simulacao.csv",
@@ -455,8 +457,7 @@ dinamica_coalescente <- function(U, S=0, N_simul, seed, disp_range, disp_kernel,
 ```
 
 
-#### Janela de Código 8:
-Estimativa de U
+#### Estimativa de U
 
 
 
@@ -499,7 +500,7 @@ for(a in 1:length(k_factor)){
 
 A simulação ocorreu entre 19h58 e 21h11, totalizando 1h13. Se considerarmos 103 sítios, serão 5h45. Pras SADS eu estimo que seja fique 54h49, 2.27 dias.
 
-```{r comparacao }
+```{r comparacao U}
 df_U <- map_df(Sys.glob("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x4km/U/*.csv"), read_csv)
 df_Umed <- df_U %>% 
   ddply(.variables = c("SiteCode","k"),summarise,
@@ -518,5 +519,123 @@ l_p[[2]] <- df_Umed %>%
   ggplot(aes(x="",y=diff_Umed)) +
   geom_jitter()
 grid.arrange(grobs=l_p,ncol=2)
+```
+
+
+#### SADs preditas
+
+```{r SADs preditas}
+df_U <- map_df(Sys.glob("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x4km/U/*.csv"), read_csv)
+df_Umed <- df_U %>% 
+  ddply(.variables = c("SiteCode","k"),summarise,
+        U_med = mean(U),
+        U_var = var(U))
+df_sims <- read.csv(file = "/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/df_piloto.csv",
+                    header = TRUE)
+df_simulacao <- left_join(x=df_sims,y=df_Umed,by=c("SiteCode","k"))
+# system(paste0("mkdir ",getwd(),"/SADs_preditas")) # pasta para armazenar os data.frames, só faz uma vez
+n_rep.SAD <- 100
+f_simulacao <- function(i,df_=df_simulacao){
+  X <- df_[i,] %>% as.data.frame()
+  mat_sim <- dinamica_coalescente(U = X[,"U_med"],
+                                  S = 0,
+                                  N_simul = n_rep.SAD,
+                                  seed = as.numeric(Sys.time()),
+                                  disp_range = X[,"d"],
+                                  disp_kernel = X[,"kernel_code"],
+                                  landscape = X[,"txt.name"])
+  df_SAD.replica <- bind_rows(alply(mat_sim,1,function(Y) data.frame(N = sort(as.integer(table(Y))) ) ),
+                              .id = "replica")
+  df_SAD.replica %<>% 
+    mutate(SiteCode = X$SiteCode, MN = "EE", k = X$k)
+  path.file <- paste0("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x4km/SADs_preditas/",
+                      X[,"SiteCode"],
+                      "_k",X[,"k"],
+                      "_EE.csv")
+  write.csv(df_SAD.replica,
+            file = path.file,
+            row.names = FALSE)
+}
+registerDoMC(3)
+simulacao <- as.list(1:dim(df_simulacao)[1])
+l_ply(simulacao,f_simulacao,.parallel = TRUE)
+```
+
+As simulações das SADs ocorreram entre 23h10 e 00h30
+
+##### teste KS
+
+```{r dados para teste KS,echo=FALSE,eval=FALSE}
+### dados e preparação
+df_U <- map_df(Sys.glob("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x4km/U/*.csv"), read_csv)
+df_Umed <- df_U %>% 
+  ddply(.variables = c("SiteCode","k"),summarise,
+        U_med = mean(U),
+        U_var = var(U))
+df_sims <- read.csv(file = "/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/df_piloto.csv",
+                    header = TRUE)
+df_resultados <- left_join(x=df_sims,y=df_Umed,by=c("SiteCode","k")) %>% 
+  mutate(diff_Umed = U_med - U_med_10x10)
+## SAD obs
+df_SAD.obs <- read.csv(file="/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/dados_para_iniciar_artigo/abundances.csv",
+                       header = TRUE,as.is = TRUE)
+df_SAD.obs %<>% filter(SiteCode %in% unique(df_resultados$SiteCode))
+# f_write <- function(df_){
+#   df_tWrite <- df_[,c("SiteCode","species.correct","N")]
+#   path_ <- paste0("/home/danilo/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/SAD_observada/SADobs_",
+#                   df_tWrite$SiteCode[1],".csv")
+#   write.csv(df_tWrite,path_,row.names = FALSE)
+# }
+# registerDoMC(3)
+# d_ply(df_SAD.obs,"SiteCode",f_write,.parallel = TRUE)
+df_SAD.obs %<>% group_by(SiteCode) %>% nest %>% rename(SAD_obs=data)
+## SAD replica
+df_SADreplica <- Sys.glob("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x4km/SADs_preditas/*.csv") %>% 
+  gsub("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x4km/SADs_preditas/|.csv|_EE","",.) %>% 
+  adply(.,1,function(x) unname( unlist( strsplit(x,"_k",fixed = TRUE))),.id = NULL) %>% 
+  rename(SiteCode = V1,k = V2)
+df_SADreplica$file_path <- Sys.glob("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x4km/SADs_preditas/*.csv")
+df_SADreplica %<>% group_by(SiteCode) %>% nest %>% rename(SAD_MN=data)
+## merge
+df_SADs <- inner_join(y=df_SADreplica,
+                      x=df_SAD.obs,
+                      by="SiteCode")
+
+### rotina de testes
+df_SADs$resultados <- vector("list",length = nrow(df_SADs))
+registerDoMC(3)
+for(i in 1:nrow(df_SADs)){
+  X <- df_SADs[i,]
+  v_SADobs <- X$SAD_obs[[1]]$N
+  # v_MN <- df_SADs$SAD_MN[1]
+  f_KS <- function(v_obs=v_SADobs,v_MN,boots=200){
+    testeKS <- ks_test(a=v_obs,b = v_MN, nboots = boots)
+    a <- data.frame(D_KSboot=testeKS[1],p.valor_KSboot=testeKS[2])
+    a$S_SAD.predita <- length(v_MN)
+    a$S_SAD.obs <- length(v_obs)
+    return(a)
+  }
+  df_predicao <- X$SAD_MN[[1]] %>% as.data.frame()
+  f_resultados <- function(path_df,parallel_=FALSE){
+    # path_df <- df_predicao$file_path[1]
+    df_SAD.MN <- read.csv(path_df,header = TRUE,as.is = TRUE)
+    df_return <- ddply(df_SAD.MN,"replica",function(Y) f_KS(v_MN=Y$N),.parallel = parallel_)
+    df_return %<>% mutate(SiteCode = df_SAD.MN$SiteCode[1], 
+                          MN = df_SAD.MN$MN[1], 
+                          k = df_SAD.MN$k[1])
+    return(df_return)
+  }
+  df_SADs$resultados[[i]] <- adply(df_predicao,1,
+                                   function(line) f_resultados(path_df = line$file_path),.parallel = TRUE)
+}
+for(i in 1:nrow(df_SADs)){
+  df_SADs$resultados[[i]]$replica <- as.character(df_SADs$resultados[[i]]$replica)
+}
+df_replicas <- df_SADs %>% rename(Site = SiteCode) %>% 
+  select(resultados) %>% unnest(cols=c(resultados)) %>% as.data.frame() %>% 
+  select(SiteCode,MN,k,replica,D_KSboot,p.valor_KSboot,S_SAD.predita,S_SAD.obs)
+write.csv(df_replicas,
+          file="/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x4km/resultados/df_replicas.csv",
+          row.names = FALSE)
 ```
 
