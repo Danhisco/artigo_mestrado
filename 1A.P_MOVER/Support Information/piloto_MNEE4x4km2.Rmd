@@ -639,3 +639,30 @@ write.csv(df_replicas,
           row.names = FALSE)
 ```
 
+```{r summarise replicas teste KS}
+# dados
+df_replicas <- read.csv("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x4km/resultados/df_replicas.csv",
+                        header = TRUE,as.is = TRUE)
+df_replicas %<>% mutate(diff_S = (S_SAD.predita - S_SAD.obs)/S_SAD.obs)
+# sumarização
+alpha <- 0.05
+f_maxRank <- function(obs,predito){
+  max_rank <- max(c(obs,predito))
+  return(max_rank)
+}
+registerDoMC(3)
+df_resultados <- ddply(df_replicas,c("MN","k","SiteCode"),summarise,
+                       # D_mean = mean(D_KSboot), D_var = var(D_KSboot),
+                       # p.value_mean = mean(p.valor_KSboot),p.value_var = var(p.valor_KSboot),
+                       # S.MN_mean = mean(S_SAD.predita), S.MN_var = var(S_SAD.predita),
+                       S.obs_mean = mean(S_SAD.obs),
+                       # S.obs_var = var(S_SAD.obs),
+                       diffS_mean = mean(diff_S),diffS_var = var(diff_S),
+                       n_nRef = sum(p.valor_KSboot>=alpha), n_Ref = sum(p.valor_KSboot<alpha),
+                       # max_rank = f_maxRank(obs=S_SAD.obs,predito=S_SAD.predita),
+                       .parallel = TRUE)
+write.csv(df_resultados,
+          "/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x4km/resultados/df_resultados.csv",
+          row.names = FALSE)
+```
+
