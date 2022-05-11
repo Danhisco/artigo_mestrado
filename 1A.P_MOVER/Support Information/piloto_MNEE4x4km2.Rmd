@@ -21,7 +21,7 @@ knitr::opts_knit$set(root.dir = "/home/danilo/Documentos/artigo_mestrado/1A.P_MO
 setwd("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x4km/")
 ```
 
-```{r pacotes}
+```{r pacotes,echo=TRUE}
 library(sads)
 library(ggpubr)
 library(imager)
@@ -50,6 +50,7 @@ Anteriormente eu havia rodado as simulações dos modelos neutros considerando p
 RESUMO DOS ACHADOS:
 1) há uma tendência de aumento da proporção de cobertura vegetal com 
   
+### Fig 1: Análise de escala de efeito e mudança na % de cobertura vegetal entre escalas
   
 ```{r fig 1: dados e graficos, fig.width=10,fig.height=4,echo=FALSE, eval=TRUE}
 # dados
@@ -85,14 +86,15 @@ l_p[[2]] <- df_recorte %>%
 grid.arrange(grobs=l_p,ncol=2)
 ```
 __Fig. 1__ a) Análise de escala de efeito: No eixto y há o peso de evidência que a extensão espacial (eixo x) atribuiu à regressão do tipo S ~ offset(N) + p_i + p_i^2, S = riqueza de espécies, N = número de espécies, p_i = proporção de cobertura vegetal da extensão espacial i. b) Mudança na porcentagem de cobertura vegetal dos sítios: em x %CV com paisagens de 10.2x10.2 km2 e em y o mesmo para paisagens de 4.14x4.14 km2; a linha preta representa o 1:1 e a linha azul uma regressão linear com os novos pontos; os pontos vermelhos foram usados no piloto. A mudança na extensão espacial da paisagem resultou em aumento médio da %CV, apesar de alguns terem diminuído.
+  
+    
+## Piloto  
 
-### Piloto
-
-
-
-__ Sorteio de sítios ao longo do gradiente de cobertura vegetal nas paisagens de 10x10km2 __  
-
-```{r dados,message=FALSE,echo=FALSE}
+No piloto 30 pontos de uma distribuição uniforme são sorteados entre 0 e 1 e selecionamos os sítios com menor diferença com a proporção de cobertura vegetal nas paisagens de 10x10km2. Com esses pontos refiz as simulações coalescente para estimar U e predizer as SADs.  
+    
+### Códigos do sorteio de sítios ao longo do gradiente de cobertura vegetal nas paisagens de 10x10km2    
+  
+```{r dados,message=FALSE,echo=FALSE,eval=FALSE,include=FALSE}
 ### dados ###
 # leitura
 df_resultados <- read.csv(file="/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/simulacao_codigos_e_resultados/resultados/df_resultados.csv",
@@ -125,24 +127,26 @@ f_random_byVar <- function(x = df_resultados,
                            column_name = "p", 
                            n_sample = 30, 
                            i_seed = 260320223){
-  # amostragem de uma uniforme
+  # amostra de uma uniforme
   set.seed(i_seed)
   sample_points <- sort(runif(n = n_sample, min = 0, max = 1))
-  # encontrar os valores mais próoximos
+  # encontra os valores mais próoximos
   df_x <- filter(x,k==levels(x$k)[1],MN=="EE")
   f_index <- function(X=df_x,
                       name=column_name,
                       v_ref){
     which.min(abs(X[[column_name]] - v_ref))
   }
-  # remover os sítios repetidos
+  # remove os sítios repetidos
   v_sites <- df_x[sapply(sample_points,function(y) f_index(v_ref=y)),"SiteCode"] %>% unique
+  ## output:
   df_return <- filter(x,SiteCode %in% v_sites,MN=="EE")
   df_return$SiteCode <- factor(df_return$SiteCode)
   return(df_return)
 }
 df_piloto <- f_random_byVar(x=df_resultados)
-write.csv(df_piloto,file = "df_piloto.csv",row.names = FALSE)
+write.csv(df_piloto,file = "./artigo_mestrado/1A.P_MOVER/Support Information/df_piloto.csv",
+          row.names = FALSE)
 ```
 
 
@@ -156,126 +160,29 @@ df_piloto %>%
   ggtitle(label="Sítios Sorteados") +
   labs(x="% Tree cover (p)",y="Species Richness")
 ```
-
-NOTA :: Mapas de cobertura vegetal para os trabalhos pilotos
-
-É suficiente recortar os atuais mapas de 10x10km2 para mapas de 4x4km2,
-pois sempre é aplicado uma função que impõe que a densidade de pixels é igual à densidade de indivíduos na área amostral. 
-Portanto, posso pular o trabalho com os mapas de cobertura vegetal e apenas fazer o recorte. Porém, como se estima
-o recorte certo? Todos tem as mesmas dimensões, mas mudam na resolução. Podemos usar uma regra de três simples
-aplicada ao número de colunas e linhas: se x colunas correspondem à 10km quanto corresponde à 4? 
-
-#### Análise de Escala de Efeito:
-
-
-a) calculo de p para cada valor de raio;  
-b) ajuste de glm.nb para cada conjunto de dados;  
-c) média ponderada pelo peso de evidência da comparação de todos os glm.nb ajustados.  
-
   
-```{r janela de codigo 2 _ scale of effect, echo=TRUE,results="hide",eval=FALSE,cache=TRUE}
-# dados brutos
-df_dados <- read.csv("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/resultados_e_SI/tabelaSI1.csv",header = TRUE)
-#
-df_se <- left_join(y=df_dados,
-                   x=expand.grid(SiteCode = df_dados$SiteCode,
-                                 raio_km = c(seq(sqrt(max(df_dados$effort_ha)*0.01)+0.1,
-                                               12,by = 0.1),12) ),
-                   by="SiteCode") %>% 
-  group_by(tif.name) %>% nest()
-df_se$resultado <- vector("list",length = nrow(df_se))
-# rotina
-registerDoMC(2)
-for(i in 1:nrow(df_se)){
-  # raster de paisagem (landsat8 Hansen et al. 2013)
-  raster_ <- raster(df_se$tif.name[i])
-  mat_raster <- matrix(data = getValues(raster_)/100)
-  dim(mat_raster) <- dim(raster_)[1:2]
-  # função para o calculo da cobertura da paisagem local
-  f_p <- function(raio_KM){
-    # 1 pixel = 30x30m
-    # raio = metade do lado da paisagem local
-    raio_pixels <- round(raio_KM * 1000 / 30)
-    raio_max <- nrow(mat_raster)/2
-    local_land <- mat_raster[(raio_max+1-raio_pixels):(raio_max+raio_pixels),
-                             (raio_max+1-raio_pixels):(raio_max+raio_pixels)]
-    # proporção de cobertura vegetal
-    v_p <- sum(local_land,na.rm = NULL)/length(local_land)
-    # para cada raio há a proporção de cobertura calculada e o raio efetivo que depende do tamanho do pixel
-    df_ <- data.frame(p=v_p,raio_efetivo.KM=raio_pixels*30/1000)
-    return(df_)
-  }
-  # dados para a f_p
-  df_se$resultado[i][[1]] <- adply(df_se$data[i][[1]]$raio_km,1,f_p,.id = NULL,.parallel = TRUE)
-}
-# dados por raio
-df_se %<>% unnest(cols = c(data,resultado)) %>% as.data.frame()
-write.csv(df_se,file="/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/resultados_e_SI/df_escalaEfeito.csv",row.names = FALSE)
-```
-
-
-```{r estatisticas descritivas da variacao em p entre escalas,echo=FALSE,include=FALSE}
-df_se <- read.csv(file="/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/resultados_e_SI/df_escalaEfeito.csv",header = T)
-df_se %>% ddply(.,"SiteCode",summarise,
-                p_mean = mean(p), 
-                p_var = var(p)) %>% 
-  mutate(p_coef = sqrt(p_var)/p_mean) %>% 
-  # arrange(p_coef) %>% tail
-  ggplot(aes(x=p_coef,y=)) + geom_density() + #bins=60 
-  ggtitle(label="coeficiente de variação da variavel p entre as extensões espaciais")
-```
-
-
-```{r selecao da escala espacial, echo=TRUE}
-df_se <- read.csv(file="/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/resultados_e_SI/df_escalaEfeito.csv",header = T)
-# ajuste de modelos aos dados
-library(MASS)
-f_glm.nb <- function(data_){
-  md_ <- glm.nb(S_obs ~ p + I(p^2) + offset(log(Ntotal)), data = data_)
-}
-registerDoMC(3)
-l_md <- dlply(df_se,"raio_km",f_glm.nb,.parallel = TRUE)
-# média ponderada dos raios pelo peso de evidência
-df_averageSE <- print(AICctab(l_md,weights=TRUE)) %>% 
-  as.data.frame()
-df_averageSE$raio_paisagem <- row.names(df_averageSE) %>% as.numeric()
-df_averageSE$weight <- as.numeric(as.character(df_averageSE$weight))
-df_averageSE$dAICc <- as.numeric(as.character(df_averageSE$dAICc))
-# (raio_medio <- round(weighted.mean(x = df_averageSE$raio_paisagem,w = df_averageSE$weight),1))  
-raio_medio <- mean(df_averageSE %>% filter(dAICc==0) %>% .$raio_paisagem)
-df_averageSE %>% 
-  # mutate(diff_moda = max(df_averageSE$weight) - weight) %>% 
-  # filter(diff_moda < 0.0005) %>% dim
-  ggplot(aes(x=raio_paisagem,y=weight)) +
-  geom_line() + 
-  geom_vline(xintercept = raio_medio,color="red",alpha=0.5) + 
-  annotate(geom="text",x=raio_medio+1.3,y=0.002,label=paste0("raio médio = ",raio_medio," km"),size=3) +
-  theme_classic()
-```
-
-O raio médio = `r raio_medio` (2.07) e portanto o lado da paisagem é de `r 2*raio_medio`km e área total de 1713.96 hectares  
+    
+### Códigos para recorte das paisagens  
+    
+É suficiente recortar os atuais mapas de 10x10km2 para mapas de 4x4km2, pois sempre é aplicado uma mudança na resolução que impõe que a densidade de pixels seja igual à densidade de indivíduos na área amostral. Assim, não é necessário partir dos mapas do Landsat8 que apresentam resolução comum para fazer o recorte.  
   
-O lado anterior é de 10.2x10.2, o lado atual é 4.14x4.14.
-
-#### Recorte para 4x4km2
-
-```{r recorte das paisagens para piloto,echo=FALSE}
-df_piloto <- read.csv(file="/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/df_piloto.csv", header = TRUE)
-df_sims <- read.csv("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/simulacao_codigos_e_resultados/df_simulacao.csv",
-                    header = TRUE) %>% 
-  filter(SiteCode %in% unique(df_piloto$SiteCode)) %>% 
-  select(!(J_M:theta))
-names(df_sims)[10:11] <- paste0(names(df_sims)[10:11],"_10x10")
-# estudo funcao
-# file_path <- df_sims$txt.name[3]
+  
+```{r recorte das paisagens para piloto,echo=TRUE,eval=FALSE}
 f_recorte <- function(file_path){
-  mat_paisagem <- read.table(file=file_path,sep=" ",header=TRUE) %>% 
+  # matriz da paisagem de 10x10km:
+  mat_paisagem <- read.table(file=file_path, 
+                             sep=" ",
+                             header=TRUE) %>% 
     as.matrix
+  #redução proporcional no número de linhas e colunas da matriz:
   v_dim_novo <- dim(mat_paisagem) - round(dim(mat_paisagem) * (4.14/10.2),0)
   v_dim <- dim(mat_paisagem)
+  # recorte:
   mat_paisagem_output <- mat_paisagem[floor(v_dim_novo[1]/2):(v_dim[1]-1-ceiling(v_dim_novo[1]/2)),
                                       floor(v_dim_novo[2]/2):(v_dim[2]-1-ceiling(v_dim_novo[2]/2))]
-  write.table(mat_paisagem_output,
+  ## outputs:
+  # salva a nova paisagem
+  write.table(mat_paisagem_output, 
               file=gsub("dados_para_iniciar_artigo",
                         "piloto_MNEE_4x4km",
                         file_path),
@@ -283,28 +190,27 @@ f_recorte <- function(file_path){
               row.names = FALSE,col.names = FALSE)
   tree.cover <- as.vector(mat_paisagem_output)
   p <- 1 - length(tree.cover[tree.cover==0])/length(tree.cover)
-  return(p)
+  # e retorna a atual proporção de cobertura vegetal
+  return(p) 
 }
-# image(mat_paisagem)
-df_ <- df_sims %>% filter(k==0.05)
-df_$p2 <- aaply(df_$txt.name,1,f_recorte)
-# df_ %>% 
-#   ggplot(aes(x=p,y=p2)) +
-#   geom_abline(slope = 1,intercept = 0,color="red",alpha=0.6) +
-#   geom_point()
-###
-df_sims <- left_join(x=df_sims,
-                     y=select(df_,SiteCode,p2),
-                     by="SiteCode") %>% 
-  mutate(txt.name_antigo = txt.name,
-         txt.name = gsub("dados_para_iniciar_artigo",
-                        "piloto_MNEE_4x4km",
-                        txt.name_antigo))
-write.csv(df_sims,
-          file="/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/df_piloto.csv",
-          row.names=FALSE)
+registerDoMC(3)
+p_4x4 <- aaply(df_$txt.name,1,f_recorte,.parallel = TRUE)
 ```
   
+    
+#### Comparação paisagem de 10x10 km2 e de 4x4 km2  
+  
+__Fig 2__ Exemplo de recorte da paisagem ao redor, no material suplementar há para os 23 sítios amostrados para o piloto.  
+
+```{r}
+
+```
+
+
+
+
+
+
 ```{r janela de codigo 7,echo=TRUE,eval=TRUE}
 dinamica_coalescente <- function(U, S=0, N_simul, seed, disp_range, disp_kernel, landscape){
   # Runs coalescent simulations for a given heterogeneous landscape
@@ -733,4 +639,35 @@ df_S2 %>%
         axis.ticks.y=element_blank())
 ```
 
-# Ap Final BIE 5770: final
+#### Escala de Efeito
+
+```{r selecao da escala espacial, echo=TRUE}
+df_se <- read.csv(file="/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/resultados_e_SI/df_escalaEfeito.csv",header = T)
+# ajuste de modelos aos dados
+library(MASS)
+f_glm.nb <- function(data_){
+  md_ <- glm.nb(S_obs ~ p + I(p^2) + offset(log(Ntotal)), data = data_)
+}
+registerDoMC(3)
+l_md <- dlply(df_se,"raio_km",f_glm.nb,.parallel = TRUE)
+# média ponderada dos raios pelo peso de evidência
+df_averageSE <- print(AICctab(l_md,weights=TRUE)) %>% 
+  as.data.frame()
+df_averageSE$raio_paisagem <- row.names(df_averageSE) %>% as.numeric()
+df_averageSE$weight <- as.numeric(as.character(df_averageSE$weight))
+df_averageSE$dAICc <- as.numeric(as.character(df_averageSE$dAICc))
+# (raio_medio <- round(weighted.mean(x = df_averageSE$raio_paisagem,w = df_averageSE$weight),1))  
+raio_medio <- mean(df_averageSE %>% filter(dAICc==0) %>% .$raio_paisagem)
+df_averageSE %>% 
+  # mutate(diff_moda = max(df_averageSE$weight) - weight) %>% 
+  # filter(diff_moda < 0.0005) %>% dim
+  ggplot(aes(x=raio_paisagem,y=weight)) +
+  geom_line() + 
+  geom_vline(xintercept = raio_medio,color="red",alpha=0.5) + 
+  annotate(geom="text",x=raio_medio+1.3,y=0.002,label=paste0("raio médio = ",raio_medio," km"),size=3) +
+  theme_classic()
+```
+
+O raio médio = `r raio_medio` (2.07) e portanto o lado da paisagem é de `r 2*raio_medio`km e área total de 1713.96 hectares  
+  
+O lado anterior é de 10.2x10.2, o lado atual é 4.14x4.14.
