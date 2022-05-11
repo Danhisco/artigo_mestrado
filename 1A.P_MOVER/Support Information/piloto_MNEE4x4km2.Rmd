@@ -16,7 +16,7 @@ text-align: justify}
 </style>
 
 ```{r setup, include=TRUE}
-knitr::opts_chunk$set(echo = TRUE, tidy = FALSE, include = TRUE, warning = FALSE,cache = TRUE,message=FALSE,eval=TRUE)
+knitr::opts_chunk$set(echo = TRUE, tidy = FALSE, include = TRUE, warning = FALSE,cache = TRUE,message=FALSE,eval=FALSE)
 knitr::opts_knit$set(root.dir = "/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/")
 setwd("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x4km/")
 ```
@@ -45,57 +45,54 @@ select <- dplyr::select
 ```
 
 
-Anteriormente eu havia rodado as simulações dos modelos neutros considerando paisagens de 10.2 x 10.2 km2, porém o sugerido pela análise de escala de efeito é 4.07 x 4.07 km2 (Fig. 1a).  
+Anteriormente eu havia rodado as simulações dos modelos neutros considerando paisagens de 10.2 x 10.2 km2, porém o sugerido pela análise de escala de efeito é 4.07 x 4.07 km2 (Fig. 1a). Em média, a redução da extensão espacial da paisagem aumentou a porcentagem de cobertura vegetal na paisagem, apesar de reduzi-la em alguns casos (Fig 1b). Para avaliar se as predições de MNEE são robustas a essa mudança selecionei alguns pontos para fazer um piloto (Fig 1b, pontos vermelhos).
 
-
-
-Será que as predições do modelo espacialmente explicito são robustas à redução da extensão espacial da paisagem?
-
-
-```{r escala de efeito preparacao}
+RESUMO DOS ACHADOS:
+1) há uma tendência de aumento da proporção de cobertura vegetal com 
+  
+  
+```{r fig 1: dados e graficos, fig.width=10,fig.height=4,echo=FALSE, eval=TRUE}
 # dados
-## dados usados na análise de escala de efeito:
-# df_escalaEfeito <- read.csv("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/resultados_e_SI/df_escalaEfeito.csv",
-#                             header = TRUE,as.is=FALSE)
 ## resultado da análise de escala de efeito:
 df_averageSE <- read.csv("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/resultados_e_SI/df_escalaEfeito_peso.csv",
                          header = TRUE)
 raio_medio <- round(weighted.mean(x = df_averageSE$raio_paisagem,w = df_averageSE$weight),1)
 raio_moda <- round(mean(df_averageSE$raio_paisagem[df_averageSE$dAICc==0]),2)
-
-
-
-
-
+#
+## pontos do piloto
+df_piloto <- read.csv(file="/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/df_piloto.csv", header = TRUE)
+#
+## resultado do recorte de paisagens
+df_recorte <- read.csv("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x4km/resultados/df_p_4x4_10x10.csv",
+                       header = TRUE) %>% 
+  mutate(class = ifelse(SiteCode %in% unique(df_piloto$SiteCode),"piloto","outros"))
 ## gráfico
-df_averageSE %>% 
+l_p <- list()
+l_p[[1]] <- df_averageSE %>% 
   ggplot(aes(x=raio_paisagem,y=weight)) +
   geom_line() +
-  geom_vline(xintercept = c(raio_medio,raio_moda),color=c("red","blue"),alpha=0.6) +
-  labs(x="metade do lado da paisagem quadrada",y="Akaike's weight",title = "Análise de Escala de Efeito") +
+  geom_vline(xintercept = c(raio_medio,raio_moda),color=c("red","darkgreen"),alpha=0.6) +
+  labs(x="metade do lado da paisagem quadrada",y="Akaike's weight",title = "a) Análise de Escala de Efeito") +
   theme_classic()
+l_p[[2]] <- df_recorte %>% 
+  ggplot(aes(x=p_10x10,y=p_4x4)) +
+  geom_abline(slope = 1,intercept = 0) +
+  geom_smooth(method = "lm",formula = "y~0+x") +
+  geom_point(aes(color=class)) +
+  scale_color_manual(values = c("piloto" = "red",
+                                "outros"="black")) + 
+  labs(x="%CV 10x10km2 - ANTERIOR",y="%CV 4x4km2 - ATUAL",color="",title="b) Mudança na % de cobertura vegetal (%CV)")
+grid.arrange(grobs=l_p,ncol=2)
 ```
-__Fig. 1__ Análise de escala de efeito. No eixto y há o peso de evidência que a extensão espacial (eixo x) atribuiu à regressão do tipo S ~ offset(N) + p_i + p_i^2, S = riqueza de espécies, N = número de espécies, p_i = proporção de cobertura vegetal da extensão espacial i.
+__Fig. 1__ a) Análise de escala de efeito: No eixto y há o peso de evidência que a extensão espacial (eixo x) atribuiu à regressão do tipo S ~ offset(N) + p_i + p_i^2, S = riqueza de espécies, N = número de espécies, p_i = proporção de cobertura vegetal da extensão espacial i. b) Mudança na porcentagem de cobertura vegetal dos sítios: em x %CV com paisagens de 10.2x10.2 km2 e em y o mesmo para paisagens de 4.14x4.14 km2; a linha preta representa o 1:1 e a linha azul uma regressão linear com os novos pontos; os pontos vermelhos foram usados no piloto. A mudança na extensão espacial da paisagem resultou em aumento médio da %CV, apesar de alguns terem diminuído.
+
+### Piloto
 
 
 
+__ Sorteio de sítios ao longo do gradiente de cobertura vegetal nas paisagens de 10x10km2 __  
 
-
-
-
-## Piloto
-
-
-
-
-
-
-
-
-
-### Sortear sítios ao longo do gradiente de cobertura vegetal 
-
-```{r dados,message=FALSE}
+```{r dados,message=FALSE,echo=FALSE}
 ### dados ###
 # leitura
 df_resultados <- read.csv(file="/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/simulacao_codigos_e_resultados/resultados/df_resultados.csv",
@@ -123,18 +120,7 @@ df_resultados %<>% cbind(.,df_resultados.z) %>%
   select(-k_1,-k_1.z)
 ```
 
-# Piloto
-
-Plano:  
-  
-1) amostrar 30 pontos de uma uniforme de 0 a 1  
-
-2) subtrair, para cada ponto sorteado em 1, a proporção de cobertura vegetal observada (coluna 'p')  
-
-3) selecionar, para cada ponto sorteado em 1, aquele que obteve menor diferença em 2  
-
-
-```{r df_piloto}
+```{r sorteio de pontos para o piloto,echo=TRUE,eval=FALSE}
 f_random_byVar <- function(x = df_resultados,
                            column_name = "p", 
                            n_sample = 30, 
@@ -160,7 +146,7 @@ write.csv(df_piloto,file = "df_piloto.csv",row.names = FALSE)
 ```
 
 
-```{r graficos df_piloto,echo=FALSE}
+```{r graficos df_piloto,echo=FALSE,eval=FALSE,include=FALSE}
 df_piloto <- read.csv(file="df_piloto.csv", header = TRUE)
 # gráficos exploratóritos
 df_piloto %>% 
@@ -228,7 +214,7 @@ write.csv(df_se,file="/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/resulta
 ```
 
 
-```{r estatisticas descritivas da variacao em p entre escalas,echo=FALSE}
+```{r estatisticas descritivas da variacao em p entre escalas,echo=FALSE,include=FALSE}
 df_se <- read.csv(file="/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/resultados_e_SI/df_escalaEfeito.csv",header = T)
 df_se %>% ddply(.,"SiteCode",summarise,
                 p_mean = mean(p), 
@@ -599,16 +585,13 @@ write.csv(df_resultados,
 
 ##### Recorte das paisagens de 10x10km para 4x4km
 
-Todas as paisagens foram recortadas
+Todas as paisagens foram recortadas e armazenadas na pasta do piloto
 
 ```{r recorte das paisagens para piloto,echo=FALSE}
-df_piloto <- read.csv(file="/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/df_piloto.csv", 
-                      header = TRUE)
 df_sims <- read.csv("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/simulacao_codigos_e_resultados/df_simulacao.csv",
                     header = TRUE) %>% 
-  filter(SiteCode %in% unique(df_piloto$SiteCode)) %>% 
-  select(!(J_M:theta))
-names(df_sims)[10:11] <- paste0(names(df_sims)[10:11],"_10x10")
+  select(!(U_med:theta)) %>% filter(k==0.05)
+# names(df_sims)[10:11] <- paste0(names(df_sims)[10:11],"_10x10")
 # estudo funcao
 # file_path <- df_sims$txt.name[3]
 f_recorte <- function(file_path){
@@ -629,16 +612,20 @@ f_recorte <- function(file_path){
   return(p)
 }
 # image(mat_paisagem)
-df_ <- df_sims %>% filter(k==0.05)
-df_$p2 <- aaply(df_$txt.name,1,f_recorte)
-# df_ %>% 
-#   ggplot(aes(x=p,y=p2)) +
+df_sims$p_4x4 <- aaply(df_sims$txt.name,1,f_recorte)
+# df_sims %>%
+#   ggplot(aes(x=p,y=p_4x4)) +
 #   geom_abline(slope = 1,intercept = 0,color="red",alpha=0.6) +
 #   geom_point()
 ###
-df_sims <- left_join(x=df_sims,
-                     y=select(df_,SiteCode,p2),
-                     by="SiteCode") %>% 
+df_sims %>% 
+  select(SiteCode, p_4x4, p) %>% 
+  rename(p_10x10 = p) %>% 
+  write.csv(x=.,
+            file="/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x4km/resultados/df_p_4x4_10x10.csv",
+            row.names = FALSE)
+# plotar todos os paineis
+df_sims %>% 
   mutate(txt.name_antigo = txt.name,
          txt.name = gsub("dados_para_iniciar_artigo",
                         "piloto_MNEE_4x4km",
@@ -646,6 +633,7 @@ df_sims <- left_join(x=df_sims,
 write.csv(df_sims,
           file="/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/df_piloto.csv",
           row.names=FALSE)
+# "/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x4km/"
 ```
 
 ##### Ap Final BIE 5770: inicio
@@ -721,6 +709,7 @@ df_S1 %>%
         axis.ticks.y=element_blank())
 # df_S1 %>% arrange(year_plot) %>% select(year_plot,UC_area_ha,state)
 ```
+
 ```{r}
 df_S2 <- read.csv("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/resultados_e_SI/tabelaSI2.csv",
                   header = TRUE) %>% 
