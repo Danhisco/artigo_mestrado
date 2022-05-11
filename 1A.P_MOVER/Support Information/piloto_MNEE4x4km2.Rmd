@@ -1,5 +1,5 @@
 ---
-title: "Exist diferença nas predições de MNEE em paisagens de 10x10km e de 4x4km?"
+title: "As predições de MNEE em paisagens de 10x10km e de 4x4km diferem?"
 author: "Danilo Pereira Mori"
 date: '2022-03-19'
 output: 
@@ -45,31 +45,28 @@ select <- dplyr::select
 ```
 
 
-Anteriormente eu havia rodado as simulações dos modelos neutros considerando paisagens de 10.2 x 10.2 km2, porém o sugerido pela análise de escala de efeito é 4.07 x 4.07 km2 (Fig. 1). Será que as predições do modelo espacialmente explicito são robustas à redução da extensão espacial da paisagem?
+Anteriormente eu havia rodado as simulações dos modelos neutros considerando paisagens de 10.2 x 10.2 km2, porém o sugerido pela análise de escala de efeito é 4.07 x 4.07 km2 (Fig. 1a).  
+
+
+
+Será que as predições do modelo espacialmente explicito são robustas à redução da extensão espacial da paisagem?
 
 
 ```{r escala de efeito preparacao}
 # dados
-df_escalaEfeito <- read.csv("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/resultados_e_SI/df_escalaEfeito.csv",
-                            header = TRUE,as.is=FALSE)
-# ajuste de modelos aos dados
-f_glm.nb <- function(data_){
-  md_ <- MASS::glm.nb(S_obs ~ p + I(p^2) + offset(log(Ntotal)), data = data_)
-}
-registerDoMC(3)
-l_md <- dlply(df_escalaEfeito,"raio_km",f_glm.nb,.parallel = TRUE)
-# média ponderada dos raios pelo peso de evidência
-df_averageSE <- print(AICctab(l_md,weights=TRUE)) %>% 
-  as.data.frame()
-df_averageSE$raio_paisagem <- row.names(df_averageSE) %>% as.numeric()
-df_averageSE$weight <- as.numeric(as.character(df_averageSE$weight))
-df_averageSE$dAICc <- as.numeric(as.character(df_averageSE$dAICc))
-## salvar o csv da escala de efeito
-write.csv(df_averageSE,
-          "/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/resultados_e_SI/df_escalaEfeito_peso.csv",
-          row.names = FALSE)
-(raio_medio <- round(weighted.mean(x = df_averageSE$raio_paisagem,w = df_averageSE$weight),1))
-(raio_moda <- round(mean(df_averageSE$raio_paisagem[df_averageSE$dAICc==0]),2))
+## dados usados na análise de escala de efeito:
+# df_escalaEfeito <- read.csv("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/resultados_e_SI/df_escalaEfeito.csv",
+#                             header = TRUE,as.is=FALSE)
+## resultado da análise de escala de efeito:
+df_averageSE <- read.csv("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/resultados_e_SI/df_escalaEfeito_peso.csv",
+                         header = TRUE)
+raio_medio <- round(weighted.mean(x = df_averageSE$raio_paisagem,w = df_averageSE$weight),1)
+raio_moda <- round(mean(df_averageSE$raio_paisagem[df_averageSE$dAICc==0]),2)
+
+
+
+
+
 ## gráfico
 df_averageSE %>% 
   ggplot(aes(x=raio_paisagem,y=weight)) +
@@ -80,7 +77,16 @@ df_averageSE %>%
 ```
 __Fig. 1__ Análise de escala de efeito. No eixto y há o peso de evidência que a extensão espacial (eixo x) atribuiu à regressão do tipo S ~ offset(N) + p_i + p_i^2, S = riqueza de espécies, N = número de espécies, p_i = proporção de cobertura vegetal da extensão espacial i.
 
+
+
+
+
+
+
 ## Piloto
+
+
+
 
 
 
@@ -116,105 +122,6 @@ names(df_resultados.z) <- sapply(names(df_resultados.z), function(x) paste0(x,".
 df_resultados %<>% cbind(.,df_resultados.z) %>% 
   select(-k_1,-k_1.z)
 ```
-
-
-
-# Material Suplementar
-
-##### Ap Final BIE 5770: inicio
-
-```{r gráficos}
-#
-df_SADs.disponiveis <- read.csv(
-  "/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/dados_para_iniciar_artigo/df_SADs_disponiveis.csv",
-  header =T)
-df_SADs.disponiveis %<>% 
-  filter(method=="parcelas" &
-           grepl("*contiguous*",arrangement) & 
-           effort_ha>=1 &
-           grepl("*yes*",status) & 
-           grepl("ok*",status_diagnostico) &
-           grepl("Atlantic_Forest*",domain) &
-           dbh_cutoff %in% c("PBH>=15.0cm","PBH>=15.7cm",
-                             "DBH>=5.0cm","DGH>=5.0cm","DBH>5.0cm",
-                             "DBH>=4.8cm",
-                             "DBH>=5.0cm&H>300cm","DBH>=5.0cm&H>500cm", 
-                             "DGH30>=5.0cm")
-         )
-# df_SADs.disponiveis %>%
-#   select(status_diagnostico:effort_ha) %>% 
-#   select(-c(state,samples))
-
-
-## dados disponíveis: usando landsat8 (ano referência 2000)
-df_S1 <- read.csv("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/resultados_e_SI/tabelaSI1.csv",
-                  header = TRUE) %>% 
-  mutate(year_plot = ifelse(is.na(year_data),year,year_data))
-df_S1$year_plot[df_S1$year_plot=="2012_2013"] <- "2012.5"
-df_S1$year_plot <- as.numeric(df_S1$year_plot)
-### Filtros usados
-### filtro universidades e campi
-# df_filtro.UC <- df_1ofiltro %>% 
-#   filter(UC_area_ha >= 1000 | 
-#          Unidade_de_conservacao %in% c("UC Protecao Integral","universities and research centers"))
-# ### filtro estados
-# df_filtro.estate <- filter(df_1ofiltro,state %in% c("RJ","RS") & year >= 1990)
-# df_filtro.estate %<>% rbind(.,filter(df_1ofiltro,state %in% c("BA","GO","MS") & year >= 2000))
-# df_filtro.estate %<>% rbind(.,filter(df_1ofiltro,!(state %in% c("BA","GO","MS","RJ","RS")) & year >= 1995))
-df_S1$site_category <- NA
-df_S1$site_category[df_S1$UC_area_ha>=1000 | 
-                      df_S1$Unidade_de_conservacao %in% 
-                      c("UC Protecao Integral","universities and research centers")] <- 1
-df_S1$site_category[df_S1$state %in% c("RJ","RS") & 
-                      df_S1$year >= 1990] <- 2
-df_S1$site_category[df_S1$state %in% c("BA","GO","MS") & 
-                      df_S1$year >= 2000] <- 3
-df_S1$site_category[!(df_S1$state %in% c("BA","GO","MS","RJ","RS")) & 
-                      df_S1$year >= 1995] <- 4
-df_S1 %>%
-  mutate(site_category = factor(site_category)) %>% 
-  ggplot(aes(x=year_plot,y=site_category,shape=site_category)) +
-  # geom_vline(xintercept = 2000,color="red") + # versão 1
-  geom_vline(aes(xintercept = year_plot),color="red",alpha=0.3) + # versão 2
-  # geom_boxplot() +
-  geom_jitter() +
-  labs(shape="Categorias:",
-       y="categoria inventário florestal",
-       x="ano inventário florestal",
-       title= "104 inventários dentro dos critérios (de 109 confiáveis)") +
-  scale_shape_discrete(breaks=c("1","2","3","4"),
-                       labels=c("todas as idades: \nUC Prot. Int. | Univ. | UC>=1000 ha",
-                                "RJ e RS >= 1990",
-                                "BA, GO e MS >= 2000",
-                                "outros estados Brasil >= 1995")) +
-  theme(axis.text.y=element_blank(),
-        axis.ticks.y=element_blank())
-# df_S1 %>% arrange(year_plot) %>% select(year_plot,UC_area_ha,state)
-```
-```{r}
-df_S2 <- read.csv("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/resultados_e_SI/tabelaSI2.csv",
-                  header = TRUE) %>% 
-  mutate(year_plot = ifelse(is.na(year_data),year,year_data))
-df_S2$year_plot[df_S2$year_plot=="2012_2013"] <- "2012.5"
-df_S2$year_plot <- as.numeric(df_S2$year_plot)
-df_S2$site_category <- "1"
-df_S2 %>%
-  mutate(site_category = factor(site_category)) %>% 
-  ggplot(aes(x=year_plot,y=site_category,shape=site_category)) +
-  geom_vline(aes(xintercept = year_plot),color="red",alpha=0.6) + # versão 2
-  # geom_boxplot() +
-  geom_jitter() +
-  labs(shape="",
-       y="",
-       x="ano inventário florestal",
-       title= "109 inventários com SAD e coordenada confiáveis") +
-  scale_shape_discrete(breaks="") +
-                       # labels="- Atlantic Forest \n- DBH >= 5.0cm \n- plot >= 1ha") +
-  theme(axis.text.y=element_blank(),
-        axis.ticks.y=element_blank())
-```
-
-# Ap Final BIE 5770: final
 
 # Piloto
 
@@ -688,3 +595,153 @@ write.csv(df_resultados,
           row.names = FALSE)
 ```
 
+# Material Suplementar
+
+##### Recorte das paisagens de 10x10km para 4x4km
+
+Todas as paisagens foram recortadas
+
+```{r recorte das paisagens para piloto,echo=FALSE}
+df_piloto <- read.csv(file="/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/df_piloto.csv", 
+                      header = TRUE)
+df_sims <- read.csv("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/simulacao_codigos_e_resultados/df_simulacao.csv",
+                    header = TRUE) %>% 
+  filter(SiteCode %in% unique(df_piloto$SiteCode)) %>% 
+  select(!(J_M:theta))
+names(df_sims)[10:11] <- paste0(names(df_sims)[10:11],"_10x10")
+# estudo funcao
+# file_path <- df_sims$txt.name[3]
+f_recorte <- function(file_path){
+  mat_paisagem <- read.table(file=file_path,sep=" ",header=TRUE) %>% 
+    as.matrix
+  v_dim_novo <- dim(mat_paisagem) - round(dim(mat_paisagem) * (4.14/10.2),0)
+  v_dim <- dim(mat_paisagem)
+  mat_paisagem_output <- mat_paisagem[floor(v_dim_novo[1]/2):(v_dim[1]-1-ceiling(v_dim_novo[1]/2)),
+                                      floor(v_dim_novo[2]/2):(v_dim[2]-1-ceiling(v_dim_novo[2]/2))]
+  write.table(mat_paisagem_output,
+              file=gsub("dados_para_iniciar_artigo",
+                        "piloto_MNEE_4x4km",
+                        file_path),
+              sep=" ", 
+              row.names = FALSE,col.names = FALSE)
+  tree.cover <- as.vector(mat_paisagem_output)
+  p <- 1 - length(tree.cover[tree.cover==0])/length(tree.cover)
+  return(p)
+}
+# image(mat_paisagem)
+df_ <- df_sims %>% filter(k==0.05)
+df_$p2 <- aaply(df_$txt.name,1,f_recorte)
+# df_ %>% 
+#   ggplot(aes(x=p,y=p2)) +
+#   geom_abline(slope = 1,intercept = 0,color="red",alpha=0.6) +
+#   geom_point()
+###
+df_sims <- left_join(x=df_sims,
+                     y=select(df_,SiteCode,p2),
+                     by="SiteCode") %>% 
+  mutate(txt.name_antigo = txt.name,
+         txt.name = gsub("dados_para_iniciar_artigo",
+                        "piloto_MNEE_4x4km",
+                        txt.name_antigo))
+write.csv(df_sims,
+          file="/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/df_piloto.csv",
+          row.names=FALSE)
+```
+
+##### Ap Final BIE 5770: inicio
+
+Gráficos usados na apresentação final de BIE 5770: ano da amostragem das SADs e ano referência do mapa de cobertura vegetal.
+
+
+```{r gráficos}
+#
+df_SADs.disponiveis <- read.csv(
+  "/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/dados_para_iniciar_artigo/df_SADs_disponiveis.csv",
+  header =T)
+df_SADs.disponiveis %<>% 
+  filter(method=="parcelas" &
+           grepl("*contiguous*",arrangement) & 
+           effort_ha>=1 &
+           grepl("*yes*",status) & 
+           grepl("ok*",status_diagnostico) &
+           grepl("Atlantic_Forest*",domain) &
+           dbh_cutoff %in% c("PBH>=15.0cm","PBH>=15.7cm",
+                             "DBH>=5.0cm","DGH>=5.0cm","DBH>5.0cm",
+                             "DBH>=4.8cm",
+                             "DBH>=5.0cm&H>300cm","DBH>=5.0cm&H>500cm", 
+                             "DGH30>=5.0cm")
+         )
+# df_SADs.disponiveis %>%
+#   select(status_diagnostico:effort_ha) %>% 
+#   select(-c(state,samples))
+
+
+## dados disponíveis: usando landsat8 (ano referência 2000)
+df_S1 <- read.csv("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/resultados_e_SI/tabelaSI1.csv",
+                  header = TRUE) %>% 
+  mutate(year_plot = ifelse(is.na(year_data),year,year_data))
+df_S1$year_plot[df_S1$year_plot=="2012_2013"] <- "2012.5"
+df_S1$year_plot <- as.numeric(df_S1$year_plot)
+### Filtros usados
+### filtro universidades e campi
+# df_filtro.UC <- df_1ofiltro %>% 
+#   filter(UC_area_ha >= 1000 | 
+#          Unidade_de_conservacao %in% c("UC Protecao Integral","universities and research centers"))
+# ### filtro estados
+# df_filtro.estate <- filter(df_1ofiltro,state %in% c("RJ","RS") & year >= 1990)
+# df_filtro.estate %<>% rbind(.,filter(df_1ofiltro,state %in% c("BA","GO","MS") & year >= 2000))
+# df_filtro.estate %<>% rbind(.,filter(df_1ofiltro,!(state %in% c("BA","GO","MS","RJ","RS")) & year >= 1995))
+df_S1$site_category <- NA
+df_S1$site_category[df_S1$UC_area_ha>=1000 | 
+                      df_S1$Unidade_de_conservacao %in% 
+                      c("UC Protecao Integral","universities and research centers")] <- 1
+df_S1$site_category[df_S1$state %in% c("RJ","RS") & 
+                      df_S1$year >= 1990] <- 2
+df_S1$site_category[df_S1$state %in% c("BA","GO","MS") & 
+                      df_S1$year >= 2000] <- 3
+df_S1$site_category[!(df_S1$state %in% c("BA","GO","MS","RJ","RS")) & 
+                      df_S1$year >= 1995] <- 4
+df_S1 %>%
+  mutate(site_category = factor(site_category)) %>% 
+  ggplot(aes(x=year_plot,y=site_category,shape=site_category)) +
+  # geom_vline(xintercept = 2000,color="red") + # versão 1
+  geom_vline(aes(xintercept = year_plot),color="red",alpha=0.3) + # versão 2
+  # geom_boxplot() +
+  geom_jitter() +
+  labs(shape="Categorias:",
+       y="categoria inventário florestal",
+       x="ano inventário florestal",
+       title= "104 inventários dentro dos critérios (de 109 confiáveis)") +
+  scale_shape_discrete(breaks=c("1","2","3","4"),
+                       labels=c("todas as idades: \nUC Prot. Int. | Univ. | UC>=1000 ha",
+                                "RJ e RS >= 1990",
+                                "BA, GO e MS >= 2000",
+                                "outros estados Brasil >= 1995")) +
+  theme(axis.text.y=element_blank(),
+        axis.ticks.y=element_blank())
+# df_S1 %>% arrange(year_plot) %>% select(year_plot,UC_area_ha,state)
+```
+```{r}
+df_S2 <- read.csv("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/resultados_e_SI/tabelaSI2.csv",
+                  header = TRUE) %>% 
+  mutate(year_plot = ifelse(is.na(year_data),year,year_data))
+df_S2$year_plot[df_S2$year_plot=="2012_2013"] <- "2012.5"
+df_S2$year_plot <- as.numeric(df_S2$year_plot)
+df_S2$site_category <- "1"
+df_S2 %>%
+  mutate(site_category = factor(site_category)) %>% 
+  ggplot(aes(x=year_plot,y=site_category,shape=site_category)) +
+  geom_vline(aes(xintercept = year_plot),color="red",alpha=0.6) + # versão 2
+  # geom_boxplot() +
+  geom_jitter() +
+  labs(shape="",
+       y="",
+       x="ano inventário florestal",
+       title= "109 inventários com SAD e coordenada confiáveis") +
+  scale_shape_discrete(breaks="") +
+                       # labels="- Atlantic Forest \n- DBH >= 5.0cm \n- plot >= 1ha") +
+  theme(axis.text.y=element_blank(),
+        axis.ticks.y=element_blank())
+```
+
+# Ap Final BIE 5770: final
