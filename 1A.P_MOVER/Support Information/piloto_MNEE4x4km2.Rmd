@@ -1,13 +1,13 @@
 ---
-title: "Piloto de MNEE em paisagens de 4x4km2"
-author: ""
+title: "Exist diferença nas predições de MNEE em paisagens de 10x10km e de 4x4km?"
+author: "Danilo Pereira Mori"
 date: '2022-03-19'
 output: 
   html_document:
     toc: true
     toc_depth: 5
 editor_options: 
-  chunk_output_type: console
+  chunk_output_type: inline
 ---
 
 <style>
@@ -15,22 +15,22 @@ body {
 text-align: justify}
 </style>
 
-```{r setup, include=FALSE}
+```{r setup, include=TRUE}
 knitr::opts_chunk$set(echo = TRUE, tidy = FALSE, include = TRUE, warning = FALSE,cache = TRUE,message=FALSE,eval=TRUE)
 knitr::opts_knit$set(root.dir = "/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/")
 setwd("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x4km/")
 ```
 
-```{r pacotes,warning=F}
+```{r pacotes}
 library(sads)
 library(ggpubr)
 library(imager)
 library(OpenImageR)
-library(cowplot)
+# library(cowplot)
 library(twosamples)
 library(doMC)
 library(raster)
-library(GUILDS)
+# library(GUILDS)
 library(bbmle)
 library(magrittr)
 library(gridExtra)
@@ -45,29 +45,47 @@ select <- dplyr::select
 ```
 
 
-## Plano do Piloto
+Anteriormente eu havia rodado as simulações dos modelos neutros considerando paisagens de 10.2 x 10.2 km2, porém o sugerido pela análise de escala de efeito é 4.07 x 4.07 km2 (Fig. 1). Será que as predições do modelo espacialmente explicito são robustas à redução da extensão espacial da paisagem?
 
-- amostrar 30 sítios ao longo do gradiente de cobertura vegetal. - FEITO  
 
-- trabalhar no raster dos sítios amostrados. - PRÓXIMO  
+```{r escala de efeito preparacao}
+# dados
+df_escalaEfeito <- read.csv("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/resultados_e_SI/df_escalaEfeito.csv",
+                            header = TRUE,as.is=FALSE)
+# ajuste de modelos aos dados
+f_glm.nb <- function(data_){
+  md_ <- MASS::glm.nb(S_obs ~ p + I(p^2) + offset(log(Ntotal)), data = data_)
+}
+registerDoMC(3)
+l_md <- dlply(df_escalaEfeito,"raio_km",f_glm.nb,.parallel = TRUE)
+# média ponderada dos raios pelo peso de evidência
+df_averageSE <- print(AICctab(l_md,weights=TRUE)) %>% 
+  as.data.frame()
+df_averageSE$raio_paisagem <- row.names(df_averageSE) %>% as.numeric()
+df_averageSE$weight <- as.numeric(as.character(df_averageSE$weight))
+df_averageSE$dAICc <- as.numeric(as.character(df_averageSE$dAICc))
+## salvar o csv da escala de efeito
+write.csv(df_averageSE,
+          "/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/resultados_e_SI/df_escalaEfeito_peso.csv",
+          row.names = FALSE)
+(raio_medio <- round(weighted.mean(x = df_averageSE$raio_paisagem,w = df_averageSE$weight),1))
+(raio_moda <- round(mean(df_averageSE$raio_paisagem[df_averageSE$dAICc==0]),2))
+## gráfico
+df_averageSE %>% 
+  ggplot(aes(x=raio_paisagem,y=weight)) +
+  geom_line() +
+  geom_vline(xintercept = c(raio_medio,raio_moda),color=c("red","blue"),alpha=0.6) +
+  labs(x="metade do lado da paisagem quadrada",y="Akaike's weight",title = "Análise de Escala de Efeito") +
+  theme_classic()
+```
+__Fig. 1__ Análise de escala de efeito. No eixto y há o peso de evidência que a extensão espacial (eixo x) atribuiu à regressão do tipo S ~ offset(N) + p_i + p_i^2, S = riqueza de espécies, N = número de espécies, p_i = proporção de cobertura vegetal da extensão espacial i.
 
-- organizar as pastas e revisar a funcionalidade do programa coalescente (simulação coalescente).  
+## Piloto
 
-- 1o sub-piloto: estimar a taxa U  
 
-- 2o sub-piloto: predizer as SADs  
 
-- calcular a diferença entre as respostas atuais e anteriores  
 
-- descrever a diferença por um modelo gaussiano misto  
 
-- Estudo das equações de conversão de parâmetros: validar com uma simulação espacialmente explícita:  
-
-1) fazer a estimativa de m para os sítios amostrados a partir de uma simulação espacialmente explícita que desconsidera a perda de habitat (referência).  
-
-2) calcular a taxa m’ usando a proposta do Coutinho e minha (olhar e-mail do encaminhamento 1) e usando a que eu fiz (pretendo implementar usando integração de Monte Carlo).  
-
-- Simular as SADs preditas por MNEI (eu fiz uma primeira pesquisa, e a fórmula de amostragem de Etienne 2005 está mais atualizado no pacote GUILDS ao invés do pacote untb).   
 
 ### Sortear sítios ao longo do gradiente de cobertura vegetal 
 
@@ -99,7 +117,11 @@ df_resultados %<>% cbind(.,df_resultados.z) %>%
   select(-k_1,-k_1.z)
 ```
 
-# Ap Final BIE 5770: inicio
+
+
+# Material Suplementar
+
+##### Ap Final BIE 5770: inicio
 
 ```{r gráficos}
 #
