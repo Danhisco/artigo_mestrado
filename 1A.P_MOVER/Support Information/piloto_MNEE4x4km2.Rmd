@@ -15,13 +15,13 @@ body {
 text-align: justify}
 </style>
 
-```{r setup, include=TRUE}
-knitr::opts_chunk$set(echo = TRUE, tidy = FALSE, include = TRUE, warning = FALSE,cache = TRUE,message=FALSE,eval=FALSE)
+```{r setup, include=TRUE,echo=FALSE}
+knitr::opts_chunk$set(echo = FALSE, tidy = FALSE, include = TRUE, warning = FALSE,cache = TRUE,message=FALSE,eval=FALSE)
 knitr::opts_knit$set(root.dir = "/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/")
 setwd("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x4km/")
 ```
 
-```{r pacotes,echo=TRUE}
+```{r pacotes}
 library(sads)
 library(ggpubr)
 library(imager)
@@ -46,12 +46,16 @@ select <- dplyr::select
 
 
 Anteriormente eu havia rodado as simulações dos modelos neutros considerando paisagens de 10.2 x 10.2 km2, porém o sugerido pela análise de escala de efeito é 4.07 x 4.07 km2 (Fig. 1a). Em média, a redução da extensão espacial da paisagem aumentou a porcentagem de cobertura vegetal na paisagem, apesar de reduzi-la em alguns casos (Fig 1b). Para avaliar se as predições de MNEE são robustas a essa mudança selecionei alguns pontos para fazer um piloto (Fig 1b, pontos vermelhos).
-
-RESUMO DOS ACHADOS:
-1) há uma tendência de aumento da proporção de cobertura vegetal com 
   
-### Fig 1: Análise de escala de efeito e mudança na % de cobertura vegetal entre escalas
+    
+      
+RESUMO DOS ACHADOS:  
+1) há uma tendência de aumento da proporção de cobertura vegetal com   
   
+    
+### Análise de escala de efeito e mudança na % de cobertura vegetal entre escalas  
+    
+      
 ```{r fig 1: dados e graficos, fig.width=10,fig.height=4,echo=FALSE, eval=TRUE}
 # dados
 ## resultado da análise de escala de efeito:
@@ -85,139 +89,45 @@ l_p[[2]] <- df_recorte %>%
   labs(x="%CV 10x10km2 - ANTERIOR",y="%CV 4x4km2 - ATUAL",color="",title="b) Mudança na % de cobertura vegetal (%CV)")
 grid.arrange(grobs=l_p,ncol=2)
 ```
+  
 __Fig. 1__ a) Análise de escala de efeito: No eixto y há o peso de evidência que a extensão espacial (eixo x) atribuiu à regressão do tipo S ~ offset(N) + p_i + p_i^2, S = riqueza de espécies, N = número de espécies, p_i = proporção de cobertura vegetal da extensão espacial i. b) Mudança na porcentagem de cobertura vegetal dos sítios: em x %CV com paisagens de 10.2x10.2 km2 e em y o mesmo para paisagens de 4.14x4.14 km2; a linha preta representa o 1:1 e a linha azul uma regressão linear com os novos pontos; os pontos vermelhos foram usados no piloto. A mudança na extensão espacial da paisagem resultou em aumento médio da %CV, apesar de alguns terem diminuído.
   
     
 ## Piloto  
-
-No piloto 30 pontos de uma distribuição uniforme são sorteados entre 0 e 1 e selecionamos os sítios com menor diferença com a proporção de cobertura vegetal nas paisagens de 10x10km2. Com esses pontos refiz as simulações coalescente para estimar U e predizer as SADs.  
-    
-### Códigos do sorteio de sítios ao longo do gradiente de cobertura vegetal nas paisagens de 10x10km2    
-  
-```{r dados,message=FALSE,echo=FALSE,eval=FALSE,include=FALSE}
-### dados ###
-# leitura
-df_resultados <- read.csv(file="/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/simulacao_codigos_e_resultados/resultados/df_resultados.csv",
-                            header = TRUE,as.is=FALSE)[,1:13]
-# padronização
-level_k <- as.character(unique(sort(as.numeric(df_resultados$k),decreasing = TRUE)))
-df_resultados$k <- factor(df_resultados$k,levels = level_k)
-levels(df_resultados$k)[19] <- "0.1"
-# z score
-f_z <- function(x){
-  m <- base::mean(x,na.rm=FALSE)
-  sd <- sd(x,na.rm=FALSE)
-  output <- (x-m)/sd
-  return(output)
-} 
-# names(df_resultados)
-# str(df_resultados)
-df_resultados %<>% mutate(diffS_gamma = diffS_mean + min(diffS_mean)*(-1) + 0.01,
-                          modulo_diffS = abs(diffS_mean),
-                          log_Sobs=log(S_obs))
-
-df_resultados.z <- as.data.frame(apply(df_resultados[,c("p","Ntotal","log_Sobs","k_1","d_Lplot","d","modulo_diffS")],2,f_z))
-names(df_resultados.z) <- sapply(names(df_resultados.z), function(x) paste0(x,".z"))
-df_resultados %<>% cbind(.,df_resultados.z) %>% 
-  select(-k_1,-k_1.z)
-```
-
-```{r sorteio de pontos para o piloto,echo=TRUE,eval=FALSE}
-f_random_byVar <- function(x = df_resultados,
-                           column_name = "p", 
-                           n_sample = 30, 
-                           i_seed = 260320223){
-  # amostra de uma uniforme
-  set.seed(i_seed)
-  sample_points <- sort(runif(n = n_sample, min = 0, max = 1))
-  # encontra os valores mais próoximos
-  df_x <- filter(x,k==levels(x$k)[1],MN=="EE")
-  f_index <- function(X=df_x,
-                      name=column_name,
-                      v_ref){
-    which.min(abs(X[[column_name]] - v_ref))
-  }
-  # remove os sítios repetidos
-  v_sites <- df_x[sapply(sample_points,function(y) f_index(v_ref=y)),"SiteCode"] %>% unique
-  ## output:
-  df_return <- filter(x,SiteCode %in% v_sites,MN=="EE")
-  df_return$SiteCode <- factor(df_return$SiteCode)
-  return(df_return)
-}
-df_piloto <- f_random_byVar(x=df_resultados)
-write.csv(df_piloto,file = "./artigo_mestrado/1A.P_MOVER/Support Information/df_piloto.csv",
-          row.names = FALSE)
-```
-
-
-```{r graficos df_piloto,echo=FALSE,eval=FALSE,include=FALSE}
-df_piloto <- read.csv(file="df_piloto.csv", header = TRUE)
-# gráficos exploratóritos
-df_piloto %>% 
-  filter(k==unique(df_piloto$k)[1]) %>% 
-  ggplot(aes(x=p,y=S_obs)) + 
-  geom_point() +
-  ggtitle(label="Sítios Sorteados") +
-  labs(x="% Tree cover (p)",y="Species Richness")
-```
   
     
-### Códigos para recorte das paisagens  
-    
-É suficiente recortar os atuais mapas de 10x10km2 para mapas de 4x4km2, pois sempre é aplicado uma mudança na resolução que impõe que a densidade de pixels seja igual à densidade de indivíduos na área amostral. Assim, não é necessário partir dos mapas do Landsat8 que apresentam resolução comum para fazer o recorte.  
-  
-  
-```{r recorte das paisagens para piloto,echo=TRUE,eval=FALSE}
-f_recorte <- function(file_path){
-  # matriz da paisagem de 10x10km:
-  mat_paisagem <- read.table(file=file_path, 
-                             sep=" ",
-                             header=TRUE) %>% 
-    as.matrix
-  #redução proporcional no número de linhas e colunas da matriz:
-  v_dim_novo <- dim(mat_paisagem) - round(dim(mat_paisagem) * (4.14/10.2),0)
-  v_dim <- dim(mat_paisagem)
-  # recorte:
-  mat_paisagem_output <- mat_paisagem[floor(v_dim_novo[1]/2):(v_dim[1]-1-ceiling(v_dim_novo[1]/2)),
-                                      floor(v_dim_novo[2]/2):(v_dim[2]-1-ceiling(v_dim_novo[2]/2))]
-  ## outputs:
-  # salva a nova paisagem
-  write.table(mat_paisagem_output, 
-              file=gsub("dados_para_iniciar_artigo",
-                        "piloto_MNEE_4x4km",
-                        file_path),
-              sep=" ", 
-              row.names = FALSE,col.names = FALSE)
-  tree.cover <- as.vector(mat_paisagem_output)
-  p <- 1 - length(tree.cover[tree.cover==0])/length(tree.cover)
-  # e retorna a atual proporção de cobertura vegetal
-  return(p) 
-}
-registerDoMC(3)
-p_4x4 <- aaply(df_$txt.name,1,f_recorte,.parallel = TRUE)
-```
+No piloto 30 pontos de uma distribuição uniforme são sorteados entre 0 e 1 e selecionamos os sítios com menor diferença com a proporção de cobertura vegetal nas paisagens de 10x10km2. Com esses pontos refiz as simulações coalescente para estimar U e predizer as SADs. É suficiente recortar os atuais mapas de 10x10km2 para mapas de 4x4km2, pois sempre é aplicado uma mudança na resolução que impõe que a densidade de pixels seja igual à densidade de indivíduos na área amostral. Assim, não é necessário partir dos mapas do Landsat8 que apresentam resolução comum para fazer o recorte.    
   
     
-### Comparação paisagem de 10x10 km2 e de 4x4 km2  
-  
+      
+### Comparação paisagem de 10x10 km2 e de 4x4 km2    
+    
+      
 ```{r fig 2 comparacao mesma paisagem diferentes escalas}
 df_sims <- read.csv(file = "/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/df_piloto.csv",
                     header = TRUE)
 ```
+  
+    
+__Fig 2__ Exemplo de recorte da paisagem ao redor, no material suplementar há para os 23 sítios amostrados para o piloto.    
 
-__Fig 2__ Exemplo de recorte da paisagem ao redor, no material suplementar há para os 23 sítios amostrados para o piloto.  
-
+  
+    
 ### Esforço computacional das simulações
 
 ADICIONAR: tabela com o tempo de execução 
 - A simulação de U ocorreu entre 19h58 e 21h11, totalizando 1h13. Se considerarmos 103 sítios, serão 5h45. Pras SADS eu estimo que seja fique 54h49, 2.27 dias.
 - As simulações das SADs ocorreram entre 23h10 e 00h30, totalizando 1h20 - similar à estimativa de U.  
 - A rotina de testes KS ocorreu entre 00h05 e 00h23  
-    
-## Comparação variáveis respostas 
-
-### Estimativas de U
-
+      
+        
+          
+## Comparação variáveis respostas   
+  
+  
+### Estimativas de U  
+   
+     
 ```{r comparacao U,warning=FALSE,message=FALSE,eval=TRUE,include=TRUE,echo=FALSE,fig.height=4,fig.width=8}
 df_U <- map_df(Sys.glob("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x4km/U/*.csv"), read_csv,show_col_types = FALSE)
 df_Umed <- df_U %>% 
@@ -241,34 +151,43 @@ l_p[[2]] <- df_Umed %>%
   geom_jitter() + labs(x="", y="",title="b) ATUAL - ANTERIOR")
 grid.arrange(grobs=l_p,ncol=2)
 ```
-__Fig. 3__ Gráficos exploratórios da média da taxa U, estimada por MNEE. a) a linha vermelha representa a relação 1:1 e a linha azul uma regressão linear padrão da função ggplot2::geom_smooth() sem intercepto. b) boxplot da diferença. 
   
-        
-__Desvio-padrão das estimativas de U: U_med10x10 = anteriores; U_med = atuais; e diff_Umed = diferença entre atual e anterior__     
     
+__Fig. 3__ Gráficos exploratórios da média da taxa U, estimada por MNEE. a) a linha vermelha representa a relação 1:1 e a linha azul uma regressão linear padrão da função ggplot2::geom_smooth() sem intercepto. b) boxplot da diferença.   
+  
+    
+          
+__Desvio-padrão das estimativas de U: U_med10x10 = anteriores; U_med = atuais; e diff_Umed = diferença entre atual e anterior__       
+     
 ```{r desvio padrao dos U,echo=TRUE,eval=TRUE}
 apply(df_Umed[,c("U_med_10x10","U_med","diff_Umed")],2,sd)
 ```
-
-
+  
+  
+  
 __Sumário padrão da regressão linear__    
       
 ```{r comparacao de U selecao de modelos,echo=TRUE,eval=TRUE}
 summary(lm(U_med ~ U_med_10x10-1,data = df_Umed))
 ```
-  
-Os resultados sugerem que não há diferenças significativas entre as simulações feitas nas paisagens de 10.2x10.2 km2 e de 4.14x4.14 km2.    
     
-### SADs preditas congruentes         
-
-```{r comparacao SADs preditas congruentes,fig.height=4,fig.width=8}
+      
+Os resultados sugerem que não há diferenças significativas entre as simulações feitas nas paisagens de 10.2x10.2 km2 e de 4.14x4.14 km2.      
+      
+        
+### SADs preditas congruentes           
+  
+    
+```{r comparacao SADs preditas congruentes,fig.height=4,fig.width=8,eval=TRUE,include=TRUE}
 df_SADsCongruentes <- read.csv("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x4km/resultados/df_resultados.csv",
                                header = TRUE) %>% 
-  select(SiteCode,k,n_nRef)
+  dplyr::select(SiteCode,k,n_nRef)
+# df_SADsCongruentes <- df_SADsCongruentes[,c("SiteCode","k","n_nRef")]
+
 df_resultados_antigos <- read.csv(file="/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/simulacao_codigos_e_resultados/resultados/df_resultados.csv",
                             header = TRUE,as.is=FALSE)[,1:13] %>% 
   filter(SiteCode %in% unique(df_SADsCongruentes$SiteCode), MN == "EE") %>% 
-  select(SiteCode,k,n_nRef) %>% 
+  dplyr::select(SiteCode,k,n_nRef) %>% 
   rename(n_nRef_10x10 = n_nRef)
 df_SADsCongruentes <- inner_join(x=df_SADsCongruentes,
                                  y=df_resultados_antigos,
@@ -293,27 +212,90 @@ __Fig. __ Gráficos exploratórios do número de SADs preditas por MNEE que são
        
 __Desvio-padrão das estimativas de U: U_med10x10 = anteriores; U_med = atuais; e diff_Umed = diferença entre atual e anterior__     
     
-```{r desvio padrao dos U,echo=TRUE,eval=TRUE}
+```{r desvio padrao SADs,echo=TRUE,eval=TRUE}
 apply(df_SADsCongruentes[,3:5],2,sd)
 ```
   
     
-__Sumário padrão da regressão linear__    
-      
-```{r comparacao de U selecao de modelos,echo=TRUE,eval=TRUE}
+__Sumário padrão da regressão linear__      
+        
+          
+```{r summary de lm SADs comparacao,echo=TRUE,eval=TRUE}
 summary(lm(n_nRef ~ n_nRef_10x10-1,data = df_SADsCongruentes))
+```  
+    
+    
+Apesar de ter aparente maior variabilidade, o número de SADs congruentes também é robusto à mudança na escala da paisagem.     
+  
+    
+### Efeito da magnitude da mudança de % CV    
+  
+    
+```{r criacao df_resultadosPiloto,echo=FALSE,eval=FALSE,include=FALSE}
+select <- dplyr::select
+# dados de proporção de cobertura vegetal e U_med anterior
+df_p <- read.csv(file = "/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/df_piloto.csv",
+                    header = TRUE) %>% select(SiteCode,k,p,p2,U_med_10x10) %>% 
+  rename(p_10x10 = p, p_4x4=p2)
+# dados das simulações do piloto para estimar U
+df_U <- map_df(Sys.glob("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x4km/U/*.csv"), read_csv,show_col_types = FALSE)
+df_Umed <- df_U %>% 
+  ddply(.variables = c("SiteCode","k"),summarise,
+        U_med_4x4 = mean(U),
+        U_var = var(U))
+# SADs congruentes
+df_SADsCongruentes <- read.csv("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x4km/resultados/df_resultados.csv",
+                               header = TRUE) %>% 
+  dplyr::select(SiteCode,k,n_nRef) %>% 
+  rename(n_cong_4x4 = n_nRef)
+df_resultados_antigos <- read.csv(file="/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/simulacao_codigos_e_resultados/resultados/df_resultados.csv",
+                            header = TRUE,as.is=FALSE)[,1:13] %>% 
+  filter(SiteCode %in% unique(df_SADsCongruentes$SiteCode), MN == "EE") %>% 
+  dplyr::select(SiteCode,k,n_nRef) %>% 
+  rename(n_cong_10x10 = n_nRef)
+df_SADsCongruentes <- inner_join(x=df_SADsCongruentes,
+                                 y=df_resultados_antigos,
+                                 by=c("SiteCode","k")) %>% 
+  select(SiteCode,k,n_cong_10x10,n_cong_4x4)
+# join
+df_resultadosPiloto <- left_join(x=df_p,
+                                 y=select(df_Umed,-U_var),
+                                 by=c("SiteCode","k")) %>% 
+  left_join(x=.,
+            y=df_SADsCongruentes,
+            by=c("SiteCode","k")) 
+df_resultadosPiloto %>% str
+write.csv(df_resultadosPiloto,
+          file = "/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x4km/resultados/df_resultadosPiloto.csv",
+          row.names = FALSE)
+```
+
+```{r graficos relacao diff Respostas e diff p, echo=FALSE,eval=TRUE,include=TRUE,fig.height=3,fig.width=7}
+select <- dplyr::select
+# dados
+df_resultadosPiloto <- read.csv("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x4km/resultados/df_resultadosPiloto.csv",
+                                header = TRUE) %>% 
+  mutate(diff_p = p_4x4-p_10x10,
+         diff_Umed = U_med_4x4 - U_med_10x10,
+         diff_SADs = n_cong_4x4 - n_cong_10x10)
+# gráficos exploratórios  
+v_labels <- c(diff_SADs="dif. #Congruentes", diff_Umed="dif. U")
+df_resultadosPiloto %>% 
+  select(SiteCode,k,diff_p:diff_SADs) %>% 
+  pivot_longer(diff_Umed:diff_SADs,names_to = "respostas",values_to = "valores") %>% 
+  ggplot(aes(x=diff_p,y=valores)) +
+  geom_smooth(method = 'loess',formula = "y ~ x") +
+  geom_point() + labs(x="dif. %CV",y="") +
+  facet_wrap(~respostas,ncol=2,scale="free",labeller = labeller(respostas = v_labels))
 ```
   
-Apesar de ter aparente maior variabilidade, o número de SADs congruentes também é robusto à mudança na escala da paisagem.   
-
-
-
-
+__Fig. __ Gráficos exploratórios da mudança nas variáveis respostas (eixo y) e da variável resposta proporção de cobertura vegetal (eixo x). A linha azul é feita pelo geom_smooth(method="sloess").    
+  
 # Material Suplementar
 
 #### Código para recorte das paisagens
 
-```{r recorte das paisagens para piloto,echo=FALSE}
+```{r recorte das paisagens para piloto remover?,echo=FALSE}
 df_sims <- read.csv("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/simulacao_codigos_e_resultados/df_simulacao.csv",
                     header = TRUE) %>% 
   select(!(U_med:theta)) %>% filter(k==0.05)
@@ -679,3 +661,107 @@ df_averageSE %>%
 <!-- O raio médio = `r raio_medio` (2.07) e portanto o lado da paisagem é de `r 2*raio_medio`km e área total de 1713.96 hectares   -->
   
 <!-- O lado anterior é de 10.2x10.2, o lado atual é 4.14x4.14. -->
+
+     
+       
+### Códigos do sorteio de sítios ao longo do gradiente de cobertura vegetal nas paisagens de 10x10km2      
+    
+```{r dados,message=FALSE,echo=FALSE,eval=FALSE,include=FALSE}
+### dados ###
+# leitura
+df_resultados <- read.csv(file="/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/simulacao_codigos_e_resultados/resultados/df_resultados.csv",
+                            header = TRUE,as.is=FALSE)[,1:13]
+# padronização
+level_k <- as.character(unique(sort(as.numeric(df_resultados$k),decreasing = TRUE)))
+df_resultados$k <- factor(df_resultados$k,levels = level_k)
+levels(df_resultados$k)[19] <- "0.1"
+# z score
+f_z <- function(x){
+  m <- base::mean(x,na.rm=FALSE)
+  sd <- sd(x,na.rm=FALSE)
+  output <- (x-m)/sd
+  return(output)
+} 
+# names(df_resultados)
+# str(df_resultados)
+df_resultados %<>% mutate(diffS_gamma = diffS_mean + min(diffS_mean)*(-1) + 0.01,
+                          modulo_diffS = abs(diffS_mean),
+                          log_Sobs=log(S_obs))
+
+df_resultados.z <- as.data.frame(apply(df_resultados[,c("p","Ntotal","log_Sobs","k_1","d_Lplot","d","modulo_diffS")],2,f_z))
+names(df_resultados.z) <- sapply(names(df_resultados.z), function(x) paste0(x,".z"))
+df_resultados %<>% cbind(.,df_resultados.z) %>% 
+  select(-k_1,-k_1.z)
+```
+
+```{r sorteio de pontos para o piloto,echo=TRUE,eval=FALSE}
+f_random_byVar <- function(x = df_resultados,
+                           column_name = "p", 
+                           n_sample = 30, 
+                           i_seed = 260320223){
+  # amostra de uma uniforme
+  set.seed(i_seed)
+  sample_points <- sort(runif(n = n_sample, min = 0, max = 1))
+  # encontra os valores mais próoximos
+  df_x <- filter(x,k==levels(x$k)[1],MN=="EE")
+  f_index <- function(X=df_x,
+                      name=column_name,
+                      v_ref){
+    which.min(abs(X[[column_name]] - v_ref))
+  }
+  # remove os sítios repetidos
+  v_sites <- df_x[sapply(sample_points,function(y) f_index(v_ref=y)),"SiteCode"] %>% unique
+  ## output:
+  df_return <- filter(x,SiteCode %in% v_sites,MN=="EE")
+  df_return$SiteCode <- factor(df_return$SiteCode)
+  return(df_return)
+}
+df_piloto <- f_random_byVar(x=df_resultados)
+write.csv(df_piloto,file = "./artigo_mestrado/1A.P_MOVER/Support Information/df_piloto.csv",
+          row.names = FALSE)
+```
+
+
+```{r graficos df_piloto,echo=FALSE,eval=FALSE,include=FALSE}
+df_piloto <- read.csv(file="df_piloto.csv", header = TRUE)
+# gráficos exploratóritos
+df_piloto %>% 
+  filter(k==unique(df_piloto$k)[1]) %>% 
+  ggplot(aes(x=p,y=S_obs)) + 
+  geom_point() +
+  ggtitle(label="Sítios Sorteados") +
+  labs(x="% Tree cover (p)",y="Species Richness")
+```
+  
+### Códigos para recorte das paisagens  
+  
+```{r recorte das paisagens para piloto,echo=TRUE,eval=FALSE}
+f_recorte <- function(file_path){
+  # matriz da paisagem de 10x10km:
+  mat_paisagem <- read.table(file=file_path, 
+                             sep=" ",
+                             header=TRUE) %>% 
+    as.matrix
+  #redução proporcional no número de linhas e colunas da matriz:
+  v_dim_novo <- dim(mat_paisagem) - round(dim(mat_paisagem) * (4.14/10.2),0)
+  v_dim <- dim(mat_paisagem)
+  # recorte:
+  mat_paisagem_output <- mat_paisagem[floor(v_dim_novo[1]/2):(v_dim[1]-1-ceiling(v_dim_novo[1]/2)),
+                                      floor(v_dim_novo[2]/2):(v_dim[2]-1-ceiling(v_dim_novo[2]/2))]
+  ## outputs:
+  # salva a nova paisagem
+  write.table(mat_paisagem_output, 
+              file=gsub("dados_para_iniciar_artigo",
+                        "piloto_MNEE_4x4km",
+                        file_path),
+              sep=" ", 
+              row.names = FALSE,col.names = FALSE)
+  tree.cover <- as.vector(mat_paisagem_output)
+  p <- 1 - length(tree.cover[tree.cover==0])/length(tree.cover)
+  # e retorna a atual proporção de cobertura vegetal
+  return(p) 
+}
+registerDoMC(3)
+p_4x4 <- aaply(df_$txt.name,1,f_recorte,.parallel = TRUE)
+```
+  
