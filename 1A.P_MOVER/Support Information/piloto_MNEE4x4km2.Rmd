@@ -34,7 +34,7 @@ library(raster)
 library(bbmle)
 library(magrittr)
 library(gridExtra)
-library(ggplot2)
+library(ggplot2); theme_set(theme_classic())
 library(readr)
 library(purrr)
 library(stringr)
@@ -200,87 +200,54 @@ p_4x4 <- aaply(df_$txt.name,1,f_recorte,.parallel = TRUE)
     
 ### Comparação paisagem de 10x10 km2 e de 4x4 km2  
   
-__Fig 2__ Exemplo de recorte da paisagem ao redor, no material suplementar há para os 23 sítios amostrados para o piloto.  
-
 ```{r fig 2 comparacao mesma paisagem diferentes escalas}
 
 ```
 
+__Fig 2__ Exemplo de recorte da paisagem ao redor, no material suplementar há para os 23 sítios amostrados para o piloto.  
+
 ### Esforço Computacional
 
 ADICIONAR: tabela com o tempo de execução 
-
-### Comparação estimativa de U e número de SADs neutras congruentes
-
-
-
-
-```{r janela de codigo 7,echo=TRUE,eval=TRUE}
-dinamica_coalescente <- function(U, S=0, N_simul, seed, disp_range, disp_kernel, landscape){
-  # Runs coalescent simulations for a given heterogeneous landscape
-  #
-  # Parameters:
-  # U: speciation rate
-  # S: observed richness (integer) - used to fit the value of U, or set to
-  #       0 (default) if that is not desired
-  # N_simul: number of simulations
-  # seed: seed of the RNG (an integer)
-  # disp_range: width of the dispersal kernel
-  # disp_kernel: an integer corresponding to the type of dispersal kernel. One of
-  #               0: uniform
-  #               1: normal
-  #               2: Laplacian
-  # landscape: either a filename containing the landscape data, or a
-  #   bidimensional R array or matrix.
-  #   TODO: describe the format of the input - trinary matrix)
-  #
-  # Returns:
-  # r: an array of dimension N_simul x landscape dimensions, that is, each
-  #   r[i.,] is a bidimensional array of the same shape as the landscape.
-  #   Each site is labeled according to the identity of the species occupying
-  #   that site.
-  # U_est: estimated speciation rate. This is returned only if input parameter S > 0
-  if (is.character(landscape)){
-    l <- as.matrix(read.table(landscape))
-    infile <- landscape
-    land_dims <- dim(l)
-  } else {
-    land_dims <- dim(landscape)
-    infile <- tempfile()
-    # input file *must* be clean: no comments, headers or anything
-    write.table(landscape, infile, col.names=F, row.names=F)
-  }
-  outfile <- tempfile()
-  repeat {
-    system(paste('./dinamica_coalescente', land_dims[1], land_dims[2], U, S, N_simul,
-                 seed, disp_range, disp_kernel, infile, outfile))
-    if (file.exists(outfile) || S == 0)
-      break
-    U <- U/10.
-    print(paste("Decreasing value of U to", U))
-    # set some lowest boundary here so simulations don't take forever
-    if (U < 1e-20){
-      print("Richness value too low, giving up...")
-      return(NULL)
-    }
-  }
-  r <- as.matrix(read.table(outfile))
-  # transpose each grid, as output is written along lines but R reads it along columns
-  # TODO: I thought I got it right, but it was wrong... please DO re-check
-  #r <- aperm(r, c(1,3,2))
-
-  # recover estimated speciation rate
-  if (S > 0){
-    out_con <- file(outfile)
-    U_line <- strsplit(readLines(out_con, 2)[2], ' ')[[1]]
-    close(out_con)
-    U_est <- as.double(U_line[length(U_line)])
-    return(list(r = r, U_est = U_est))
-  }
-  return(r)
-}
+  
+    
+## Comparação U e SADs preditas congruentes   
+    
+```{r comparacao U,warning=FALSE,message=FALSE,eval=TRUE,include=TRUE,echo=FALSE}
+df_U <- map_df(Sys.glob("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x4km/U/*.csv"), read_csv,show_col_types = FALSE)
+df_Umed <- df_U %>% 
+  ddply(.variables = c("SiteCode","k"),summarise,
+        U_med = mean(U),
+        U_var = var(U))
+df_sims <- read.csv(file = "/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/df_piloto.csv",
+                    header = TRUE)
+df_Umed <- left_join(x=df_sims,y=df_Umed,by=c("SiteCode","k")) %>% 
+  mutate(diff_Umed = U_med - U_med_10x10)
+l_p <- list()
+l_p[[1]] <- df_Umed %>% 
+  ggplot(aes(x=U_med_10x10,y=U_med)) +
+  geom_abline(intercept = 0,slope = 1,color="red",alpha=0.6) +
+  geom_smooth(method = "lm",formula = "y~0+x",alpha=0.5) +
+  geom_point(alpha=0.5) + 
+  labs(x="U 10x10 km2 - ANTERIOR", y="U 4x4 km2 - ATUAL",title="a) lm(ATUAL ~ offset(ANTERIOR))?")
+l_p[[2]] <- df_Umed %>% 
+  ggplot(aes(x="",y=diff_Umed)) +
+  geom_boxplot() +
+  geom_jitter() + labs(x="", y="",title="b) ATUAL - ANTERIOR")
+grid.arrange(grobs=l_p,ncol=2)
 ```
+__Fig. 3__ Gráficos exploratórios da média da taxa U, estimada por MNEE. a) a linha vermelha representa a relação 1:1 e a linha azul uma regressão linear padrão da função ggplot2::geom_smooth() sem intercepto. b) boxplot da diferença.  
+    
+__Sumário padrão da regressão linear__    
+      
+```{r comparacao de U selecao de modelos,echo=TRUE,eval=TRUE}
+summary(lm(U_med ~ U_med_10x10-1,data = df_Umed))
+```
+Os resultados sugerem que não há diferenças significativas entre as estimativas de U.  
 
+
+
+  
 
 #### Estimativa de U
 
