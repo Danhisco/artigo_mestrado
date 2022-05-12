@@ -54,6 +54,14 @@ library(dplyr)
 # leitura
 df_resultados <- read.csv(file="/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/simulacao_codigos_e_resultados/resultados/df_resultados.csv",
                             header = TRUE,as.is=FALSE)[,1:13]
+df_p_4_10 <- read.csv("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x4km/resultados/df_p_4x4_10x10.csv",
+                       header = TRUE) %>% 
+  select(-p_10x10)
+df_resultados <- left_join(x=df_resultados,
+                           y=df_p_4_10,
+                           by="SiteCode") %>% 
+  rename(p_10x10=p,
+         p=p_4x4)
 # padronização
 level_k <- as.character(unique(sort(as.numeric(df_resultados$k),decreasing = TRUE)))
 df_resultados$k <- factor(df_resultados$k,levels = level_k)
@@ -73,7 +81,7 @@ df_resultados %<>% mutate(diffS_gamma = diffS_mean + min(diffS_mean)*(-1) + 0.01
                           log10_U = log10(U_med),
                           log10_d = log10(d))
 
-df_resultados.z <- as.data.frame(apply(df_resultados[,c("p","Ntotal","log10_Sobs","k_1","d_Lplot","d","log10_d","modulo_diffS")],2,f_z))
+df_resultados.z <- as.data.frame(apply(df_resultados[,c("p","p_10x10","Ntotal","log10_Sobs","k_1","d_Lplot","d","log10_d","modulo_diffS")],2,f_z))
 names(df_resultados.z) <- sapply(names(df_resultados.z), function(x) paste0(x,".z"))
 df_resultados %<>% cbind(.,df_resultados.z) %>% 
   select(-k_1,-k_1.z)
@@ -112,11 +120,11 @@ knitr::kable(df_variaveis,caption = "Variables") %>%
 ```
 
   
-^    
-__Figure 1__ Possible Predictor Variables  
+   
+<!-- __Figure 1__ Possible Predictor Variables -->
   
     
-```{r figura 11 possiveis variaveis preditoras,echo=TRUE,include=FALSE,fig.height=7,fig.align='center',fig.width=7}
+```{r figura 11 possiveis variaveis preditoras,echo=TRUE,include=FALSE,fig.height=7,fig.align='center',fig.width=7,include=F,eval=FALSE}
 l_p <- list()
 l_p[[1]] <- ggplot(df_resultados,aes(x=k,y=d)) +
   geom_jitter(alpha=0.3) +
@@ -136,7 +144,7 @@ layout_mat <- rbind(c(1,1,1,2,2,2),
 grid.arrange(l_p[[1]],l_p[[2]],l_p[[3]],l_p[[4]],l_p[[5]],top="Possible Predictor Variables",layout_matrix=layout_mat)
 ```
 
-```{r fig.width=12,fig.height=5}
+```{r desvio padrao funcao de dispersao por k ,fig.width=12,fig.height=5}
 l_p <- list()
 l_p[[1]] <- df_resultados %>% filter(MN == "EE") %>% select(SiteCode,k,d,DA) %>% mutate(k_cont = as.numeric(as.character(k))) %>% 
   ggplot(aes(x=k,y=d,color=DA)) +
@@ -151,7 +159,7 @@ l_p[[2]] <- df_resultados %>% filter(MN == "EE") %>% select(SiteCode,k,d,DA) %>%
 grid.arrange(grobs=l_p,ncol=2)
 ```
 
-```{r}
+```{r parametros de MNEI pelos parametros de MNEE e p}
 df_resultados %<>% 
   mutate(J_M = 10404 * DA * p,
          L_plot = sqrt( 10000 * (Ntotal/DA) ),
@@ -179,7 +187,30 @@ l_p[[4]] <- df_resultados %>%
 grid.arrange(grobs=l_p,ncol=2)
 ```
 
-```{r}
+```{r distribuicao de valores de U escala padrao e ln}
+l_p <- list()
+l_p[[1]] <- df_resultados %>% 
+  ggplot(aes(x="",y=U_med)) +
+  geom_jitter() +
+  geom_boxplot() +
+  scale_y_continuous(labels = scales::scientific,
+                     breaks= as.vector(summary(df_resultados$U_med))) +
+  labs(y="taxa U")
+l_p[[2]] <- df_resultados %>% 
+  ggplot(aes(x="",y=U_med)) +
+  geom_jitter() +
+  geom_boxplot() +
+  scale_y_continuous(trans="log",
+                     labels = scales::scientific,  # = function(x) format(x, scientific = TRUE)
+                     breaks= as.vector(summary(df_resultados$U_med))) +
+  labs(y="taxa U")
+grid.arrange(grobs=l_p,ncol=2)
+```
+
+
+
+
+```{r contexto de MNEE pior do que MNEI}
 l_p <- list()
 l_p[[1]] <- df_resultados %>% filter(d>=5 & p>0.35) %>%
   ggplot(aes(x="",y= m_ ) ) +
@@ -210,15 +241,15 @@ grid.arrange(grobs=l_p,ncol=2)
 
 
 
-```{r}
+```{r pontos usados para ajustar os modelos estatisticos}
 df_resultados %>% 
   ggplot(aes(p,d)) +
   geom_point()
-df_resultados %>% 
-  ggplot(aes(p,DA)) +
-  geom_point()
+# df_resultados %>% 
+#   ggplot(aes(p,DA)) +
+# geom_point()
 ```
-```{r}
+```{r figura de criterio de parcimonia}
 eixo_x <- 0.5
 eixo_y <- 3
 ggplot() +
@@ -380,7 +411,8 @@ df_auditoria.md <- ldply(l_nRef__modeloCheio,f_warning,.id="glmer") %>%
 
 
 ```{r l_md_nRef.GLMM, eval=FALSE,echo=FALSE}
-save(l_nRef__modeloCheio,file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_md_nRef_GLMM.Rdata")
+# save(l_nRef__modeloCheio,file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_md_nRef_GLMM.Rdata")
+save(l_nRef__modeloCheio,file="~/Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x4km/resultados/l_md_nRef_GLMM_4x4.Rdata")
 ```
   
 __Table 2.1__ Modelos Cheios estimados e avisos de convergência  
@@ -497,6 +529,7 @@ f_md <- function(dados){
 }
 registerDoMC(3)
 l_nRef__modeloCheio2 <- dlply(df_md,.(var_dispersao),f_md,.parallel = TRUE)
+#?
 names(l_nRef__modeloCheio2) <- NULL
 l_nRef__modeloCheio2 <- do.call(c,l_nRef__modeloCheio2)
 #
@@ -513,7 +546,8 @@ df_auditoria.md <- ldply(l_nRef__modeloCheio2,f_warning,.id="glmer") %>%
 
 
 ```{r l_nRef__modeloCheio2,eval=FALSE,echo=FALSE}
-save(l_nRef__modeloCheio2,file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_md_nRef_GLMM2.Rdata")
+# save(l_nRef__modeloCheio2,file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_md_nRef_GLMM2.Rdata")
+save(l_nRef__modeloCheio2,file="~/Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x4km/resultados/l_md_nRef_GLMM_4x4.Rdata")
 ```
   
     
@@ -521,7 +555,8 @@ __Table 2.2__ Modelos Cheios estimados e avisos de convergência
     
       
 ```{r warningns l_nRef__modeloCheio2,eval=TRUE,echo=FALSE}
-load("~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_md_nRef_GLMM2.Rdata")
+# load("~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_md_nRef_GLMM2.Rdata")
+load("~/Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x4km/resultados/l_md_nRef_GLMM_4x4.Rdata")
 # avaliação e melhora do ajuste dos modelos
 ## warnings
 f_warning <- function(glmm_object){
@@ -725,14 +760,16 @@ l_nRefEE_mdCheio <- dlply(df_md,"md_class",f_md,.parallel = TRUE)
 
 
 ```{r save l_nRefEE_mdCheio, eval=FALSE}
-save(l_nRefEE_mdCheio,file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_nRefEE_mdCheio.Rdata")
+# save(l_nRefEE_mdCheio,file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_nRefEE_mdCheio.Rdata")
+save(l_nRefEE_mdCheio,file="~/Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x4km/resultados/l_nRefEE_mdCheio.Rdata")
 ```
 
 
 __Tabela 2.2.1__ Comparação de modelos Cheios
 
 ```{r AICctab l_nRefEE_mdCheio,echo=FALSE,eval=TRUE}
-load("~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_nRefEE_mdCheio.Rdata")
+# load("~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_nRefEE_mdCheio.Rdata")
+load("~/Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x4km/resultados/l_nRefEE_mdCheio.Rdata")
 AICctab(l_nRefEE_mdCheio,weights=TRUE)
 df_md <- df_resultados %>% filter(MN=="EE") %>% distinct()
 md_nRefEE <- glmer(cbind(n_nRef,100-n_nRef) ~ 
@@ -796,12 +833,14 @@ ggplot(df_md,aes(x=nRef_observado,y=nRef_predito)) +
 # todas as combinações de modelo do modelo cheio
 registerDoMC(3)
 l_md.dredge_nRefEE <- llply(dredge(md_nRefEE,trace = FALSE,evaluate=FALSE), eval,.parallel = TRUE)
-save(l_md.dredge_nRefEE,file="~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/Support Information/l_md.dredge_nRefEE.Rdata")
+save(l_md.dredge_nRefEE,file="~/Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x4km/resultados/l_nRefEE_mdCheio.Rdata")
 ```
 
 
 ```{r selecao de variaveis nRefEE,eval=TRUE,echo=FALSE,results='hide'}
-load("~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_md.dredge_nRefEE.Rdata")
+# load("~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_md.dredge_nRefEE.Rdata")
+load("~/Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x4km/resultados/l_nRefEE_mdCheio.Rdata")
+
 # AICctab
 df_tableGLMM <- print(AICctab(l_md.dredge_nRefEE,weights=TRUE)) %>% 
   as.data.frame()
@@ -824,7 +863,7 @@ knitr::kable(head(df_tableGLMM,n=10)) %>%
 ```{r model averaging EE MuMIn e AICcmodavg,message=FALSE,eval=FALSE}
 # Model Averaging for SiteCode predictions
 mdAvg_nRefEE__MuMIn <- model.avg(l_md.dredge_nRefEE)
-save(mdAvg_nRefEE__MuMIn,file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_nRefEE__MuMIn.Rdata")
+save(mdAvg_nRefEE__MuMIn,file="~Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x4km/resultados/mdAvg_nRefEE__MuMIn.Rdata")
 # Model Averaging for new data predictions
 df_pred <- expand.grid(SiteCode=levels(df_resultados$SiteCode)[1],
                        d.z=seq(min(df_resultados$d.z),max(df_resultados$d.z),length=40),
