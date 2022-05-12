@@ -201,7 +201,8 @@ p_4x4 <- aaply(df_$txt.name,1,f_recorte,.parallel = TRUE)
 ### Comparação paisagem de 10x10 km2 e de 4x4 km2  
   
 ```{r fig 2 comparacao mesma paisagem diferentes escalas}
-
+df_sims <- read.csv(file = "/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/df_piloto.csv",
+                    header = TRUE)
 ```
 
 __Fig 2__ Exemplo de recorte da paisagem ao redor, no material suplementar há para os 23 sítios amostrados para o piloto.  
@@ -241,27 +242,91 @@ l_p[[2]] <- df_Umed %>%
 grid.arrange(grobs=l_p,ncol=2)
 ```
 __Fig. 3__ Gráficos exploratórios da média da taxa U, estimada por MNEE. a) a linha vermelha representa a relação 1:1 e a linha azul uma regressão linear padrão da função ggplot2::geom_smooth() sem intercepto. b) boxplot da diferença. 
+  
+        
+__Desvio-padrão das estimativas de U: U_med10x10 = anteriores; U_med = atuais; e diff_Umed = diferença entre atual e anterior__     
     
+```{r desvio padrao dos U,echo=TRUE,eval=TRUE}
+apply(df_Umed[,c("U_med_10x10","U_med","diff_Umed")],2,sd)
+```
+
+
 __Sumário padrão da regressão linear__    
       
 ```{r comparacao de U selecao de modelos,echo=TRUE,eval=TRUE}
 summary(lm(U_med ~ U_med_10x10-1,data = df_Umed))
 ```
   
-__Desvio padrão dos anteriores, atuais e da diferença entre atual e anterior respectivamente:__     
-    
-```{r desvio padrao dos U,echo=TRUE,eval=TRUE}
-apply(df_Umed[,c("U_med_10x10","U_med","diff_Umed")],2,sd)
-```
-  
 Os resultados sugerem que não há diferenças significativas entre as simulações feitas nas paisagens de 10.2x10.2 km2 e de 4.14x4.14 km2.    
     
 ### SADs preditas congruentes         
-        
 
-#### Estimativa de U
+```{r}
+write.csv(df_resultados,
+          "/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x4km/resultados/df_resultados.csv",
+          row.names = FALSE)
+```
 
-```{r simulacao U}
+# Material Suplementar
+
+#### Código para recorte das paisagens
+
+```{r recorte das paisagens para piloto,echo=FALSE}
+df_sims <- read.csv("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/simulacao_codigos_e_resultados/df_simulacao.csv",
+                    header = TRUE) %>% 
+  select(!(U_med:theta)) %>% filter(k==0.05)
+# names(df_sims)[10:11] <- paste0(names(df_sims)[10:11],"_10x10")
+# estudo funcao
+# file_path <- df_sims$txt.name[3]
+f_recorte <- function(file_path){
+  mat_paisagem <- read.table(file=file_path,sep=" ",header=TRUE) %>% 
+    as.matrix
+  v_dim_novo <- dim(mat_paisagem) - round(dim(mat_paisagem) * (4.14/10.2),0)
+  v_dim <- dim(mat_paisagem)
+  mat_paisagem_output <- mat_paisagem[floor(v_dim_novo[1]/2):(v_dim[1]-1-ceiling(v_dim_novo[1]/2)),
+                                      floor(v_dim_novo[2]/2):(v_dim[2]-1-ceiling(v_dim_novo[2]/2))]
+  write.table(mat_paisagem_output,
+              file=gsub("dados_para_iniciar_artigo",
+                        "piloto_MNEE_4x4km",
+                        file_path),
+              sep=" ", 
+              row.names = FALSE,col.names = FALSE)
+  tree.cover <- as.vector(mat_paisagem_output)
+  p <- 1 - length(tree.cover[tree.cover==0])/length(tree.cover)
+  return(p)
+}
+# image(mat_paisagem)
+df_sims$p_4x4 <- aaply(df_sims$txt.name,1,f_recorte)
+# df_sims %>%
+#   ggplot(aes(x=p,y=p_4x4)) +
+#   geom_abline(slope = 1,intercept = 0,color="red",alpha=0.6) +
+#   geom_point()
+###
+df_sims %>% 
+  select(SiteCode, p_4x4, p) %>% 
+  rename(p_10x10 = p) %>% 
+  write.csv(x=.,
+            file="/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x4km/resultados/df_p_4x4_10x10.csv",
+            row.names = FALSE)
+# plotar todos os paineis
+df_sims %>% 
+  mutate(txt.name_antigo = txt.name,
+         txt.name = gsub("dados_para_iniciar_artigo",
+                        "piloto_MNEE_4x4km",
+                        txt.name_antigo))
+write.csv(df_sims,
+          file="/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/df_piloto.csv",
+          row.names=FALSE)
+# "/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x4km/"
+```
+
+#### Recortes das paisagens de 10x10km para 4x4km
+  
+-- INSERIR   
+  
+- Códigos Estimativa de U  
+
+```{r simulacao U, echo=FALSE,eval=FALSE,include=FALSE}
 # replicas
 n_rep.U <- 10
 func1 <- function(x,replicas=n_rep.U) {
@@ -300,31 +365,9 @@ for(a in 1:length(k_factor)){
 
 A simulação ocorreu entre 19h58 e 21h11, totalizando 1h13. Se considerarmos 103 sítios, serão 5h45. Pras SADS eu estimo que seja fique 54h49, 2.27 dias.
 
-```{r comparacao U}
-df_U <- map_df(Sys.glob("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x4km/U/*.csv"), read_csv)
-df_Umed <- df_U %>% 
-  ddply(.variables = c("SiteCode","k"),summarise,
-        U_med = mean(U),
-        U_var = var(U))
-df_sims <- read.csv(file = "/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/df_piloto.csv",
-                    header = TRUE)
-df_Umed <- left_join(x=df_sims,y=df_Umed,by=c("SiteCode","k")) %>% 
-  mutate(diff_Umed = U_med - U_med_10x10)
-l_p <- list()
-l_p[[1]] <- df_Umed %>% 
-  ggplot(aes(x=U_med_10x10,y=U_med)) +
-  geom_abline(intercept = 0,slope = 1,color="red",alpha=0.6) +
-  geom_point()
-l_p[[2]] <- df_Umed %>% 
-  ggplot(aes(x="",y=diff_Umed)) +
-  geom_jitter()
-grid.arrange(grobs=l_p,ncol=2)
-```
+- Códigos SADs preditas
 
-
-#### SADs preditas
-
-```{r SADs preditas}
+```{r simulacao SADs MNEE, echo=FALSE,eval=FALSE,include=FALSE}
 df_U <- map_df(Sys.glob("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x4km/U/*.csv"), read_csv)
 df_Umed <- df_U %>% 
   ddply(.variables = c("SiteCode","k"),summarise,
@@ -363,9 +406,9 @@ l_ply(simulacao,f_simulacao,.parallel = TRUE)
 
 As simulações das SADs ocorreram entre 23h10 e 00h30
 
-##### teste KS
+- Códigos teste KS
 
-```{r dados para teste KS,echo=FALSE,eval=FALSE}
+```{r dados para teste KS,echo=FALSE,eval=FALSE,include=FALSE}
 ### dados e preparação
 df_U <- map_df(Sys.glob("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x4km/U/*.csv"), read_csv)
 df_Umed <- df_U %>% 
@@ -439,7 +482,7 @@ write.csv(df_replicas,
           row.names = FALSE)
 ```
 
-```{r summarise replicas teste KS}
+```{r summarise replicas teste KS,echo=FALSE,eval=FALSE,include=FALSE}
 # dados
 df_replicas <- read.csv("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x4km/resultados/df_replicas.csv",
                         header = TRUE,as.is = TRUE)
@@ -466,67 +509,11 @@ write.csv(df_resultados,
           row.names = FALSE)
 ```
 
-# Material Suplementar
-
-##### Recorte das paisagens de 10x10km para 4x4km
-
-Todas as paisagens foram recortadas e armazenadas na pasta do piloto
-
-```{r recorte das paisagens para piloto,echo=FALSE}
-df_sims <- read.csv("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/simulacao_codigos_e_resultados/df_simulacao.csv",
-                    header = TRUE) %>% 
-  select(!(U_med:theta)) %>% filter(k==0.05)
-# names(df_sims)[10:11] <- paste0(names(df_sims)[10:11],"_10x10")
-# estudo funcao
-# file_path <- df_sims$txt.name[3]
-f_recorte <- function(file_path){
-  mat_paisagem <- read.table(file=file_path,sep=" ",header=TRUE) %>% 
-    as.matrix
-  v_dim_novo <- dim(mat_paisagem) - round(dim(mat_paisagem) * (4.14/10.2),0)
-  v_dim <- dim(mat_paisagem)
-  mat_paisagem_output <- mat_paisagem[floor(v_dim_novo[1]/2):(v_dim[1]-1-ceiling(v_dim_novo[1]/2)),
-                                      floor(v_dim_novo[2]/2):(v_dim[2]-1-ceiling(v_dim_novo[2]/2))]
-  write.table(mat_paisagem_output,
-              file=gsub("dados_para_iniciar_artigo",
-                        "piloto_MNEE_4x4km",
-                        file_path),
-              sep=" ", 
-              row.names = FALSE,col.names = FALSE)
-  tree.cover <- as.vector(mat_paisagem_output)
-  p <- 1 - length(tree.cover[tree.cover==0])/length(tree.cover)
-  return(p)
-}
-# image(mat_paisagem)
-df_sims$p_4x4 <- aaply(df_sims$txt.name,1,f_recorte)
-# df_sims %>%
-#   ggplot(aes(x=p,y=p_4x4)) +
-#   geom_abline(slope = 1,intercept = 0,color="red",alpha=0.6) +
-#   geom_point()
-###
-df_sims %>% 
-  select(SiteCode, p_4x4, p) %>% 
-  rename(p_10x10 = p) %>% 
-  write.csv(x=.,
-            file="/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x4km/resultados/df_p_4x4_10x10.csv",
-            row.names = FALSE)
-# plotar todos os paineis
-df_sims %>% 
-  mutate(txt.name_antigo = txt.name,
-         txt.name = gsub("dados_para_iniciar_artigo",
-                        "piloto_MNEE_4x4km",
-                        txt.name_antigo))
-write.csv(df_sims,
-          file="/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/df_piloto.csv",
-          row.names=FALSE)
-# "/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x4km/"
-```
-
-##### Ap Final BIE 5770: inicio
+- EXTRA: Ap Final BIE 5770
 
 Gráficos usados na apresentação final de BIE 5770: ano da amostragem das SADs e ano referência do mapa de cobertura vegetal.
 
-
-```{r gráficos}
+```{r gráficos,include=FALSE,eval=FALSE,echo=FALSE}
 #
 df_SADs.disponiveis <- read.csv(
   "/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/dados_para_iniciar_artigo/df_SADs_disponiveis.csv",
@@ -595,7 +582,7 @@ df_S1 %>%
 # df_S1 %>% arrange(year_plot) %>% select(year_plot,UC_area_ha,state)
 ```
 
-```{r}
+```{r df_S2 ,include=FALSE,eval=FALSE,echo=FALSE}
 df_S2 <- read.csv("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/resultados_e_SI/tabelaSI2.csv",
                   header = TRUE) %>% 
   mutate(year_plot = ifelse(is.na(year_data),year,year_data))
@@ -618,9 +605,9 @@ df_S2 %>%
         axis.ticks.y=element_blank())
 ```
 
-#### Escala de Efeito
+ Escala de Efeito
 
-```{r selecao da escala espacial, echo=TRUE}
+```{r selecao da escala espacial, echo=FALSE, include=FALSE, eval=FALSE}
 df_se <- read.csv(file="/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/resultados_e_SI/df_escalaEfeito.csv",header = T)
 # ajuste de modelos aos dados
 library(MASS)
@@ -647,6 +634,6 @@ df_averageSE %>%
   theme_classic()
 ```
 
-O raio médio = `r raio_medio` (2.07) e portanto o lado da paisagem é de `r 2*raio_medio`km e área total de 1713.96 hectares  
+<!-- O raio médio = `r raio_medio` (2.07) e portanto o lado da paisagem é de `r 2*raio_medio`km e área total de 1713.96 hectares   -->
   
-O lado anterior é de 10.2x10.2, o lado atual é 4.14x4.14.
+<!-- O lado anterior é de 10.2x10.2, o lado atual é 4.14x4.14. -->
