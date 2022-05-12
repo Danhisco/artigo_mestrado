@@ -198,15 +198,19 @@ p_4x4 <- aaply(df_$txt.name,1,f_recorte,.parallel = TRUE)
 ```
   
     
-#### Comparação paisagem de 10x10 km2 e de 4x4 km2  
+### Comparação paisagem de 10x10 km2 e de 4x4 km2  
   
 __Fig 2__ Exemplo de recorte da paisagem ao redor, no material suplementar há para os 23 sítios amostrados para o piloto.  
 
-```{r}
+```{r fig 2 comparacao mesma paisagem diferentes escalas}
 
 ```
 
+### Esforço Computacional
 
+ADICIONAR: tabela com o tempo de execução 
+
+### Comparação estimativa de U e número de SADs neutras congruentes
 
 
 
