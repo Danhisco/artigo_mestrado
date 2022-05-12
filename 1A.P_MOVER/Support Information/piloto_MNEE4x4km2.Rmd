@@ -206,14 +206,18 @@ p_4x4 <- aaply(df_$txt.name,1,f_recorte,.parallel = TRUE)
 
 __Fig 2__ Exemplo de recorte da paisagem ao redor, no material suplementar há para os 23 sítios amostrados para o piloto.  
 
-### Esforço Computacional
+### Esforço computacional das simulações
 
 ADICIONAR: tabela com o tempo de execução 
-  
+- A simulação de U ocorreu entre 19h58 e 21h11, totalizando 1h13. Se considerarmos 103 sítios, serão 5h45. Pras SADS eu estimo que seja fique 54h49, 2.27 dias.
+- As simulações das SADs ocorreram entre 23h10 e 00h30, totalizando 1h20 - similar à estimativa de U.  
+- A rotina de testes KS ocorreu entre 00h05 e 00h23  
     
-## Comparação U e SADs preditas congruentes   
-    
-```{r comparacao U,warning=FALSE,message=FALSE,eval=TRUE,include=TRUE,echo=FALSE}
+## Comparação variáveis respostas 
+
+### Estimativas de U
+
+```{r comparacao U,warning=FALSE,message=FALSE,eval=TRUE,include=TRUE,echo=FALSE,fig.height=4,fig.width=8}
 df_U <- map_df(Sys.glob("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x4km/U/*.csv"), read_csv,show_col_types = FALSE)
 df_Umed <- df_U %>% 
   ddply(.variables = c("SiteCode","k"),summarise,
@@ -229,29 +233,33 @@ l_p[[1]] <- df_Umed %>%
   geom_abline(intercept = 0,slope = 1,color="red",alpha=0.6) +
   geom_smooth(method = "lm",formula = "y~0+x",alpha=0.5) +
   geom_point(alpha=0.5) + 
-  labs(x="U 10x10 km2 - ANTERIOR", y="U 4x4 km2 - ATUAL",title="a) lm(ATUAL ~ offset(ANTERIOR))?")
+  labs(x="U 10x10 km2 - ANTERIOR", y="U 4x4 km2 - ATUAL",title="a) lm(ATUAL ~ ANTERIOR-1)")
 l_p[[2]] <- df_Umed %>% 
   ggplot(aes(x="",y=diff_Umed)) +
   geom_boxplot() +
   geom_jitter() + labs(x="", y="",title="b) ATUAL - ANTERIOR")
 grid.arrange(grobs=l_p,ncol=2)
 ```
-__Fig. 3__ Gráficos exploratórios da média da taxa U, estimada por MNEE. a) a linha vermelha representa a relação 1:1 e a linha azul uma regressão linear padrão da função ggplot2::geom_smooth() sem intercepto. b) boxplot da diferença.  
+__Fig. 3__ Gráficos exploratórios da média da taxa U, estimada por MNEE. a) a linha vermelha representa a relação 1:1 e a linha azul uma regressão linear padrão da função ggplot2::geom_smooth() sem intercepto. b) boxplot da diferença. 
     
 __Sumário padrão da regressão linear__    
       
 ```{r comparacao de U selecao de modelos,echo=TRUE,eval=TRUE}
 summary(lm(U_med ~ U_med_10x10-1,data = df_Umed))
 ```
-Os resultados sugerem que não há diferenças significativas entre as estimativas de U.  
-
-
-
   
+__Desvio padrão dos anteriores, atuais e da diferença entre atual e anterior respectivamente:__     
+    
+```{r desvio padrao dos U,echo=TRUE,eval=TRUE}
+apply(df_Umed[,c("U_med_10x10","U_med","diff_Umed")],2,sd)
+```
+  
+Os resultados sugerem que não há diferenças significativas entre as simulações feitas nas paisagens de 10.2x10.2 km2 e de 4.14x4.14 km2.    
+    
+### SADs preditas congruentes         
+        
 
 #### Estimativa de U
-
-
 
 ```{r simulacao U}
 # replicas
