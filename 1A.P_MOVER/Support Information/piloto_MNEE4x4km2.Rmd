@@ -261,11 +261,53 @@ Os resultados sugerem que não há diferenças significativas entre as simulaç�
     
 ### SADs preditas congruentes         
 
-```{r}
-write.csv(df_resultados,
-          "/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x4km/resultados/df_resultados.csv",
-          row.names = FALSE)
+```{r comparacao SADs preditas congruentes,fig.height=4,fig.width=8}
+df_SADsCongruentes <- read.csv("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x4km/resultados/df_resultados.csv",
+                               header = TRUE) %>% 
+  select(SiteCode,k,n_nRef)
+df_resultados_antigos <- read.csv(file="/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/simulacao_codigos_e_resultados/resultados/df_resultados.csv",
+                            header = TRUE,as.is=FALSE)[,1:13] %>% 
+  filter(SiteCode %in% unique(df_SADsCongruentes$SiteCode), MN == "EE") %>% 
+  select(SiteCode,k,n_nRef) %>% 
+  rename(n_nRef_10x10 = n_nRef)
+df_SADsCongruentes <- inner_join(x=df_SADsCongruentes,
+                                 y=df_resultados_antigos,
+                                 by=c("SiteCode","k")) %>% 
+  mutate(diff_SADs = n_nRef - n_nRef_10x10)
+l_p <- list()
+l_p[[1]] <- df_SADsCongruentes %>% 
+  ggplot(aes(x=n_nRef_10x10,y=n_nRef)) +
+  geom_abline(intercept = 0,slope = 1,color="red",alpha=0.6) +
+  geom_smooth(method = "lm",formula = "y~0+x",alpha=0.5) +
+  geom_point(alpha=0.5) + 
+  labs(x="#Congruentes 10x10 km2 - ANTERIOR", y="#Congruentes 4x4 km2 - ATUAL",title="a) lm(ATUAL ~ ANTERIOR-1)") #+
+  # facet_wrap(~k,ncol=4)
+l_p[[2]] <- df_SADsCongruentes %>% 
+  ggplot(aes(x="",y=diff_SADs)) +
+  geom_boxplot() +
+  geom_jitter() + labs(x="", y="",title="b) ATUAL - ANTERIOR")
+grid.arrange(grobs=l_p,ncol=2)
 ```
+__Fig. __ Gráficos exploratórios do número de SADs preditas por MNEE que são congruentes segundo o teste KS (#Congruentes) a) a linha vermelha representa a relação 1:1 e a linha azul uma regressão linear padrão da função ggplot2::geom_smooth() sem intercepto. b) boxplot da diferença. O ponto que mais diferiu ocorreu no cenário de limitação a dispersão menos severo.
+
+       
+__Desvio-padrão das estimativas de U: U_med10x10 = anteriores; U_med = atuais; e diff_Umed = diferença entre atual e anterior__     
+    
+```{r desvio padrao dos U,echo=TRUE,eval=TRUE}
+apply(df_SADsCongruentes[,3:5],2,sd)
+```
+  
+    
+__Sumário padrão da regressão linear__    
+      
+```{r comparacao de U selecao de modelos,echo=TRUE,eval=TRUE}
+summary(lm(n_nRef ~ n_nRef_10x10-1,data = df_SADsCongruentes))
+```
+  
+Apesar de ter aparente maior variabilidade, o número de SADs congruentes também é robusto à mudança na escala da paisagem.   
+
+
+
 
 # Material Suplementar
 
