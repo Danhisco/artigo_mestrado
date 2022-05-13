@@ -43,16 +43,12 @@ library(plyr)
 library(dplyr)
 select <- dplyr::select
 ```
-
-
-Anteriormente eu havia rodado as simulações dos modelos neutros considerando paisagens de 10.2 x 10.2 km2, porém o sugerido pela análise de escala de efeito é 4.07 x 4.07 km2 (Fig. 1a). Em média, a redução da extensão espacial da paisagem aumentou a porcentagem de cobertura vegetal na paisagem, apesar de reduzi-la em alguns casos (Fig 1b). Para avaliar se as predições de MNEE são robustas a essa mudança selecionei alguns pontos para fazer um piloto (Fig 1b, pontos vermelhos).
   
-    
-      
-RESUMO DOS ACHADOS:  
-1) há uma tendência de aumento da proporção de cobertura vegetal com   
+# RESUMO  
   
-    
+Anteriormente eu havia rodado as simulações considerando paisagens de 10.2 x 10.2 km2, porém o sugerido pela análise de escala de efeito é 4.07 x 4.07 km2 (Fig. 1a). Em média, a redução da extensão espacial da paisagem aumentou a porcentagem de cobertura vegetal na paisagem, apesar de reduzi-la em alguns casos, modificando a ordenação dos sítios ao longo do gradiente de cobertura vegetal (Fig 1b). Para avaliar se as predições de MNEE são robustas a essa mudança selecionei alguns pontos para fazer um piloto (Fig 1b, pontos vermelhos). Conclui que as mudanças não eram significantes (Figs) e segui atualizando os modelos estatístiscos com a nova ordenação dos sítios ao longo do gradiente. Observei melhora no ajuste do modelo estatístico, com aumento dos coeficientes de determinação (principalmente o condicional), sem mudança nos padrões qualitativos tanto na mediana quanto nos percentis de 5% e 95% (Figs ) 
+  
+
 ### Análise de escala de efeito e mudança na % de cobertura vegetal entre escalas  
     
       
@@ -93,14 +89,14 @@ grid.arrange(grobs=l_p,ncol=2)
 __Fig. 1__ a) Análise de escala de efeito: No eixto y há o peso de evidência que a extensão espacial (eixo x) atribuiu à regressão do tipo S ~ offset(N) + p_i + p_i^2, S = riqueza de espécies, N = número de espécies, p_i = proporção de cobertura vegetal da extensão espacial i. b) Mudança na porcentagem de cobertura vegetal dos sítios: em x %CV com paisagens de 10.2x10.2 km2 e em y o mesmo para paisagens de 4.14x4.14 km2; a linha preta representa o 1:1 e a linha azul uma regressão linear com os novos pontos; os pontos vermelhos foram usados no piloto. A mudança na extensão espacial da paisagem resultou em aumento médio da %CV, apesar de alguns terem diminuído.
   
     
-## Piloto  
+### Piloto  
   
     
 No piloto 30 pontos de uma distribuição uniforme são sorteados entre 0 e 1 e selecionamos os sítios com menor diferença com a proporção de cobertura vegetal nas paisagens de 10x10km2. Com esses pontos refiz as simulações coalescente para estimar U e predizer as SADs. É suficiente recortar os atuais mapas de 10x10km2 para mapas de 4x4km2, pois sempre é aplicado uma mudança na resolução que impõe que a densidade de pixels seja igual à densidade de indivíduos na área amostral. Assim, não é necessário partir dos mapas do Landsat8 que apresentam resolução comum para fazer o recorte.    
   
     
       
-### Comparação paisagem de 10x10 km2 e de 4x4 km2    
+#### Comparação paisagem de 10x10 km2 e de 4x4 km2    
     
       
 ```{r fig 2 comparacao mesma paisagem diferentes escalas}
@@ -113,7 +109,7 @@ __Fig 2__ Exemplo de recorte da paisagem ao redor, no material suplementar há p
 
   
     
-### Esforço computacional das simulações
+#### Esforço computacional das simulações
 
 ADICIONAR: tabela com o tempo de execução 
 - A simulação de U ocorreu entre 19h58 e 21h11, totalizando 1h13. Se considerarmos 103 sítios, serão 5h45. Pras SADS eu estimo que seja fique 54h49, 2.27 dias.
@@ -122,10 +118,10 @@ ADICIONAR: tabela com o tempo de execução
       
         
           
-## Comparação variáveis respostas   
+### Comparação variáveis respostas   
   
   
-### Estimativas de U  
+#### Estimativas de U  
    
      
 ```{r comparacao U,warning=FALSE,message=FALSE,eval=TRUE,include=TRUE,echo=FALSE,fig.height=4,fig.width=8}
@@ -175,7 +171,7 @@ summary(lm(U_med ~ U_med_10x10-1,data = df_Umed))
 Os resultados sugerem que não há diferenças significativas entre as simulações feitas nas paisagens de 10.2x10.2 km2 e de 4.14x4.14 km2.      
       
         
-### SADs preditas congruentes           
+#### SADs preditas congruentes           
   
     
 ```{r comparacao SADs preditas congruentes,fig.height=4,fig.width=8,eval=TRUE,include=TRUE}
@@ -228,7 +224,7 @@ summary(lm(n_nRef ~ n_nRef_10x10-1,data = df_SADsCongruentes))
 Apesar de ter aparente maior variabilidade, o número de SADs congruentes também é robusto à mudança na escala da paisagem.     
   
     
-### Efeito da magnitude da mudança de % CV    
+#### Relação com outras preditoras
   
     
 ```{r criacao df_resultadosPiloto,echo=FALSE,eval=FALSE,include=FALSE}
@@ -270,7 +266,7 @@ write.csv(df_resultadosPiloto,
           row.names = FALSE)
 ```
 
-```{r graficos relacao diff Respostas e diff p, echo=FALSE,eval=TRUE,include=TRUE,fig.height=3,fig.width=7}
+```{r graficos relacao diff Respostas e diff p, echo=FALSE,eval=TRUE,include=TRUE,fig.height=5,fig.width=10}
 select <- dplyr::select
 # dados
 df_resultadosPiloto <- read.csv("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x4km/resultados/df_resultadosPiloto.csv",
@@ -278,18 +274,61 @@ df_resultadosPiloto <- read.csv("/home/danilo/Documentos/artigo_mestrado/1A.P_MO
   mutate(diff_p = p_4x4-p_10x10,
          diff_Umed = U_med_4x4 - U_med_10x10,
          diff_SADs = n_cong_4x4 - n_cong_10x10)
+df_dadosSites <- read.csv(file="/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/simulacao_codigos_e_resultados/resultados/df_resultados.csv",
+                            header = TRUE,as.is=FALSE)[,1:13] %>% 
+  select(SiteCode, S_obs,Ntotal,DA) %>% distinct
+df_resultadosPiloto <- left_join(x=df_resultadosPiloto,
+                                 y=df_dadosSites,
+                                 by="SiteCode")
 # gráficos exploratórios  
 v_labels <- c(diff_SADs="dif. #Congruentes", diff_Umed="dif. U")
-df_resultadosPiloto %>% 
+l_p <- list()
+l_p[[1]] <- df_resultadosPiloto %>% 
   select(SiteCode,k,diff_p:diff_SADs) %>% 
   pivot_longer(diff_Umed:diff_SADs,names_to = "respostas",values_to = "valores") %>% 
   ggplot(aes(x=diff_p,y=valores)) +
   geom_smooth(method = 'loess',formula = "y ~ x") +
   geom_point() + labs(x="dif. %CV",y="") +
   facet_wrap(~respostas,ncol=2,scale="free",labeller = labeller(respostas = v_labels))
+v_labels <- c(S_obs="Riqueza", Ntotal="Indivíduos",DA="Densidade")
+l_p[[2]] <- df_resultadosPiloto %>% 
+  select(SiteCode,k,diff_p:DA) %>% 
+  pivot_longer(S_obs:DA,names_to = "preditoras",values_to = "v_preditoras") %>% 
+  ggplot(aes(x=v_preditoras,y=diff_SADs)) +
+  geom_smooth(method = 'loess',formula = "y ~ x") +
+  geom_point() + labs(x="",y="dif. #Congruentes") +
+  facet_wrap(~preditoras,ncol=3,scale="free",labeller = labeller(preditoras = v_labels))
+grid.arrange(grobs=l_p,
+             ncol=1)
 ```
   
 __Fig. __ Gráficos exploratórios da mudança nas variáveis respostas (eixo y) e da variável resposta proporção de cobertura vegetal (eixo x). A linha azul é feita pelo geom_smooth(method="sloess").    
+  
+  
+  
+  
+## Resultados Atualizados
+
+```{r}
+## predito pelo modelo médio para novo conjunto de dados
+load(file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_nRefEE__AICcmodavg.Rdata")
+df_plot <- mdAvg_nRefEE__AICcmodavg
+df_plot %<>% 
+  mutate(p = p.z * sd(df_resultados$p) + mean(df_resultados$p),
+         d = d.z*sd(df_resultados$d) + mean(df_resultados$d))
+## R2 marginal e condicional
+df_md <- df_resultados %>% filter(MN=="EE") %>% distinct()
+md_nRefEE <- glmer(cbind(n_nRef,100-n_nRef) ~ 
+                      (p.z + I(p.z^2)) * (d.z + I(d.z^2)) + 
+                      (d.z + I(d.z^2)|SiteCode),
+                 family = "binomial",data=df_md,
+                 control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e6)),
+                 na.action = "na.fail")
+MuMIn::r.squaredGLMM(md_nRefEE)
+```
+ 
+
+
   
 # Material Suplementar
 
