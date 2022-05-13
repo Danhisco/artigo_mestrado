@@ -863,14 +863,14 @@ knitr::kable(head(df_tableGLMM,n=10)) %>%
 ```{r model averaging EE MuMIn e AICcmodavg,message=FALSE,eval=FALSE}
 # Model Averaging for SiteCode predictions
 mdAvg_nRefEE__MuMIn <- model.avg(l_md.dredge_nRefEE)
-save(mdAvg_nRefEE__MuMIn,file="~Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x4km/resultados/mdAvg_nRefEE__MuMIn.Rdata")
+save(mdAvg_nRefEE__MuMIn,file="/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x4km/resultados/mdAvg_nRefEE__MuMIn.Rdata")
 # Model Averaging for new data predictions
-df_pred <- expand.grid(SiteCode=levels(df_resultados$SiteCode)[1],
+df_pred <- expand.grid(SiteCode=unique(df_resultados$SiteCode)[1],
                        d.z=seq(min(df_resultados$d.z),max(df_resultados$d.z),length=40),
                        p.z=seq(min(df_resultados$p.z),max(df_resultados$p.z),length=200))
 mdAvg_nRefEE__AICcmodavg <- modavgPred(l_md.dredge_nRefEE,newdata = df_pred) %>%
   cbind(df_pred)
-save(mdAvg_nRefEE__AICcmodavg,file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_nRefEE__AICcmodavg.Rdata")
+save(mdAvg_nRefEE__AICcmodavg,file="/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x4km/resultados/mdAvg_nRefEE__MuMIn.Rdata")
 ```
   
     
