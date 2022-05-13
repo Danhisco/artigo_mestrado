@@ -26,11 +26,11 @@ library(sads)
 library(ggpubr)
 library(imager)
 library(OpenImageR)
-# library(cowplot)
+library(cowplot)
 library(twosamples)
 library(doMC)
 library(raster)
-# library(GUILDS)
+library(grid)
 library(bbmle)
 library(magrittr)
 library(gridExtra)
@@ -304,18 +304,126 @@ grid.arrange(grobs=l_p,
   
 __Fig. __ Gráficos exploratórios da mudança nas variáveis respostas (eixo y) e da variável resposta proporção de cobertura vegetal (eixo x). A linha azul é feita pelo geom_smooth(method="sloess").    
   
-  
-  
-  
-## Resultados Atualizados
 
-```{r}
+## Resultados Atualizados
+  
+  
+### Probabilidade de SAD predita ser congruente    
+  
+    
+```{r  Comparacao predito modelo medio entre escalas, fig.height=5.5, fig.width=9}
 ## predito pelo modelo médio para novo conjunto de dados
+### 4x4 km2
+load(file="/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x4km/resultados/mdAvg_nRefEE__AICcmodavg.Rdata")
+mdAvg_nRefEE__AICcmodavg$SCALE <- "4x4"
+df_ <- mdAvg_nRefEE__AICcmodavg
+### 10x10 km2
 load(file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_nRefEE__AICcmodavg.Rdata")
-df_plot <- mdAvg_nRefEE__AICcmodavg
+mdAvg_nRefEE__AICcmodavg$SCALE <- "10x10"
+df_plot <- rbind(df_,mdAvg_nRefEE__AICcmodavg)
 df_plot %<>% 
   mutate(p = p.z * sd(df_resultados$p) + mean(df_resultados$p),
          d = d.z*sd(df_resultados$d) + mean(df_resultados$d))
+############# 
+## Gráficos
+l_p <- list()
+labels_IC <- c(lower.CL="quantile 5%", upper.CL="quantile 95%")
+# labels_median <- c(EE="IC 5%", upper.CL="IC 95%")
+v_breaks <- c(0.25,0.50,0.75)
+### SENM Spatially-Explicit Neutral Model
+df_plot_4x4 <- df_plot %>% filter(SCALE=="4x4") %>% mutate(label_ = "median")
+l_p[[1]] <- ggplot(df_plot_4x4,aes(x=p,y=d,fill=mod.avg.pred)) +
+  geom_tile() +
+  # scale_fill_gradient2(limits = c(0,1),midpoint=0.5, high="#800000", low="#000080",mid="#7CFC00") +
+  # scale_fill_continuous() +
+  # scale_fill_gsea() +
+  scale_fill_distiller(palette = "Spectral") +
+  geom_contour(aes(z=mod.avg.pred),alpha=0.2, col="black",
+               breaks = v_breaks) +
+  labs(fill="",x="",y="") +
+  coord_cartesian(expand = FALSE) +
+  scale_y_continuous(breaks = seq(0,20,by=4)) +
+  scale_x_continuous(breaks = seq(0.05,0.95,by=0.10)) +
+  ggtitle("4x4 km2") +
+  theme_classic() + facet_wrap(~label_, ncol=1) + 
+  theme(legend.position = "bottom",
+        plot.title = element_text(margin=margin(0,0,-1,-0),
+                                  hjust = 0.5),
+        plot.margin = unit(c(0.1,0.1,0.1,-0.5), "cm"))
+v_legend <- get_legend(l_p[[1]])
+l_p[[1]] <- l_p[[1]] + theme(legend.position="none")
+df_plot_4x4 %<>% gather(key = IC_class ,value = IC_pred,lower.CL:upper.CL)
+l_p[[2]] <- ggplot(df_plot_4x4,aes(x=p,y=d,fill=IC_pred)) +
+  geom_tile() +
+  # scale_fill_gradient2(limits = c(0,1),midpoint=0.5, high="red", low="blue",mid="black") +
+  scale_fill_distiller(palette = "Spectral") +
+  geom_contour(aes(z=IC_pred),alpha=0.2, col="black",
+               breaks = v_breaks) +
+  labs(fill="",x="",y="") +
+  coord_cartesian(expand = FALSE) +
+  scale_y_continuous(breaks = seq(0,20,by=4)) +
+  scale_x_continuous(breaks = seq(0.10,0.90,by=0.20)) +
+  theme_classic() + facet_wrap(~IC_class,ncol=2,labeller = labeller(IC_class = labels_IC)) + 
+  theme(legend.position="none",
+        plot.margin = unit(c(0.1,0.1,0.1,-0.5), "cm"))
+a_4x4 <- plot_grid(l_p[[1]],NULL,l_p[[2]],ncol=1,rel_heights=c(2,-0.1,1.35))
+# l_p[[3]] <- ggdraw() + draw_label("SENM")
+# a_SENM <- plot_grid(l_p[[3]],NULL,a_SENM,ncol=1,rel_heights=c(0.1,-0.075,1))
+### SINM Spatially-Explicit Neutral Model
+df_plot_10x10 <- df_plot %>% filter(SCALE=="10x10") %>% mutate(label_ = "median")
+l_p[[1]] <- ggplot(df_plot_10x10,aes(x=p,y=d,fill=mod.avg.pred)) +
+  geom_tile() +
+  # scale_fill_gradient2(limits = c(0,1),midpoint=0.5, high="red", low="blue",mid="black") +
+  scale_fill_distiller(palette = "Spectral") +
+  geom_contour(aes(z=mod.avg.pred),alpha=0.2, col="black",
+               breaks = v_breaks) +
+  coord_cartesian(expand = FALSE) +
+  scale_y_continuous(breaks = seq(0,20,by=4)) +
+  scale_x_continuous(breaks = seq(0.05,0.95,by=0.10)) +
+  ggtitle("10x10 km2") +
+  theme_classic() + facet_wrap(~label_, ncol=1) + 
+  labs(fill="",x="",y="") +
+  theme(legend.position = "none",
+        plot.title = element_text(margin=margin(0,0,-1,0),
+                                  hjust = 0.5),
+        plot.margin = unit(c(0.1,0.1,0.1,-0.5), "cm"))
+df_plot_10x10 %<>% gather(key = IC_class ,value = IC_pred,lower.CL:upper.CL)
+l_p[[2]] <- ggplot(df_plot_10x10,aes(x=p,y=d,fill=IC_pred)) +
+  geom_tile() +
+  # scale_fill_gradient2(limits = c(0,1),midpoint=0.5, high="red", low="blue",mid="green") +
+  scale_fill_distiller(palette = "Spectral") +
+  geom_contour(aes(z=IC_pred),alpha=0.2, col="black",
+               breaks = v_breaks) +
+  labs(fill="",x="",y="") +
+  coord_cartesian(expand = FALSE) +
+  scale_y_continuous(breaks = seq(0,20,by=4)) +
+  scale_x_continuous(breaks = seq(0.10,0.90,by=0.20)) +
+  theme_classic() + facet_wrap(~IC_class,ncol=2,labeller = labeller(IC_class = labels_IC)) + 
+  theme(legend.position="none",
+        plot.margin = unit(c(0.1,0.1,0.1,-0.5), "cm"))
+b_10x10 <- plot_grid(l_p[[1]],NULL,l_p[[2]],ncol=1,rel_heights=c(2,-0.1,1.35))
+# l_p[[3]] <- ggdraw() + draw_label("SINM")
+# b_SINM <- plot_grid(l_p[[3]],b_SINM,ncol=1,rel_heights=c(0.1, 1))
+### Probability of not refuting a predicted SAD
+l_p[[1]] <- ggdraw() + 
+  draw_label("Prob. SAD predita ser Congruente",size=18,fontface ="bold") + 
+  theme(plot.margin = unit(c(0,0,0,0), "lines"))
+title <- plot_grid(l_p[[1]],NULL,v_legend,ncol=3,rel_widths = c(1,-0.39,0.50))
+l_p[[2]] <- plot_grid(a_4x4,b_10x10,ncol=2,align = "hv")
+#create common x and y labels
+y.grob <- textGrob("d", 
+                   gp=gpar(fontface="bold"), rot=90)
+x.grob <- textGrob("p", 
+                   gp=gpar(fontface="bold"))
+l_p[[3]] <- plot_grid(y.grob,NULL,l_p[[2]],ncol=3,rel_widths = c(0.015,0,1))
+l_p[[4]] <- plot_grid(l_p[[3]],NULL,x.grob,ncol=1,rel_heights = c(1,-0.04,0.04))
+a_prob_of_not_refuting <- plot_grid(NULL,title,NULL,l_p[[4]],ncol=1,rel_heights = c(-0.08,0.25,-0.08,1))
+a_prob_of_not_refuting
+```
+ 
+
+
+```{r}
 ## R2 marginal e condicional
 df_md <- df_resultados %>% filter(MN=="EE") %>% distinct()
 md_nRefEE <- glmer(cbind(n_nRef,100-n_nRef) ~ 
@@ -326,7 +434,6 @@ md_nRefEE <- glmer(cbind(n_nRef,100-n_nRef) ~
                  na.action = "na.fail")
 MuMIn::r.squaredGLMM(md_nRefEE)
 ```
- 
 
 
   
