@@ -1,5 +1,5 @@
 ---
-title: "As predições de MNEE em paisagens de 10x10km e de 4x4km diferem?"
+title: "Piloto e atualização dos resultados de MNEE para paisagens de 4x4 km2"
 author: "Danilo Pereira Mori"
 date: '2022-03-19'
 output: 
@@ -23,6 +23,7 @@ setwd("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x4km/")
 
 ```{r pacotes}
 library(sads)
+library(metR)
 library(ggpubr)
 library(imager)
 library(OpenImageR)
@@ -43,10 +44,56 @@ library(plyr)
 library(dplyr)
 select <- dplyr::select
 ```
+```{r dados mesmo,message=FALSE,warning=FALSE,include=TRUE,eval=TRUE}
+### dados ###
+# leitura
+df_resultados <- read.csv(file="/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/simulacao_codigos_e_resultados/resultados/df_resultados.csv",
+                            header = TRUE,as.is=FALSE)[,1:13]
+df_p_4_10 <- read.csv("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x4km/resultados/df_p_4x4_10x10.csv",
+                       header = TRUE) %>% 
+  dplyr::select(-p_10x10)
+df_resultados <- left_join(x=df_resultados,
+                           y=df_p_4_10,
+                           by="SiteCode") %>% 
+  rename(p_10x10=p,
+         p=p_4x4)
+# padronização
+level_k <- as.character(unique(sort(as.numeric(df_resultados$k),decreasing = TRUE)))
+df_resultados$k <- factor(df_resultados$k,levels = level_k)
+levels(df_resultados$k)[19] <- "0.1"
+# z score
+f_z <- function(x){
+  m <- base::mean(x,na.rm=FALSE)
+  sd <- sd(x,na.rm=FALSE)
+  output <- (x-m)/sd
+  return(output)
+} 
+# names(df_resultados)
+# str(df_resultados)
+df_resultados %<>% mutate(diffS_gamma = diffS_mean + min(diffS_mean)*(-1) + 0.01,
+                          modulo_diffS = abs(diffS_mean),
+                          log10_Sobs=log10(S_obs),
+                          log10_U = log10(U_med),
+                          log10_d = log10(d))
+
+df_resultados.z <- as.data.frame(apply(df_resultados[,c("p","p_10x10","Ntotal","log10_Sobs","k_1","d_Lplot","d","log10_d","modulo_diffS")],2,f_z))
+names(df_resultados.z) <- sapply(names(df_resultados.z), function(x) paste0(x,".z"))
+df_resultados %<>% cbind(.,df_resultados.z) %>% 
+  dplyr::select(-k_1,-k_1.z)
+###############
+df_U <- df_resultados %>% 
+  filter(MN=="EE") %>%  
+  dplyr::select(U_med,log10_U,SiteCode,k,d,d.z,p,p.z,log10_Sobs,log10_Sobs.z,log10_d,log10_d.z) %>% 
+  distinct 
+#%>% 
+  # mutate(log10_Sobs = log10(S_obs),
+         # log10_U = log10(U_med))
+```
+
+
+### Resumo
   
-# RESUMO  
-  
-Anteriormente eu havia rodado as simulações em paisagens de 10.2 x 10.2 km2, porém o sugerido pela análise de escala de efeito é 4.07 x 4.07 km2 (Fig. 1a). Em média, a redução da extensão espacial da paisagem aumentou a porcentagem de cobertura vegetal na paisagem, apesar de reduzi-la em alguns casos, modificando a ordenação dos sítios ao longo do gradiente de cobertura vegetal (Fig 1b). Para avaliar se as predições de MNEE são robustas a essa mudança selecionei alguns pontos para fazer um piloto (Fig 1b, pontos vermelhos). Conclui que as mudanças não eram significantes (Figs) e segui atualizando os modelos estatístiscos com a nova ordenação dos sítios ao longo do gradiente. Observei melhora no ajuste do modelo estatístico, com aumento dos coeficientes de determinação (principalmente o condicional), sem mudança nos padrões qualitativos tanto na mediana quanto nos percentis de 5% e 95% (Figs ) 
+Anteriormente as simulações consideraram paisagens de 10.2 x 10.2 km2, porém o sugerido pela análise de escala de efeito é 4.07 x 4.07 km2 (Fig. 1a). Em média, a redução da extensão espacial da paisagem aumentou a porcentagem de cobertura vegetal na paisagem, apesar de reduzi-la em alguns casos, modificando a ordenação dos sítios ao longo do gradiente de cobertura vegetal (Fig 1b). Para avaliar se as predições de MNEE são robustas a essa mudança selecionei alguns pontos para fazer um piloto (Fig 1b pontos vermelhos e Fig 2 para exemplo). O tempo de execução das simulações foi bem mais rápido do que eu esperava (tabela 1). Conclui que as mudanças não eram significantes (Fig. 3, 4 e 5) e segui atualizando os modelos estatístiscos com a nova ordenação dos sítios ao longo do gradiente (Fig. 6 e 7). A atualização dos modelos estatísticos e suas figuras levou cerca de 7 horas (GLMM, GAMM e pausas). Nos GLMM cheios que rodei com a variável para 10x10 km2, os coeficientes de determinação apresentaram valores maiores do que esta no texto (tabela 2), achei estranho. Em comparação ao que tava no texto eles são maiores, porém com relação aos da variável de 4x4 km2 são similares (tabela 2) - eu verifiquei que são as variávies corretas e as figuras 6 e 7 confirmam que houveram mudanças. As figuras principais de predito pelo modelo médio para novo conjunto de dados se mantém qualitativamente iguais (Figs 6 e 7).
   
 
 ### Análise de escala de efeito e mudança na % de cobertura vegetal entre escalas  
@@ -96,14 +143,13 @@ Fiz um sorteio de 30 pontos de uma distribuição uniforme entre 0 e 1 e selecio
   
     
       
-#### Comparação paisagem de 10x10 km2 e de 4x4 km2    
-    
+#### Comparação paisagem de 4x4 km2 e de 10x10 km2
       
-```{r fig 2 comparacao mesma paisagem diferentes escalas}
+```{r fig 2 comparacao mesma paisagem diferentes escalas,eval=TRUE,include=TRUE,fig.height=4,fig.width=8}
 df_sims <- read.csv(file = "/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/df_piloto.csv",
                     header = TRUE)
 df_plot <- df_sims[3,] %>% 
-  select(SiteCode,txt.name,txt.name_antigo) #%>% 
+  dplyr::select(SiteCode,txt.name,txt.name_antigo) #%>% 
   # rename(scale_4x4=txt.name,
   #        scale_10x10=txt.name_antigo) %>% 
   # pivot_longer(!SiteCode,names_to = "scale",values_to = "path_file")
@@ -113,6 +159,7 @@ mat_10x10 <- read.table(df_plot[,"txt.name_antigo"],sep=" ",header=TRUE) %>%
   as.matrix()
 #
 par(mfrow=c(1,2))
+par(mai=c(0,0,0.5,0))
 image(mat_4x4,
       main="4x4 km2",
       col=terrain.colors(12,rev = TRUE),
@@ -123,28 +170,31 @@ image(mat_10x10,
       axes=FALSE)
 ```
   
-    
 __Fig 2__ Exemplo de recorte da paisagem ao redor.    
 
   
     
 #### Esforço computacional das simulações
 
-ADICIONAR: tabela com o tempo de execução 
-- A simulação de U ocorreu entre 19h58 e 21h11, totalizando 1h13. Se considerarmos 103 sítios, serão 5h45. Pras SADS eu estimo que seja fique 54h49, 2.27 dias.
-- As simulações das SADs ocorreram entre 23h10 e 00h30, totalizando 1h20 - similar à estimativa de U.  
-- A rotina de testes KS ocorreu entre 00h05 e 00h23  
+<!-- ADICIONAR: tabela com o tempo de execução  -->
+<!-- - A simulação de U ocorreu entre 19h58 e 21h11, totalizando 1h13. Se considerarmos 103 sítios, serão 5h45. Pras SADS eu estimo que seja fique 54h49, 2.27 dias. -->
+<!-- - As simulações das SADs ocorreram entre 23h10 e 00h30, totalizando 1h20 - similar à estimativa de U.   -->
+<!-- - A rotina de testes KS ocorreu entre 00h05 e 00h23   -->
 
-```{r}
+__Tabela 1__ Uso Computacional observado (minutos, n=23) e estimado (horas, n=103)
+
+```{r tabela 1 esforco computacional, eval=TRUE,include=TRUE}
 library(kableExtra)
 # library(ggpubr)
 # library(ggstance)
 df_esforcoComputacional <- data.frame(item = c("Sim. U","Sim. SADs","teste KS"),
-                                      min = c(73,80,18)) %>% 
-  mutate(min_todosSitios = min *103/23,horas = min_todosSitios/60) %>% select(-min_todosSitios)
-kable(df_esforcoComputacional,
-      caption = "Uso Computacional observado (n=23) e estimado (n=103)",
-      col.names = c("","min", "horas estimadas"))
+                                      minutos = c(73,80,18)) %>% 
+  mutate(min_todosSitios = minutos*103/23,horas = round(min_todosSitios/60,2)) %>% dplyr::select(-min_todosSitios)
+# kable(df_esforcoComputacional,
+#       # caption = "Uso Computacional observado (n=23) e estimado (n=103)",
+#       col.names = c("","min", "h"))
+df_esforcoComputacional
+
 ```
 
         
@@ -155,7 +205,7 @@ kable(df_esforcoComputacional,
 #### Estimativas de U  
    
      
-```{r comparacao U,warning=FALSE,message=FALSE,eval=TRUE,include=TRUE,echo=FALSE,fig.height=4,fig.width=8}
+```{r Fig 3 comparacao U,warning=FALSE,message=FALSE,eval=TRUE,include=TRUE,echo=FALSE,fig.height=4,fig.width=8}
 df_U <- map_df(Sys.glob("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x4km/U/*.csv"), read_csv,show_col_types = FALSE)
 df_Umed <- df_U %>% 
   ddply(.variables = c("SiteCode","k"),summarise,
@@ -193,7 +243,7 @@ apply(df_Umed[,c("U_med_10x10","U_med","diff_Umed")],2,sd)
   
   
 __Sumário padrão da regressão linear__    
-      
+       
 ```{r comparacao de U selecao de modelos,echo=TRUE,eval=TRUE}
 summary(lm(U_med ~ U_med_10x10-1,data = df_Umed))
 ```
@@ -205,7 +255,7 @@ Os resultados sugerem que não há diferenças significativas entre as simulaç�
 #### SADs preditas congruentes           
   
     
-```{r comparacao SADs preditas congruentes,fig.height=4,fig.width=8,eval=TRUE,include=TRUE}
+```{r Fig 4 comparacao SADs preditas congruentes,fig.height=4,fig.width=8,eval=TRUE,include=TRUE}
 df_SADsCongruentes <- read.csv("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x4km/resultados/df_resultados.csv",
                                header = TRUE) %>% 
   dplyr::select(SiteCode,k,n_nRef)
@@ -234,18 +284,21 @@ l_p[[2]] <- df_SADsCongruentes %>%
   geom_jitter() + labs(x="", y="",title="b) ATUAL - ANTERIOR")
 grid.arrange(grobs=l_p,ncol=2)
 ```
-__Fig. __ Gráficos exploratórios do número de SADs preditas por MNEE que são congruentes segundo o teste KS (#Congruentes) a) a linha vermelha representa a relação 1:1 e a linha azul uma regressão linear padrão da função ggplot2::geom_smooth() sem intercepto. b) boxplot da diferença. O ponto que mais diferiu ocorreu no cenário de limitação a dispersão menos severo.
-
-       
-__Desvio-padrão das estimativas de U: U_med10x10 = anteriores; U_med = atuais; e diff_Umed = diferença entre atual e anterior__     
+  
     
+__Fig. 4__ Gráficos exploratórios do número de SADs preditas por MNEE que são congruentes segundo o teste KS (#Congruentes) a) a linha vermelha representa a relação 1:1 e a linha azul uma regressão linear padrão da função ggplot2::geom_smooth() sem intercepto. b) boxplot da diferença. O ponto que mais diferiu ocorreu no cenário de limitação a dispersão menos severo.
+  
+         
+__Desvio-padrão das estimativas de U: U_med10x10 = anteriores; U_med = atuais; e diff_Umed = diferença entre atual e anterior__      
+      
+        
 ```{r desvio padrao SADs,echo=TRUE,eval=TRUE}
 apply(df_SADsCongruentes[,3:5],2,sd)
 ```
   
     
 __Sumário padrão da regressão linear__      
-        
+          
           
 ```{r summary de lm SADs comparacao,echo=TRUE,eval=TRUE}
 summary(lm(n_nRef ~ n_nRef_10x10-1,data = df_SADsCongruentes))
@@ -297,7 +350,7 @@ write.csv(df_resultadosPiloto,
           row.names = FALSE)
 ```
 
-```{r graficos relacao diff Respostas e diff p, echo=FALSE,eval=TRUE,include=TRUE,fig.height=5,fig.width=10}
+```{r Fig 5 graficos relacao diff Respostas e diff p, echo=FALSE,eval=TRUE,include=TRUE,fig.height=5,fig.width=10}
 select <- dplyr::select
 # dados
 df_resultadosPiloto <- read.csv("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x4km/resultados/df_resultadosPiloto.csv",
@@ -333,7 +386,7 @@ grid.arrange(grobs=l_p,
              ncol=1)
 ```
   
-__Fig. __ Gráficos exploratórios da mudança nas variáveis respostas (eixo y) e da variável resposta proporção de cobertura vegetal (eixo x). A linha azul é feita pelo geom_smooth(method="sloess").    
+__Fig. 5__ Gráficos exploratórios da mudança nas variáveis respostas (eixo y) e da variável resposta proporção de cobertura vegetal (eixo x). A linha azul é feita pelo geom_smooth(method="sloess").    
   
 
 ## Resultados Atualizados
@@ -342,7 +395,8 @@ __Fig. __ Gráficos exploratórios da mudança nas variáveis respostas (eixo y)
 ### Probabilidade de SAD predita ser congruente    
   
     
-```{r  Comparacao predito modelo medio entre escalas, fig.height=5.5, fig.width=9}
+```{r  Fig 6 Comparacao predito modelo medio entre escalas, fig.height=5.5, fig.width=9,eval=TRUE,include=TRUE}
+library(grid)
 ## predito pelo modelo médio para novo conjunto de dados
 ### 4x4 km2
 load(file="/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x4km/resultados/mdAvg_nRefEE__AICcmodavg.Rdata")
@@ -442,9 +496,9 @@ l_p[[1]] <- ggdraw() +
 title <- plot_grid(l_p[[1]],NULL,v_legend,ncol=3,rel_widths = c(1,-0.39,0.50))
 l_p[[2]] <- plot_grid(a_4x4,b_10x10,ncol=2,align = "hv")
 #create common x and y labels
-y.grob <- textGrob("d", 
+y.grob <- grid::textGrob("d", 
                    gp=gpar(fontface="bold"), rot=90)
-x.grob <- textGrob("p", 
+x.grob <- grid::textGrob("p", 
                    gp=gpar(fontface="bold"))
 l_p[[3]] <- plot_grid(y.grob,NULL,l_p[[2]],ncol=3,rel_widths = c(0.015,0,1))
 l_p[[4]] <- plot_grid(l_p[[3]],NULL,x.grob,ncol=1,rel_heights = c(1,-0.04,0.04))
@@ -452,26 +506,48 @@ a_prob_of_not_refuting <- plot_grid(NULL,title,NULL,l_p[[4]],ncol=1,rel_heights 
 a_prob_of_not_refuting
 ```
    
-__Fig. __ Comparação predição pelo modelo médio. 
+__Fig. 6__ Comparação predição pelo modelo médio. 
 
 
-```{r}
+__Tabela 2__ Número de SADs congruentes: R2 marginal e condicional atualizado e antigo  
+  
+    
+```{r tabela 2 R2 marginal e  condicional, eval=TRUE,include=TRUE}
+library(lme4)
 ## R2 marginal e condicional
 df_md <- df_resultados %>% filter(MN=="EE") %>% distinct()
-md_nRefEE <- glmer(cbind(n_nRef,100-n_nRef) ~ 
+l_md <- list()
+l_md[[1]] <- glmer(cbind(n_nRef,100-n_nRef) ~ 
                       (p.z + I(p.z^2)) * (d.z + I(d.z^2)) + 
                       (d.z + I(d.z^2)|SiteCode),
                  family = "binomial",data=df_md,
                  control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e6)),
                  na.action = "na.fail")
-MuMIn::r.squaredGLMM(md_nRefEE)
+l_md[[2]] <- glmer(cbind(n_nRef,100-n_nRef) ~ 
+                      (p_10x10.z + I(p_10x10.z^2)) * (d.z + I(d.z^2)) + 
+                      (d.z + I(d.z^2)|SiteCode),
+                 family = "binomial",data=df_md,
+                 control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e6)),
+                 na.action = "na.fail")
+# GLMM <- l_md[[2]]
+f_R2_GLMM <- function(GLMM){
+  df_ <- as.data.frame(MuMIn::r.squaredGLMM(GLMM))
+  (df_ %>% 
+      mutate(method=c("theoretical","delta"),
+             across(1:2,round, 4)))
+}
+names(l_md) <- c("4x4","10x10")
+df_R2 <- ldply(l_md,f_R2_GLMM) %>% 
+  rename(landscape=".id")
+df_R2
 ```
 
 
-## U Estimado  
+### U Estimado  
   
 
-```{r GAMM U predito, fig.height=6,fig.width=13.5}
+```{r Fig 7 GAMM U predito, fig.height=6,fig.width=13.5,eval=TRUE,include=TRUE}
+library(metR)
 # dados
 df_plot <- read.csv("~/Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x4km/resultados/df_plot_U.Rdata",
                       header = TRUE,as.is = TRUE)
@@ -522,13 +598,72 @@ l_p[[3]] <- ggplot(df_plot,aes(x=p,y=d,fill=upper)) +
                     breaks = round(quantile(df_plot$upper,probs = c(0.1,0.25,0.5,0.75,0.9)),5),
                     rotate = FALSE,
                     size=2.7)
-grid.arrange(grobs=l_p,ncol=3,top="taxa de colonização de novas espécies na paisagem necessária para manter a riqueza na área amostral")
+grid.arrange(grobs=l_p,ncol=3,top="4x4 km2")
 ```
 
+
+
+```{r Fig 7 GAMM U predito 10x10km2, fig.height=6,fig.width=13.5,eval=TRUE,include=TRUE}
+# dados
+df_plot <- read.csv("~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/df_plot_U.Rdata",
+                      header = TRUE,as.is = TRUE)
+## graficos
+l_p <- list()
+# 
+df_plot$IC_pred <- "5% quantile"
+l_p[[1]] <- ggplot(df_plot,aes(x=p,y=d,fill=lower)) +
+  coord_cartesian(expand = FALSE) + 
+  geom_tile() +
+  scale_fill_distiller(palette = "Spectral") +
+  theme_classic() + 
+  facet_wrap(~IC_pred,ncol=1) +
+  theme(legend.position="bottom",legend.title = element_blank()) +
+  geom_contour(aes(z=lower),alpha=0.4, col="black",
+               breaks = round(quantile(df_plot$lower,probs = c(0.1,0.25,0.5,0.75,0.9)),5)) +
+  geom_text_contour(aes(z=lower),stroke=0.2,
+                    breaks = round(quantile(df_plot$lower,probs = c(0.1,0.25,0.5,0.75,0.9)),5),
+                    rotate = FALSE,
+                    size=2.7)
+#
+df_plot$variable <- "median"
+l_p[[2]] <- ggplot(df_plot,aes(x=p,y=d,fill=fit)) +
+  coord_cartesian(expand = FALSE) + 
+  geom_tile() +
+  scale_fill_distiller(palette = "Spectral") +
+  theme_classic() + 
+  facet_wrap(~variable,ncol=1) +
+  theme(legend.position="bottom",legend.title = element_blank()) +
+  geom_contour(aes(z=fit),alpha=0.4, col="black",
+               breaks = round(quantile(df_plot$fit,probs = c(0.1,0.25,0.5,0.75,0.9)),5) ) +
+  geom_text_contour(aes(z=fit),stroke=0.2,
+                    breaks = round(quantile(df_plot$fit,probs = c(0.1,0.25,0.5,0.75,0.9)),5),
+                    rotate = FALSE,
+                    size=3)
+#
+df_plot$IC_pred <- "95% quantile"
+l_p[[3]] <- ggplot(df_plot,aes(x=p,y=d,fill=upper)) +
+  coord_cartesian(expand = FALSE) + 
+  geom_tile() +
+  scale_fill_distiller(palette = "Spectral") +
+  theme_classic() + 
+  facet_wrap(~IC_pred,ncol=1) +
+  theme(legend.position="bottom",legend.title = element_blank()) +
+  geom_contour(aes(z=upper),alpha=0.4, col="black",
+               breaks = round(quantile(df_plot$upper,probs = c(0.1,0.25,0.5,0.75,0.9)),5)) +
+  geom_text_contour(aes(z=upper),stroke=0.2,
+                    breaks = round(quantile(df_plot$upper,probs = c(0.1,0.25,0.5,0.75,0.9)),5),
+                    rotate = FALSE,
+                    size=2.7)
+grid.arrange(grobs=l_p,ncol=3,top="10x10 km2")
+```
+  
+__Fig. 7__ Predito pelo modelo estatístico para o U estimado nas paisagens atuais (4x4 km2) e anteriores (10x10 km2).  
+  
+  
   
 # Material Suplementar
 
-#### Código para recorte das paisagens
+<!-- #### Código para recorte das paisagens -->
 
 ```{r recorte das paisagens para piloto remover?,echo=FALSE}
 df_sims <- read.csv("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/simulacao_codigos_e_resultados/df_simulacao.csv",
@@ -579,11 +714,9 @@ write.csv(df_sims,
 # "/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x4km/"
 ```
 
-#### Recortes das paisagens de 10x10km para 4x4km
+<!-- #### Recortes das paisagens de 10x10km para 4x4km -->
   
--- INSERIR   
-  
-- Códigos Estimativa de U  
+<!-- - Códigos Estimativa de U   -->
 
 ```{r simulacao U, echo=FALSE,eval=FALSE,include=FALSE}
 # replicas
@@ -622,9 +755,9 @@ for(a in 1:length(k_factor)){
 }
 ```
 
-A simulação ocorreu entre 19h58 e 21h11, totalizando 1h13. Se considerarmos 103 sítios, serão 5h45. Pras SADS eu estimo que seja fique 54h49, 2.27 dias.
+<!-- A simulação ocorreu entre 19h58 e 21h11, totalizando 1h13. Se considerarmos 103 sítios, serão 5h45. Pras SADS eu estimo que seja fique 54h49, 2.27 dias. -->
 
-- Códigos SADs preditas
+<!-- - Códigos SADs preditas -->
 
 ```{r simulacao SADs MNEE, echo=FALSE,eval=FALSE,include=FALSE}
 df_U <- map_df(Sys.glob("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x4km/U/*.csv"), read_csv)
@@ -663,9 +796,9 @@ simulacao <- as.list(1:dim(df_simulacao)[1])
 l_ply(simulacao,f_simulacao,.parallel = TRUE)
 ```
 
-As simulações das SADs ocorreram entre 23h10 e 00h30
+<!-- As simulações das SADs ocorreram entre 23h10 e 00h30 -->
 
-- Códigos teste KS
+<!-- - Códigos teste KS -->
 
 ```{r dados para teste KS,echo=FALSE,eval=FALSE,include=FALSE}
 ### dados e preparação
@@ -768,9 +901,9 @@ write.csv(df_resultados,
           row.names = FALSE)
 ```
 
-- EXTRA: Ap Final BIE 5770
+<!-- - EXTRA: Ap Final BIE 5770 -->
 
-Gráficos usados na apresentação final de BIE 5770: ano da amostragem das SADs e ano referência do mapa de cobertura vegetal.
+<!-- Gráficos usados na apresentação final de BIE 5770: ano da amostragem das SADs e ano referência do mapa de cobertura vegetal. -->
 
 ```{r gráficos,include=FALSE,eval=FALSE,echo=FALSE}
 #
@@ -864,7 +997,7 @@ df_S2 %>%
         axis.ticks.y=element_blank())
 ```
 
- Escala de Efeito
+ <!-- Escala de Efeito -->
 
 ```{r selecao da escala espacial, echo=FALSE, include=FALSE, eval=FALSE}
 df_se <- read.csv(file="/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/resultados_e_SI/df_escalaEfeito.csv",header = T)
