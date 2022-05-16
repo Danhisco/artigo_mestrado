@@ -2722,35 +2722,37 @@ lmer_U <- lmer(log10_U ~ log10_Sobs + (1|SiteCode),data=df_U)
 beta_log10_Sobs <- fixef(lmer_U)[2] %>% as.numeric() %>% round(.,digits = 3)
 # usar o SiteCode como fator foi fundamental para usar a GAMM
 df_U$SiteCode <- factor(df_U$SiteCode)
-# l_md <- list()
-# l_md[[1]] <- gam(log10_U ~ offset(beta_log10_Sobs*log10_Sobs) +
-#                  s(log10_d.z,bs="tp",k=10) + s(p.z,bs="tp",k=10) + ti(log10_d.z,p.z,bs=c("tp","tp"),k=c(10,10)) +
-#                  s(log10_d.z,SiteCode,bs="fs",k=10),
-#                 data = df_U, family=gaussian, method = "REML")
-# l_md[[2]] <- gam(log10_U ~ offset(beta_log10_Sobs*log10_Sobs) +
-#                  s(log10_d.z,bs="tp",k=15) + s(p.z,bs="tp",k=10) + ti(log10_d.z,p.z,bs=c("tp","tp"),k=c(15,10)) +
-#                  s(log10_d.z,SiteCode,bs="fs",k=15),
-#                 data = df_U, family=gaussian, method = "REML")
-# names(l_md) <- c("k=10","k=15")
-# AICctab(l_md,weights=TRUE)
-# l_md_GAMM_U <- l_md
-# save(l_md_GAMM_U,file = "/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x4km/resultados/l_md_GAMM_U.Rdata")
-md_U <- gam(log10_U ~ offset(beta_log10_Sobs*log10_Sobs) +
+l_md <- list()
+l_md[[1]] <- gam(log10_U ~ offset(beta_log10_Sobs*log10_Sobs) +
                  s(log10_d.z,bs="cr",k=15) + s(p.z,bs="cr",k=10) + ti(log10_d.z,p.z,bs=c("cr","cr"),k=c(15,10)) +
                  s(log10_d.z,SiteCode,bs="fs",k=15,xt=list("cr"),m=1),
                 data = df_U, family=gaussian, method = "REML")
+l_md[[2]] <- gam(log10_U ~ offset(beta_log10_Sobs*log10_Sobs) +
+                 s(d.z,bs="cr",k=15) + s(p.z,bs="cr",k=10) + ti(d.z,p.z,bs=c("cr","cr"),k=c(15,10)) +
+                 s(d.z,SiteCode,bs="fs",k=15,xt=list("cr"),m=1),
+                data = df_U, family=gaussian, method = "REML")
+names(l_md) <- c("log(d)","d")
+AICctab(l_md,weights=TRUE)
+md_U <- l_md[["d"]]
 save(md_U,file = "/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x4km/resultados/md_U.Rdata")
+# exclui o arquivo a seguir:
+# save(l_md,file = "/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x4km/resultados/l_md_U.Rdata")
 ```
+
 ```{r}
 load("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x4km/resultados/md_U.Rdata")
-# gam.check(md_U)
+# The following code was adapted from:  
+#   https://fromthebottomoftheheap.net/2016/12/15/simultaneous-interval-revisited/ 
+#   https://mikl.dk/post/2019-prediction-intervals-for-gam/
+#   https://www.r-bloggers.com/2019/08/prediction-intervals-for-generalized-additive-models-gams/
+gam.check(md_U)
 ###
 # novo conjunto de dados
 lmer_U <- lmer(log10_U ~ log10_Sobs + (1|SiteCode),data=df_U)
 beta_log10_Sobs <- fixef(lmer_U)[2] %>% as.numeric() %>% round(.,digits = 3)
 df_newdata <- expand.grid(SiteCode=unique(df_U$SiteCode)[1],
                           # d=seq(min(df_U$d),max(df_U$d),length=40),
-                          log10_d.z=seq(min(df_U$log10_d.z),max(df_U$log10_d.z),length=40),
+                          d.z=seq(min(df_U$d.z),max(df_U$d.z),length=40),
                           p.z=seq(min(df_U$p.z),max(df_U$p.z),length=200),
                           log10_Sobs=0)
 df_newdata$predito <- predict(md_U, type = "response",newdata=df_newdata,newdata.guaranteed=TRUE)
@@ -2771,18 +2773,68 @@ names(df_pred) <- c("IClower","median","ICupper")
 # grafico
 df_plot_U <- cbind(df_newdata,df_pred)
 df_plot_U %<>% mutate(p = p.z*sd(df_U$p) + mean(df_U$p),
-                      log10_d = log10_d.z*sd(df_U$log10_d) + mean(df_U$log10_d),
-                      d = 10^log10_d,
+                      d = d.z*sd(df_U$d) + mean(df_U$d),
                       fit = 10^median,
                       lower = 10^IClower,
                       upper = 10^ICupper)
+# gamm atualizado com o que foi usado na última versão, espero que não seja necessário muitos mais ajustes
 write.csv(df_plot_U,file="~/Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x4km/resultados/df_plot_U.Rdata",row.names = FALSE)
 ```
 
-```{r GAMM U predicao para novo conjunto de dados}
-
+```{r GAMM U predito, fig.height=6,fig.width=13.5}
+# dados
+df_plot <- read.csv("~/Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x4km/resultados/df_plot_U.Rdata",
+                      header = TRUE,as.is = TRUE)
+apply(df_plot[,c("fit","lower","upper")],2,function(X) formatC(X,format="e")) %>% summary
+## graficos
+l_p <- list()
+# 
+df_plot$IC_pred <- "5% quantile"
+l_p[[1]] <- ggplot(df_plot,aes(x=p,y=d,fill=lower)) +
+  coord_cartesian(expand = FALSE) + 
+  geom_tile() +
+  scale_fill_distiller(palette = "Spectral") +
+  theme_classic() + 
+  facet_wrap(~IC_pred,ncol=1) +
+  theme(legend.position="bottom",legend.title = element_blank()) +
+  geom_contour(aes(z=lower),alpha=0.4, col="black",
+               breaks = round(quantile(df_plot$lower,probs = c(0.1,0.25,0.5,0.75,0.9)),5)) +
+  geom_text_contour(aes(z=lower),stroke=0.2,
+                    breaks = round(quantile(df_plot$lower,probs = c(0.1,0.25,0.5,0.75,0.9)),5),
+                    rotate = FALSE,
+                    size=2.7)
+#
+df_plot$variable <- "median"
+l_p[[2]] <- ggplot(df_plot,aes(x=p,y=d,fill=fit)) +
+  coord_cartesian(expand = FALSE) + 
+  geom_tile() +
+  scale_fill_distiller(palette = "Spectral") +
+  theme_classic() + 
+  facet_wrap(~variable,ncol=1) +
+  theme(legend.position="bottom",legend.title = element_blank()) +
+  geom_contour(aes(z=fit),alpha=0.4, col="black",
+               breaks = round(quantile(df_plot$fit,probs = c(0.1,0.25,0.5,0.75,0.9)),5) ) +
+  geom_text_contour(aes(z=fit),stroke=0.2,
+                    breaks = round(quantile(df_plot$fit,probs = c(0.1,0.25,0.5,0.75,0.9)),5),
+                    rotate = FALSE,
+                    size=3)
+#
+df_plot$IC_pred <- "95% quantile"
+l_p[[3]] <- ggplot(df_plot,aes(x=p,y=d,fill=upper)) +
+  coord_cartesian(expand = FALSE) + 
+  geom_tile() +
+  scale_fill_distiller(palette = "Spectral") +
+  theme_classic() + 
+  facet_wrap(~IC_pred,ncol=1) +
+  theme(legend.position="bottom",legend.title = element_blank()) +
+  geom_contour(aes(z=upper),alpha=0.4, col="black",
+               breaks = round(quantile(df_plot$upper,probs = c(0.1,0.25,0.5,0.75,0.9)),5)) +
+  geom_text_contour(aes(z=upper),stroke=0.2,
+                    breaks = round(quantile(df_plot$upper,probs = c(0.1,0.25,0.5,0.75,0.9)),5),
+                    rotate = FALSE,
+                    size=2.7)
+grid.arrange(grobs=l_p,ncol=3,top="taxa de colonização de novas espécies na paisagem necessária para manter a riqueza na área amostral")
 ```
-
 
 ## GAMMM
 
@@ -3171,7 +3223,7 @@ write.csv(df_plot_U,file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Inform
 ```
 
 
-```{r U predito, fig.height=6,fig.width=13.5}
+```{r GAMM U predito, fig.height=6,fig.width=13.5}
 # dados
 df_plot <- read.csv("~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/df_plot_U.Rdata",
                       header = TRUE,as.is = TRUE)
