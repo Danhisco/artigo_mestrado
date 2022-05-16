@@ -7,7 +7,7 @@ output:
     toc: true
     toc_depth: 5
 editor_options: 
-  chunk_output_type: console
+  chunk_output_type: inline
 ---
 
 <style>
@@ -86,7 +86,10 @@ names(df_resultados.z) <- sapply(names(df_resultados.z), function(x) paste0(x,".
 df_resultados %<>% cbind(.,df_resultados.z) %>% 
   select(-k_1,-k_1.z)
 ###############
-df_U <- df_resultados %>% filter(MN=="EE") %>% distinct 
+df_U <- df_resultados %>% 
+  filter(MN=="EE") %>%  
+  select(U_med,log10_U,SiteCode,k,d,d.z,p,p.z,log10_Sobs,log10_Sobs.z,log10_d,log10_d.z) %>% 
+  distinct 
 #%>% 
   # mutate(log10_Sobs = log10(S_obs),
          # log10_U = log10(U_med))
@@ -870,7 +873,8 @@ df_pred <- expand.grid(SiteCode=unique(df_resultados$SiteCode)[1],
                        p.z=seq(min(df_resultados$p.z),max(df_resultados$p.z),length=200))
 mdAvg_nRefEE__AICcmodavg <- modavgPred(l_md.dredge_nRefEE,newdata = df_pred) %>%
   cbind(df_pred)
-save(mdAvg_nRefEE__AICcmodavg,file="/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x4km/resultados/mdAvg_nRefEE__MuMIn.Rdata")
+save(mdAvg_nRefEE__AICcmodavg,
+     file="/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x4km/resultados/mdAvg_nRefEE__AICcmodavg.Rdata")
 ```
   
     
@@ -878,7 +882,7 @@ __Figura 2.2.4__ Observado e predito pelo modelo médio
 
 ```{r fig 224 nRefEE observado e predito modelo medio, comment=FALSE, message=FALSE,warning=FALSE,results="hide",fig.width=8, fig.height=30}
 # Modelo Global
-load(file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_nRefEE__MuMIn.Rdata")
+load(file="/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x4km/resultados/mdAvg_nRefEE__MuMIn.Rdata")
 # Predição
 df_md <- df_resultados %>% filter(MN=="EE")
 df_md$Pr_nRef <- predict(mdAvg_nRefEE__MuMIn,type="response")*100
@@ -889,7 +893,7 @@ ggplot(df_md,aes(x=d,y=n_nRef)) +
   geom_point() + geom_line(aes(y=Pr_nRef),color="red") +
   labs(x="Dispersão Média",
        y="Número de SADs não Refutadas",
-       title="Prob. Não Refutar uma SAD neutra MN=EE") +
+       title="Prob. SAD predita ser congruente, MNEE") +
   facet_wrap(~title,ncol=5)
 ```
   
@@ -898,7 +902,7 @@ __Figura 2.2.5__ Predito pelo modelo médio para novo conjunto de dados
 
 ```{r figura 225 predito modelo medio novo conjunto de dados}
 # dados
-load(file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_nRefEE__AICcmodavg.Rdata")
+load(file="/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x4km/resultados/mdAvg_nRefEE__AICcmodavg.Rdata")
 df_plot <- mdAvg_nRefEE__AICcmodavg
 df_plot %<>% 
   mutate(p = p.z * sd(df_resultados$p) + mean(df_resultados$p),
@@ -2710,6 +2714,74 @@ summary(md_pSobs)
 ```
 
 
+## Versão de atualização dos modelos estatísticos usando a %CV para 4x4 km2
+
+
+```{r GAMM U para 4x4 km2}
+lmer_U <- lmer(log10_U ~ log10_Sobs + (1|SiteCode),data=df_U)
+beta_log10_Sobs <- fixef(lmer_U)[2] %>% as.numeric() %>% round(.,digits = 3)
+# usar o SiteCode como fator foi fundamental para usar a GAMM
+df_U$SiteCode <- factor(df_U$SiteCode)
+# l_md <- list()
+# l_md[[1]] <- gam(log10_U ~ offset(beta_log10_Sobs*log10_Sobs) +
+#                  s(log10_d.z,bs="tp",k=10) + s(p.z,bs="tp",k=10) + ti(log10_d.z,p.z,bs=c("tp","tp"),k=c(10,10)) +
+#                  s(log10_d.z,SiteCode,bs="fs",k=10),
+#                 data = df_U, family=gaussian, method = "REML")
+# l_md[[2]] <- gam(log10_U ~ offset(beta_log10_Sobs*log10_Sobs) +
+#                  s(log10_d.z,bs="tp",k=15) + s(p.z,bs="tp",k=10) + ti(log10_d.z,p.z,bs=c("tp","tp"),k=c(15,10)) +
+#                  s(log10_d.z,SiteCode,bs="fs",k=15),
+#                 data = df_U, family=gaussian, method = "REML")
+# names(l_md) <- c("k=10","k=15")
+# AICctab(l_md,weights=TRUE)
+# l_md_GAMM_U <- l_md
+# save(l_md_GAMM_U,file = "/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x4km/resultados/l_md_GAMM_U.Rdata")
+md_U <- gam(log10_U ~ offset(beta_log10_Sobs*log10_Sobs) +
+                 s(log10_d.z,bs="cr",k=15) + s(p.z,bs="cr",k=10) + ti(log10_d.z,p.z,bs=c("cr","cr"),k=c(15,10)) +
+                 s(log10_d.z,SiteCode,bs="fs",k=15,xt=list("cr"),m=1),
+                data = df_U, family=gaussian, method = "REML")
+save(md_U,file = "/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x4km/resultados/md_U.Rdata")
+```
+```{r}
+load("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x4km/resultados/md_U.Rdata")
+# gam.check(md_U)
+###
+# novo conjunto de dados
+lmer_U <- lmer(log10_U ~ log10_Sobs + (1|SiteCode),data=df_U)
+beta_log10_Sobs <- fixef(lmer_U)[2] %>% as.numeric() %>% round(.,digits = 3)
+df_newdata <- expand.grid(SiteCode=unique(df_U$SiteCode)[1],
+                          # d=seq(min(df_U$d),max(df_U$d),length=40),
+                          log10_d.z=seq(min(df_U$log10_d.z),max(df_U$log10_d.z),length=40),
+                          p.z=seq(min(df_U$p.z),max(df_U$p.z),length=200),
+                          log10_Sobs=0)
+df_newdata$predito <- predict(md_U, type = "response",newdata=df_newdata,newdata.guaranteed=TRUE)
+beta <- coef(md_U)
+V <- vcov.gam(md_U)
+##  simulação de parâmetros
+num_beta_vecs <- 10000
+Cv <- chol(V)
+set.seed(1)
+nus <- rnorm(num_beta_vecs * length(beta))
+beta_sims <- beta + t(Cv) %*% matrix(nus, nrow = length(beta), ncol = num_beta_vecs)
+# dim(beta_sims)
+matrix_lprediction <- predict(md_U,type="lpmatrix",newdata=df_newdata,newdata.guaranteed=TRUE) 
+predict_link <- matrix_lprediction %*% beta_sims
+df_pred <- t(apply(predict_link,1,function(X) quantile(X,probs = c(0.05,0.50,0.95)))) %>% 
+  as.data.frame()
+names(df_pred) <- c("IClower","median","ICupper")
+# grafico
+df_plot_U <- cbind(df_newdata,df_pred)
+df_plot_U %<>% mutate(p = p.z*sd(df_U$p) + mean(df_U$p),
+                      log10_d = log10_d.z*sd(df_U$log10_d) + mean(df_U$log10_d),
+                      d = 10^log10_d,
+                      fit = 10^median,
+                      lower = 10^IClower,
+                      upper = 10^ICupper)
+write.csv(df_plot_U,file="~/Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x4km/resultados/df_plot_U.Rdata",row.names = FALSE)
+```
+
+```{r GAMM U predicao para novo conjunto de dados}
+
+```
 
 
 ## GAMMM
@@ -2722,6 +2794,8 @@ Inicio a modelagem pressupondo GAMM com smoother por sítio de amostragem com um
 
 
 ```{r gamm U 1, eval=FALSE, echo=TRUE}
+MuMIn::r.squaredGLMM(lmer_U)
+lmer_U <- lmer(log10_U ~ log10_Sobs + (1|SiteCode),data=df_U)
 beta_log10_Sobs <- fixef(lmer_U)[2] %>% as.numeric() %>% round(.,digits = 3)
 l_md <- list()
 l_md[[1]] <- gam(log10_U ~ offset(beta_log10_Sobs*log10_Sobs) +
@@ -2732,6 +2806,10 @@ l_md[[2]] <- gam(log10_U ~ offset(beta_log10_Sobs*log10_Sobs) +
                  s(d.z,bs="cr",k=10) + s(p.z,bs="cr",k=10) + ti(d.z,p.z,bs=c("cr","cr"),k=c(10,10)) +
                  s(d.z,SiteCode,bs="fs",k=10,xt = list("cr")),
                 data = df_U, family=gaussian,method = "REML")
+
+
+
+df_U %>% head
 ```
 
 ```{r save l_md.U_gamEstudo,eval=FALSE,echo=FALSE}
@@ -2771,7 +2849,10 @@ df_plot %>% ggplot(aes(x=d.z,y=log10_U)) +
 
 na escala padrão, os valores baixos de d.z, que ocorrem nos percentis elevados (e.g.0.99), são muito próximos entre si e aqueles em valores mais altos mais espaçados. Isso pq o kernel de dispersão é exponencial. Uma maneira de ponderar este efeito é transformando a variável d para a escala log:
 
-```{r echo=TRUE,eval=FALSE}
+
+
+```{r gamm U log_d.z k10 , echo=TRUE,eval=FALSE}
+#transformar a variavel d foi uma estrategia para melhorar o ajuste
 beta_log10_Sobs <- fixef(lmer_U)[2] %>% as.numeric() %>% round(.,digits = 3)
 l_md <- list()
 l_md[[1]] <- gam(log10_U ~ offset(beta_log10_Sobs*log10_Sobs) +
@@ -2784,19 +2865,19 @@ l_md[[2]] <- gam(log10_U ~ offset(beta_log10_Sobs*log10_Sobs) +
                 data = df_U, family=gaussian,method = "REML")
 ```
 
-```{r}
+```{r l_md_U_log10_dz}
 names(l_md) <- c("tp","cr") #,"cc","ps","gp"
 l_md_U_log10_dz <- l_md
 save(l_md_U_log10_dz,file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_md_U_log10_dz.Rdata")
 ```
 
-```{r}
+```{r load l_md_U_log10_dz}
 load("~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_md_U_log10_dz.Rdata")
 AICctab(l_md_U_log10_dz,weights=TRUE)
 ```
 para a variável log10(d) o mais plausível é a função de base 'tp' 
 
-```{r md_U escala d na escala log10, eval=TRUE,echo=FALSE,fig.width=9, fig.height=29}
+```{r md_U escala d na escala log10__DESCONSIDERAR, eval=TRUE,echo=FALSE,fig.width=9, fig.height=29}
 # dados
 md_U <- l_md_U_log10_dz[["tp"]]
 df_ <- cbind(cbind(data.frame(fit = md_U$fitted.values,
@@ -2813,7 +2894,7 @@ df_plot %>% ggplot(aes(x=log10_d.z,y=log10_U)) +
   geom_point(alpha=0.5) + 
   geom_line(aes(x=log10_d.z,y=fit),color="red") + #
   # scale_colour_manual(values=c("red", "blue")) +
-  theme(legend.position = "top") +
+  theme(legend.position = "top") + labs(title="log(d).z, bs=tp, k=10") +
   facet_wrap(~title,ncol=5,scales="free")
 ```
 
@@ -2847,7 +2928,7 @@ gratia::appraise(md_U)
 ```
 Talvez se aumentar o número de funções de base possa ser possível obter melhor ajuste:
 
-```{r}
+```{r aumento do numero de funcoes base de 15 para 18}
 beta_log10_Sobs <- fixef(lmer_U)[2] %>% as.numeric() %>% round(.,digits = 3)
 l_md <- list()
 l_md[[1]] <- md_U
@@ -2869,6 +2950,7 @@ gam.check(md_U)
 load("~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_md_U_k15.Rdata")
 AICctab(l_md_U_k15)
 md_U <- l_md_U_k15[["k=15"]]
+summary(md_U)
 ```
 
 
@@ -2937,8 +3019,17 @@ O modelo tp é o único plausível. Acredito que com a atual abordagem de GAM pa
 Por final vou comparar os melhores gams para a variável de dispersão per capita 
 
 ```{r}
+df_U %>% 
+  select()
 l_md <- list()
 l_md[[1]] <- md_U
+gam(log10_U ~ offset(beta_log10_Sobs*log10_Sobs) +
+      s(d.z,bs="cr",k=18) + s(p.z,bs="cr",k=10) + 
+      ti(d.z,p.z,bs=c("cr","cr"),k=c(15,10)) +
+      s(d.z,SiteCode,bs="fs",k=15,xt = list("cr"),m=1), 
+    family=gaussian,method = "REML",
+    data=df_U)
+
 l_md[[2]] <- gam(log10_U ~ offset(beta_log10_Sobs*log10_Sobs) +
                    s(d.z,bs="cr",k=18) + s(p.z,bs="cr",k=10) + ti(d.z,p.z,bs=c("cr","cr"),k=c(15,10)) +
                    s(d.z,SiteCode,bs="fs",k=15,xt = list("cr"),m=1),
@@ -2957,6 +3048,9 @@ md_U <- l_md[[2]]
 gam.check(l_md[["log10(d)"]])
 gam.check(l_md[["d"]])
 ```
+
+
+
 
 
 
