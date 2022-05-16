@@ -46,7 +46,7 @@ select <- dplyr::select
   
 # RESUMO  
   
-Anteriormente eu havia rodado as simulações considerando paisagens de 10.2 x 10.2 km2, porém o sugerido pela análise de escala de efeito é 4.07 x 4.07 km2 (Fig. 1a). Em média, a redução da extensão espacial da paisagem aumentou a porcentagem de cobertura vegetal na paisagem, apesar de reduzi-la em alguns casos, modificando a ordenação dos sítios ao longo do gradiente de cobertura vegetal (Fig 1b). Para avaliar se as predições de MNEE são robustas a essa mudança selecionei alguns pontos para fazer um piloto (Fig 1b, pontos vermelhos). Conclui que as mudanças não eram significantes (Figs) e segui atualizando os modelos estatístiscos com a nova ordenação dos sítios ao longo do gradiente. Observei melhora no ajuste do modelo estatístico, com aumento dos coeficientes de determinação (principalmente o condicional), sem mudança nos padrões qualitativos tanto na mediana quanto nos percentis de 5% e 95% (Figs ) 
+Anteriormente eu havia rodado as simulações em paisagens de 10.2 x 10.2 km2, porém o sugerido pela análise de escala de efeito é 4.07 x 4.07 km2 (Fig. 1a). Em média, a redução da extensão espacial da paisagem aumentou a porcentagem de cobertura vegetal na paisagem, apesar de reduzi-la em alguns casos, modificando a ordenação dos sítios ao longo do gradiente de cobertura vegetal (Fig 1b). Para avaliar se as predições de MNEE são robustas a essa mudança selecionei alguns pontos para fazer um piloto (Fig 1b, pontos vermelhos). Conclui que as mudanças não eram significantes (Figs) e segui atualizando os modelos estatístiscos com a nova ordenação dos sítios ao longo do gradiente. Observei melhora no ajuste do modelo estatístico, com aumento dos coeficientes de determinação (principalmente o condicional), sem mudança nos padrões qualitativos tanto na mediana quanto nos percentis de 5% e 95% (Figs ) 
   
 
 ### Análise de escala de efeito e mudança na % de cobertura vegetal entre escalas  
@@ -92,7 +92,7 @@ __Fig. 1__ a) Análise de escala de efeito: No eixto y há o peso de evidência 
 ### Piloto  
   
     
-No piloto 30 pontos de uma distribuição uniforme são sorteados entre 0 e 1 e selecionamos os sítios com menor diferença com a proporção de cobertura vegetal nas paisagens de 10x10km2. Com esses pontos refiz as simulações coalescente para estimar U e predizer as SADs. É suficiente recortar os atuais mapas de 10x10km2 para mapas de 4x4km2, pois sempre é aplicado uma mudança na resolução que impõe que a densidade de pixels seja igual à densidade de indivíduos na área amostral. Assim, não é necessário partir dos mapas do Landsat8 que apresentam resolução comum para fazer o recorte.    
+Fiz um sorteio de 30 pontos de uma distribuição uniforme entre 0 e 1 e selecionamos os sítios com menor diferença com a proporção de cobertura vegetal nas paisagens de 10x10km2. Excluindo os pontos repetidos, usei 23 sítios. Com esses pontos refiz as simulações coalescente para estimar U e predizer as SADs. Recortei os atuais mapas de 10x10km2 para mapas de 4x4km2.    
   
     
       
@@ -102,10 +102,29 @@ No piloto 30 pontos de uma distribuição uniforme são sorteados entre 0 e 1 e 
 ```{r fig 2 comparacao mesma paisagem diferentes escalas}
 df_sims <- read.csv(file = "/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/df_piloto.csv",
                     header = TRUE)
+df_plot <- df_sims[3,] %>% 
+  select(SiteCode,txt.name,txt.name_antigo) #%>% 
+  # rename(scale_4x4=txt.name,
+  #        scale_10x10=txt.name_antigo) %>% 
+  # pivot_longer(!SiteCode,names_to = "scale",values_to = "path_file")
+mat_4x4 <- read.table(df_plot[,"txt.name"],sep=" ",header=TRUE) %>% 
+  as.matrix()
+mat_10x10 <- read.table(df_plot[,"txt.name_antigo"],sep=" ",header=TRUE) %>% 
+  as.matrix()
+#
+par(mfrow=c(1,2))
+image(mat_4x4,
+      main="4x4 km2",
+      col=terrain.colors(12,rev = TRUE),
+      axes=FALSE)
+image(mat_10x10,
+      main="10x10 km2",
+      col=terrain.colors(12,rev = TRUE),
+      axes=FALSE)
 ```
   
     
-__Fig 2__ Exemplo de recorte da paisagem ao redor, no material suplementar há para os 23 sítios amostrados para o piloto.    
+__Fig 2__ Exemplo de recorte da paisagem ao redor.    
 
   
     
@@ -115,7 +134,19 @@ ADICIONAR: tabela com o tempo de execução
 - A simulação de U ocorreu entre 19h58 e 21h11, totalizando 1h13. Se considerarmos 103 sítios, serão 5h45. Pras SADS eu estimo que seja fique 54h49, 2.27 dias.
 - As simulações das SADs ocorreram entre 23h10 e 00h30, totalizando 1h20 - similar à estimativa de U.  
 - A rotina de testes KS ocorreu entre 00h05 e 00h23  
-      
+
+```{r}
+library(kableExtra)
+# library(ggpubr)
+# library(ggstance)
+df_esforcoComputacional <- data.frame(item = c("Sim. U","Sim. SADs","teste KS"),
+                                      min = c(73,80,18)) %>% 
+  mutate(min_todosSitios = min *103/23,horas = min_todosSitios/60) %>% select(-min_todosSitios)
+kable(df_esforcoComputacional,
+      caption = "Uso Computacional observado (n=23) e estimado (n=103)",
+      col.names = c("","min", "horas estimadas"))
+```
+
         
           
 ### Comparação variáveis respostas   
@@ -420,7 +451,8 @@ l_p[[4]] <- plot_grid(l_p[[3]],NULL,x.grob,ncol=1,rel_heights = c(1,-0.04,0.04))
 a_prob_of_not_refuting <- plot_grid(NULL,title,NULL,l_p[[4]],ncol=1,rel_heights = c(-0.08,0.25,-0.08,1))
 a_prob_of_not_refuting
 ```
- 
+   
+__Fig. __ Comparação predição pelo modelo médio. 
 
 
 ```{r}
@@ -435,6 +467,63 @@ md_nRefEE <- glmer(cbind(n_nRef,100-n_nRef) ~
 MuMIn::r.squaredGLMM(md_nRefEE)
 ```
 
+
+## U Estimado  
+  
+
+```{r GAMM U predito, fig.height=6,fig.width=13.5}
+# dados
+df_plot <- read.csv("~/Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x4km/resultados/df_plot_U.Rdata",
+                      header = TRUE,as.is = TRUE)
+## graficos
+l_p <- list()
+# 
+df_plot$IC_pred <- "5% quantile"
+l_p[[1]] <- ggplot(df_plot,aes(x=p,y=d,fill=lower)) +
+  coord_cartesian(expand = FALSE) + 
+  geom_tile() +
+  scale_fill_distiller(palette = "Spectral") +
+  theme_classic() + 
+  facet_wrap(~IC_pred,ncol=1) +
+  theme(legend.position="bottom",legend.title = element_blank()) +
+  geom_contour(aes(z=lower),alpha=0.4, col="black",
+               breaks = round(quantile(df_plot$lower,probs = c(0.1,0.25,0.5,0.75,0.9)),5)) +
+  geom_text_contour(aes(z=lower),stroke=0.2,
+                    breaks = round(quantile(df_plot$lower,probs = c(0.1,0.25,0.5,0.75,0.9)),5),
+                    rotate = FALSE,
+                    size=2.7)
+#
+df_plot$variable <- "median"
+l_p[[2]] <- ggplot(df_plot,aes(x=p,y=d,fill=fit)) +
+  coord_cartesian(expand = FALSE) + 
+  geom_tile() +
+  scale_fill_distiller(palette = "Spectral") +
+  theme_classic() + 
+  facet_wrap(~variable,ncol=1) +
+  theme(legend.position="bottom",legend.title = element_blank()) +
+  geom_contour(aes(z=fit),alpha=0.4, col="black",
+               breaks = round(quantile(df_plot$fit,probs = c(0.1,0.25,0.5,0.75,0.9)),5) ) +
+  geom_text_contour(aes(z=fit),stroke=0.2,
+                    breaks = round(quantile(df_plot$fit,probs = c(0.1,0.25,0.5,0.75,0.9)),5),
+                    rotate = FALSE,
+                    size=3)
+#
+df_plot$IC_pred <- "95% quantile"
+l_p[[3]] <- ggplot(df_plot,aes(x=p,y=d,fill=upper)) +
+  coord_cartesian(expand = FALSE) + 
+  geom_tile() +
+  scale_fill_distiller(palette = "Spectral") +
+  theme_classic() + 
+  facet_wrap(~IC_pred,ncol=1) +
+  theme(legend.position="bottom",legend.title = element_blank()) +
+  geom_contour(aes(z=upper),alpha=0.4, col="black",
+               breaks = round(quantile(df_plot$upper,probs = c(0.1,0.25,0.5,0.75,0.9)),5)) +
+  geom_text_contour(aes(z=upper),stroke=0.2,
+                    breaks = round(quantile(df_plot$upper,probs = c(0.1,0.25,0.5,0.75,0.9)),5),
+                    rotate = FALSE,
+                    size=2.7)
+grid.arrange(grobs=l_p,ncol=3,top="taxa de colonização de novas espécies na paisagem necessária para manter a riqueza na área amostral")
+```
 
   
 # Material Suplementar
