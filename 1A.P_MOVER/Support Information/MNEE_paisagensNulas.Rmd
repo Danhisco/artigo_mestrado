@@ -1,0 +1,644 @@
+---
+title: "MNEE equilíbrio paisagens idealizadas integras"
+author: "Danilo Pereira Mori"
+date: '2022-03-19'
+output: 
+  html_document:
+    toc: true
+    toc_depth: 5
+editor_options: 
+  chunk_output_type: console
+---
+
+<style>
+body {
+text-align: justify}
+</style>
+
+```{r setup, include=TRUE,echo=FALSE}
+knitr::opts_chunk$set(echo = FALSE, tidy = FALSE, include = TRUE, warning = FALSE,cache = TRUE,message=FALSE,eval=FALSE)
+knitr::opts_knit$set(root.dir = "/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/")
+setwd("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/paisagens_nulas/")
+```
+
+```{r pacotes}
+library(sads)
+library(metR)
+library(ggpubr)
+library(imager)
+library(OpenImageR)
+library(cowplot)
+library(twosamples)
+library(doMC)
+library(raster)
+library(grid)
+library(bbmle)
+library(magrittr)
+library(gridExtra)
+library(ggplot2); theme_set(theme_classic())
+library(readr)
+library(purrr)
+library(stringr)
+library(tidyr)
+library(plyr)
+library(dplyr)
+select <- dplyr::select
+```
+```{r dados mesmo,message=FALSE,warning=FALSE,include=TRUE,eval=TRUE}
+### dados ###
+# leitura
+df_resultados <- read.csv(file="/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/simulacao_codigos_e_resultados/resultados/df_resultados.csv",
+                            header = TRUE,as.is=FALSE)[,1:13]
+df_p_4_10 <- read.csv("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x4km/resultados/df_p_4x4_10x10.csv",
+                       header = TRUE) %>% 
+  dplyr::select(-p_10x10)
+df_resultados <- left_join(x=df_resultados,
+                           y=df_p_4_10,
+                           by="SiteCode") %>% 
+  rename(p_10x10=p,
+         p=p_4x4)
+# padronização
+level_k <- as.character(unique(sort(as.numeric(df_resultados$k),decreasing = TRUE)))
+df_resultados$k <- factor(df_resultados$k,levels = level_k)
+levels(df_resultados$k)[19] <- "0.1"
+# z score
+f_z <- function(x){
+  m <- base::mean(x,na.rm=FALSE)
+  sd <- sd(x,na.rm=FALSE)
+  output <- (x-m)/sd
+  return(output)
+} 
+# names(df_resultados)
+# str(df_resultados)
+df_resultados %<>% mutate(diffS_gamma = diffS_mean + min(diffS_mean)*(-1) + 0.01,
+                          modulo_diffS = abs(diffS_mean),
+                          log10_Sobs=log10(S_obs),
+                          log10_U = log10(U_med),
+                          log10_d = log10(d))
+
+df_resultados.z <- as.data.frame(apply(df_resultados[,c("p","p_10x10","Ntotal","log10_Sobs","k_1","d_Lplot","d","log10_d","modulo_diffS")],2,f_z))
+names(df_resultados.z) <- sapply(names(df_resultados.z), function(x) paste0(x,".z"))
+df_resultados %<>% cbind(.,df_resultados.z) %>% 
+  dplyr::select(-k_1,-k_1.z)
+###############
+df_U <- df_resultados %>% 
+  filter(MN=="EE") %>%  
+  dplyr::select(U_med,log10_U,SiteCode,k,d,d.z,p,p.z,log10_Sobs,log10_Sobs.z,log10_d,log10_d.z) %>% 
+  distinct 
+#%>% 
+  # mutate(log10_Sobs = log10(S_obs),
+         # log10_U = log10(U_med))
+```
+
+
+## Objetivo
+
+
+
+## Resultados Atualizados
+  
+  
+### Probabilidade de SAD predita ser congruente    
+  
+    
+```{r  Fig 6 Comparacao predito modelo medio entre escalas, fig.height=5.5, fig.width=9,eval=TRUE,include=TRUE}
+library(grid)
+## predito pelo modelo médio para novo conjunto de dados
+### 4x4 km2
+load(file="/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x4km/resultados/mdAvg_nRefEE__AICcmodavg.Rdata")
+mdAvg_nRefEE__AICcmodavg$SCALE <- "4x4"
+df_ <- mdAvg_nRefEE__AICcmodavg
+### 10x10 km2
+load(file="~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/mdAvg_nRefEE__AICcmodavg.Rdata")
+mdAvg_nRefEE__AICcmodavg$SCALE <- "10x10"
+df_plot <- rbind(df_,mdAvg_nRefEE__AICcmodavg)
+df_plot %<>% 
+  mutate(p = p.z * sd(df_resultados$p) + mean(df_resultados$p),
+         d = d.z*sd(df_resultados$d) + mean(df_resultados$d))
+############# 
+## Gráficos
+l_p <- list()
+labels_IC <- c(lower.CL="quantile 5%", upper.CL="quantile 95%")
+# labels_median <- c(EE="IC 5%", upper.CL="IC 95%")
+v_breaks <- c(0.25,0.50,0.75)
+### SENM Spatially-Explicit Neutral Model
+df_plot_4x4 <- df_plot %>% filter(SCALE=="4x4") %>% mutate(label_ = "median")
+l_p[[1]] <- ggplot(df_plot_4x4,aes(x=p,y=d,fill=mod.avg.pred)) +
+  geom_tile() +
+  # scale_fill_gradient2(limits = c(0,1),midpoint=0.5, high="#800000", low="#000080",mid="#7CFC00") +
+  # scale_fill_continuous() +
+  # scale_fill_gsea() +
+  scale_fill_distiller(palette = "Spectral") +
+  geom_contour(aes(z=mod.avg.pred),alpha=0.2, col="black",
+               breaks = v_breaks) +
+  labs(fill="",x="",y="") +
+  coord_cartesian(expand = FALSE) +
+  scale_y_continuous(breaks = seq(0,20,by=4)) +
+  scale_x_continuous(breaks = seq(0.05,0.95,by=0.10)) +
+  ggtitle("4x4 km2") +
+  theme_classic() + facet_wrap(~label_, ncol=1) + 
+  theme(legend.position = "bottom",
+        plot.title = element_text(margin=margin(0,0,-1,-0),
+                                  hjust = 0.5),
+        plot.margin = unit(c(0.1,0.1,0.1,-0.5), "cm"))
+v_legend <- get_legend(l_p[[1]])
+l_p[[1]] <- l_p[[1]] + theme(legend.position="none")
+df_plot_4x4 %<>% gather(key = IC_class ,value = IC_pred,lower.CL:upper.CL)
+l_p[[2]] <- ggplot(df_plot_4x4,aes(x=p,y=d,fill=IC_pred)) +
+  geom_tile() +
+  # scale_fill_gradient2(limits = c(0,1),midpoint=0.5, high="red", low="blue",mid="black") +
+  scale_fill_distiller(palette = "Spectral") +
+  geom_contour(aes(z=IC_pred),alpha=0.2, col="black",
+               breaks = v_breaks) +
+  labs(fill="",x="",y="") +
+  coord_cartesian(expand = FALSE) +
+  scale_y_continuous(breaks = seq(0,20,by=4)) +
+  scale_x_continuous(breaks = seq(0.10,0.90,by=0.20)) +
+  theme_classic() + facet_wrap(~IC_class,ncol=2,labeller = labeller(IC_class = labels_IC)) + 
+  theme(legend.position="none",
+        plot.margin = unit(c(0.1,0.1,0.1,-0.5), "cm"))
+a_4x4 <- plot_grid(l_p[[1]],NULL,l_p[[2]],ncol=1,rel_heights=c(2,-0.1,1.35))
+# l_p[[3]] <- ggdraw() + draw_label("SENM")
+# a_SENM <- plot_grid(l_p[[3]],NULL,a_SENM,ncol=1,rel_heights=c(0.1,-0.075,1))
+### SINM Spatially-Explicit Neutral Model
+df_plot_10x10 <- df_plot %>% filter(SCALE=="10x10") %>% mutate(label_ = "median")
+l_p[[1]] <- ggplot(df_plot_10x10,aes(x=p,y=d,fill=mod.avg.pred)) +
+  geom_tile() +
+  # scale_fill_gradient2(limits = c(0,1),midpoint=0.5, high="red", low="blue",mid="black") +
+  scale_fill_distiller(palette = "Spectral") +
+  geom_contour(aes(z=mod.avg.pred),alpha=0.2, col="black",
+               breaks = v_breaks) +
+  coord_cartesian(expand = FALSE) +
+  scale_y_continuous(breaks = seq(0,20,by=4)) +
+  scale_x_continuous(breaks = seq(0.05,0.95,by=0.10)) +
+  ggtitle("10x10 km2") +
+  theme_classic() + facet_wrap(~label_, ncol=1) + 
+  labs(fill="",x="",y="") +
+  theme(legend.position = "none",
+        plot.title = element_text(margin=margin(0,0,-1,0),
+                                  hjust = 0.5),
+        plot.margin = unit(c(0.1,0.1,0.1,-0.5), "cm"))
+df_plot_10x10 %<>% gather(key = IC_class ,value = IC_pred,lower.CL:upper.CL)
+l_p[[2]] <- ggplot(df_plot_10x10,aes(x=p,y=d,fill=IC_pred)) +
+  geom_tile() +
+  # scale_fill_gradient2(limits = c(0,1),midpoint=0.5, high="red", low="blue",mid="green") +
+  scale_fill_distiller(palette = "Spectral") +
+  geom_contour(aes(z=IC_pred),alpha=0.2, col="black",
+               breaks = v_breaks) +
+  labs(fill="",x="",y="") +
+  coord_cartesian(expand = FALSE) +
+  scale_y_continuous(breaks = seq(0,20,by=4)) +
+  scale_x_continuous(breaks = seq(0.10,0.90,by=0.20)) +
+  theme_classic() + facet_wrap(~IC_class,ncol=2,labeller = labeller(IC_class = labels_IC)) + 
+  theme(legend.position="none",
+        plot.margin = unit(c(0.1,0.1,0.1,-0.5), "cm"))
+b_10x10 <- plot_grid(l_p[[1]],NULL,l_p[[2]],ncol=1,rel_heights=c(2,-0.1,1.35))
+# l_p[[3]] <- ggdraw() + draw_label("SINM")
+# b_SINM <- plot_grid(l_p[[3]],b_SINM,ncol=1,rel_heights=c(0.1, 1))
+### Probability of not refuting a predicted SAD
+l_p[[1]] <- ggdraw() + 
+  draw_label("Prob. SAD predita ser Congruente",size=18,fontface ="bold") + 
+  theme(plot.margin = unit(c(0,0,0,0), "lines"))
+title <- plot_grid(l_p[[1]],NULL,v_legend,ncol=3,rel_widths = c(1,-0.39,0.50))
+l_p[[2]] <- plot_grid(a_4x4,b_10x10,ncol=2,align = "hv")
+#create common x and y labels
+y.grob <- grid::textGrob("d", 
+                   gp=gpar(fontface="bold"), rot=90)
+x.grob <- grid::textGrob("p", 
+                   gp=gpar(fontface="bold"))
+l_p[[3]] <- plot_grid(y.grob,NULL,l_p[[2]],ncol=3,rel_widths = c(0.015,0,1))
+l_p[[4]] <- plot_grid(l_p[[3]],NULL,x.grob,ncol=1,rel_heights = c(1,-0.04,0.04))
+a_prob_of_not_refuting <- plot_grid(NULL,title,NULL,l_p[[4]],ncol=1,rel_heights = c(-0.08,0.25,-0.08,1))
+a_prob_of_not_refuting
+```
+   
+__Fig. 6__ Comparação predição pelo modelo médio. 
+
+
+__Tabela 2__ Número de SADs congruentes: R2 marginal e condicional atualizado e antigo  
+  
+    
+```{r tabela 2 R2 marginal e  condicional, eval=TRUE,include=TRUE}
+library(lme4)
+## R2 marginal e condicional
+df_md <- df_resultados %>% filter(MN=="EE") %>% distinct()
+l_md <- list()
+l_md[[1]] <- glmer(cbind(n_nRef,100-n_nRef) ~ 
+                      (p.z + I(p.z^2)) * (d.z + I(d.z^2)) + 
+                      (d.z + I(d.z^2)|SiteCode),
+                 family = "binomial",data=df_md,
+                 control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e6)),
+                 na.action = "na.fail")
+l_md[[2]] <- glmer(cbind(n_nRef,100-n_nRef) ~ 
+                      (p_10x10.z + I(p_10x10.z^2)) * (d.z + I(d.z^2)) + 
+                      (d.z + I(d.z^2)|SiteCode),
+                 family = "binomial",data=df_md,
+                 control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e6)),
+                 na.action = "na.fail")
+# GLMM <- l_md[[2]]
+f_R2_GLMM <- function(GLMM){
+  df_ <- as.data.frame(MuMIn::r.squaredGLMM(GLMM))
+  (df_ %>% 
+      mutate(method=c("theoretical","delta"),
+             across(1:2,round, 4)))
+}
+names(l_md) <- c("4x4","10x10")
+df_R2 <- ldply(l_md,f_R2_GLMM) %>% 
+  rename(landscape=".id")
+df_R2
+```
+
+
+### U Estimado  
+  
+
+```{r Fig 7 GAMM U predito, fig.height=6,fig.width=13.5,eval=TRUE,include=TRUE}
+library(metR)
+# dados
+df_plot <- read.csv("~/Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x4km/resultados/df_plot_U.Rdata",
+                      header = TRUE,as.is = TRUE)
+## graficos
+l_p <- list()
+# 
+df_plot$IC_pred <- "5% quantile"
+l_p[[1]] <- ggplot(df_plot,aes(x=p,y=d,fill=lower)) +
+  coord_cartesian(expand = FALSE) + 
+  geom_tile() +
+  scale_fill_distiller(palette = "Spectral") +
+  theme_classic() + 
+  facet_wrap(~IC_pred,ncol=1) +
+  theme(legend.position="bottom",legend.title = element_blank()) +
+  geom_contour(aes(z=lower),alpha=0.4, col="black",
+               breaks = round(quantile(df_plot$lower,probs = c(0.1,0.25,0.5,0.75,0.9)),5)) +
+  geom_text_contour(aes(z=lower),stroke=0.2,
+                    breaks = round(quantile(df_plot$lower,probs = c(0.1,0.25,0.5,0.75,0.9)),5),
+                    rotate = FALSE,
+                    size=2.7)
+#
+df_plot$variable <- "median"
+l_p[[2]] <- ggplot(df_plot,aes(x=p,y=d,fill=fit)) +
+  coord_cartesian(expand = FALSE) + 
+  geom_tile() +
+  scale_fill_distiller(palette = "Spectral") +
+  theme_classic() + 
+  facet_wrap(~variable,ncol=1) +
+  theme(legend.position="bottom",legend.title = element_blank()) +
+  geom_contour(aes(z=fit),alpha=0.4, col="black",
+               breaks = round(quantile(df_plot$fit,probs = c(0.1,0.25,0.5,0.75,0.9)),5) ) +
+  geom_text_contour(aes(z=fit),stroke=0.2,
+                    breaks = round(quantile(df_plot$fit,probs = c(0.1,0.25,0.5,0.75,0.9)),5),
+                    rotate = FALSE,
+                    size=3)
+#
+df_plot$IC_pred <- "95% quantile"
+l_p[[3]] <- ggplot(df_plot,aes(x=p,y=d,fill=upper)) +
+  coord_cartesian(expand = FALSE) + 
+  geom_tile() +
+  scale_fill_distiller(palette = "Spectral") +
+  theme_classic() + 
+  facet_wrap(~IC_pred,ncol=1) +
+  theme(legend.position="bottom",legend.title = element_blank()) +
+  geom_contour(aes(z=upper),alpha=0.4, col="black",
+               breaks = round(quantile(df_plot$upper,probs = c(0.1,0.25,0.5,0.75,0.9)),5)) +
+  geom_text_contour(aes(z=upper),stroke=0.2,
+                    breaks = round(quantile(df_plot$upper,probs = c(0.1,0.25,0.5,0.75,0.9)),5),
+                    rotate = FALSE,
+                    size=2.7)
+grid.arrange(grobs=l_p,ncol=3,top="4x4 km2")
+```
+
+
+
+```{r Fig 7 GAMM U predito 10x10km2, fig.height=6,fig.width=13.5,eval=TRUE,include=TRUE}
+# dados
+df_plot <- read.csv("~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/df_plot_U.Rdata",
+                      header = TRUE,as.is = TRUE)
+## graficos
+l_p <- list()
+# 
+df_plot$IC_pred <- "5% quantile"
+l_p[[1]] <- ggplot(df_plot,aes(x=p,y=d,fill=lower)) +
+  coord_cartesian(expand = FALSE) + 
+  geom_tile() +
+  scale_fill_distiller(palette = "Spectral") +
+  theme_classic() + 
+  facet_wrap(~IC_pred,ncol=1) +
+  theme(legend.position="bottom",legend.title = element_blank()) +
+  geom_contour(aes(z=lower),alpha=0.4, col="black",
+               breaks = round(quantile(df_plot$lower,probs = c(0.1,0.25,0.5,0.75,0.9)),5)) +
+  geom_text_contour(aes(z=lower),stroke=0.2,
+                    breaks = round(quantile(df_plot$lower,probs = c(0.1,0.25,0.5,0.75,0.9)),5),
+                    rotate = FALSE,
+                    size=2.7)
+#
+df_plot$variable <- "median"
+l_p[[2]] <- ggplot(df_plot,aes(x=p,y=d,fill=fit)) +
+  coord_cartesian(expand = FALSE) + 
+  geom_tile() +
+  scale_fill_distiller(palette = "Spectral") +
+  theme_classic() + 
+  facet_wrap(~variable,ncol=1) +
+  theme(legend.position="bottom",legend.title = element_blank()) +
+  geom_contour(aes(z=fit),alpha=0.4, col="black",
+               breaks = round(quantile(df_plot$fit,probs = c(0.1,0.25,0.5,0.75,0.9)),5) ) +
+  geom_text_contour(aes(z=fit),stroke=0.2,
+                    breaks = round(quantile(df_plot$fit,probs = c(0.1,0.25,0.5,0.75,0.9)),5),
+                    rotate = FALSE,
+                    size=3)
+#
+df_plot$IC_pred <- "95% quantile"
+l_p[[3]] <- ggplot(df_plot,aes(x=p,y=d,fill=upper)) +
+  coord_cartesian(expand = FALSE) + 
+  geom_tile() +
+  scale_fill_distiller(palette = "Spectral") +
+  theme_classic() + 
+  facet_wrap(~IC_pred,ncol=1) +
+  theme(legend.position="bottom",legend.title = element_blank()) +
+  geom_contour(aes(z=upper),alpha=0.4, col="black",
+               breaks = round(quantile(df_plot$upper,probs = c(0.1,0.25,0.5,0.75,0.9)),5)) +
+  geom_text_contour(aes(z=upper),stroke=0.2,
+                    breaks = round(quantile(df_plot$upper,probs = c(0.1,0.25,0.5,0.75,0.9)),5),
+                    rotate = FALSE,
+                    size=2.7)
+grid.arrange(grobs=l_p,ncol=3,top="10x10 km2")
+```
+  
+__Fig. 7__ Predito pelo modelo estatístico para o U estimado nas paisagens atuais (4x4 km2) e anteriores (10x10 km2).  
+  
+  
+  
+# Material Suplementar
+
+<!-- #### Código para recorte das paisagens -->
+
+```{r recorte das paisagens para piloto remover?,echo=FALSE}
+df_sims <- read.csv("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/simulacao_codigos_e_resultados/df_simulacao.csv",
+                    header = TRUE) %>% filter(k==0.05) %>% 
+  select(SiteCode, txt.name) %>% 
+  mutate(txt.name = gsub("dados_para_iniciar_artigo",
+                        "piloto_MNEE_4x4km",
+                        txt.name))
+file_path <- df_sims$txt.name[1]
+f_paisagemNula <- function(file_path){
+  mat_paisagem <- read.table(file=file_path,sep=" ",header=TRUE) %>% 
+    as.matrix
+  mat_paisagem[mat_paisagem==0] <- 1
+  write.table(mat_paisagem,
+              file=gsub("piloto_MNEE_4x4km",
+                        "paisagens_nulas",
+                        file_path),
+              sep=" ", 
+              row.names = FALSE,col.names = FALSE)
+}
+# image(mat_paisagem)
+a_ply(df_sims$txt.name,1,f_paisagemNula)
+```
+
+<!-- #### Recortes das paisagens de 10x10km para 4x4km -->
+  
+<!-- - Códigos Estimativa de U   -->
+
+```{r simulacao U, echo=FALSE,eval=FALSE,include=FALSE}
+df_sims <- read.csv("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/simulacao_codigos_e_resultados/df_simulacao.csv",
+                    header = TRUE) %>% 
+  select(!(U_med:theta),-p,-DA) %>% 
+  mutate(txt.name = gsub("dados_para_iniciar_artigo",
+                        "paisagem_nula",
+                        txt.name))
+# replicas
+n_rep.U <- 10
+func1 <- function(x,replicas=n_rep.U) {
+  x$U <- NA
+  x <- x[rep(1:dim(x)[1],each=replicas),]
+}
+# nomes
+df_simulacao.U <- df_sims %>% func1()
+####################
+# simulacao
+## objetos necessarios
+# system(paste0("mkdir ",getwd(),"/U")) # pasta para armazenar os data.frames, só faz uma vez
+k_factor <- unique(df_simulacao.U$k) # dividi as simulações por blocos de cenário de limitação
+registerDoMC(3)
+for(a in 1:length(k_factor)){
+  df_simU <- df_simulacao.U %>% dplyr::filter(k == k_factor[a])
+  op <- options(digits.secs=6)
+  funcao_imigracao <- function(i,df_temp=df_simU){
+    aviao <- list()
+    aviao <- dinamica_coalescente(U = 1.25e-06,
+                                  S = df_temp[i,"S_obs"],
+                                  N_simul = 1,
+                                  seed = as.numeric(Sys.time()),
+                                  disp_range = df_temp[i,"d"],
+                                  disp_kernel = df_temp[i,"kernel_code"],
+                                  landscape = df_temp[i,"txt.name"])
+    return(aviao$U_est)
+  }
+  replica.sim <- as.list(1:dim(df_simU)[1])
+  sim.coal_U <- llply(.data = replica.sim, .fun = funcao_imigracao, .parallel = TRUE)
+  df_simU[,"U"] <- unlist(sim.coal_U)
+  write.csv(df_simU,
+            file=paste0("./U/","df_simU__k",k_factor[a],".csv"),row.names = FALSE)
+}
+```
+
+<!-- A simulação ocorreu entre 19h58 e 21h11, totalizando 1h13. Se considerarmos 103 sítios, serão 5h45. Pras SADS eu estimo que seja fique 54h49, 2.27 dias. -->
+
+<!-- - Códigos SADs preditas -->
+
+```{r simulacao SADs MNEE, echo=FALSE,eval=FALSE,include=FALSE}
+df_U <- map_df(Sys.glob("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/paisagem_nula/U/*.csv"), read_csv)
+df_Umed <- df_U %>% 
+  ddply(.variables = c("SiteCode","k"),summarise,
+        U_med = mean(U),
+        U_var = var(U))
+# df_sims <- read.csv(file = "/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/df_piloto.csv",
+#                     header = TRUE)
+df_simulacao <- left_join(x=df_sims,y=df_Umed,by=c("SiteCode","k"))
+# system(paste0("mkdir ",getwd(),"/SADs_preditas")) # pasta para armazenar os data.frames, só faz uma vez
+n_rep.SAD <- 100
+f_simulacao <- function(i,df_=df_simulacao){
+  X <- df_[i,] %>% as.data.frame()
+  mat_sim <- dinamica_coalescente(U = X[,"U_med"],
+                                  S = 0,
+                                  N_simul = n_rep.SAD,
+                                  seed = as.numeric(Sys.time()),
+                                  disp_range = X[,"d"],
+                                  disp_kernel = X[,"kernel_code"],
+                                  landscape = X[,"txt.name"])
+  df_SAD.replica <- bind_rows(alply(mat_sim,1,function(Y) data.frame(N = sort(as.integer(table(Y))) ) ),
+                              .id = "replica")
+  df_SAD.replica %<>% 
+    mutate(SiteCode = X$SiteCode, MN = "EE", k = X$k)
+  path.file <- paste0("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/paisagem_nula/SADs_preditas/",
+                      X[,"SiteCode"],
+                      "_k",X[,"k"],
+                      "_EE.csv")
+  write.csv(df_SAD.replica,
+            file = path.file,
+            row.names = FALSE)
+}
+registerDoMC(3)
+simulacao <- as.list(1:dim(df_simulacao)[1])
+l_ply(simulacao,f_simulacao,.parallel = TRUE)
+```
+
+<!-- As simulações das SADs ocorreram entre 23h10 e 00h30 -->
+
+<!-- - Códigos teste KS -->
+
+```{r dados para teste KS,echo=FALSE,eval=FALSE,include=FALSE}
+### dados e preparação
+df_U <- map_df(Sys.glob("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/paisagem_nula/U/*.csv"), read_csv)
+df_Umed <- df_U %>% 
+  ddply(.variables = c("SiteCode","k"),summarise,
+        U_med = mean(U),
+        U_var = var(U))
+## SAD obs
+df_SAD.obs <- read.csv(file="/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/dados_para_iniciar_artigo/abundances.csv",
+                       header = TRUE,as.is = TRUE)
+df_SAD.obs %<>% filter(SiteCode %in% unique(df_Umed$SiteCode))
+df_SAD.obs %<>% group_by(SiteCode) %>% nest %>% rename(SAD_obs=data)
+## SAD replica
+df_SADreplica <- Sys.glob("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/paisagem_nula/SADs_preditas/*.csv") %>% 
+  gsub("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/paisagem_nula/SADs_preditas/|.csv|_EE","",.) %>% 
+  adply(.,1,function(x) unname( unlist( strsplit(x,"_k",fixed = TRUE))),.id = NULL) %>% 
+  rename(SiteCode = V1,k = V2)
+df_SADreplica$file_path <- Sys.glob("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/paisagem_nula/SADs_preditas/*.csv")
+df_SADreplica %<>% group_by(SiteCode) %>% nest %>% rename(SAD_MN=data)
+## merge
+df_SADs <- inner_join(y=df_SADreplica,
+                      x=df_SAD.obs,
+                      by="SiteCode")
+
+### rotina de testes
+df_SADs$resultados <- vector("list",length = nrow(df_SADs))
+registerDoMC(3)
+for(i in 1:nrow(df_SADs)){
+  X <- df_SADs[i,]
+  v_SADobs <- X$SAD_obs[[1]]$N
+  # v_MN <- df_SADs$SAD_MN[1]
+  f_KS <- function(v_obs=v_SADobs,v_MN,boots=200){
+    testeKS <- ks_test(a=v_obs,b = v_MN, nboots = boots)
+    a <- data.frame(D_KSboot=testeKS[1],p.valor_KSboot=testeKS[2])
+    a$S_SAD.predita <- length(v_MN)
+    a$S_SAD.obs <- length(v_obs)
+    return(a)
+  }
+  df_predicao <- X$SAD_MN[[1]] %>% as.data.frame()
+  f_resultados <- function(path_df,parallel_=FALSE){
+    # path_df <- df_predicao$file_path[1]
+    df_SAD.MN <- read.csv(path_df,header = TRUE,as.is = TRUE)
+    df_return <- ddply(df_SAD.MN,"replica",function(Y) f_KS(v_MN=Y$N),.parallel = parallel_)
+    df_return %<>% mutate(SiteCode = df_SAD.MN$SiteCode[1], 
+                          MN = df_SAD.MN$MN[1], 
+                          k = df_SAD.MN$k[1])
+    return(df_return)
+  }
+  df_SADs$resultados[[i]] <- adply(df_predicao,1,
+                                   function(line) f_resultados(path_df = line$file_path),.parallel = TRUE)
+}
+for(i in 1:nrow(df_SADs)){
+  df_SADs$resultados[[i]]$replica <- as.character(df_SADs$resultados[[i]]$replica)
+}
+df_replicas <- df_SADs %>% rename(Site = SiteCode) %>% 
+  select(resultados) %>% unnest(cols=c(resultados)) %>% as.data.frame() %>% 
+  select(SiteCode,MN,k,replica,D_KSboot,p.valor_KSboot,S_SAD.predita,S_SAD.obs)
+write.csv(df_replicas,
+          file="/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/paisagem_nula/resultados/df_replicas.csv",
+          row.names = FALSE)
+```
+
+```{r summarise replicas teste KS,echo=FALSE,eval=FALSE,include=FALSE}
+# dados
+df_replicas <- read.csv("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/paisagem_nula/resultados/df_replicas.csv",
+                        header = TRUE,as.is = TRUE)
+df_replicas %<>% mutate(diff_S = (S_SAD.predita - S_SAD.obs)/S_SAD.obs)
+# sumarização
+alpha <- 0.05
+f_maxRank <- function(obs,predito){
+  max_rank <- max(c(obs,predito))
+  return(max_rank)
+}
+registerDoMC(3)
+df_resultados <- ddply(df_replicas,c("MN","k","SiteCode"),summarise,
+                       # D_mean = mean(D_KSboot), D_var = var(D_KSboot),
+                       # p.value_mean = mean(p.valor_KSboot),p.value_var = var(p.valor_KSboot),
+                       # S.MN_mean = mean(S_SAD.predita), S.MN_var = var(S_SAD.predita),
+                       S.obs_mean = mean(S_SAD.obs),
+                       # S.obs_var = var(S_SAD.obs),
+                       diffS_mean = mean(diff_S),diffS_var = var(diff_S),
+                       n_nRef = sum(p.valor_KSboot>=alpha), n_Ref = sum(p.valor_KSboot<alpha),
+                       # max_rank = f_maxRank(obs=S_SAD.obs,predito=S_SAD.predita),
+                       .parallel = TRUE)
+write.csv(df_resultados,
+          "/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/paisagem_nula/resultados/df_resultados.csv",
+          row.names = FALSE)
+```
+
+#####
+```{r comparacao modelos cheios nRefEE,echo=TRUE,eval=TRUE}
+# dados
+df_md <- df_resultados %>% filter(MN=="EE") %>% 
+  distinct() %>% 
+  mutate(rep = 1)
+df_md <- left_join(x=data.frame(rep=1,
+                                md_class=c("(p+p^2)(d+d^2)+(d+d^2|Site)",
+                                           "(p+p^2)+(1|Site)",
+                                           "(d+d^2)+(d+d^2|Site)",
+                                           "1")),
+                   y=df_md,
+                   by="rep")
+# função de ajuste
+f_md <- function(dados){
+  md_class <- unique(dados$md_class)
+  if(md_class == "(p+p^2)(d+d^2)+(d+d^2|Site)"){
+    md_ <- glmer(cbind(n_nRef,100-n_nRef) ~ 
+                      (p.z + I(p.z^2)) * (d.z + I(d.z^2)) + 
+                      (d.z + I(d.z^2)|SiteCode),
+                 family = "binomial",data=dados,
+                 control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e6)),
+                 na.action = "na.fail")
+  }else if(md_class == "(p+p^2)+(1|Site)"){
+    md_ <- glmer(cbind(n_nRef,100-n_nRef) ~ 
+                      p.z + I(p.z^2) + 
+                      (1|SiteCode),
+                 family = "binomial",data=dados,
+                 control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e6)),
+                 na.action = "na.fail")
+  }else if(md_class == "(d+d^2)+(d+d^2|Site)"){
+    md_ <- glmer(cbind(n_nRef,100-n_nRef) ~ 
+                      (d.z + I(d.z^2)) + 
+                      (d.z + I(d.z^2)|SiteCode),
+                 family = "binomial",data=dados,
+                 control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e6)),
+                 na.action = "na.fail")
+  }else{
+    md_ <- glmer(cbind(n_nRef,100-n_nRef) ~ 
+                      1 + 
+                      (1|SiteCode),
+                 family = "binomial",data=dados,
+                 control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e6)),
+                 na.action = "na.fail")
+  }
+  return(md_)
+}
+registerDoMC(3)
+l_nRefEE_mdCheio <- dlply(df_md,"md_class",f_md,.parallel = TRUE)
+save(l_nRefEE_mdCheio,file="~/Documentos/artigo_mestrado/1A.P_MOVER/paisagem_nula/resultados/l_nRefEE_mdCheio.Rdata")
+```
+
+
+__Tabela 2.2.1__ Comparação de modelos Cheios
+
+```{r AICctab l_nRefEE_mdCheio,echo=FALSE,eval=TRUE}
+# load("~/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/l_nRefEE_mdCheio.Rdata")
+load("~/Documentos/artigo_mestrado/1A.P_MOVER/paisagem_nula/resultados/l_nRefEE_mdCheio.Rdata")
+AICctab(l_nRefEE_mdCheio,weights=TRUE)
+# df_md <- df_resultados %>% filter(MN=="EE") %>% distinct()
+# md_nRefEE <- glmer(cbind(n_nRef,100-n_nRef) ~ 
+#                       (p.z + I(p.z^2)) * (d.z + I(d.z^2)) + 
+#                       (d.z + I(d.z^2)|SiteCode),
+#                  family = "binomial",data=df_md,
+#                  control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e6)),
+#                  na.action = "na.fail")
+```
