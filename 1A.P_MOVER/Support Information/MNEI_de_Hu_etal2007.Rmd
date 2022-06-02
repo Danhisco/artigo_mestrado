@@ -12,10 +12,49 @@ knitr::opts_chunk$set(echo = TRUE, eval=TRUE,message = FALSE, warning = FALSE)
 ```{r pacotes}
 library(magrittr)
 library(tidyverse)
+library(plyr)
+library(dplyr)
 ```
 
 Referência Base:
 Hu, X. S., He, F., & Hubbell, S. P. (2007). Species diversity in local neutral communities. American Naturalist, 170(6), 844–853. https://doi.org/10.1086/522935
+
+
+## Contexto
+
+```{r}
+df_U <- map_df(Sys.glob("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/simulacao_codigos_e_resultados/U/*.csv"), read_csv)
+df_simulacao <-  inner_join(x=distinct(dplyr::select(df_U, SiteCode, k, Ntotal, S_obs, kernel_code, DA, d, p, txt.name)),
+                            y=ddply(df_U,c("SiteCode","k"),summarise,U_med = mean(U), U_var = var(U)),
+                            by=c("SiteCode","k"))
+df_p_4_10 <- read.csv("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x4km/resultados/df_p_4x4_10x10.csv",
+                       header = TRUE) %>% 
+  dplyr::select(-p_10x10)
+df_resultados <- left_join(x=df_simulacao,
+                           y=df_p_4_10,
+                           by="SiteCode") %>% 
+  select(-p,-kernel_code,-txt.name) |>
+  select(SiteCode,p_4x4,k:U_med) |> 
+  dplyr::rename(p=p_4x4)
+# conversão de parâmetros
+df_resultados %<>% 
+  mutate(J_M = 1713.96 * DA * p, # 4.14x4.14  km2 = 1713.96 ha
+         L = sqrt( 10000 * (Ntotal/DA) ),
+         m = ((d^2)/(L^2)) *(L*sqrt(2)/d - 1/2 + (1-L * sqrt(2)/d) * exp(-L*sqrt(2)/d) - exp(-2*sqrt(2)*L/d)/2), # eq 8, Contas de Coutinho
+         m_ = m * p / ( 1 - (1-p)*m ),#eq 5
+         # theta = U_med * ( J_M - 1 ) / (1-U_med), #Vallade & Houshmandzadeh (2003)
+         theta = 2 * J_M * U_med,
+         ratio_J_JM = Ntotal/J_M) 
+df_resultados |> 
+  ggplot(aes(x=m_,y=U_med)) +
+  geom_bin2d(bins=70) +
+  scale_fill_continuous(type = "viridis") +
+  geom_abline(slope = 1,intercept = 0,color="red",alpha=0.6,size=1) +
+  coord_cartesian(expand = FALSE) +
+  labs(x="probabilidade m",y="taxa U",title="Em alguns casos U > m") +
+  theme_classic() 
+```
+
 
 ## Species Diversity under Constant Immigration
 
