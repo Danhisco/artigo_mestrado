@@ -1,0 +1,87 @@
+---
+title: "MNEI de Hu et al. 2007"
+author: "Danilo Pereira Mori"
+date: '2022-06-01'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, eval=TRUE,message = FALSE, warning = FALSE)
+```
+
+```{r pacotes}
+library(magrittr)
+library(tidyverse)
+```
+
+Referência Base:
+Hu, X. S., He, F., & Hubbell, S. P. (2007). Species diversity in local neutral communities. American Naturalist, 170(6), 844–853. https://doi.org/10.1086/522935
+
+## Species Diversity under Constant Immigration
+
+### Metacomunnity Diversity  
+  
+__Eq. 2 - The expected number of species per relative abundance__  
+  
+The distribution of relative species abundance in the neutral community has the form of infinite-allele modelo (Wright 1969):    
+      
+```{r eq 2}
+J_M <- 1.6*10^6 # avg density = 1000 individuals/ha, landscape area ~ 1600 ha
+U <- 10^(-5) # same as Hu et al. 2007
+theta <- 2*J_M*U # theta from the Markovian lineage of neutral models
+f_eq2 <- function(Q=1/J_M, theta=theta){ 
+  (v_numSpp_w_RabundQ <- (theta * ((1-Q)^(theta-1)))/Q)  # eq. 2 Hu et al. 2007
+}
+```
+```{r figura 1 sobre eq 2,echo=FALSE}
+df_plot <- data.frame(Q=seq(1/J_M,1,by=(10^3)/J_M)) |> 
+  mutate(numSpp = f_eq2(Q),
+         log_S = log(numSpp))
+v_labels <- c(numSpp="# esperado de espécies", log_S="log(# esperado de espécies)")
+df_plot |> 
+pivot_longer(!Q,names_to = "S",values_to = "S_value") |>
+ggplot(aes(x=Q,y=S_value)) +
+  geom_line() +
+  # scale_y_continuous(trans='log') +
+  facet_wrap(~S,ncol=2,scales="free",labeller = labeller(S = v_labels)) +
+  labs(y="number of spp that have relative abundance Q",title="JM=1.6e+6, U=10e-5, theta=32")
+```
+  
+__Figura 1__   
+  
+    
+Essa curva não é uma PDF da SAD da metacomunidade. O número esperado de espécies com abundância relativa menor do que `r round(max(df_plot$Q[df_plot$numSpp>=1]),4)`é sempre menor do que zero, e por definição o número esperado de espécies com Q=1 é zero.
+
+
+__Eq 3 - PDF for the relative abundance of species__
+
+```{r eq 3 e eq de C}
+# C equation from Hu et al. 2007
+f_preC <- function(Q,.theta=theta){
+  (v_ <- ((1-Q)^(.theta-1))/Q)
+}
+lInt_C <- integrate(f_preC,
+                    lower = 1/J_M, # only species with at least one individual (Hu et al. 2007)
+                    upper = 1)
+v_C <- (lInt_C$value)^(-1)
+# eq. 3
+f_eq3 <- function(.Q,.theta=theta,.C=v_C){
+  (v_ <- (.C * ((1-.Q) ^ (.theta-1)))/.Q) 
+}
+lInt_PDF <- integrate(f_eq3,
+                      lower = 1/J_M,
+                      upper = 1)
+```
+```{r figura 2 sobre a eq 3,echo=FALSE}
+df_plot %<>% 
+  mutate(Rel_Abund = f_eq3(Q),
+         log_RA = log(Rel_Abund))
+plot(density(log(df_plot$Rel_Abund)))
+# |>
+  
+  # ggplot(aes(x=Q,y=Rel_Abund)) +
+  # geom_line() +
+  # scale_y_continuous(trans='log')
+```
+
+
