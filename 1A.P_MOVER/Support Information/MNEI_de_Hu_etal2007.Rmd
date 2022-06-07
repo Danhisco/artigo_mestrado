@@ -9,7 +9,7 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE, eval=TRUE,message = FALSE, warning = FALSE)
 ```
 
-```{r pacotes}
+```{r pacotes,echo=FALSE,warning=FALSE,message=FALSE}
 library(magrittr)
 library(tidyverse)
 library(plyr)
@@ -22,7 +22,7 @@ Hu, X. S., He, F., & Hubbell, S. P. (2007). Species diversity in local neutral c
 
 ## Contexto
 
-```{r}
+```{r dados simulados,echo=FALSE,warning=FALSE,message=FALSE}
 df_U <- map_df(Sys.glob("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/simulacao_codigos_e_resultados/U/*.csv"), read_csv)
 df_simulacao <-  inner_join(x=distinct(dplyr::select(df_U, SiteCode, k, Ntotal, S_obs, kernel_code, DA, d, p, txt.name)),
                             y=ddply(df_U,c("SiteCode","k"),summarise,U_med = mean(U), U_var = var(U)),
@@ -36,23 +36,36 @@ df_resultados <- left_join(x=df_simulacao,
   select(-p,-kernel_code,-txt.name) |>
   select(SiteCode,p_4x4,k:U_med) |> 
   dplyr::rename(p=p_4x4)
-# conversão de parâmetros
+```
+```{r conversão de parâmetros}
 df_resultados %<>% 
   mutate(J_M = 1713.96 * DA * p, # 4.14x4.14  km2 = 1713.96 ha
          L = sqrt( 10000 * (Ntotal/DA) ),
          m = ((d^2)/(L^2)) *(L*sqrt(2)/d - 1/2 + (1-L * sqrt(2)/d) * exp(-L*sqrt(2)/d) - exp(-2*sqrt(2)*L/d)/2), # eq 8, Contas de Coutinho
          m_ = m * p / ( 1 - (1-p)*m ),#eq 5
-         # theta = U_med * ( J_M - 1 ) / (1-U_med), #Vallade & Houshmandzadeh (2003)
-         theta = 2 * J_M * U_med,
-         ratio_J_JM = Ntotal/J_M) 
-df_resultados |> 
+         ratio_J_JM = Ntotal/J_M)
+```
+```{r figura 1 U e m,fig.width=10,fig.height=4,echo=FALSE,warning=FALSE,message=FALSE}
+l_p <- list()
+l_p[[1]] <- df_resultados |> 
   ggplot(aes(x=m_,y=U_med)) +
   geom_bin2d(bins=70) +
   scale_fill_continuous(type = "viridis") +
   geom_abline(slope = 1,intercept = 0,color="red",alpha=0.6,size=1) +
   coord_cartesian(expand = FALSE) +
-  labs(x="probabilidade m",y="taxa U",title="Em alguns casos U > m") +
-  theme_classic() 
+  labs(x="probabilidade m corrigida por p",y="taxa U",title="Em alguns casos U > m e na maioria U não é << m") +
+  theme_classic()
+l_p[[2]] <- df_resultados |> 
+  ggplot(aes(x=m_,y=U_med)) +
+  geom_bin2d(bins=70) +
+  scale_fill_continuous(type = "viridis") +
+  geom_abline(slope = 1,intercept = 0,color="red",alpha=0.6,size=1) +
+  coord_cartesian(expand = FALSE) +
+  scale_y_continuous(trans="log10") +
+  scale_x_continuous(trans="log10") +
+  labs(x="probabilidade m corrigida por p",y="taxa U",title="log10 x log10") +
+  theme_classic()
+gridExtra::grid.arrange(grobs=l_p,ncol=2)
 ```
 
 
@@ -62,20 +75,20 @@ df_resultados |>
   
 __Eq. 2 - The expected number of species per relative abundance__  
   
-The distribution of relative species abundance in the neutral community has the form of infinite-allele modelo (Wright 1969):    
+The distribution of relative species abundance in the neutral community has the form of infinite-allele model (Wright 1969):    
       
-```{r eq 2}
+```{r eq 2,echo=TRUE}
 J_M <- 1.6*10^6 # avg density = 1000 individuals/ha, landscape area ~ 1600 ha
 U <- 10^(-5) # same as Hu et al. 2007
 theta <- 2*J_M*U # theta from the Markovian lineage of neutral models
-f_eq2 <- function(Q=1/J_M, theta=theta){ 
-  (v_numSpp_w_RabundQ <- (theta * ((1-Q)^(theta-1)))/Q)  # eq. 2 Hu et al. 2007
+f_eq2 <- function(Q=1/J_M, .theta=theta){ 
+  (v_numSpp_w_RabundQ <- (.theta * ((1-Q)^(.theta-1)))/Q)  # eq. 2 Hu et al. 2007
 }
 ```
 ```{r figura 1 sobre eq 2,echo=FALSE}
 df_plot <- data.frame(Q=seq(1/J_M,1,by=(10^3)/J_M)) |> 
   mutate(numSpp = f_eq2(Q),
-         log_S = log(numSpp))
+         log_S = log10(numSpp))
 v_labels <- c(numSpp="# esperado de espécies", log_S="log(# esperado de espécies)")
 df_plot |> 
 pivot_longer(!Q,names_to = "S",values_to = "S_value") |>
@@ -83,7 +96,9 @@ ggplot(aes(x=Q,y=S_value)) +
   geom_line() +
   # scale_y_continuous(trans='log') +
   facet_wrap(~S,ncol=2,scales="free",labeller = labeller(S = v_labels)) +
-  labs(y="number of spp that have relative abundance Q",title="JM=1.6e+6, U=10e-5, theta=32")
+  labs(y="number of spp that have relative abundance Q",
+       title= "eq. 2",
+       subtitle="JM=1.6e+6, U=10e-5, theta=2*J_M*U=32")
 ```
   
 __Figura 1__   
@@ -111,16 +126,87 @@ lInt_PDF <- integrate(f_eq3,
                       lower = 1/J_M,
                       upper = 1)
 ```
-```{r figura 2 sobre a eq 3,echo=FALSE}
+```{r mutate eq 3,echo=FALSE}
 df_plot %<>% 
   mutate(Rel_Abund = f_eq3(Q),
-         log_RA = log(Rel_Abund))
-plot(density(log(df_plot$Rel_Abund)))
-# |>
+         log_RA = log10(Rel_Abund))
+# plot(density(log(df_plot$Rel_Abund)))
+```
+```{r figura 2 sobre a eq 3,echo=FALSE}
+v_labels <- c(Rel_Abund="# esperado de espécies", log_RA="log(# esperado de espécies)")
+df_plot |> 
+  select(-c(numSpp,log_S)) |> 
+  pivot_longer(!Q,names_to = "S",values_to = "S_value") |>
+  ggplot(aes(x=Q,y=S_value)) +
+  geom_line() +
+  # scale_y_continuous(trans='log') +
+  facet_wrap(~S,ncol=2,scales="free",labeller = labeller(S = v_labels)) +
+  labs(y="number of spp that have relative abundance Q",
+       title= "eq. 3",
+       subtitle="JM=1.6e+6, U=10e-5, theta=2*J_M*U=32")
+# df_plot |>
+#   ggplot(aes(x=Q,y=Rel_Abund)) +
+#   geom_line() +
+#   scale_y_continuous(trans='log')
+```
+
   
-  # ggplot(aes(x=Q,y=Rel_Abund)) +
-  # geom_line() +
-  # scale_y_continuous(trans='log')
+### Local Community Diversity  
+
+
+
+__eq 4__ The expected number of species with abundance x at local community  
+
+The density distribution of the average relative abundance of a species Q in the immigrants in a local community, equal to Q in the metacommunity, can be described by equation (3).
+
+
+Without variation in immigration, the density function for species abundance in the local community J(x) can be readily obtained, conditional on the relative abundance in migrants (Q), that is, phi_(x|Q).
+
+
+  
+   
+```{r eq 4, eval=FALSE}
+f_eq4 <- function(x,Q,C_1,lambda,theta_){
+  v_ <- C_1 * ((1-x) ^ (2 * lambda *(1-Q) + theta_ -1))*(x^(2*lambda*Q-1))
+}
+```
+```{r parametros locais}
+J = 1000 # moda de indivíduos em 1ha
+theta_ = 2 * J * U
+lambda = J * mean(df_resultados$m_)
+```
+```{r eq 5}
+f_eq5 <- function(.x=1/J,
+                  .J_M=J_M,
+                  .J=J,
+                  .C=v_C,
+                  .theta=theta,
+                  .theta_=theta_,
+                  .lambda=lambda){
+  f_Int <- function(Q,
+                    x=.x,
+                    lamb = .lambda,
+                    theta_peq = .theta_,
+                    theta_g = .theta){
+    # the conditional relative spp abundance in the local community
+    ## C1:
+    exp( lgamma(2 * lamb + theta_peq + 1) - (lgamma(2*lamb*(1-Q)) + lgamma(2*lamb*Q+1)) ) *
+    ## x:
+    ((1-x)^(2*lamb*(1-Q) + theta_peq)) * (x^((2*lamb*Q)-1)) *
+    # the PDF of the relative spp abundance in the metacommunity
+    ((1-Q)^(theta_g-1))/Q
+  }
+lInt_ <- integrate(f_Int,  # mensagem do exemplo "531558.7 with absolute error < 39"
+                   upper = 1,
+                   lower = 1/.J_M)
+v_exp_NumSpp_abundance_x <- lInt_$value * .C
+return(v_exp_NumSpp_abundance_x)
+}
+df_dados <- data.frame(x=seq(1/J,1,by=1/J)) |> 
+  mutate(exp_sppRich = function(x) f_eq5(.x=x))
+df_dados$exp_sppRich <- aaply(df_dados,.margins = 1,.fun = function(X) f_eq5(x=X))
+f_eq5(.x=0.5)
+
 ```
 
 
