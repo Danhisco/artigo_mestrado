@@ -22,7 +22,7 @@ Hu, X. S., He, F., & Hubbell, S. P. (2007). Species diversity in local neutral c
 
 ## Contexto
 
-```{r dados simulados,echo=FALSE,warning=FALSE,message=FALSE}
+```{r dados simulados,echo=FALSE,warning=FALSE,message=FALSE, eval=FALSE}
 df_U <- map_df(Sys.glob("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/simulacao_codigos_e_resultados/U/*.csv"), read_csv)
 df_simulacao <-  inner_join(x=distinct(dplyr::select(df_U, SiteCode, k, Ntotal, S_obs, kernel_code, DA, d, p, txt.name)),
                             y=ddply(df_U,c("SiteCode","k"),summarise,U_med = mean(U), U_var = var(U)),
@@ -36,8 +36,11 @@ df_resultados <- left_join(x=df_simulacao,
   select(-p,-kernel_code,-txt.name) |>
   select(SiteCode,p_4x4,k:U_med) |> 
   dplyr::rename(p=p_4x4)
+write_csv(df_resultados,
+          file = "/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/df_dados_Hu2007.csv")
 ```
 ```{r conversão de parâmetros}
+df_resultados <- read_csv("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/df_dados_Hu2007.csv")
 df_resultados %<>% 
   mutate(J_M = 1713.96 * DA * p, # 4.14x4.14  km2 = 1713.96 ha
          L = sqrt( 10000 * (Ntotal/DA) ),
@@ -81,6 +84,7 @@ The distribution of relative species abundance in the neutral community has the 
 J_M <- 1.6*10^6 # avg density = 1000 individuals/ha, landscape area ~ 1600 ha
 U <- 10^(-5) # same as Hu et al. 2007
 theta <- 2*J_M*U # theta from the Markovian lineage of neutral models
+###
 f_eq2 <- function(Q=1/J_M, .theta=theta){ 
   (v_numSpp_w_RabundQ <- (.theta * ((1-Q)^(.theta-1)))/Q)  # eq. 2 Hu et al. 2007
 }
@@ -98,7 +102,7 @@ ggplot(aes(x=Q,y=S_value)) +
   facet_wrap(~S,ncol=2,scales="free",labeller = labeller(S = v_labels)) +
   labs(y="number of spp that have relative abundance Q",
        title= "eq. 2",
-       subtitle="JM=1.6e+6, U=10e-5, theta=2*J_M*U=32")
+       subtitle="JM=1.6e+6, U=1e-5, theta=2*J_M*U=32")
 ```
   
 __Figura 1__   
@@ -202,10 +206,29 @@ v_exp_NumSpp_abundance_x <- lInt_$value * .C
 return(v_exp_NumSpp_abundance_x)
 }
 #### em construção
-df_dados <- data.frame(x=seq(1/J,1,by=1/J)) |> 
-  mutate(exp_sppRich = function(x) f_eq5(.x=x))
+df_dados <- data.frame(x=seq(1/J,1,by=1/J)) 
+# |> 
+  # mutate(exp_sppRich = function(x) f_eq5(.x=x))
 df_dados$exp_sppRich <- aaply(df_dados,.margins = 1,.fun = function(X) f_eq5(x=X))
 f_eq5(.x=0.5)
+v_ExpRich <- vector("numeric")
+for(i in 1:nrow(df_dados)){
+  v_ExpRich[i] <- f_eq5(.x=df_dados$x[i])
+}
+# v_ExpRich |> range()
+df_dados$ExpRich <- v_ExpRich
+v_labels <- c(ExpRich="# esperado de espécies", log_ExpRich="log(# esperado de espécies)")
+df_dados |> 
+  mutate(log_ExpRich = log(ExpRich)) |> 
+  pivot_longer(!x,names_to = "S",values_to = "S_value") |>
+  ggplot(aes(x=x,y=S_value)) +
+  geom_line() +
+  # scale_y_continuous(trans='log') +
+  facet_wrap(~S,ncol=2,scales="free",labeller = labeller(S = v_labels)) +
+  labs(y="number of spp that have relative abundance Q",
+       title= "eq. 5",
+       subtitle="J=1000, U=10e-5")
+
 ```
 
 
