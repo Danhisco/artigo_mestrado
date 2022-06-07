@@ -6,7 +6,7 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, eval=TRUE,message = FALSE, warning = FALSE)
+knitr::opts_chunk$set(echo = TRUE, eval=TRUE,message = FALSE, warning = FALSE,cache=TRUE)
 ```
 
 ```{r pacotes,echo=FALSE,warning=FALSE,message=FALSE}
@@ -163,8 +163,7 @@ The density distribution of the average relative abundance of a species Q in the
 Without variation in immigration, the density function for species abundance in the local community J(x) can be readily obtained, conditional on the relative abundance in migrants (Q), that is, phi_(x|Q).
 
 
-  
-   
+
 ```{r eq 4, eval=FALSE}
 f_eq4 <- function(x,Q,C_1,lambda,theta_){
   v_ <- C_1 * ((1-x) ^ (2 * lambda *(1-Q) + theta_ -1))*(x^(2*lambda*Q-1))
@@ -175,7 +174,7 @@ J = 1000 # moda de indivíduos em 1ha
 theta_ = 2 * J * U
 lambda = J * mean(df_resultados$m_)
 ```
-```{r eq 5}
+```{r eq 5,eval=FALSE}
 f_eq5 <- function(.x=1/J,
                   .J_M=J_M,
                   .J=J,
@@ -202,11 +201,11 @@ lInt_ <- integrate(f_Int,  # mensagem do exemplo "531558.7 with absolute error <
 v_exp_NumSpp_abundance_x <- lInt_$value * .C
 return(v_exp_NumSpp_abundance_x)
 }
+#### em construção
 df_dados <- data.frame(x=seq(1/J,1,by=1/J)) |> 
   mutate(exp_sppRich = function(x) f_eq5(.x=x))
 df_dados$exp_sppRich <- aaply(df_dados,.margins = 1,.fun = function(X) f_eq5(x=X))
 f_eq5(.x=0.5)
-
 ```
 
 
