@@ -11,6 +11,7 @@ knitr::opts_chunk$set(echo = TRUE, eval=TRUE,message = FALSE, warning = FALSE,ca
 
 ```{r pacotes,echo=FALSE,warning=FALSE,message=FALSE}
 library(magrittr)
+library(doMC)
 library(tidyverse)
 library(plyr)
 library(dplyr)
@@ -264,12 +265,13 @@ f_MNEI_Hu_etal_2007 <- function(.J_M,.J,.U,.m){
                      upper = 1,
                      lower = 1/.J_M),
         silent = TRUE)
-    try(v_ExpRich_withRelAbun_x <- lInt_$value*C,
+    try(v_ExpRich_withRelAbun_x <- lInt_$value*v_C,
         silent = TRUE)
     return(ifelse(.x == 1, 0, v_ExpRich_withRelAbun_x))
   }
 df_return <- data.frame(x=seq(1/.J,1,by=1/.J))  
 df_return$ExpRich <- sapply(df_return$x,f_ExpRich)
+f_ExpRich(.x = 0.01)
 return(df_return)
 }
 f_simMNEI <- function(i,df_=df_fig3_HUetal2007){
@@ -280,8 +282,10 @@ f_simMNEI <- function(i,df_=df_fig3_HUetal2007){
                               .m = X$m)
   return(df_r)
 }
-
-
+registerDoMC(2)
+simulacao <- as.list(1:dim(df_fig3_HUetal2007)[1])
+teste <- ldply(simulacao,f_simMNEI,.parallel = TRUE)
+teste |> head()
 
 ```
 
