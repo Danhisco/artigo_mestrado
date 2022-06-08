@@ -86,7 +86,7 @@ U <- 10^(-5) # same as Hu et al. 2007
 theta <- 2*J_M*U # theta from the Markovian lineage of neutral models
 ###
 f_eq2 <- function(Q=1/J_M, .theta=theta){ 
-  (v_numSpp_w_RabundQ <- (.theta * ((1-Q)^(.theta-1)))/Q)  # eq. 2 Hu et al. 2007
+  (v_numSpp_w_RabundQ <- (.theta * ((1-Q)^(.theta-1)) )/Q)  # eq. 2 Hu et al. 2007
 }
 ```
 ```{r figura 1 sobre eq 2,echo=FALSE}
@@ -176,9 +176,10 @@ f_eq4 <- function(x,Q,C_1,lambda,theta_){
 ```{r parametros locais}
 J = 1000 # moda de indivíduos em 1ha
 theta_ = 2 * J * U
-lambda = J * mean(df_resultados$m_)
+# lambda = J * mean(df_resultados$m_)
+lambda = 1
 ```
-```{r eq 5,eval=FALSE}
+```{r eq 5,eval=TRUE}
 f_eq5 <- function(.x=1/J,
                   .J_M=J_M,
                   .J=J,
@@ -195,7 +196,7 @@ f_eq5 <- function(.x=1/J,
     ## C1:
     exp( lgamma(2 * lamb + theta_peq + 1) - (lgamma(2*lamb*(1-Q)) + lgamma(2*lamb*Q+1)) ) *
     ## x:
-    ((1-x)^(2*lamb*(1-Q) + theta_peq)) * (x^((2*lamb*Q)-1)) *
+    ((1-x)^(2*lamb*(1-Q) + theta_peq-1)) * (x^((2*lamb*Q)-1)) *
     # the PDF of the relative spp abundance in the metacommunity
     ((1-Q)^(theta_g-1))/Q
   }
@@ -209,8 +210,8 @@ return(v_exp_NumSpp_abundance_x)
 df_dados <- data.frame(x=seq(1/J,1,by=1/J)) 
 # |> 
   # mutate(exp_sppRich = function(x) f_eq5(.x=x))
-df_dados$exp_sppRich <- aaply(df_dados,.margins = 1,.fun = function(X) f_eq5(x=X))
-f_eq5(.x=0.5)
+# df_dados$exp_sppRich <- aaply(df_dados,.margins = 1,.fun = function(X) f_eq5(x=X))
+# f_eq5(.x=0.5)
 v_ExpRich <- vector("numeric")
 for(i in 1:nrow(df_dados)){
   v_ExpRich[i] <- f_eq5(.x=df_dados$x[i])
@@ -228,6 +229,59 @@ df_dados |>
   labs(y="number of spp that have relative abundance Q",
        title= "eq. 5",
        subtitle="J=1000, U=10e-5")
+
+```
+Reprodução Figura 3
+
+```{r}
+# dados usados na figura
+df_fig3_HUetal2007 <- data.frame(U=10^(-5),J=10^4,J_M=10^6,m=10^(-6:-3))
+# eq 5
+f_MNEI_Hu_etal_2007 <- function(.J_M,.J,.U,.m){
+# par. primários 
+  theta_grande <- 2*.J_M*.U
+  theta_pequeno <- 2*.J*.U
+  lambda <- .J*.m
+# C: metacommunity normalization factor
+  lInt_C <- integrate(f = function(Q) ((1-Q)^(theta_grande-1))/Q,
+                      lower = 1/.J_M, # only species with at least one individual (Hu et al. 2007)
+                      upper = 1)
+  v_C <- (lInt_C$value)^(-1)
+# função que integra todos os possíveis Q para um determinado x
+  f_ExpRich <- function(.x){
+    f_Int <- function(Q){
+    # local community
+    C1 <- exp( lgamma(2 * lambda + theta_pequeno + 1) - (lgamma(2*lambda*(1-Q)+theta_pequeno) + lgamma(2*lambda*Q+1)) )
+    primeiro_termo <- (1-.x)^(2*lambda*(1-Q)+theta_pequeno-1)
+    segundo_termo <- .x^(2*lambda*Q-1)
+    # PDF metacommunity
+    metacommunity <- ((1-Q)^(theta_grande-1))/Q
+    v_return <- C1 * primeiro_termo * segundo_termo * metacommunity
+    return(v_return)
+    }
+    # integral em todos os possíveis valores de Q
+    try(lInt_ <- integrate(f = f_Int,
+                     upper = 1,
+                     lower = 1/.J_M),
+        silent = TRUE)
+    try(v_ExpRich_withRelAbun_x <- lInt_$value*C,
+        silent = TRUE)
+    return(ifelse(.x == 1, 0, v_ExpRich_withRelAbun_x))
+  }
+df_return <- data.frame(x=seq(1/.J,1,by=1/.J))  
+df_return$ExpRich <- sapply(df_return$x,f_ExpRich)
+return(df_return)
+}
+f_simMNEI <- function(i,df_=df_fig3_HUetal2007){
+  X <- df_[i,]
+  df_r <- f_MNEI_Hu_etal_2007(.J_M = X$J_M,
+                              .J = X$J,
+                              .U = X$U,
+                              .m = X$m)
+  return(df_r)
+}
+
+
 
 ```
 
