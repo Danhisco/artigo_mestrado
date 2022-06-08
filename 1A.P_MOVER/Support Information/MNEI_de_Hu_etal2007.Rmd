@@ -180,7 +180,7 @@ theta_ = 2 * J * U
 # lambda = J * mean(df_resultados$m_)
 lambda = 1
 ```
-```{r eq 5,eval=TRUE}
+```{r eq 5,eval=FALSE}
 f_eq5 <- function(.x=1/J,
                   .J_M=J_M,
                   .J=J,
@@ -234,7 +234,7 @@ df_dados |>
 ```
 Reprodução Figura 3
 
-```{r}
+```{r,echo=TRUE,eval=FALSE}
 # dados usados na figura
 df_fig3_HUetal2007 <- data.frame(U=10^(-5),J=10^4,J_M=10^6,m=10^(-6:-3))
 # eq 5
@@ -271,7 +271,6 @@ f_MNEI_Hu_etal_2007 <- function(.J_M,.J,.U,.m){
   }
 df_return <- data.frame(x=seq(1/.J,1,by=1/.J))  
 df_return$ExpRich <- sapply(df_return$x,f_ExpRich)
-f_ExpRich(.x = 0.01)
 return(df_return)
 }
 f_simMNEI <- function(i,df_=df_fig3_HUetal2007){
