@@ -11,8 +11,10 @@ knitr::opts_chunk$set(echo = TRUE, eval=TRUE,message = FALSE, warning = FALSE,ca
 
 ```{r pacotes,echo=FALSE,warning=FALSE,message=FALSE}
 library(magrittr)
+library(jpeg)
 library(doMC)
 library(tidyverse)
+library(cowplot)
 library(plyr)
 library(dplyr)
 ```
@@ -21,7 +23,7 @@ Referência Base:
 Hu, X. S., He, F., & Hubbell, S. P. (2007). Species diversity in local neutral communities. American Naturalist, 170(6), 844–853. https://doi.org/10.1086/522935
 
 
-## Contexto
+<!-- ## Contexto -->
 
 ```{r dados simulados,echo=FALSE,warning=FALSE,message=FALSE, eval=FALSE}
 df_U <- map_df(Sys.glob("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/simulacao_codigos_e_resultados/U/*.csv"), read_csv)
@@ -40,7 +42,7 @@ df_resultados <- left_join(x=df_simulacao,
 write_csv(df_resultados,
           file = "/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/df_dados_Hu2007.csv")
 ```
-```{r conversão de parâmetros}
+```{r conversão de parâmetros,echo=FALSE,eval=FALSE}
 df_resultados <- read_csv("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/df_dados_Hu2007.csv")
 df_resultados %<>% 
   mutate(J_M = 1713.96 * DA * p, # 4.14x4.14  km2 = 1713.96 ha
@@ -49,7 +51,7 @@ df_resultados %<>%
          m_ = m * p / ( 1 - (1-p)*m ),#eq 5
          ratio_J_JM = Ntotal/J_M)
 ```
-```{r figura 1 U e m,fig.width=10,fig.height=4,echo=FALSE,warning=FALSE,message=FALSE}
+```{r figura 1 U e m,fig.width=10,fig.height=4,echo=FALSE,warning=FALSE,message=FALSE,eval=FALSE}
 l_p <- list()
 l_p[[1]] <- df_resultados |> 
   ggplot(aes(x=m_,y=U_med)) +
@@ -73,179 +75,17 @@ gridExtra::grid.arrange(grobs=l_p,ncol=2)
 ```
 
 
-## Species Diversity under Constant Immigration
+## Hu et al. 2007  
 
-### Metacomunnity Diversity  
-  
-__Eq. 2 - The expected number of species per relative abundance__  
-  
-The distribution of relative species abundance in the neutral community has the form of infinite-allele model (Wright 1969):    
-      
-```{r eq 2,echo=TRUE}
-J_M <- 1.6*10^6 # avg density = 1000 individuals/ha, landscape area ~ 1600 ha
-U <- 10^(-5) # same as Hu et al. 2007
-theta <- 2*J_M*U # theta from the Markovian lineage of neutral models
-###
-f_eq2 <- function(Q=1/J_M, .theta=theta){ 
-  (v_numSpp_w_RabundQ <- (.theta * ((1-Q)^(.theta-1)) )/Q)  # eq. 2 Hu et al. 2007
-}
-```
-```{r figura 1 sobre eq 2,echo=FALSE}
-df_plot <- data.frame(Q=seq(1/J_M,1,by=(10^3)/J_M)) |> 
-  mutate(numSpp = f_eq2(Q),
-         log_S = log10(numSpp))
-v_labels <- c(numSpp="# esperado de espécies", log_S="log(# esperado de espécies)")
-df_plot |> 
-pivot_longer(!Q,names_to = "S",values_to = "S_value") |>
-ggplot(aes(x=Q,y=S_value)) +
-  geom_line() +
-  # scale_y_continuous(trans='log') +
-  facet_wrap(~S,ncol=2,scales="free",labeller = labeller(S = v_labels)) +
-  labs(y="number of spp that have relative abundance Q",
-       title= "eq. 2",
-       subtitle="JM=1.6e+6, U=1e-5, theta=2*J_M*U=32")
-```
-  
-__Figura 1__   
-  
-    
-Essa curva não é uma PDF da SAD da metacomunidade. O número esperado de espécies com abundância relativa menor do que `r round(max(df_plot$Q[df_plot$numSpp>=1]),4)`é sempre menor do que zero, e por definição o número esperado de espécies com Q=1 é zero.
+__Eq. 5:__
 
-
-__Eq 3 - PDF for the relative abundance of species__
-
-```{r eq 3 e eq de C}
-# C equation from Hu et al. 2007
-f_preC <- function(Q,.theta=theta){
-  (v_ <- ((1-Q)^(.theta-1))/Q)
-}
-lInt_C <- integrate(f_preC,
-                    lower = 1/J_M, # only species with at least one individual (Hu et al. 2007)
-                    upper = 1)
-v_C <- (lInt_C$value)^(-1)
-# eq. 3
-f_eq3 <- function(.Q,.theta=theta,.C=v_C){
-  (v_ <- (.C * ((1-.Q) ^ (.theta-1)))/.Q) 
-}
-lInt_PDF <- integrate(f_eq3,
-                      lower = 1/J_M,
-                      upper = 1)
-```
-```{r mutate eq 3,echo=FALSE}
-df_plot %<>% 
-  mutate(Rel_Abund = f_eq3(Q),
-         log_RA = log10(Rel_Abund))
-# plot(density(log(df_plot$Rel_Abund)))
-```
-```{r figura 2 sobre a eq 3,echo=FALSE}
-v_labels <- c(Rel_Abund="# esperado de espécies", log_RA="log(# esperado de espécies)")
-df_plot |> 
-  select(-c(numSpp,log_S)) |> 
-  pivot_longer(!Q,names_to = "S",values_to = "S_value") |>
-  ggplot(aes(x=Q,y=S_value)) +
-  geom_line() +
-  # scale_y_continuous(trans='log') +
-  facet_wrap(~S,ncol=2,scales="free",labeller = labeller(S = v_labels)) +
-  labs(y="number of spp that have relative abundance Q",
-       title= "eq. 3",
-       subtitle="JM=1.6e+6, U=10e-5, theta=2*J_M*U=32")
-# df_plot |>
-#   ggplot(aes(x=Q,y=Rel_Abund)) +
-#   geom_line() +
-#   scale_y_continuous(trans='log')
-```
-
-  
-### Local Community Diversity  
-
-
-
-__eq 4__ The expected number of species with abundance x at local community  
-
-The density distribution of the average relative abundance of a species Q in the immigrants in a local community, equal to Q in the metacommunity, can be described by equation (3).
-
-
-Without variation in immigration, the density function for species abundance in the local community J(x) can be readily obtained, conditional on the relative abundance in migrants (Q), that is, phi_(x|Q).
-
-
-
-```{r eq 4, eval=FALSE}
-f_eq4 <- function(x,Q,C_1,lambda,theta_){
-  v_ <- C_1 * ((1-x) ^ (2 * lambda *(1-Q) + theta_ -1))*(x^(2*lambda*Q-1))
-}
-```
-```{r parametros locais}
-J = 1000 # moda de indivíduos em 1ha
-theta_ = 2 * J * U
-# lambda = J * mean(df_resultados$m_)
-lambda = 1
-```
-```{r eq 5,eval=FALSE}
-f_eq5 <- function(.x=1/J,
-                  .J_M=J_M,
-                  .J=J,
-                  .C=v_C,
-                  .theta=theta,
-                  .theta_=theta_,
-                  .lambda=lambda){
-  f_Int <- function(Q,
-                    x=.x,
-                    lamb = .lambda,
-                    theta_peq = .theta_,
-                    theta_g = .theta){
-    # the conditional relative spp abundance in the local community
-    ## C1:
-    exp( lgamma(2 * lamb + theta_peq + 1) - (lgamma(2*lamb*(1-Q)) + lgamma(2*lamb*Q+1)) ) *
-    ## x:
-    ((1-x)^(2*lamb*(1-Q) + theta_peq-1)) * (x^((2*lamb*Q)-1)) *
-    # the PDF of the relative spp abundance in the metacommunity
-    ((1-Q)^(theta_g-1))/Q
-  }
-lInt_ <- integrate(f_Int,  # mensagem do exemplo "531558.7 with absolute error < 39"
-                   upper = 1,
-                   lower = 1/.J_M)
-v_exp_NumSpp_abundance_x <- lInt_$value * .C
-return(v_exp_NumSpp_abundance_x)
-}
-#### em construção
-df_dados <- data.frame(x=seq(1/J,1,by=1/J)) 
-# |> 
-  # mutate(exp_sppRich = function(x) f_eq5(.x=x))
-# df_dados$exp_sppRich <- aaply(df_dados,.margins = 1,.fun = function(X) f_eq5(x=X))
-# f_eq5(.x=0.5)
-v_ExpRich <- vector("numeric")
-for(i in 1:nrow(df_dados)){
-  v_ExpRich[i] <- f_eq5(.x=df_dados$x[i])
-}
-# v_ExpRich |> range()
-df_dados$ExpRich <- v_ExpRich
-v_labels <- c(ExpRich="# esperado de espécies", log_ExpRich="log(# esperado de espécies)")
-df_dados |> 
-  mutate(log_ExpRich = log(ExpRich)) |> 
-  pivot_longer(!x,names_to = "S",values_to = "S_value") |>
-  ggplot(aes(x=x,y=S_value)) +
-  geom_line() +
-  # scale_y_continuous(trans='log') +
-  facet_wrap(~S,ncol=2,scales="free",labeller = labeller(S = v_labels)) +
-  labs(y="number of spp that have relative abundance Q",
-       title= "eq. 5",
-       subtitle="J=1000, U=10e-5")
-
-```
-Reprodução Figura 3
-
-```{r,echo=TRUE,eval=FALSE}
-# dados usados na figura 3
-df_fig3_HUetal2007 <- data.frame(U=10^(-5),J=10^4,J_M=10^6,m=10^(-6:-3)) |> 
-  mutate(lambda=factor(J*m))
-f_rep <- function(x,n_rep=100) {
-  x <- x[rep(1:dim(x)[1],each=n_rep),]
-  x$rep <- rep(1:100,4)
-  row.names(x) <- NULL
-  return(x)
-}
-# df_fig3_HUetal2007 <- f_rep(df_fig3_HUetal2007)
-# eq 5
+```{r equacao 5 de Hu et al 2007, echo=TRUE,eval=TRUE}
+# .J_M <- 10^6
+# .J <- 10^4
+# .U <- 10^(-5)
+# .m <- 10^(-6)
+# .x <- 1/.J
+# Q <- 1/.J_M
 f_MNEI_Hu_etal_2007 <- function(.J_M,.J,.U,.m){
 # par. primários 
   theta_grande <- 2*.J_M*.U
@@ -281,6 +121,17 @@ df_return <- data.frame(x=seq(1/.J,1,by=1/.J))
 df_return$ExpRich <- sapply(df_return$x,f_ExpRich)
 return(df_return)
 }
+```
+```{r dados para figura 3 de Hu et al 2007, echo=FALSE,eval=TRUE}
+# dados usados na figura 3
+df_fig3_HUetal2007 <- data.frame(U=10^(-5),J=10^4,J_M=10^6,m=10^(-6:-3)) |> 
+  mutate(lambda=factor(J*m))
+f_rep <- function(x,n_rep=100) {
+  x <- x[rep(1:dim(x)[1],each=n_rep),]
+  x$rep <- rep(1:100,4)
+  row.names(x) <- NULL
+  return(x)
+}
 registerDoMC(2)
 df_plot  <- ddply(df_fig3_HUetal2007,
                   "lambda",
@@ -290,13 +141,27 @@ df_plot  <- ddply(df_fig3_HUetal2007,
                                                   .m = X$m),
                   .parallel = TRUE)
 # df_plot |> is.na() |> table() |> names() == "FALSE"
-df_plot |> 
+```
+```{r grafico para reproduzir figura 3 de Hu et al 2007 e comparacao, echo=FALSE,eval=TRUE,fig.width=10}
+l_p <- list()
+l_p[[1]] <- df_plot |> 
   mutate(lambda=as.numeric(as.character(lambda))) |>
   ggplot(aes(x=x,y=ExpRich,group=lambda)) +
   geom_line(aes(color=lambda)) +
   ylim(0,80) +
-  labs(title="lambda = c(0.01, 0.1, 1, 10)") +
-  theme_classic()
-```
+  # labs(title="lambda = c(0.01, 0.1, 1, 10)") +
+  theme_classic() +
+  theme(
+    legend.position = c(.90, .95),
+    legend.justification = c("right", "top"),
+    legend.box.just = "right",
+    legend.margin = margin(6, 6, 6, 6)
+    )
 
+photo <- readJPEG("/home/danilo/Documentos/mestrado_Ecologia - USP/comites/1oComite/encaminhamentos/MNEI_c_Ulocal/Fig3_HUetal2007.jpg",native=TRUE)
+l_p[[2]] <- ggdraw() + draw_image(photo, scale = 1)
+plot_grid(plotlist = l_p, ncol = 2,rel_heights = c(0.35,1))
+```
+  
+Figura com os mesmos parâmetros da figura 3 de Hu et al. 2007.  
 
