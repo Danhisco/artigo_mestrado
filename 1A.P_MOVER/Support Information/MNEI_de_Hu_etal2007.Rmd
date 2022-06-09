@@ -289,7 +289,14 @@ df_plot  <- ddply(df_fig3_HUetal2007,
                                                   .U = X$U,
                                                   .m = X$m),
                   .parallel = TRUE)
-
+# df_plot |> is.na() |> table() |> names() == "FALSE"
+df_plot |> 
+  mutate(lambda=as.numeric(as.character(lambda))) |>
+  ggplot(aes(x=x,y=ExpRich,group=lambda)) +
+  geom_line(aes(color=lambda)) +
+  ylim(0,80) +
+  labs(title="lambda = c(0.01, 0.1, 1, 10)") +
+  theme_classic()
 ```
 
 
