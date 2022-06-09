@@ -235,8 +235,16 @@ df_dados |>
 Reprodução Figura 3
 
 ```{r,echo=TRUE,eval=FALSE}
-# dados usados na figura
-df_fig3_HUetal2007 <- data.frame(U=10^(-5),J=10^4,J_M=10^6,m=10^(-6:-3))
+# dados usados na figura 3
+df_fig3_HUetal2007 <- data.frame(U=10^(-5),J=10^4,J_M=10^6,m=10^(-6:-3)) |> 
+  mutate(lambda=factor(J*m))
+f_rep <- function(x,n_rep=100) {
+  x <- x[rep(1:dim(x)[1],each=n_rep),]
+  x$rep <- rep(1:100,4)
+  row.names(x) <- NULL
+  return(x)
+}
+# df_fig3_HUetal2007 <- f_rep(df_fig3_HUetal2007)
 # eq 5
 f_MNEI_Hu_etal_2007 <- function(.J_M,.J,.U,.m){
 # par. primários 
@@ -273,18 +281,14 @@ df_return <- data.frame(x=seq(1/.J,1,by=1/.J))
 df_return$ExpRich <- sapply(df_return$x,f_ExpRich)
 return(df_return)
 }
-f_simMNEI <- function(i,df_=df_fig3_HUetal2007){
-  X <- df_[i,]
-  df_r <- f_MNEI_Hu_etal_2007(.J_M = X$J_M,
-                              .J = X$J,
-                              .U = X$U,
-                              .m = X$m)
-  return(df_r)
-}
 registerDoMC(2)
-simulacao <- as.list(1:dim(df_fig3_HUetal2007)[1])
-teste <- ldply(simulacao,f_simMNEI,.parallel = TRUE)
-teste |> head()
+df_plot  <- ddply(df_fig3_HUetal2007,
+                  "lambda",
+                  function(X) f_MNEI_Hu_etal_2007(.J_M = X$J_M,
+                                                  .J = X$J,
+                                                  .U = X$U,
+                                                  .m = X$m),
+                  .parallel = TRUE)
 
 ```
 
