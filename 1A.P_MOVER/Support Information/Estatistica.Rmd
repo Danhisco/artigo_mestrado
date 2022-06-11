@@ -119,32 +119,40 @@ f_logOR <- function(x_num,y_den){
 }
 df_U <- df_U |> 
   mutate(logOR_U.m = f_logOR(x_num = U_med,y_den = m_ ))
-df_U |> 
+l_p <- list()
+l_p[[1]] <- df_U |> 
   ggplot(aes(x=logOR_U.m)) +
   geom_vline(xintercept = 0,color="red",alpha=0.5) +
   geom_density() +
   labs(title="log odds ratio (U/m)",x="") +
   theme(plot.title = element_text(hjust = 0.5))
-```
-```{r logOR Um por sitio,fig.width=8, fig.height=27}
-df_plot <- df_U %>%
-  mutate(title = paste0(SiteCode," p=",round(p,3))) %>% arrange(p)
-df_plot$title <- factor(df_plot$title,levels = unique(df_plot$title))
-df_plot %>% ggplot(aes(x=d,y=logOR_U.m)) +
-  geom_smooth(method = "loess",se = FALSE,color="red",alpha=0.5) +
-  geom_point(alpha=0.5) + 
-  facet_wrap(~title,ncol=5)
-```
+l_p[[2]] <- df_U |> 
+  ggplot(aes(x=p,y=logOR_U.m)) +
+  geom_point() +
+  geom_smooth()
 
+```
 
 
 ```{r gamm logOR Um}
 #####
 df_U$SiteCode <- factor(df_U$SiteCode)
+# +- 1h:
 md_logOR_Um <- gam(logOR_U.m ~ s(d.z,bs="cr",k=15) + s(p.z,bs="cr",k=10) + 
                      ti(d.z,p.z,bs=c("cr","cr"),k=c(15,10)) +
                      s(d.z,SiteCode,bs="fs",k=15,xt=list("cr"),m=1),
                    data = df_U, family=gaussian, method = "REML")
+gam.check(md_logOR_Um)
+save(md_logOR_Um,file = "~/Documentos/artigo_mestrado/1A.P_MOVER/resultados_e_SI/md_logOR_Um.Rdata")
+```
+```{r logOR Um por sitio,fig.width=8, fig.height=27}
+df_plot <- df_U %>%
+  mutate(title = paste0(SiteCode," p=",round(p,3))) %>% arrange(p)
+df_plot$title <- factor(df_plot$title,levels = unique(df_plot$title))
+df_plot %>% ggplot(aes(x=log10_d,y=logOR_U.m)) +
+  geom_smooth(method = "loess",se = FALSE,color="red",alpha=0.5,formula="y~x") +
+  geom_point(alpha=0.5) + 
+  facet_wrap(~title,ncol=5,scales = "free")
 ```
 
 
