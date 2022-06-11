@@ -47,21 +47,23 @@ library(tidyr)
 library(purrr)
 library(plyr)
 library(dplyr)
+select <- dplyr::select
+rename <- dplyr::rename
 ```
 
 ```{r dados,message=FALSE}
 ### dados ###
 # leitura
 df_resultados <- read.csv(file="/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/simulacao_codigos_e_resultados/resultados/df_resultados.csv",
-                            header = TRUE,as.is=FALSE)[,1:13]
+                            header = TRUE,as.is=FALSE)[,1:13] |> 
+  dplyr::select(-p)
 df_p_4_10 <- read.csv("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x4km/resultados/df_p_4x4_10x10.csv",
                        header = TRUE) %>% 
-  select(-p_10x10)
+  dplyr::select(-p_10x10)
 df_resultados <- left_join(x=df_resultados,
                            y=df_p_4_10,
-                           by="SiteCode") %>% 
-  rename(p_10x10=p,
-         p=p_4x4)
+                           by="SiteCode") %>%
+  rename(p=p_4x4)
 # padronização
 level_k <- as.character(unique(sort(as.numeric(df_resultados$k),decreasing = TRUE)))
 df_resultados$k <- factor(df_resultados$k,levels = level_k)
@@ -81,19 +83,70 @@ df_resultados %<>% mutate(diffS_gamma = diffS_mean + min(diffS_mean)*(-1) + 0.01
                           log10_U = log10(U_med),
                           log10_d = log10(d))
 
-df_resultados.z <- as.data.frame(apply(df_resultados[,c("p","p_10x10","Ntotal","log10_Sobs","k_1","d_Lplot","d","log10_d","modulo_diffS")],2,f_z))
+df_resultados.z <- as.data.frame(
+  apply(
+    df_resultados[,
+                  c("p","Ntotal","log10_Sobs","k_1","d_Lplot","d","log10_d","modulo_diffS")],
+    2,f_z))
 names(df_resultados.z) <- sapply(names(df_resultados.z), function(x) paste0(x,".z"))
 df_resultados %<>% cbind(.,df_resultados.z) %>% 
   select(-k_1,-k_1.z)
 ###############
 df_U <- df_resultados %>% 
-  filter(MN=="EE") %>%  
-  select(U_med,log10_U,SiteCode,k,d,d.z,p,p.z,log10_Sobs,log10_Sobs.z,log10_d,log10_d.z) %>% 
-  distinct 
-#%>% 
-  # mutate(log10_Sobs = log10(S_obs),
-         # log10_U = log10(U_med))
+  filter(MN=="EE") %>%
+  select(U_med,log10_U,SiteCode,k,d,d.z,p,p.z,log10_Sobs,log10_Sobs.z,log10_d,log10_d.z,Ntotal,DA) %>% 
+  distinct |> 
+  mutate(J_M = 1713.96 * DA * p,
+         L = sqrt( 10000 * (Ntotal/DA) ),
+         m = ((d^2)/(L^2)) *(L*sqrt(2)/d - 1/2 + (1-L * sqrt(2)/d) * exp(-L*sqrt(2)/d) - exp(-2*sqrt(2)*L/d)/2),
+         m_ = m * p / ( 1 - (1-p)*m ),
+         ratio_J_JM = Ntotal/J_M)
 ```
+</br>
+
+# Log Odds Ratio: U/m
+
+<!-- To remove all except one: -->
+<!-- rm(list=setdiff(ls(), "df_U")) -->
+
+É necessário desconsiderar o efeito da riqueza? Diria que não. A pergunta é se, nos eventos de substituição de indivíduos locais por de fora da parcela (1-m), a chance de ser de uma nova espécies na paisagem (U) é maior do que ser de um indivíduo da paisagem ao redor da parcela (m) em paisagens com baixa proporção de cobertura vegetal. E pra isso não é necessário descontar o efeito da riqueza observada em determinar a magnitude de U, na verdade essa relação que é o interesse. 
+  
+    
+```{r criacao logOR U m}
+# dados
+f_logOR <- function(x_num,y_den){
+  (v <- log((x_num/(1-x_num))/(y_den/(1-y_den))))
+}
+df_U <- df_U |> 
+  mutate(logOR_U.m = f_logOR(x_num = U_med,y_den = m_ ))
+df_U |> 
+  ggplot(aes(x=logOR_U.m)) +
+  geom_vline(xintercept = 0,color="red",alpha=0.5) +
+  geom_density() +
+  labs(title="log odds ratio (U/m)",x="") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+```{r logOR Um por sitio,fig.width=8, fig.height=27}
+df_plot <- df_U %>%
+  mutate(title = paste0(SiteCode," p=",round(p,3))) %>% arrange(p)
+df_plot$title <- factor(df_plot$title,levels = unique(df_plot$title))
+df_plot %>% ggplot(aes(x=d,y=logOR_U.m)) +
+  geom_smooth(method = "loess",se = FALSE,color="red",alpha=0.5) +
+  geom_point(alpha=0.5) + 
+  facet_wrap(~title,ncol=5)
+```
+
+
+
+```{r gamm logOR Um}
+#####
+df_U$SiteCode <- factor(df_U$SiteCode)
+md_logOR_Um <- gam(logOR_U.m ~ s(d.z,bs="cr",k=15) + s(p.z,bs="cr",k=10) + 
+                     ti(d.z,p.z,bs=c("cr","cr"),k=c(15,10)) +
+                     s(d.z,SiteCode,bs="fs",k=15,xt=list("cr"),m=1),
+                   data = df_U, family=gaussian, method = "REML")
+```
+
 
 
 # 0 - Relação Riqueza na área amostral ~ Proporção de Cobertura vegetal na paisagem local
@@ -2785,7 +2838,6 @@ write.csv(df_plot_U,file="~/Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x
 # dados
 df_plot <- read.csv("~/Documentos/artigo_mestrado/1A.P_MOVER/piloto_MNEE_4x4km/resultados/df_plot_U.Rdata",
                       header = TRUE,as.is = TRUE)
-apply(df_plot[,c("fit","lower","upper")],2,function(X) formatC(X,format="e")) %>% summary
 ## graficos
 l_p <- list()
 # 
