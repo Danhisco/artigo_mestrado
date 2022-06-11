@@ -88,7 +88,7 @@ Anteriormente aproximamos MNEI pela fórmula de amostragem de Etienne (2005). Ne
 
 </br>
 
-Posteriormente encontramos o artigo de Hu et al (2007) onde eles criam um MNEI em que há U localmente e exploram o limite em que J -> J_M. Nós exploramos em algum grau esse limite ao investigar paisagens com perda de cobertura vegetal, porém, mesmo nas paisagens com perda de cobertura vegetal mais severa (~5% de cobertura remanescente) a área da parcela corresponde à menos de 1% da área total de cobertura vegetal, se mantendo distante da situação limite que Hu et al. 2007 exploram de J/J_M = 1. Assim, escolhemos implementar MNEI de Hu et al. (2007) pela possibilidade de incluir U localmente. Na situação limite de m->U, a SAD predita pela fórmula de amostragem (Etienne 2005) deve tender para uma lognormal; em MNEI de Hu et al. (2007) na ausência de propágulos vindos da paisagem ao redor é possível modelar a SAD local como de uma metacomunidade de tamanho J, se aproximando de uma SAD com duas modas: raras e abundantes (fig. 3). 
+Posteriormente encontramos o artigo de Hu et al (2007) onde eles criam um MNEI em que há U localmente e exploram o limite em que J -> J_M. Nós exploramos em algum grau esse limite ao investigar paisagens com perda de cobertura vegetal, porém, mesmo nas paisagens com perda de cobertura vegetal mais severa (~5% de cobertura remanescente) a área da parcela corresponde à menos de 1% da área total de cobertura vegetal, se mantendo distante da situação limite que Hu et al. 2007 exploram de J/J_M = 1. Assim, escolhemos implementar MNEI de Hu et al. (2007) pela possibilidade de incluir U localmente. Na situação limite de m->U, a SAD predita pela fórmula de amostragem (Etienne 2005) deve tender para uma lognormal (Magurran 2003); em MNEI de Hu et al. (2007), na ausência de propágulos vindos da paisagem ao redor é possível modelar a SAD local como de uma metacomunidade de tamanho J, se aproximando de uma SAD com duas modas: raras e abundantes (fig. 3, Hu et al. 2007). 
   
 </br>
   
@@ -96,6 +96,8 @@ Posteriormente encontramos o artigo de Hu et al (2007) onde eles criam um MNEI e
 
 -   A chance de U é maior do que a chance de m em paisagens com baixa proporção de cobertura vegetal?  
 -   No campo de parâmetros investigado, há diferença na SAD predita pela fórmula de amostragem (Etienne 2005) e MNEI de Hu et al. (2007)?  
+
+# Descrição do LogOR(U/m)
 
 
 
@@ -126,7 +128,8 @@ f_MNEI_Hu_etal_2007 <- function(.J_M,.J,.U,.m){
   f_ExpRich <- function(.x){
     f_Int <- function(Q){
     # local community
-    C1 <- exp( lgamma(2 * lambda + theta_pequeno + 1) - (lgamma(2*lambda*(1-Q)+theta_pequeno) + lgamma(2*lambda*Q+1)) )
+    C1 <- exp( lgamma(2 * lambda + theta_pequeno + 1) - 
+                 (lgamma(2*lambda*(1-Q)+theta_pequeno) + lgamma(2*lambda*Q+1)) )
     primeiro_termo <- (1-.x)^(2*lambda*(1-Q)+theta_pequeno-1)
     segundo_termo <- .x^(2*lambda*Q-1)
     # PDF metacommunity
@@ -154,7 +157,7 @@ df_fig3_HUetal2007 <- data.frame(U=10^(-5),J=10^4,J_M=10^6,m=10^(-6:-3)) |>
   mutate(lambda=factor(J*m))
 f_rep <- function(x,n_rep=100) {
   x <- x[rep(1:dim(x)[1],each=n_rep),]
-  x$rep <- rep(1:100,4)
+  x$rep <- rep(1:n_rep,4)
   row.names(x) <- NULL
   return(x)
 }
@@ -168,7 +171,7 @@ df_plot  <- ddply(df_fig3_HUetal2007,
                   .parallel = TRUE)
 # df_plot |> is.na() |> table() |> names() == "FALSE"
 ```
-```{r grafico para reproduzir figura 3 de Hu et al 2007 e comparacao, echo=FALSE,eval=TRUE,fig.width=10}
+```{r grafico para reproduzir figura 3 de Hu et al 2007 e comparacao, echo=FALSE,eval=FALSE,fig.width=10}
 l_p <- list()
 l_p[[1]] <- df_plot |> 
   mutate(lambda=as.numeric(as.character(lambda))) |>
