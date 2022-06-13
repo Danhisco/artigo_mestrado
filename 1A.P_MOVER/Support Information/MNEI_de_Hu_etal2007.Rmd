@@ -23,11 +23,11 @@ library(dplyr)
 Referência Base:
 Hu, X. S., He, F., & Hubbell, S. P. (2007). Species diversity in local neutral communities. American Naturalist, 170(6), 844–853. https://doi.org/10.1086/522935
 
-</br>
+<!-- </br> -->
 
-# Contexto
+<!-- # Contexto -->
 
-</br>
+<!-- </br> -->
 
 ```{r dados simulados,echo=FALSE,warning=FALSE,message=FALSE, eval=FALSE}
 df_U <- map_df(Sys.glob("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/simulacao_codigos_e_resultados/U/*.csv"), read_csv)
@@ -55,7 +55,7 @@ df_resultados %<>%
          m_ = m * p / ( 1 - (1-p)*m ),#eq 5
          ratio_J_JM = Ntotal/J_M)
 ```
-```{r figura 1 U e m,fig.width=10,fig.height=4,echo=FALSE,warning=FALSE,message=FALSE,eval=TRUE}
+```{r figura 1 U e m,fig.width=10,fig.height=4,echo=FALSE,warning=FALSE,message=FALSE,eval=FALSE}
 l_p <- list()
 l_p[[1]] <- df_resultados |> 
   ggplot(aes(x=m_,y=U_med)) +
@@ -78,38 +78,38 @@ l_p[[2]] <- df_resultados |>
 gridExtra::grid.arrange(grobs=l_p,ncol=2)
 ```
 
-</br>
+<!-- </br> -->
 
-__Figura 1__  Probabilidade média de surgimento de um indivíduo de uma nova espécie na paisagem (U) e a probabilidade média de uma colonização na comunidade local ser de um propágulo vindo da paisagem ao redor (m), corrigida pela proporção de cobertura vegetal na paisagem (p).  
+<!-- __Figura 1__  Probabilidade média de surgimento de um indivíduo de uma nova espécie na paisagem (U) e a probabilidade média de uma colonização na comunidade local ser de um propágulo vindo da paisagem ao redor (m), corrigida pela proporção de cobertura vegetal na paisagem (p).   -->
 
-</br>    
-  
-Anteriormente aproximamos MNEI pela fórmula de amostragem de Etienne (2005). Nesse modelo, e na maior parte dos modelos neutros espacialmente implícitos, se assume que U << m e, portanto, é possível negligenciar U na comunidade local. Em nosso caso, que estamos interpretando MNEI como uma simplificação de MNEE e usamos o último para estimar o parâmetro U para um dado cenário de limitação de dispersão, não encontramos situações em que é razoável pressupor U << m (Figura 1). Acredito que iniciamos a investigação com a fórmula de amostragem pois ela já tinha sido comparada anteriormente com MNEE (Etienne & Rosindell 2011), mesmo MNEE pressupondo U local. Apesar de não se considerar U local, os modelos espacialmente implícitos podem decompor m no componente de espécies locais daquele de novas espécies (species input, Condit et al. 2012). Ambos parâmetros da fórmula de amostragem (theta e (I ou m?)) são correlacionados simultaneamente com o desvio-padrão da função de dispersão e com U de MNEE (Etienne & Rosindell 2011). Assim uma primeira aproximação que pensamos em fazer foi o de usar a fórmula de amostragem somando no parâmetro m a taxa U, inflando o species input, para aproveitar pacotes existentes do R (e.g. untb).   
+<!-- </br>     -->
 
-</br>
+<!-- Anteriormente aproximamos MNEI pela fórmula de amostragem de Etienne (2005). Nesse modelo, e na maior parte dos modelos neutros espacialmente implícitos, se assume que U << m e, portanto, é possível negligenciar U na comunidade local. Em nosso caso, que estamos interpretando MNEI como uma simplificação de MNEE e usamos o último para estimar o parâmetro U para um dado cenário de limitação de dispersão, não encontramos situações em que é razoável pressupor U << m (Figura 1). Acredito que iniciamos a investigação com a fórmula de amostragem pois ela já tinha sido comparada anteriormente com MNEE (Etienne & Rosindell 2011), mesmo MNEE pressupondo U local. Apesar de não se considerar U local, os modelos espacialmente implícitos podem decompor m no componente de espécies locais daquele de novas espécies (species input, Condit et al. 2012). Ambos parâmetros da fórmula de amostragem (theta e (I ou m?)) são correlacionados simultaneamente com o desvio-padrão da função de dispersão e com U de MNEE (Etienne & Rosindell 2011). Assim uma primeira aproximação que pensamos em fazer foi o de usar a fórmula de amostragem somando no parâmetro m a taxa U, inflando o species input, para aproveitar pacotes existentes do R (e.g. untb).    -->
 
-Posteriormente encontramos o artigo de Hu et al (2007) onde eles criam um MNEI em que há U localmente e exploram o limite em que J -> J_M. Nós exploramos em algum grau esse limite ao investigar paisagens com perda de cobertura vegetal, porém, mesmo nas paisagens com perda de cobertura vegetal mais severa (~5% de cobertura remanescente) a área da parcela corresponde à menos de 1% da área total de cobertura vegetal, se mantendo distante da situação limite que Hu et al. 2007 exploram de J/J_M = 1. Assim, escolhemos implementar MNEI de Hu et al. (2007) pela possibilidade de incluir U localmente. Na situação limite de m->U, a SAD predita pela fórmula de amostragem (Etienne 2005) deve tender para uma lognormal (Magurran 2003); em MNEI de Hu et al. (2007), na ausência de propágulos vindos da paisagem ao redor é possível modelar a SAD local como de uma metacomunidade de tamanho J, se aproximando de uma SAD com duas modas: raras e abundantes (fig. 3, Hu et al. 2007). 
-  
-</br>
-  
-### Perguntas
+<!-- </br> -->
 
--   A chance de U é maior do que a chance de m em paisagens com baixa proporção de cobertura vegetal?  
--   No campo de parâmetros investigado, há diferença na SAD predita pela fórmula de amostragem (Etienne 2005) e MNEI de Hu et al. (2007)?  
+<!-- Posteriormente encontramos o artigo de Hu et al (2007) onde eles criam um MNEI em que há U localmente e exploram o limite em que J -> J_M. Nós exploramos em algum grau esse limite ao investigar paisagens com perda de cobertura vegetal, porém, mesmo nas paisagens com perda de cobertura vegetal mais severa (~5% de cobertura remanescente) a área da parcela corresponde à menos de 1% da área total de cobertura vegetal, se mantendo distante da situação limite que Hu et al. 2007 exploram de J/J_M = 1. Assim, escolhemos implementar MNEI de Hu et al. (2007) pela possibilidade de incluir U localmente. Na situação limite de m->U, a SAD predita pela fórmula de amostragem (Etienne 2005) deve tender para uma lognormal (Magurran 2003); em MNEI de Hu et al. (2007), na ausência de propágulos vindos da paisagem ao redor é possível modelar a SAD local como de uma metacomunidade de tamanho J, se aproximando de uma SAD com duas modas: raras e abundantes (fig. 3, Hu et al. 2007).  -->
 
-# Descrição do LogOR(U/m)
+<!-- </br> -->
+
+<!-- ### Perguntas -->
+
+<!-- -   A chance de U é maior do que a chance de m em paisagens com baixa proporção de cobertura vegetal?   -->
+<!-- -   No campo de parâmetros investigado, há diferença na SAD predita pela fórmula de amostragem (Etienne 2005) e MNEI de Hu et al. (2007)?   -->
+
+<!-- # Descrição do LogOR(U/m) -->
 
 
 
-# MNEI
+<!-- # MNEI -->
 
 ## Hu et al. 2007  
 
 __Eq. 5:__
 
 ```{r equacao 5 de Hu et al 2007, echo=TRUE,eval=TRUE}
-# .J_M <- 10^6
-# .J <- 10^4
+# .JM <- 10^6
+# .JL <- 10^4
 # .U <- 10^(-5)
 # .m <- 10^(-6)
 # .x <- 1/.J
@@ -150,33 +150,54 @@ df_return <- data.frame(x=seq(1/.J,1,by=1/.J))
 df_return$ExpRich <- sapply(df_return$x,f_ExpRich)
 return(df_return)
 }
+###### código do PI adaptado do SI de Hu et al. 2007
+f_MNEI_HUetal2017 <- function(.U,.m,.JL,.JM){
+  f_abundance <- function(x, speciation, migration_rate, JL, JM){
+    small_theta <- 2*JL*speciation
+    capital_theta <- 2*JM*speciation
+    migrants <- JL*migration_rate
+    f1 <- function(y) (1-y)^(capital_theta-1)/y
+    .C <- 1/integrate(f1,1/JM, 1)$value
+    c1 <- function(Q){
+      lc1 <- lgamma(2*migrants+small_theta+1) -
+        (lgamma(2*migrants*(1-Q)+small_theta) + lgamma(2*migrants*Q+1))
+      exp(lc1)
+    }
+    f2 <- function(Q)
+      c1(Q)*(1-x)^(2*migrants*(1-Q)+small_theta-1)*x^(2*migrants*Q-1)*(1-Q)^(capital_theta-1)/Q
+    .C*integrate(f2, 1/JM, 1)$value
+  }
+  r.abund <- seq(0.01,0.99, by=0.01) #seq(1/.JL,0.99, by=1/.JL)
+  phi.x <- sapply(r.abund, f_abundance , speciation = .U, migration_rate = .m, JL = .JL, JM=.JM)
+  df_ <- data.frame(x=r.abund,phi_x=phi.x)
+  return(df_)
+}
 ```
 ```{r dados para figura 3 de Hu et al 2007, echo=FALSE,eval=TRUE}
 # dados usados na figura 3
-df_fig3_HUetal2007 <- data.frame(U=10^(-5),J=10^4,J_M=10^6,m=10^(-6:-3)) |> 
+df_fig3_HUetal2007 <- data.frame(U=10^(-5),J=10^4,JM=10^6,m=10^(-6:-3)) |> 
   mutate(lambda=factor(J*m))
-f_rep <- function(x,n_rep=100) {
-  x <- x[rep(1:dim(x)[1],each=n_rep),]
-  x$rep <- rep(1:n_rep,4)
-  row.names(x) <- NULL
-  return(x)
-}
+# f_rep <- function(x,n_rep=100) {
+  # x <- x[rep(1:dim(x)[1],each=n_rep),]
+  # x$rep <- rep(1:n_rep,4)
+  # row.names(x) <- NULL
+  # return(x)
+# }
 registerDoMC(2)
 df_plot  <- ddply(df_fig3_HUetal2007,
                   "lambda",
-                  function(X) f_MNEI_Hu_etal_2007(.J_M = X$J_M,
-                                                  .J = X$J,
-                                                  .U = X$U,
-                                                  .m = X$m),
+                  function(X) f_MNEI_HUetal2017(.JM = X$JM,.JL = X$J,.U = X$U,.m = X$m),
                   .parallel = TRUE)
 # df_plot |> is.na() |> table() |> names() == "FALSE"
 ```
-```{r grafico para reproduzir figura 3 de Hu et al 2007 e comparacao, echo=FALSE,eval=FALSE,fig.width=10}
+```{r grafico para reproduzir figura 3 de Hu et al 2007 e comparacao, echo=FALSE,eval=TRUE,fig.width=10}
 l_p <- list()
 l_p[[1]] <- df_plot |> 
   mutate(lambda=as.numeric(as.character(lambda))) |>
-  ggplot(aes(x=x,y=ExpRich,group=lambda)) +
+  filter(x>=0.03) |> 
+  ggplot(aes(x=x,y=phi_x,group=lambda)) +
   geom_line(aes(color=lambda)) +
+  # geom_point() +
   ylim(0,80) +
   # labs(title="lambda = c(0.01, 0.1, 1, 10)") +
   theme_classic() +
@@ -185,9 +206,11 @@ l_p[[1]] <- df_plot |>
     legend.justification = c("right", "top"),
     legend.box.just = "right",
     legend.margin = margin(6, 6, 6, 6)
-    )
+    ) +
+  coord_cartesian(expand = FALSE)
 
-photo <- readJPEG("/home/danilo/Documentos/mestrado_Ecologia - USP/comites/1oComite/encaminhamentos/MNEI_c_Ulocal/Fig3_HUetal2007.jpg",native=TRUE)
+photo <- readJPEG("/home/danilo/Documentos/mestrado_Ecologia - USP/comites/1oComite/encaminhamentos/MNEI_c_Ulocal/Fig3_HUetal2007.jpg",
+                  native=TRUE)
 l_p[[2]] <- ggdraw() + draw_image(photo, scale = 1)
 plot_grid(plotlist = l_p, ncol = 2,rel_heights = c(0.35,1))
 ```
