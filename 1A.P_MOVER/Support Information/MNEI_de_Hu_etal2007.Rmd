@@ -114,42 +114,6 @@ __Eq. 5:__
 # .m <- 10^(-6)
 # .x <- 1/.J
 # Q <- 1/.J_M
-f_MNEI_Hu_etal_2007 <- function(.J_M,.J,.U,.m){
-# par. primários 
-  theta_grande <- 2*.J_M*.U
-  theta_pequeno <- 2*.J*.U
-  lambda <- .J*.m
-# C: metacommunity normalization factor
-  lInt_C <- integrate(f = function(Q) ((1-Q)^(theta_grande-1))/Q,
-                      lower = 1/.J_M, # only species with at least one individual (Hu et al. 2007)
-                      upper = 1)
-  v_C <- (lInt_C$value)^(-1)
-# função que integra todos os possíveis Q para um determinado x
-  f_ExpRich <- function(.x){
-    f_Int <- function(Q){
-    # local community
-    C1 <- exp( lgamma(2 * lambda + theta_pequeno + 1) - 
-                 (lgamma(2*lambda*(1-Q)+theta_pequeno) + lgamma(2*lambda*Q+1)) )
-    primeiro_termo <- (1-.x)^(2*lambda*(1-Q)+theta_pequeno-1)
-    segundo_termo <- .x^(2*lambda*Q-1)
-    # PDF metacommunity
-    metacommunity <- ((1-Q)^(theta_grande-1))/Q
-    v_return <- C1 * primeiro_termo * segundo_termo * metacommunity
-    return(v_return)
-    }
-    # integral em todos os possíveis valores de Q
-    try(lInt_ <- integrate(f = f_Int,
-                     upper = 1,
-                     lower = 1/.J_M),
-        silent = TRUE)
-    try(v_ExpRich_withRelAbun_x <- lInt_$value*v_C,
-        silent = TRUE)
-    return(ifelse(.x == 1, 0, v_ExpRich_withRelAbun_x))
-  }
-df_return <- data.frame(x=seq(1/.J,1,by=1/.J))  
-df_return$ExpRich <- sapply(df_return$x,f_ExpRich)
-return(df_return)
-}
 ###### código do PI adaptado do SI de Hu et al. 2007
 f_MNEI_HUetal2017 <- function(.U,.m,.JL,.JM){
   f_abundance <- function(x, speciation, migration_rate, JL, JM){
@@ -212,8 +176,104 @@ l_p[[1]] <- df_plot |>
 photo <- readJPEG("/home/danilo/Documentos/mestrado_Ecologia - USP/comites/1oComite/encaminhamentos/MNEI_c_Ulocal/Fig3_HUetal2007.jpg",
                   native=TRUE)
 l_p[[2]] <- ggdraw() + draw_image(photo, scale = 1)
-plot_grid(plotlist = l_p, ncol = 2,rel_heights = c(0.35,1))
+plot_grid(plotlist = l_p, ncol = 2,rel_heights = c(-0.15,1))
 ```
   
-Figura com os mesmos parâmetros da figura 3 de Hu et al. 2007.  
+__Figura 1__ Comparação da figura 3 de Hu et al. 2007 e aquela obtida pela versão do código em R. Nesse exemplo as abundâncias relativas abaixo de 0.03 não foram adiconados.
+
+
+```{r figura de phi de x com abund relat completa,echo=FALSE,eval=FALSE}
+df_plot |> 
+  mutate(lambda=as.numeric(as.character(lambda))) |>
+  # filter(x>=0.03) |> 
+  ggplot(aes(x=x,y=phi_x,group=lambda)) +
+  geom_line(aes(color=lambda)) +
+  # geom_point() +
+  ylim(0,80) +
+  # labs(title="lambda = c(0.01, 0.1, 1, 10)") +
+  theme_classic() +
+  theme(
+    legend.position = c(.90, .95),
+    legend.justification = c("right", "top"),
+    legend.box.just = "right",
+    legend.margin = margin(6, 6, 6, 6)
+    ) +
+  coord_cartesian(expand = FALSE) #+
+  # facet_wrap(~lambda,ncol=2)
+```
+  
+__Figura 2__ Idem com abundância relativa entre 1/J e 1.  
+
+
+### Investigação da equação 5 quando lambda -> 0
+
+Um aspecto fundamental do modelo de Hu et al. (2007) é que quando m->0 a distribuição de abundância de espécies da comunidade local converge para a distribuição esperada se fosse uma metacomunidade de tamanho $J_L$ (equação 2).
+  
+    
+$$
+eq 2: \Phi(Q) = \Theta\frac{(1-Q)^{\Theta-1}}{Q}
+$$
+  
+    
+Quando m=0, a equação 5 não converge para a equação 2:
+
+$$
+\phi(x) = C\int_{1/J_M}^{1}C_1\frac{(1-x)^{\theta-1}}{x}\frac{(1-Q)^{\Theta-1}}{Q}dQ
+$$
+  
+Eu acho estranho que nessa situação a distribuição de abundância da metacomunidade seja relevante, não? No texto eles falam que a remoção de $\bar{Q}$ é desejável pois em geral não se sabe "the ratio of the abundance of an immigrating species to the total abundance of all immigrants per unit time interval". Pra mim essa afirmação não é verdadeira, pois as inforações necessárias para se obter a equação 3 e $\bar{Q}$ são iguais. 
+
+Já a equação 4 parece ter a propriedade de convergir para a equação 2, quando m=0:
+
+$$
+\phi(x|Q) = C_1\frac{(1-x)^{\theta-1}}x
+$$
+$$
+C_1 = \frac{\Gamma(\theta+1)}{\Gamma(\theta)}
+$$
+
+
+
+
+
+<!-- Material Suplementar -->
+
+```{r 1a versao MNEI, echo=FALSE, eval=FALSE}
+f_MNEI_Hu_etal_2007 <- function(.J_M,.J,.U,.m){
+# par. primários 
+  theta_grande <- 2*.J_M*.U
+  theta_pequeno <- 2*.J*.U
+  lambda <- .J*.m
+# C: metacommunity normalization factor
+  lInt_C <- integrate(f = function(Q) ((1-Q)^(theta_grande-1))/Q,
+                      lower = 1/.J_M, # only species with at least one individual (Hu et al. 2007)
+                      upper = 1)
+  v_C <- (lInt_C$value)^(-1)
+# função que integra todos os possíveis Q para um determinado x
+  f_ExpRich <- function(.x){
+    f_Int <- function(Q){
+    # local community
+    C1 <- exp( lgamma(2 * lambda + theta_pequeno + 1) - 
+                 (lgamma(2*lambda*(1-Q)+theta_pequeno) + lgamma(2*lambda*Q+1)) )
+    primeiro_termo <- (1-.x)^(2*lambda*(1-Q)+theta_pequeno-1)
+    segundo_termo <- .x^(2*lambda*Q-1)
+    # PDF metacommunity
+    metacommunity <- ((1-Q)^(theta_grande-1))/Q
+    v_return <- C1 * primeiro_termo * segundo_termo * metacommunity
+    return(v_return)
+    }
+    # integral em todos os possíveis valores de Q
+    try(lInt_ <- integrate(f = f_Int,
+                     upper = 1,
+                     lower = 1/.J_M),
+        silent = TRUE)
+    try(v_ExpRich_withRelAbun_x <- lInt_$value*v_C,
+        silent = TRUE)
+    return(ifelse(.x == 1, 0, v_ExpRich_withRelAbun_x))
+  }
+df_return <- data.frame(x=seq(1/.J,1,by=1/.J))  
+df_return$ExpRich <- sapply(df_return$x,f_ExpRich)
+return(df_return)
+}
+```
 
