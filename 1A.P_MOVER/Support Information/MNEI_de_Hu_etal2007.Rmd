@@ -11,7 +11,7 @@ knitr::opts_chunk$set(echo = TRUE, eval=TRUE,message = FALSE, warning = FALSE,ca
 
 ```{r pacotes,echo=FALSE,warning=FALSE,message=FALSE}
 library(magrittr)
-library(jpeg)
+`library(jpeg)
 library(doMC)
 library(tidyverse)
 library(cowplot)
@@ -105,17 +105,18 @@ gridExtra::grid.arrange(grobs=l_p,ncol=2)
 
 ## Hu et al. 2007  
 
-__Eq. 5:__
+<!-- __Eq. 5:__ -->
 
-```{r equacao 5 de Hu et al 2007, echo=TRUE,eval=TRUE}
+```{r equacao 5 de Hu et al 2007, echo=FALSE,eval=FALSE}
 # .JM <- 10^6
 # .JL <- 10^4
 # .U <- 10^(-5)
 # .m <- 10^(-6)
-# .x <- 1/.J
+# .x <- 1/.JL
 # Q <- 1/.J_M
 ###### código do PI adaptado do SI de Hu et al. 2007
-f_MNEI_HUetal2017 <- function(.U,.m,.JL,.JM){
+# equação 5
+f_eq5_HUetal2007 <- function(.U,.m,.JL,.JM){
   f_abundance <- function(x, speciation, migration_rate, JL, JM){
     small_theta <- 2*JL*speciation
     capital_theta <- 2*JM*speciation
@@ -136,6 +137,34 @@ f_MNEI_HUetal2017 <- function(.U,.m,.JL,.JM){
   df_ <- data.frame(x=r.abund,phi_x=phi.x)
   return(df_)
 }
+######
+# equação 4
+f_eq4_HUetal2007 <- function(.x,.U,.m,.JL,.JM){
+  f_abundance <- function(x, speciation, migration_rate, JL, JM){
+    small_theta <- 2*JL*speciation
+    capital_theta <- 2*JM*speciation
+    migrants <- JL*migration_rate
+    f1 <- function(y) (1-y)^(capital_theta-1)/y
+    .C <- 1/integrate(f1,1/JM, 1)$value
+    f_Qbarra <- function(Q) (1-Q)^(capital_theta-1)
+    Qbarra <- .C * integrate(f_Qbarra,1/JM, 1)$value
+    c1 <- function(Q){
+      lc1 <- lgamma(2*migrants+small_theta+1) -
+        (lgamma(2*migrants*(1-Q)+small_theta) + lgamma(2*migrants*Q+1))
+      exp(lc1)
+    }
+    f2 <- function(Q) c1(Q)*(1-x)^(2*migrants*(1-Q)+small_theta-1)*x^(2*migrants*Q-1)
+    f2(Qbarra)
+  }
+  phi_x <- f_abundance(x=.x)
+  r.abund <- seq(0.01,0.99, by=0.01) #seq(1/.JL,0.99, by=1/.JL)
+  phi.x <- sapply(r.abund, f_abundance , speciation = .U, migration_rate = .m, JL = .JL, JM=.JM)
+  df_ <- data.frame(x=r.abund,phi_x=phi.x)
+  return(df_)
+}
+df_ |> 
+  ggplot(aes(x=x,y=phi_x)) +
+  geom_line()
 ```
 ```{r dados para figura 3 de Hu et al 2007, echo=FALSE,eval=TRUE}
 # dados usados na figura 3
@@ -150,11 +179,11 @@ df_fig3_HUetal2007 <- data.frame(U=10^(-5),J=10^4,JM=10^6,m=10^(-6:-3)) |>
 registerDoMC(2)
 df_plot  <- ddply(df_fig3_HUetal2007,
                   "lambda",
-                  function(X) f_MNEI_HUetal2017(.JM = X$JM,.JL = X$J,.U = X$U,.m = X$m),
+                  function(X) f_eq5_HUetal2007(.JM = X$JM,.JL = X$J,.U = X$U,.m = X$m),
                   .parallel = TRUE)
 # df_plot |> is.na() |> table() |> names() == "FALSE"
 ```
-```{r grafico para reproduzir figura 3 de Hu et al 2007 e comparacao, echo=FALSE,eval=TRUE,fig.width=10}
+```{r grafico para reproduzir figura 3 de Hu et al 2007 e comparacao, echo=FALSE,eval=FALSE,fig.width=10}
 l_p <- list()
 l_p[[1]] <- df_plot |> 
   mutate(lambda=as.numeric(as.character(lambda))) |>
@@ -179,7 +208,7 @@ l_p[[2]] <- ggdraw() + draw_image(photo, scale = 1)
 plot_grid(plotlist = l_p, ncol = 2,rel_heights = c(-0.15,1))
 ```
   
-__Figura 1__ Comparação da figura 3 de Hu et al. 2007 e aquela obtida pela versão do código em R. Nesse exemplo as abundâncias relativas abaixo de 0.03 não foram adiconados.
+<!-- __Figura 1__ Comparação da figura 3 de Hu et al. 2007 e aquela obtida pela versão do código em R. Nesse exemplo as abundâncias relativas abaixo de 0.03 não foram adiconados. -->
 
 
 ```{r figura de phi de x com abund relat completa,echo=FALSE,eval=FALSE}
@@ -202,7 +231,7 @@ df_plot |>
   # facet_wrap(~lambda,ncol=2)
 ```
   
-__Figura 2__ Idem com abundância relativa entre 1/J e 1.  
+<!-- __Figura 2__ Idem com abundância relativa entre 1/J e 1.   -->
 
 
 ### Investigação da equação 5 quando lambda -> 0
