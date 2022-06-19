@@ -4,7 +4,7 @@ author: "Mori, Danilo"
 date: "19/10/2019"
 output: html_document
 editor_options: 
-  chunk_output_type: console
+  chunk_output_type: inline
 ---
 
 <style>
@@ -15,8 +15,6 @@ text-align: justify}
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE, tidy = TRUE, include = TRUE, warning = FALSE,cache = TRUE,message=FALSE)
-knitr::opts_knit$set(root.dir = "~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/")
-setwd("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/")
 ```
 
 ```{r pacotes}
@@ -69,10 +67,9 @@ system("for a in ./SADs_preditas/*.csv; do rm $a; done")
 ->> para remover todos os EI
 for a in *EI*; do rm $a; done
 
-
+###### SADs preditas
 
 ```{r avaliacao da simulacao 1}
-# setwd("~/Documentos/Doutorado/artigo_mestrado/1A.P_MOVER/simulacao/SADs_preditas/")
 ## numero de arquivos na pasta SADs_preditas: 
 system("ls -l ./SADs_preditas/ | egrep -c '^-'")
 ## eu esperava: 416000
@@ -85,8 +82,10 @@ Agora temos 416000 SADs e todos as linhas da bateria de simulação foram igualm
 
 ```{r avaliacao da simulacao 1}
 # data frame
-df_SAD.predita <- data.frame(SAD_MN.name=as.character(Sys.glob("./SADs_preditas/*.csv")))
-df_SAD.predita$SAD_MN.name %<>% as.character()
+df_SAD.predita <- data.frame(SAD_MN.name=
+                               list.files(path = "../simulacao_codigos_e_resultados/SADs_preditas/",
+                                                    pattern = ".csv")) |> 
+  extract(SAD_MN.name,c("SiteCode","k"),"^([[:alnum:]]+)_k(0.[0-9]*)_EE.csv$")
 
 df_SAD.predita %<>% mutate(MN=as.character(str_match(SAD_MN.name,"EE|EI")),
                            k=str_match(SAD_MN.name,"__k(.*?).E")[,2],
