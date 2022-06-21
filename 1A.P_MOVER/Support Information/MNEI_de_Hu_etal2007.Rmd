@@ -11,10 +11,12 @@ knitr::opts_chunk$set(echo = TRUE, eval=TRUE,message = FALSE, warning = FALSE,ca
 
 ```{r pacotes,echo=FALSE,warning=FALSE,message=FALSE}
 library(magrittr)
-`library(jpeg)
+library(jpeg)
 library(doMC)
 library(tidyverse)
 library(cowplot)
+library(tidyr)
+library(readr)
 library(plyr)
 library(dplyr)
 ```
@@ -46,7 +48,7 @@ df_resultados <- left_join(x=df_simulacao,
 write_csv(df_resultados,
           file = "/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/df_dados_Hu2007.csv")
 ```
-```{r conversão de parâmetros,echo=FALSE,eval=FALSE}
+```{r conversão de parâmetros,echo=FALSE,eval=TRUE}
 df_resultados <- read_csv("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/df_dados_Hu2007.csv")
 df_resultados %<>% 
   mutate(J_M = 1713.96 * DA * p, # 4.14x4.14  km2 = 1713.96 ha
@@ -55,7 +57,7 @@ df_resultados %<>%
          m_ = m * p / ( 1 - (1-p)*m ),#eq 5
          ratio_J_JM = Ntotal/J_M)
 ```
-```{r figura 1 U e m,fig.width=10,fig.height=4,echo=FALSE,warning=FALSE,message=FALSE,eval=FALSE}
+```{r figura 1 U e m,fig.width=10,fig.height=4,echo=FALSE,warning=FALSE,message=FALSE,eval=TRUE}
 l_p <- list()
 l_p[[1]] <- df_resultados |> 
   ggplot(aes(x=m_,y=U_med)) +
@@ -78,11 +80,11 @@ l_p[[2]] <- df_resultados |>
 gridExtra::grid.arrange(grobs=l_p,ncol=2)
 ```
 
-<!-- </br> -->
+</br>
 
-<!-- __Figura 1__  Probabilidade média de surgimento de um indivíduo de uma nova espécie na paisagem (U) e a probabilidade média de uma colonização na comunidade local ser de um propágulo vindo da paisagem ao redor (m), corrigida pela proporção de cobertura vegetal na paisagem (p).   -->
+__Figura 1__  Probabilidade média de surgimento de um indivíduo de uma nova espécie na paisagem (U) e a probabilidade média de uma colonização na comunidade local ser de um propágulo vindo da paisagem ao redor (m), corrigida pela proporção de cobertura vegetal na paisagem (p).
 
-<!-- </br>     -->
+</br>
 
 <!-- Anteriormente aproximamos MNEI pela fórmula de amostragem de Etienne (2005). Nesse modelo, e na maior parte dos modelos neutros espacialmente implícitos, se assume que U << m e, portanto, é possível negligenciar U na comunidade local. Em nosso caso, que estamos interpretando MNEI como uma simplificação de MNEE e usamos o último para estimar o parâmetro U para um dado cenário de limitação de dispersão, não encontramos situações em que é razoável pressupor U << m (Figura 1). Acredito que iniciamos a investigação com a fórmula de amostragem pois ela já tinha sido comparada anteriormente com MNEE (Etienne & Rosindell 2011), mesmo MNEE pressupondo U local. Apesar de não se considerar U local, os modelos espacialmente implícitos podem decompor m no componente de espécies locais daquele de novas espécies (species input, Condit et al. 2012). Ambos parâmetros da fórmula de amostragem (theta e (I ou m?)) são correlacionados simultaneamente com o desvio-padrão da função de dispersão e com U de MNEE (Etienne & Rosindell 2011). Assim uma primeira aproximação que pensamos em fazer foi o de usar a fórmula de amostragem somando no parâmetro m a taxa U, inflando o species input, para aproveitar pacotes existentes do R (e.g. untb).    -->
 
@@ -107,14 +109,15 @@ gridExtra::grid.arrange(grobs=l_p,ncol=2)
 
 <!-- __Eq. 5:__ -->
 
-```{r equacao 5 de Hu et al 2007, echo=FALSE,eval=FALSE}
+```{r parametros para estudo da f_eq5,echo=FALSE,eval=FALSE}
 # .JM <- 10^6
 # .JL <- 10^4
 # .U <- 10^(-5)
 # .m <- 10^(-6)
 # .x <- 1/.JL
 # Q <- 1/.J_M
-###### código do PI adaptado do SI de Hu et al. 2007
+```
+```{r equacao 5 de Hu et al 2007, echo=FALSE,eval=TRUE}
 # equação 5
 f_eq5_HUetal2007 <- function(.U,.m,.JL,.JM){
   f_abundance <- function(x, speciation, migration_rate, JL, JM){
@@ -137,34 +140,6 @@ f_eq5_HUetal2007 <- function(.U,.m,.JL,.JM){
   df_ <- data.frame(x=r.abund,phi_x=phi.x)
   return(df_)
 }
-######
-# equação 4
-f_eq4_HUetal2007 <- function(.x,.U,.m,.JL,.JM){
-  f_abundance <- function(x, speciation, migration_rate, JL, JM){
-    small_theta <- 2*JL*speciation
-    capital_theta <- 2*JM*speciation
-    migrants <- JL*migration_rate
-    f1 <- function(y) (1-y)^(capital_theta-1)/y
-    .C <- 1/integrate(f1,1/JM, 1)$value
-    f_Qbarra <- function(Q) (1-Q)^(capital_theta-1)
-    Qbarra <- .C * integrate(f_Qbarra,1/JM, 1)$value
-    c1 <- function(Q){
-      lc1 <- lgamma(2*migrants+small_theta+1) -
-        (lgamma(2*migrants*(1-Q)+small_theta) + lgamma(2*migrants*Q+1))
-      exp(lc1)
-    }
-    f2 <- function(Q) c1(Q)*(1-x)^(2*migrants*(1-Q)+small_theta-1)*x^(2*migrants*Q-1)
-    f2(Qbarra)
-  }
-  phi_x <- f_abundance(x=.x)
-  r.abund <- seq(0.01,0.99, by=0.01) #seq(1/.JL,0.99, by=1/.JL)
-  phi.x <- sapply(r.abund, f_abundance , speciation = .U, migration_rate = .m, JL = .JL, JM=.JM)
-  df_ <- data.frame(x=r.abund,phi_x=phi.x)
-  return(df_)
-}
-df_ |> 
-  ggplot(aes(x=x,y=phi_x)) +
-  geom_line()
 ```
 ```{r dados para figura 3 de Hu et al 2007, echo=FALSE,eval=TRUE}
 # dados usados na figura 3
@@ -183,7 +158,7 @@ df_plot  <- ddply(df_fig3_HUetal2007,
                   .parallel = TRUE)
 # df_plot |> is.na() |> table() |> names() == "FALSE"
 ```
-```{r grafico para reproduzir figura 3 de Hu et al 2007 e comparacao, echo=FALSE,eval=FALSE,fig.width=10}
+```{r grafico para reproduzir figura 3 de Hu et al 2007 e comparacao, echo=FALSE,eval=TRUE,fig.width=10}
 l_p <- list()
 l_p[[1]] <- df_plot |> 
   mutate(lambda=as.numeric(as.character(lambda))) |>
@@ -201,56 +176,36 @@ l_p[[1]] <- df_plot |>
     legend.margin = margin(6, 6, 6, 6)
     ) +
   coord_cartesian(expand = FALSE)
-
 photo <- readJPEG("/home/danilo/Documentos/mestrado_Ecologia - USP/comites/1oComite/encaminhamentos/MNEI_c_Ulocal/Fig3_HUetal2007.jpg",
                   native=TRUE)
 l_p[[2]] <- ggdraw() + draw_image(photo, scale = 1)
 plot_grid(plotlist = l_p, ncol = 2,rel_heights = c(-0.15,1))
 ```
   
-<!-- __Figura 1__ Comparação da figura 3 de Hu et al. 2007 e aquela obtida pela versão do código em R. Nesse exemplo as abundâncias relativas abaixo de 0.03 não foram adiconados. -->
-
-
-```{r figura de phi de x com abund relat completa,echo=FALSE,eval=FALSE}
-df_plot |> 
-  mutate(lambda=as.numeric(as.character(lambda))) |>
-  # filter(x>=0.03) |> 
-  ggplot(aes(x=x,y=phi_x,group=lambda)) +
-  geom_line(aes(color=lambda)) +
-  # geom_point() +
-  ylim(0,80) +
-  # labs(title="lambda = c(0.01, 0.1, 1, 10)") +
-  theme_classic() +
-  theme(
-    legend.position = c(.90, .95),
-    legend.justification = c("right", "top"),
-    legend.box.just = "right",
-    legend.margin = margin(6, 6, 6, 6)
-    ) +
-  coord_cartesian(expand = FALSE) #+
-  # facet_wrap(~lambda,ncol=2)
-```
+</br>
   
-<!-- __Figura 2__ Idem com abundância relativa entre 1/J e 1.   -->
+__Figura 2__ Comparação da figura 3 de Hu et al. 2007 e aquela obtida pela versão do código em R. Nesse exemplo as abundâncias relativas abaixo de 0.03 não foram adiconados.
+
+</br>
 
 
 ### Investigação da equação 5 quando lambda -> 0
 
 Um aspecto fundamental do modelo de Hu et al. (2007) é que quando m->0 a distribuição de abundância de espécies da comunidade local converge para a distribuição esperada se fosse uma metacomunidade de tamanho $J_L$ (equação 2).
-  
-    
+
+
 $$
 eq 2: \Phi(Q) = \Theta\frac{(1-Q)^{\Theta-1}}{Q}
 $$
-  
-    
+
+
 Quando m=0, a equação 5 não converge para a equação 2:
 
 $$
 \phi(x) = C\int_{1/J_M}^{1}C_1\frac{(1-x)^{\theta-1}}{x}\frac{(1-Q)^{\Theta-1}}{Q}dQ
 $$
-  
-Eu acho estranho que nessa situação a distribuição de abundância da metacomunidade seja relevante, não? No texto eles falam que a remoção de $\bar{Q}$ é desejável pois em geral não se sabe "the ratio of the abundance of an immigrating species to the total abundance of all immigrants per unit time interval". Pra mim essa afirmação não é verdadeira, pois as inforações necessárias para se obter a equação 3 e $\bar{Q}$ são iguais. 
+
+Eu acho estranho que nessa situação a distribuição de abundância da metacomunidade seja relevante, não? No texto eles falam que a remoção de $\bar{Q}$ é desejável pois em geral não se sabe "the ratio of the abundance of an immigrating species to the total abundance of all immigrants per unit time interval". Pra mim essa afirmação não é verdadeira, pois as inforações necessárias para se obter a equação 3 e $\bar{Q}$ são iguais.
 
 Já a equação 4 parece ter a propriedade de convergir para a equação 2, quando m=0:
 
@@ -261,9 +216,63 @@ $$
 C_1 = \frac{\Gamma(\theta+1)}{\Gamma(\theta)}
 $$
 
+  
+Porém, a equação 4 conserva o comportamento de U - não houve mudança qualitativa. 
 
+</br>
 
+### Eq.5 com os parâmetros estimados por MNEE
 
+Por algum motivo há apenas 1032/2060 baterias de simulação. Não entendo o motivo.  
+  
+  
+```{r dados para simulacao,echo=FALSE,eval=TRUE}
+df_SAD.predita <- data.frame(path=
+                               list.files(path = "../simulacao_codigos_e_resultados/SADs_preditas/",
+                                                    pattern = "_EE.csv")) |> 
+  extract(path,c("SiteCode","k","MN"),"^([[:alnum:]]+)_k(0.[0-9]*)_([a-zA-Z]{2}).csv$",remove=FALSE)
+df_SAD.predita %<>% mutate(k=factor(k))
+df_resultados %<>% mutate(k=factor(k))
+df_SAD.predita <- left_join(x=select(df_SAD.predita,-MN),
+                            y=df_resultados,
+                            by=c("SiteCode","k"))
+# X <- df_SAD.predita %>% filter(path=="BAlenc4_k0.9_EE.csv")
+```
+```{r aplicar eq 5 usando as classes de abundância,echo=TRUE,eval=FALSE,cache=FALSE,error=FALSE}
+f_ExpRich_EEeEI <- function(X){
+  # EE
+  df_SADrep <- read_csv(file = paste0("../simulacao_codigos_e_resultados/SADs_preditas/",X$path),
+                        show_col_types = FALSE) 
+  f_ <- function(Y){
+    df_ <- table(Y$N) %>% as.data.frame() %>% rename(N=Var1,EE=Freq)
+  }
+  df_SADrep %<>% mutate(replica=factor(replica)) %>%
+      ddply(.,"replica",f_) %>% mutate(N=as.numeric(N),x=N/X$Ntotal)
+  # EI
+  source("../R_funcoes/f_eq5_HUetal2007.R")
+  df_SADrep$EI <- sapply(df_SADrep$x,f_eq5_HUetal2007, 
+                         speciation = X$U_med, migration_rate = X$m_, JL = X$Ntotal, JM=X$J_M)
+  # save df_SADrep
+  write_csv(df_SADrep,file=paste0("../simulacao_codigos_e_resultados/SADs_preditas/",gsub("EE","EEeEI",x=X$path)))
+  # summary
+  df_ <- df_SADrep %>% ddply(.,"replica",summarise,
+                      S_EE=sum(EE),S_EI=sum(EI),
+                      x_max=max(x)) %>% select(-replica) %>%
+    apply(.,2,mean) %>% t %>% as.data.frame() %>% rename()
+  cbind(X,df_)
+}
+df_SAD.predita <- adply(df_SAD.predita,1,f_ExpRich_EEeEI)
+```
+
+</br>
+
+__Mensagem de Erro__  
+
+Error in integrate(f2, 1/JM, 1) : the integral is probably divergent
+
+</br>
+
+A linha de código que parou a simulação era um caso de 
 
 <!-- Material Suplementar -->
 
@@ -305,4 +314,57 @@ df_return$ExpRich <- sapply(df_return$x,f_ExpRich)
 return(df_return)
 }
 ```
+
+
+
+```{r eq 4 e figura de phi de x com abund relat completa,echo=FALSE,eval=FALSE}
+######
+# equação 4
+f_eq4_HUetal2007 <- function(.x,.U,.m,.JL,.JM){
+  f_abundance <- function(x, speciation, migration_rate, JL, JM){
+    small_theta <- 2*JL*speciation
+    capital_theta <- 2*JM*speciation
+    migrants <- JL*migration_rate
+    f1 <- function(y) (1-y)^(capital_theta-1)/y
+    .C <- 1/integrate(f1,1/JM, 1)$value
+    f_Qbarra <- function(Q) (1-Q)^(capital_theta-1)
+    Qbarra <- .C * integrate(f_Qbarra,1/JM, 1)$value
+    c1 <- function(Q){
+      lc1 <- lgamma(2*migrants+small_theta+1) -
+        (lgamma(2*migrants*(1-Q)+small_theta) + lgamma(2*migrants*Q+1))
+      exp(lc1)
+    }
+    f2 <- function(Q) c1(Q)*(1-x)^(2*migrants*(1-Q)+small_theta-1)*x^(2*migrants*Q-1)
+    f2(Qbarra)
+  }
+  phi_x <- f_abundance(x=.x)
+  r.abund <- seq(0.01,0.99, by=0.01) #seq(1/.JL,0.99, by=1/.JL)
+  phi.x <- sapply(r.abund, f_abundance , speciation = .U, migration_rate = .m, JL = .JL, JM=.JM)
+  df_ <- data.frame(x=r.abund,phi_x=phi.x)
+  return(df_)
+}
+# df_ |> 
+  # ggplot(aes(x=x,y=phi_x)) +
+  # geom_line()
+###############################
+df_plot |> 
+  mutate(lambda=as.numeric(as.character(lambda))) |>
+  # filter(x>=0.03) |> 
+  ggplot(aes(x=x,y=phi_x,group=lambda)) +
+  geom_line(aes(color=lambda)) +
+  # geom_point() +
+  ylim(0,80) +
+  # labs(title="lambda = c(0.01, 0.1, 1, 10)") +
+  theme_classic() +
+  theme(
+    legend.position = c(.90, .95),
+    legend.justification = c("right", "top"),
+    legend.box.just = "right",
+    legend.margin = margin(6, 6, 6, 6)
+    ) +
+  coord_cartesian(expand = FALSE) #+
+  # facet_wrap(~lambda,ncol=2)
+```
+
+
 
