@@ -232,9 +232,10 @@ df_SAD.predita <- data.frame(path=
                                                     pattern = "_EE.csv")) |> 
   extract(path,c("SiteCode","k","MN"),"^([[:alnum:]]+)_k(0.[0-9]*)_([a-zA-Z]{2}).csv$",remove=FALSE)
 df_SAD.predita %<>% mutate(k=factor(k))
+df_SAD.predita$status <- 1
 df_resultados %<>% mutate(k=factor(k))
-df_SAD.predita <- left_join(x=select(df_SAD.predita,-MN),
-                            y=df_resultados,
+df_SAD.predita <- full_join(x=df_resultados,
+                            y=select(df_SAD.predita,-MN),
                             by=c("SiteCode","k"))
 # X <- df_SAD.predita %>% filter(path=="BAlenc4_k0.9_EE.csv")
 ```
@@ -253,12 +254,14 @@ f_ExpRich_EEeEI <- function(X){
   df_SADrep$EI <- sapply(df_SADrep$x,f_eq5_HUetal2007, 
                          speciation = X$U_med, migration_rate = X$m_, JL = X$Ntotal, JM=X$J_M)
   # save df_SADrep
-  write_csv(df_SADrep,file=paste0("../simulacao_codigos_e_resultados/SADs_preditas/",gsub("EE","EEeEI",x=X$path)))
+  write_csv(df_SADrep,
+            file=paste0("../simulacao_codigos_e_resultados/SADs_preditas/",
+                        gsub("EE","EEeEI",x=X$path)))
   # summary
   df_ <- df_SADrep %>% ddply(.,"replica",summarise,
                       S_EE=sum(EE),S_EI=sum(EI),
                       x_max=max(x)) %>% select(-replica) %>%
-    apply(.,2,mean) %>% t %>% as.data.frame() %>% rename()
+    apply(.,2,mean) %>% t %>% as.data.frame()
   cbind(X,df_)
 }
 df_SAD.predita <- adply(df_SAD.predita,1,f_ExpRich_EEeEI)
@@ -272,7 +275,57 @@ Error in integrate(f2, 1/JM, 1) : the integral is probably divergent
 
 </br>
 
-A linha de código que parou a simulação era um caso de 
+```{r auditoria de EEeEI.csv, echo=FALSE,eval=TRUE,cache=TRUE,fig.width=10,fig.height=4}
+# dados
+df_EEeEI <- data.frame(path_EEeEI=
+                         list.files(path = "../simulacao_codigos_e_resultados/SADs_preditas/",
+                                                    pattern = "EEeEI.csv")) |> 
+  extract(path_EEeEI,c("SiteCode","k"),"^([[:alnum:]]+)_k(0.[0-9]*)_[a-zA-Z]*.csv$",remove=FALSE) %>% 
+  mutate(k=factor(k))
+# estatísticas de resumo
+f_summary <- function(X){
+  df_SADrep <- read_csv(file = paste0("../simulacao_codigos_e_resultados/SADs_preditas/",X$path_EEeEI),
+                        show_col_types = FALSE)
+  ddply(df_SADrep,"replica",summarise,
+        S_EE=sum(EE),S_EI=sum(EI),
+        x_max=max(x)) %>% select(-replica) %>%
+    apply(.,2,mean) %>% t %>% as.data.frame()
+}
+registerDoMC(2)
+df_plot <- adply(df_EEeEI,1,f_summary,.parallel = TRUE)
+# join
+df_auditoria <- full_join(x=df_SAD.predita,
+                          y=select(df_plot,-path_EEeEI),
+                          by=c("SiteCode","k"))
+df_auditoria$status[is.na(df_auditoria$status)] <- 0
+# gráficos
+l_p <- list()
+l_p[[1]] <- df_auditoria %>% mutate(status=factor(status)) %>% 
+  ggplot(aes(x=p,y=d,color=status)) +
+  geom_point(alpha=0.4) +
+  scale_color_manual(values=c("red","blue")) +
+  labs(title = "0 = sem SAD EE")
+l_p[[2]] <- df_auditoria %>% 
+  mutate(status2=factor(ifelse(is.na(S_EI),0,1))) %>% 
+  ggplot(aes(x=U_med,y=m_,color=status2)) +
+  geom_point(alpha=0.4) +
+  labs(title = "0 = sem SAD EI, erro de integração") +
+  scale_color_manual(values=c("red","blue"))
+  # scale_y_continuous(trans="log10") +
+  # scale_x_continuous(trans="log10")
+gridExtra::grid.arrange(grobs=l_p,ncol=2)
+```
+
+```{r comparacao riqueza media EE e EI,echo=FALSE,eval=TRUE}
+df_auditoria %>% 
+  filter(!is.na(S_EI)) %>% 
+  pivot_longer(S_EE:S_EI,names_to = "S_MN",values_to = "S_value") %>% 
+  ggplot(aes(x=x_max,y=S_value,color=S_MN)) +
+    geom_point(alpha=0.5) +
+  labs(title="riqueza predita e abundância relativa máxima",x="Ab. Rel. Max.",y="riqueza predita") +
+  scale_y_continuous(trans="log10")
+```
+
 
 <!-- Material Suplementar -->
 
