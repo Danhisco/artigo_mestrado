@@ -17,8 +17,6 @@ text-align: justify}
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, tidy = FALSE, include = TRUE, warning = FALSE,cache = TRUE,message=FALSE,eval=FALSE)
-knitr::opts_knit$set(root.dir = "/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/dados_para_iniciar_artigo")
-setwd("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/dados_para_iniciar_artigo")
 ```
 
 ```{r pacotes,eval=TRUE,include=TRUE}
@@ -1074,7 +1072,7 @@ l_ply(simulacao,f_simulacaoEI,.parallel = TRUE)
 
 #### Eq 5 de Hu et al. 2007 como representante de MNEI:
 
-```{r transformar as SADs preditas em classes de abundância e contabilizar as classes }
+```{r transformar as SADs preditas em classes de abundância e contabilizar as classes,message=FALSE,warning=FALSE}
 # dados para simular:
 df_resultados <- read_csv("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/Support Information/df_dados_Hu2007.csv")
 df_resultados %<>% 
@@ -1087,19 +1085,15 @@ df_resultados %<>%
 # dados disponíveis:
 df_SAD.predita <- data.frame(path=
                                list.files(path = "../simulacao_codigos_e_resultados/SADs_preditas/",
-                                                    pattern = ".csv")) |> 
+                                                    pattern = "_EE.csv")) |> 
   extract(path,c("SiteCode","k","MN"),"^([[:alnum:]]+)_k(0.[0-9]*)_([a-zA-Z]{2}).csv$",remove=FALSE)
-# df_SAD.predita$MN |> table()
-# df_SAD.predita$SiteCode |> unique() %>% length()
-# df_resultados$SiteCode %>% unique %>% as.character() %>% sort == df_SAD.predita$SiteCode %>% unique %>% as.character() %>% sort
-# df_resultados %>% filter(!SiteCode %in% unique(df_SAD.predita$SiteCode)) %>% .$SiteCode %>% unique
 df_SAD.predita %<>% mutate(k=factor(k))
 df_resultados %<>% mutate(k=factor(k))
 df_SAD.predita <- left_join(x=select(df_SAD.predita,-MN),
                             y=df_resultados,
                             by=c("SiteCode","k"))
 #
-X <- df_SAD.predita[1,]
+# X <- df_SAD.predita %>% filter(path=="BAlenc4_k0.9_EE.csv")
 f_ExpRich_EEeEI <- function(X){
   # EE
   df_SADrep <- read_csv(file = paste0("../simulacao_codigos_e_resultados/SADs_preditas/",X$path)) 
@@ -1115,12 +1109,28 @@ f_ExpRich_EEeEI <- function(X){
   # save sd_SADrep
   write_csv(df_SADrep,file=paste0("../simulacao_codigos_e_resultados/SADs_preditas/",gsub("EE","EEeEI",x=X$path)))
   # summary
-  df_SADrep %>% ddply(.,"replica",summarise,
+  df_ <- df_SADrep %>% ddply(.,"replica",summarise,
                       S_EE=sum(EE),S_EI=sum(EI),
-                      x_max=max(x)) %>% select(-replica) %>% 
-    apply(.,2,mean) %>% t %>% as.data.frame()
-  
+                      x_max=max(x)) %>% select(-replica) %>%
+    apply(.,2,mean) %>% t %>% as.data.frame() %>% rename()
+  cbind(X,df_)
 }
+df_SAD.predita <- adply(df_SAD.predita,1,f_ExpRich_EEeEI)
+```
+
+Houve erro:
+"Error in integrate(f1, 1/JM, 1) : a limit is NA or NaN"
+
+```{r}
+df_auditoria <- data.frame(path=
+                             list.files(path = "../simulacao_codigos_e_resultados/SADs_preditas/",
+                                                    pattern = "EEeEI.csv")) |> 
+  extract(path,c("SiteCode","k"),"^([[:alnum:]]+)_k(0.[0-9]*)_[a-zA-Z]*.csv$",remove=FALSE) %>% 
+  rename(path_feito=path)
+df_auditoria$auditoria <- "OK"
+df_auditoria <- full_join(x=mutate(df_SAD.predita,ordem=1:nrow(df_SAD.predita)),
+                          y=df_auditoria,
+                          by=c("SiteCode","k"))
 ```
 
 
