@@ -905,7 +905,7 @@ write.csv(df_resultados,
 
 <!-- Gráficos usados na apresentação final de BIE 5770: ano da amostragem das SADs e ano referência do mapa de cobertura vegetal. -->
 
-```{r gráficos,include=FALSE,eval=FALSE,echo=FALSE}
+```{r gráficos,include=FALSE,eval=FALSE,echo=FALSE,message=FALSE,warning=FALSE}
 #
 df_SADs.disponiveis <- read.csv(
   "/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/dados_para_iniciar_artigo/df_SADs_disponiveis.csv",
@@ -953,25 +953,62 @@ df_S1$site_category[df_S1$state %in% c("BA","GO","MS") &
                       df_S1$year >= 2000] <- 3
 df_S1$site_category[!(df_S1$state %in% c("BA","GO","MS","RJ","RS")) & 
                       df_S1$year >= 1995] <- 4
-df_S1 %>%
-  mutate(site_category = factor(site_category)) %>% 
-  ggplot(aes(x=year_plot,y=site_category,shape=site_category)) +
-  # geom_vline(xintercept = 2000,color="red") + # versão 1
-  geom_vline(aes(xintercept = year_plot),color="red",alpha=0.3) + # versão 2
-  # geom_boxplot() +
-  geom_jitter() +
-  labs(shape="Categorias:",
-       y="categoria inventário florestal",
-       x="ano inventário florestal",
-       title= "104 inventários dentro dos critérios (de 109 confiáveis)") +
-  scale_shape_discrete(breaks=c("1","2","3","4"),
-                       labels=c("todas as idades: \nUC Prot. Int. | Univ. | UC>=1000 ha",
-                                "RJ e RS >= 1990",
-                                "BA, GO e MS >= 2000",
-                                "outros estados Brasil >= 1995")) +
-  theme(axis.text.y=element_blank(),
-        axis.ticks.y=element_blank())
+# df_S1 %>%
+#   mutate(site_category = factor(site_category)) %>% 
+#   ggplot(aes(x=year_plot,y=site_category,shape=site_category)) +
+#   geom_vline(xintercept = 2000,color="red") + # versão 1
+#   # geom_vline(aes(xintercept = year_plot),color="red",alpha=0.3) + # versão 2
+#   # geom_boxplot() +
+#   geom_jitter() +
+#   labs(shape="Categorias:",
+#        y="categoria inventário florestal",
+#        x="ano inventário florestal",
+#        title= "104 inventários dentro dos critérios (de 109 confiáveis)") +
+#   scale_shape_discrete(breaks=c("1","2","3","4"),
+#                        labels=c("todas as idades: \nUC Prot. Int. | Univ. | UC>=1000 ha",
+#                                 "RJ e RS >= 1990",
+#                                 "BA, GO e MS >= 2000",
+#                                 "outros estados Brasil >= 1995")) +
+#   theme(axis.text.y=element_blank(),
+#         axis.ticks.y=element_blank())
 # df_S1 %>% arrange(year_plot) %>% select(year_plot,UC_area_ha,state)
+
+###
+# gráfico 
+###
+df_S1$Unidade_de_conservacao[is.na(df_S1$Unidade_de_conservacao)] <- "no info"
+df_S1$Unidade_de_conservacao[df_S1$Unidade_de_conservacao=="private_in_APA"] <- "priv. APA"
+df_S1$Unidade_de_conservacao[df_S1$Unidade_de_conservacao=="universities and research centers"] <- "res. cent."
+df_S1$Unidade_de_conservacao[df_S1$Unidade_de_conservacao=="UC Uso Sustentavel"] <- "UC Sust."
+df_S1$Unidade_de_conservacao[df_S1$Unidade_de_conservacao=="UC Protecao Integral"] <- "UC Int."
+df_S1$forest_succession[df_S1$forest_succession=="capoeira"] <- "<=20 y"
+df_S1$forest_succession[df_S1$forest_succession=="secondary"] <- "<=20 y"
+df_S1$forest_succession[df_S1$forest_succession=="primary/secondary"] <- "]20,80[ y"
+df_S1$forest_succession[df_S1$forest_succession=="primary"] <- ">=80 y"
+# df_S1 %>% .$forest_succession %>% unique
+df_S1 %>% #.$Unidade_de_conservacao %>% unique
+  select(Unidade_de_conservacao,forest_succession) %>% 
+  mutate(Uso_Solo = factor(Unidade_de_conservacao,
+                           levels=unique(.$Unidade_de_conservacao)[c(6:5,3,2,4,1)]),
+         Forest_Age = factor(forest_succession,
+                             levels=unique(.$forest_succession)[3:1]),
+         count=1) %>% 
+  # select(Uso_Solo,Forest_Age) %>% 
+  # table
+  group_by(Uso_Solo,Forest_Age,.drop = FALSE) %>% 
+  summarize(Freq=n()) %>% 
+  ggplot(aes(x=Uso_Solo,y=Forest_Age,fill=Freq)) +
+  geom_tile(color = "black",alpha=0.5) +
+  geom_text(aes(label = Freq), color = "black", size = 3.5) +
+  scale_fill_gradient(low = "white", high = "green") +
+  labs(x="",y="",fill="",title="Patch Scale Information: Age and Use") +
+  theme(legend.position="none",
+        axis.text=element_text(size=12),
+        plot.subtitle = element_text(hjust = 0.5),
+        axis.line=element_blank()) +
+  coord_fixed()
+
+
 ```
 
 ```{r df_S2 ,include=FALSE,eval=FALSE,echo=FALSE}
@@ -995,6 +1032,10 @@ df_S2 %>%
                        # labels="- Atlantic Forest \n- DBH >= 5.0cm \n- plot >= 1ha") +
   theme(axis.text.y=element_blank(),
         axis.ticks.y=element_blank())
+df_S2$Unidade_de_conservacao %>% table 
+  # ggplot(aes(x=Unidade_de_conservacao,y=forest_succession)) +
+  # geom_boxplot() +
+  # geom_jitter()
 ```
 
  <!-- Escala de Efeito -->
