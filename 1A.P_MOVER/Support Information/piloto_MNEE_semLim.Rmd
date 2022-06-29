@@ -43,35 +43,15 @@ library(dplyr)
 select <- dplyr::select
 ```
 
-    
+
 ```{r dados,message=FALSE,echo=FALSE,eval=FALSE,include=FALSE}
 ### dados ###
 # leitura
 df_resultados <- read.csv(file="/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/simulacao_codigos_e_resultados/resultados/df_resultados.csv",
-                            header = TRUE,as.is=FALSE)[,1:13]
-# padronização
-level_k <- as.character(unique(sort(as.numeric(df_resultados$k),decreasing = TRUE)))
-df_resultados$k <- factor(df_resultados$k,levels = level_k)
-levels(df_resultados$k)[19] <- "0.1"
-# z score
-f_z <- function(x){
-  m <- base::mean(x,na.rm=FALSE)
-  sd <- sd(x,na.rm=FALSE)
-  output <- (x-m)/sd
-  return(output)
-} 
-# names(df_resultados)
-# str(df_resultados)
-df_resultados %<>% mutate(diffS_gamma = diffS_mean + min(diffS_mean)*(-1) + 0.01,
-                          modulo_diffS = abs(diffS_mean),
-                          log_Sobs=log(S_obs))
-
-df_resultados.z <- as.data.frame(apply(df_resultados[,c("p","Ntotal","log_Sobs","k_1","d_Lplot","d","modulo_diffS")],2,f_z))
-names(df_resultados.z) <- sapply(names(df_resultados.z), function(x) paste0(x,".z"))
-df_resultados %<>% cbind(.,df_resultados.z) %>% 
-  select(-k_1,-k_1.z)
+                            header = TRUE,as.is=FALSE) |> 
+  select(SiteCode,p,Ntotal,S_obs,DA,txt.name) %>% 
+  distinct()
 ```
-
 ```{r sorteio de pontos para o piloto,echo=TRUE,eval=FALSE}
 f_random_byVar <- function(x = df_resultados,
                            column_name = "p", 
@@ -81,7 +61,7 @@ f_random_byVar <- function(x = df_resultados,
   set.seed(i_seed)
   sample_points <- sort(runif(n = n_sample, min = 0, max = 1))
   # encontra os valores mais próoximos
-  df_x <- filter(x,k==levels(x$k)[1],MN=="EE")
+  df_x <- x
   f_index <- function(X=df_x,
                       name=column_name,
                       v_ref){
@@ -90,12 +70,13 @@ f_random_byVar <- function(x = df_resultados,
   # remove os sítios repetidos
   v_sites <- df_x[sapply(sample_points,function(y) f_index(v_ref=y)),"SiteCode"] %>% unique
   ## output:
-  df_return <- filter(x,SiteCode %in% v_sites,MN=="EE")
+  df_return <- filter(x,SiteCode %in% v_sites)
   df_return$SiteCode <- factor(df_return$SiteCode)
   return(df_return)
 }
 df_piloto <- f_random_byVar(x=df_resultados)
-write.csv(df_piloto,file = "./artigo_mestrado/1A.P_MOVER/Support Information/df_piloto.csv",
-          row.names = FALSE)
+write.csv(df_piloto,file = "df_piloto.csv",row.names = FALSE)
 ```
+
+# Estimativa de U
 
