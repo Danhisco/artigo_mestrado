@@ -2,7 +2,9 @@
 title: "MNEI de Hu et al. 2007"
 author: "Danilo Pereira Mori"
 date: '2022-06-01'
-output: html_document
+output:
+  html_document:
+    toc: true
 ---
 
 ```{r setup, include=FALSE}
@@ -21,6 +23,9 @@ library(plyr)
 library(dplyr)
 ```
 </br>
+
+### Contexto
+  
 
 Referência Base:
 Hu, X. S., He, F., & Hubbell, S. P. (2007). Species diversity in local neutral communities. American Naturalist, 170(6), 844–853. https://doi.org/10.1086/522935
@@ -65,7 +70,7 @@ l_p[[1]] <- df_resultados |>
   scale_fill_continuous(type = "viridis") +
   geom_abline(slope = 1,intercept = 0,color="red",alpha=0.6,size=1) +
   coord_cartesian(expand = FALSE) +
-  labs(x="probabilidade m corrigida por p",y="taxa U",title="Em alguns casos U > m e na maioria U não é << m") +
+  labs(x="probabilidade m corrigida por p",y="taxa U",title="Aproxidamente, m >= U") +
   theme_classic()
 l_p[[2]] <- df_resultados |> 
   ggplot(aes(x=m_,y=U_med)) +
@@ -82,9 +87,14 @@ gridExtra::grid.arrange(grobs=l_p,ncol=2)
 
 </br>
 
-__Figura 1__  Probabilidade média de surgimento de um indivíduo de uma nova espécie na paisagem (U) e a probabilidade média de uma colonização na comunidade local ser de um propágulo vindo da paisagem ao redor (m), corrigida pela proporção de cobertura vegetal na paisagem (p).
+__Figura 1__   Probabilidade média de surgimento de um indivíduo de uma nova espécie na paisagem (U) e a probabilidade média de uma colonização na comunidade local ser de um propágulo vindo da paisagem ao redor (m), corrigida pela proporção de cobertura vegetal na paisagem (p). 
 
 </br>
+
+A maior implicação de m >=U é que não se torna razoável negligenciar U sem negligenciar m.
+    
+    
+
 
 <!-- Anteriormente aproximamos MNEI pela fórmula de amostragem de Etienne (2005). Nesse modelo, e na maior parte dos modelos neutros espacialmente implícitos, se assume que U << m e, portanto, é possível negligenciar U na comunidade local. Em nosso caso, que estamos interpretando MNEI como uma simplificação de MNEE e usamos o último para estimar o parâmetro U para um dado cenário de limitação de dispersão, não encontramos situações em que é razoável pressupor U << m (Figura 1). Acredito que iniciamos a investigação com a fórmula de amostragem pois ela já tinha sido comparada anteriormente com MNEE (Etienne & Rosindell 2011), mesmo MNEE pressupondo U local. Apesar de não se considerar U local, os modelos espacialmente implícitos podem decompor m no componente de espécies locais daquele de novas espécies (species input, Condit et al. 2012). Ambos parâmetros da fórmula de amostragem (theta e (I ou m?)) são correlacionados simultaneamente com o desvio-padrão da função de dispersão e com U de MNEE (Etienne & Rosindell 2011). Assim uma primeira aproximação que pensamos em fazer foi o de usar a fórmula de amostragem somando no parâmetro m a taxa U, inflando o species input, para aproveitar pacotes existentes do R (e.g. untb).    -->
 
@@ -105,9 +115,9 @@ __Figura 1__  Probabilidade média de surgimento de um indivíduo de uma nova es
 
 <!-- # MNEI -->
 
-## Hu et al. 2007  
+### Eq. 5, Hu et al. 2007  
 
-<!-- __Eq. 5:__ -->
+<!-- __:__ -->
 
 ```{r parametros para estudo da f_eq5,echo=FALSE,eval=FALSE}
 # .JM <- 10^6
@@ -117,7 +127,7 @@ __Figura 1__  Probabilidade média de surgimento de um indivíduo de uma nova es
 # .x <- 1/.JL
 # Q <- 1/.J_M
 ```
-```{r equacao 5 de Hu et al 2007, echo=FALSE,eval=TRUE}
+```{r equacao 5 de Hu et al 2007, echo=TRUE,eval=TRUE}
 # equação 5
 f_eq5_HUetal2007 <- function(.U,.m,.JL,.JM){
   f_abundance <- function(x, speciation, migration_rate, JL, JM){
@@ -187,48 +197,51 @@ plot_grid(plotlist = l_p, ncol = 2,rel_heights = c(-0.15,1))
 __Figura 2__ Comparação da figura 3 de Hu et al. 2007 e aquela obtida pela versão do código em R. Nesse exemplo as abundâncias relativas abaixo de 0.03 não foram adiconados.
 
 </br>
-
-
-### Investigação da equação 5 quando lambda -> 0
-
-Um aspecto fundamental do modelo de Hu et al. (2007) é que quando m->0 a distribuição de abundância de espécies da comunidade local converge para a distribuição esperada se fosse uma metacomunidade de tamanho $J_L$ (equação 2).
-
-
-$$
-eq 2: \Phi(Q) = \Theta\frac{(1-Q)^{\Theta-1}}{Q}
-$$
-
-
-Quando m=0, a equação 5 não converge para a equação 2:
-
-$$
-\phi(x) = C\int_{1/J_M}^{1}C_1\frac{(1-x)^{\theta-1}}{x}\frac{(1-Q)^{\Theta-1}}{Q}dQ
-$$
-
-Eu acho estranho que nessa situação a distribuição de abundância da metacomunidade seja relevante, não? No texto eles falam que a remoção de $\bar{Q}$ é desejável pois em geral não se sabe "the ratio of the abundance of an immigrating species to the total abundance of all immigrants per unit time interval". Pra mim essa afirmação não é verdadeira, pois as inforações necessárias para se obter a equação 3 e $\bar{Q}$ são iguais.
-
-Já a equação 4 parece ter a propriedade de convergir para a equação 2, quando m=0:
-
-$$
-\phi(x|Q) = C_1\frac{(1-x)^{\theta-1}}x
-$$
-$$
-C_1 = \frac{\Gamma(\theta+1)}{\Gamma(\theta)}
-$$
-
   
-Porém, a equação 4 conserva o comportamento de U - não houve mudança qualitativa. 
+##### Uma dúvida:  
+  
+Como é possível em uma mesma amostra existir mais de uma espécie com abundância relativa de 0.99 ou maior?    
+  
+    
 
-</br>
+<!-- ### Investigação da equação 5 quando lambda -> 0 -->
+
+<!-- Um aspecto fundamental do modelo de Hu et al. (2007) é que quando m->0 a distribuição de abundância de espécies da comunidade local converge para a distribuição esperada se fosse uma metacomunidade de tamanho $J_L$ (equação 2). -->
+
+
+<!-- $$ -->
+<!-- eq 2: \Phi(Q) = \Theta\frac{(1-Q)^{\Theta-1}}{Q} -->
+<!-- $$ -->
+
+
+<!-- Quando m=0, a equação 5 não converge para a equação 2: -->
+
+<!-- $$ -->
+<!-- \phi(x) = C\int_{1/J_M}^{1}C_1\frac{(1-x)^{\theta-1}}{x}\frac{(1-Q)^{\Theta-1}}{Q}dQ -->
+<!-- $$ -->
+
+<!-- Eu acho estranho que nessa situação a distribuição de abundância da metacomunidade seja relevante, não? No texto eles falam que a remoção de $\bar{Q}$ é desejável pois em geral não se sabe "the ratio of the abundance of an immigrating species to the total abundance of all immigrants per unit time interval". Pra mim essa afirmação não é verdadeira, pois as inforações necessárias para se obter a equação 3 e $\bar{Q}$ são iguais. -->
+
+<!-- Já a equação 4 parece ter a propriedade de convergir para a equação 2, quando m=0: -->
+
+<!-- $$ -->
+<!-- \phi(x|Q) = C_1\frac{(1-x)^{\theta-1}}x -->
+<!-- $$ -->
+<!-- $$ -->
+<!-- C_1 = \frac{\Gamma(\theta+1)}{\Gamma(\theta)} -->
+<!-- $$ -->
+
+
+<!-- Porém, a equação 4 conserva o comportamento de U - não houve mudança qualitativa.  -->
+
+<!-- </br> -->
 
 ### Eq.5 com os parâmetros estimados por MNEE
 
 Por algum motivo há apenas 1032/2060 baterias de simulação. Não entendo o motivo.  
-  
-  
 ```{r dados para simulacao,echo=FALSE,eval=TRUE}
 df_SAD.predita <- data.frame(path=
-                               list.files(path = "../simulacao_codigos_e_resultados/SADs_preditas/",
+                               list.files(path = "./simulacao_codigos_e_resultados/SADs_preditas/",
                                                     pattern = "_EE.csv")) |> 
   extract(path,c("SiteCode","k","MN"),"^([[:alnum:]]+)_k(0.[0-9]*)_([a-zA-Z]{2}).csv$",remove=FALSE)
 df_SAD.predita %<>% mutate(k=factor(k))
@@ -239,10 +252,10 @@ df_SAD.predita <- full_join(x=df_resultados,
                             by=c("SiteCode","k"))
 # X <- df_SAD.predita %>% filter(path=="BAlenc4_k0.9_EE.csv")
 ```
-```{r aplicar eq 5 usando as classes de abundância,echo=TRUE,eval=FALSE,cache=FALSE,error=FALSE}
+```{r aplicar eq 5 usando as classes de abundância,echo=FALSE,eval=FALSE,cache=FALSE,error=FALSE}
 f_ExpRich_EEeEI <- function(X){
   # EE
-  df_SADrep <- read_csv(file = paste0("../simulacao_codigos_e_resultados/SADs_preditas/",X$path),
+  df_SADrep <- read_csv(file = paste0("./simulacao_codigos_e_resultados/SADs_preditas/",X$path),
                         show_col_types = FALSE) 
   f_ <- function(Y){
     df_ <- table(Y$N) %>% as.data.frame() %>% rename(N=Var1,EE=Freq)
@@ -250,12 +263,12 @@ f_ExpRich_EEeEI <- function(X){
   df_SADrep %<>% mutate(replica=factor(replica)) %>%
       ddply(.,"replica",f_) %>% mutate(N=as.numeric(N),x=N/X$Ntotal)
   # EI
-  source("../R_funcoes/f_eq5_HUetal2007.R")
+  source("./R_funcoes/f_eq5_HUetal2007.R")
   df_SADrep$EI <- sapply(df_SADrep$x,f_eq5_HUetal2007, 
                          speciation = X$U_med, migration_rate = X$m_, JL = X$Ntotal, JM=X$J_M)
   # save df_SADrep
   write_csv(df_SADrep,
-            file=paste0("../simulacao_codigos_e_resultados/SADs_preditas/",
+            file=paste0("./simulacao_codigos_e_resultados/SADs_preditas/",
                         gsub("EE","EEeEI",x=X$path)))
   # summary
   df_ <- df_SADrep %>% ddply(.,"replica",summarise,
@@ -269,22 +282,22 @@ df_SAD.predita <- adply(df_SAD.predita,1,f_ExpRich_EEeEI)
 
 </br>
 
-__Mensagem de Erro__  
+<!-- __Mensagem de Erro__   -->
 
-Error in integrate(f2, 1/JM, 1) : the integral is probably divergent
+<!-- Error in integrate(f2, 1/JM, 1) : the integral is probably divergent -->
 
 </br>
 
-```{r auditoria de EEeEI.csv, echo=FALSE,eval=TRUE,cache=TRUE,fig.width=10,fig.height=4}
+```{r auditoria de EEeEI.csv, echo=FALSE,eval=FALSE}
 # dados
 df_EEeEI <- data.frame(path_EEeEI=
-                         list.files(path = "../simulacao_codigos_e_resultados/SADs_preditas/",
+                         list.files(path = "./simulacao_codigos_e_resultados/SADs_preditas/",
                                                     pattern = "EEeEI.csv")) |> 
   extract(path_EEeEI,c("SiteCode","k"),"^([[:alnum:]]+)_k(0.[0-9]*)_[a-zA-Z]*.csv$",remove=FALSE) %>% 
   mutate(k=factor(k))
 # estatísticas de resumo
 f_summary <- function(X){
-  df_SADrep <- read_csv(file = paste0("../simulacao_codigos_e_resultados/SADs_preditas/",X$path_EEeEI),
+  df_SADrep <- read_csv(file = paste0("./simulacao_codigos_e_resultados/SADs_preditas/",X$path_EEeEI),
                         show_col_types = FALSE)
   ddply(df_SADrep,"replica",summarise,
         S_EE=sum(EE),S_EI=sum(EI),
@@ -298,6 +311,10 @@ df_auditoria <- full_join(x=df_SAD.predita,
                           y=select(df_plot,-path_EEeEI),
                           by=c("SiteCode","k"))
 df_auditoria$status[is.na(df_auditoria$status)] <- 0
+write_csv(df_auditoria,file = "./resultados_e_SI/df_auditoria_HUetal.csv")
+```
+```{r SADs EE disponiveis e SAD EI integraveis,echo=FALSE,eval=TRUE,cache=TRUE,fig.width=10,fig.height=4}
+df_auditoria <- read_csv("./resultados_e_SI/df_auditoria_HUetal.csv",show_col_types = FALSE)
 # gráficos
 l_p <- list()
 l_p[[1]] <- df_auditoria %>% mutate(status=factor(status)) %>% 
@@ -306,6 +323,7 @@ l_p[[1]] <- df_auditoria %>% mutate(status=factor(status)) %>%
   scale_color_manual(values=c("red","blue")) +
   labs(title = "0 = sem SAD EE")
 l_p[[2]] <- df_auditoria %>% 
+  filter(status!=0) |> 
   mutate(status2=factor(ifelse(is.na(S_EI),0,1))) %>% 
   ggplot(aes(x=U_med,y=m_,color=status2)) +
   geom_point(alpha=0.4) +
@@ -316,6 +334,13 @@ l_p[[2]] <- df_auditoria %>%
 gridExtra::grid.arrange(grobs=l_p,ncol=2)
 ```
 
+</br>
+
+__Figura 3__ Painél da esquerda: Sítios e cenários de limitação de dispersão em que está disponível a SAD do modelo espacialmente explícito (SAD EE). Painél da direita: combinação de parâmetros onde o modelo integrou. O erro de integração foi: "Error in integrate(f2, 1/JM, 1) : the integral is probably divergent".  
+
+</br>
+
+
 ```{r comparacao riqueza media EE e EI,echo=FALSE,eval=TRUE}
 df_auditoria %>% 
   filter(!is.na(S_EI)) %>% 
@@ -325,6 +350,14 @@ df_auditoria %>%
   labs(title="riqueza predita e abundância relativa máxima",x="Ab. Rel. Max.",y="riqueza predita") +
   scale_y_continuous(trans="log10")
 ```
+  
+</br>
+
+__Figura 4__ Riqueza predita pela maior abundância relativa de cada SAD de EE (eixo x). Usamos as classes de abundância relativa simulados por MNEE para calcular o número médio de espécies naquela classe segundo o modelo de Hu et al. 2007. Então somei o número esperado em cada classe (eixo y). As predições do modelo de Hu et al. (2007) são várias ordens de magnitude maiores do que as predições da simulação coalescente, que erra pouco a riqueza observada.   
+
+</br>
+
+
 
 
 <!-- Material Suplementar -->
