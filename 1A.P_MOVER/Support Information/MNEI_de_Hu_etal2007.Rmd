@@ -353,7 +353,7 @@ df_auditoria %>%
   
 </br>
 
-__Figura 4__ Riqueza predita pela maior abundância relativa de cada SAD de EE (eixo x). Usamos as classes de abundância relativa simulados por MNEE para calcular o número médio de espécies naquela classe segundo o modelo de Hu et al. 2007. Então somei o número esperado em cada classe (eixo y). As predições do modelo de Hu et al. (2007) são várias ordens de magnitude maiores do que as predições da simulação coalescente, que erra pouco a riqueza observada.   
+__Figura 4__ Riqueza predita (S_MN) e a  maior abundância relativa de cada SAD de EE (eixo x). Usamos as classes de abundância relativa simulados por MNEE para calcular o número médio de espécies naquela classe segundo o modelo de Hu et al. 2007. Então somei o número esperado em cada classe (eixo y). As predições do modelo de Hu et al. (2007) são várias ordens de magnitude maiores do que as predições da simulação coalescente, que erra pouco a riqueza observada. S_EE = modelo espacialmente explícito, S_EI = modelo espacialmente implícito.
 
 </br>
 
