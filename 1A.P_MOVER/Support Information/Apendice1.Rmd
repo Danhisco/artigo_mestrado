@@ -81,11 +81,11 @@ df_dados <- inner_join(x = inner_join(x = df_references,
 #
 df_SADs.disponiveis <- inner_join(x = df_references,y = df_SAD.obs,by = "SiteCode")
 write.csv(df_SADs.disponiveis,
-          "/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/dados_para_iniciar_artigo/df_SADs_disponiveis.csv",
+          "./dados_para_iniciar_artigo/df_SADs_disponiveis.csv",
           row.names = FALSE)
 
 # write.csv(df_dados,
-#           "/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/dados_para_iniciar_artigo/df_dados_disponiveis.csv",
+#           "./dados_para_iniciar_artigo/df_dados_disponiveis.csv",
 #           row.names = FALSE)
 ```
 
@@ -95,7 +95,7 @@ Aplicação de filtro nos dados disponíveis na base de dados TreeCo (Lima et al
 
 ```{r janela de codigo 1,eval=TRUE,echo=TRUE}
 ### dados
-df_dados.brutos <- read.csv("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/dados_para_iniciar_artigo/df_SADs_disponiveis.csv",
+df_dados.brutos <- read.csv("./dados_para_iniciar_artigo/df_SADs_disponiveis.csv",
                      header = TRUE,as.is = TRUE)
 ### filtro geral
 df_1ofiltro <- df_dados.brutos %>% filter(method=="parcelas" &
@@ -120,10 +120,14 @@ df_filtro.estate %<>% rbind(.,filter(df_1ofiltro,!(state %in% c("BA","GO","MS","
 ### unindo e salvando
 df_dados <- rbind(df_filtro.UC,df_filtro.estate) %>% 
   distinct()
-### atualizando referencias de pastas
+### atualizando referencias de pastas - REFAZER
 df_dados$tif.name <- gsub("/home/danilo/Documentos/Doutorado/artigo_mestrado/paisagens_atualizadas",
                           "/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/dados_para_iniciar_artigo/paisagens_atualizadas", 
                           df_dados$tif.name)
+### tabela para Greg
+df_Sites_e_AnoAmostragem <- df_1ofiltro |> 
+  mutate(year_bestProxy = ifelse(is.na(year_data),year,year_data)) |> 
+  select(SiteCode, refID, ordem, year_bestProxy) 
 ### escrever os dados na tabela SI 1
 write.csv(df_dados,
           "/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/resultados_e_SI/tabelaSI1.csv",
@@ -131,6 +135,9 @@ write.csv(df_dados,
 write.csv(df_1ofiltro,
           "/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/resultados_e_SI/tabelaSI2.csv",
           row.names = FALSE)
+write.csv(df_Sites_e_AnoAmostragem,
+          "./resultados_e_SI/df_Greg_SitesAnoAmostragem.csv",
+          row.names=F)
 ```
 
 
@@ -641,7 +648,7 @@ qkernel<- function(sigma, kernel, p, density=20852/50, npoints = 1e5){
         result <- quantile(dist_norm, p)
     }
     if(kernel=="uniform"){
-        b_unif <- sigma/2
+        b_unif <- sigma/2 # sigma correspondente ao range da distribuição uniforme
         X_unif <- d_ind_MA * round(runif(npoints, min = -b_unif, max = b_unif) / d_ind_MA)
         Y_unif <- d_ind_MA * round(runif(npoints, min = -b_unif, max = b_unif) / d_ind_MA)
         dist_unif <- sqrt(X_unif^2+Y_unif^2)
