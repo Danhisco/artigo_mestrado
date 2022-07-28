@@ -68,7 +68,7 @@ df_tif$tif.name <- Sys.glob("/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/
 ## references
 # df_references %>% names
 df_references <- read.csv(file="/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/dados_para_iniciar_artigo/references_TreeCo.csv",
-                          as.is = TRUE,header =T, na.strings = c("","NA")) %>%
+                          as.is = TRUE,header =T, na.strings = c("","NA")) %>% 
    dplyr::select(SiteCode,refID,status,ordem,status_diagnostico,confiabilidade,method,state,arrangement,samples,effort_ha,dbh_cutoff,UC_area_ha, Unidade_de_conservacao,frag_area,forest_size,domain,forest_type,forest_subtype,forest_succession,forest_age,year_data,year)
 ## merge
 ### columns class
@@ -121,13 +121,21 @@ df_filtro.estate %<>% rbind(.,filter(df_1ofiltro,!(state %in% c("BA","GO","MS","
 df_dados <- rbind(df_filtro.UC,df_filtro.estate) %>% 
   distinct()
 ### atualizando referencias de pastas - REFAZER
-df_dados$tif.name <- gsub("/home/danilo/Documentos/Doutorado/artigo_mestrado/paisagens_atualizadas",
-                          "/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/dados_para_iniciar_artigo/paisagens_atualizadas", 
-                          df_dados$tif.name)
+# df_dados$tif.name <- gsub("/home/danilo/Documentos/Doutorado/artigo_mestrado/paisagens_atualizadas",
+#                           "/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/dados_para_iniciar_artigo/paisagens_atualizadas", 
+#                           df_dados$tif.name)
 ### tabela para Greg
+df_LatLong <- read.csv(file="/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/dados_para_iniciar_artigo/references_TreeCo.csv",
+                          as.is = TRUE,header =T, na.strings = c("","NA")) %>% 
+   dplyr::select(SiteCode,matches("^(lat|long)$|_correct$"))
+
 df_Sites_e_AnoAmostragem <- df_1ofiltro |> 
   mutate(year_bestProxy = ifelse(is.na(year_data),year,year_data)) |> 
-  select(SiteCode, refID, ordem, year_bestProxy) 
+  select(SiteCode, refID, ordem, year_bestProxy) |> 
+  left_join(.,
+            y=df_LatLong,
+            by="SiteCode")
+
 ### escrever os dados na tabela SI 1
 write.csv(df_dados,
           "/home/danilo/Documentos/artigo_mestrado/1A.P_MOVER/resultados_e_SI/tabelaSI1.csv",
