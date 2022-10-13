@@ -6,7 +6,7 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, tidy = FALSE, include = TRUE, warning = FALSE,cache = TRUE,message=FALSE,eval=FALSE)
+knitr::opts_chunk$set(echo = TRUE, tidy = FALSE, include = TRUE, warning = FALSE,cache = TRUE,message=FALSE,eval=TRUE)
 ```
 
 ```{r pacotes,eval=TRUE,include=TRUE}
@@ -43,7 +43,7 @@ df_tif <- data.frame(tif.name = list.files(path="./dados_para_iniciar_artigo/pai
 ## Ano de Amostragem 2000
 ### mapbiomas 6 e landsat8 mesmo ano
 
-```{r difrenca entre idade das paisagens nula}
+```{r difrenca entre idade das paisagens nula, fig.height=3.75}
 # dados
 df_plot <- df_tif |> filter(diff_yBestproxy_y2000 == 0)
 # funções
@@ -57,28 +57,26 @@ f_dataRaster <- function(path_raster,label){
            value = ifelse(value %in% c(0,1),value,value/100),
            value = ifelse(value>=0.7,1,0)) 
 }
-# 
+# gráficos para plotar 
 f_ggplotRaster <- function(data){
   ggplot(data) +
   geom_tile(aes(x=x,y=y,fill=value)) +
-  scale_fill_gradientn(colours = terrain.colors(10)) +
-  theme_bw() + labs(x="",y="") + theme(legend.position="bottom") + facet_wrap(~label)
+  scale_fill_gradientn(colours = rev(terrain.colors(10))) +
+  coord_cartesian(expand = FALSE) +
+  theme_bw() + labs(x="",y="") + theme(legend.position="none") + facet_wrap(~label)
 }
 # for loop
 for(i in 1:nrow(df_plot)){
   df <- df_plot[i,]
-  
+  ## rasters individuais
+  l_data <- list()
+  l_data[[1]] <- f_dataRaster(path_raster = df$tif.name, label = "mapbiomas6")
+  v_path.landsat8 <- paste0("./dados_para_iniciar_artigo/paisagens_atualizadas/ref",df$refID,"_NA_",df$ordem,".tif")
+  l_data[[2]] <- f_dataRaster(path_raster = v_path.landsat8, label = "landsat8")
+  ## gráficos
+  l_p <- llply(l_data,f_ggplotRaster)
+  v_top <- paste0(df$SiteCode,", sample year: ",df$year_bestProxy)
+  grid.arrange(grobs=l_p,ncol=2,top=v_top)
 }
-## rasters individuais
-
-l_data <- list()
-l_data[[1]] <- f_dataRaster(path_raster = df$tif.name, label = "mapbiomas6")
-v_path.landsat8 <- paste0("./dados_para_iniciar_artigo/paisagens_atualizadas/ref",df$refID,"_NA_",df$ordem,".tif")
-l_data[[2]] <- f_dataRaster(path_raster = v_path.landsat8, label = "landsat8")
-## gráficos
-
-l_p <- llply(l_data,f_ggplotRaster)
-v_top <- paste0(df$SiteCode,", sample year: ",df$year_bestProxy)
-grid.arrange(grobs=l_p,ncol=2,top=v_top)
 ```
 
