@@ -11,7 +11,7 @@ editor_options:
 knitr::opts_chunk$set(echo = FALSE, tidy = FALSE, include = TRUE, warning = FALSE,cache = TRUE,message=FALSE,eval=FALSE)
 ```
 
-```{r pacotes}
+```{r pacotes,eval=TRUE,include=TRUE}
 library(doMC)
 library(readr)
 library(purrr)
@@ -45,14 +45,18 @@ write_csv(df_simulacao.U,file="./simulacao/df_simulacao.csv")
 ## Introdução
     
 Passos gerais da simulação coalescente:
-1) estimar U
-2) simular SADs
   
-   
-__tabela 1__ As 11 primeiras linhas (de 200) do data frame usada para guiar a simulação coalescente usada para estimar a taxa de especiação média necessária para obter a riqueza observada (U). k = proporção de propágulos que permanece até a distância entre dois indivíduos vizinhos imediatos; S_obs =  número de espécies observado na parcela amostrada; kernel_code = código do tipo de kernel de dispersão usado na simulação coalescente, 2 indica distribuição de Laplace; d = distância em metros usado para parametrizar o desvio padrão da função de dispersão; txt.name = caminho do arquivo .txt que contém o mapa de cobertura vegetal com a resolução ajustada tal que a densidade de pixels seja igual a densidade de indivíduos na parcela; U = coluna que irá armazenar a estimativa da taxa de especiação necessária para obter a riqueza observada; .n = identificador da réplica, são 10 réplicas por bateria de simulação (anteriormente observamos pouca variação entre réplicas por isso usamos apenas 10 réplicas).  
+1) estimar U  
+  
+2) simular SADs  
+    
+  
+Te mando o exemplo mínimo que corresponde a simulação da SAD observada em uma parcela para os 20 cenários de limitação à dispersão no nível dos indivíduos. Para estimar U usamos 10 réplicas por combinação única de parâmetros (bateria de simulação), pois observamos variação muito pequena entre réplicas (tabela 1).  
+     
+__tabela 1__ As 11 primeiras linhas (de 200) do data frame usada para guiar a simulação coalescente usada para estimar a taxa de especiação média necessária para obter a riqueza observada (U) no exemplo mínimo. k = proporção de propágulos que permanece até a distância de dois indivíduos vizinhos imediatos; S_obs =  número de espécies observado na parcela amostrada; kernel_code = código do tipo de kernel de dispersão usado na simulação coalescente, 2 indica distribuição de Laplace; d = distância em metros usado para parametrizar o desvio padrão da função de dispersão; txt.name = caminho do arquivo .txt que contém o mapa de cobertura vegetal com a resolução ajustada tal que a densidade de pixels seja igual a densidade de indivíduos na parcela; U = coluna que irá armazenar a estimativa da taxa de especiação necessária para obter a riqueza observada; .n = identificador da réplica, são 10 réplicas por bateria de simulação.  
   
 
-```{r 11 primeiras linhas da tabela guia da estimativa de U echo=FALSE,eval=TRUE}
+```{r 11 primeiras linhas da tabela guia da estimativa de U, echo=FALSE,eval=TRUE}
 df_simulacao.U <- read_csv("./simulacao/df_simulacao.csv")
 df_simulacao.U |> head(n=11)
 ```
@@ -191,11 +195,13 @@ for(a in 1:length(k_factor)){
   
 Feita a estimativa de U, então calculo a média e variância dos U por bateria de simulação e determino o número de SADs réplicas igual 100:
     
-```{r media de U por bateria de simulacao, echo=TRUE,eval=FALSE}
+```{r media de U por bateria de simulacao, echo=TRUE,eval=FALSE,tidy=TRUE}
 df_U <- map_df(Sys.glob("./U/*.csv"), read_csv)
-df_simulacao <-  inner_join(x=distinct(dplyr::select(df_U, SiteCode, k, Ntotal, S_obs, kernel_code, DA, d, p, txt.name)),
-                            y=ddply(df_U,c("SiteCode","k"),summarise,U_med = mean(U), U_var = var(U)),
-                            by=c("SiteCode","k"))
+df_simulacao <- 
+  inner_join(x=distinct(dplyr::select(df_U,
+                                      SiteCode, k, Ntotal, S_obs, kernel_code, DA, d, p, txt.name)),
+             y=ddply(df_U,c("SiteCode","k"),summarise,U_med = mean(U), U_var = var(U)),
+             by=c("SiteCode","k"))
 n_rep.SAD <- 100
 ```
     
