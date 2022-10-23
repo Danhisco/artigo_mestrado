@@ -8,15 +8,12 @@ editor_options:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE, tidy = FALSE, include = TRUE, warning = FALSE,cache = TRUE,message=FALSE,eval=TRUE)
-```
-
-```{r pacotes,eval=TRUE,include=TRUE}
+knitr::opts_chunk$set(echo = FALSE, tidy = FALSE, include = TRUE, warning = FALSE,cache = TRUE,message=FALSE,eval=FALSE)
+# pacotes
 library(doMC)
-library(ggpubr)
-library(imager)
-library(cowplot)
 library(raster)
+library(png)
+library(grid)
 library(gridExtra)
 library(ggplot2)
 library(readr)
@@ -26,11 +23,6 @@ library(tidyr)
 library(plyr)
 library(dplyr)
 select <- dplyr::select
-```
-
-
-
-```{r dados}
 # dados
 df_sitios_greg <- read_csv("./resultados_e_SI/df_Greg_SitesAnoAmostragem.csv") |> 
   mutate(year_bestProxy = as.numeric(year_bestProxy))
@@ -89,7 +81,7 @@ for(i in 1:nrow(df_plot)){
 
 ## Padronização dos recortes de paisagem para o formato do Treeco: 800 x 800 pixels
 
-```{r padronizacao dos recortes de paisagem para o formato de TreeCo}
+```{r padronizacao dos recortes de paisagem para o formato de TreeCo,eval=FALSE}
 df_tif
 # dimensões dos raster
 f_rasterDim <- function(tif_path){
@@ -100,7 +92,7 @@ df_audR <- ldply(df_tif$tif.name,f_rasterDim,.parallel = TRUE)
 df_audR |> summary()
 ```
 
-```{r padronização da extensão do raster,fig.width=10,fig.height=4.1}
+```{r padronização da extensão do raster,fig.width=10,fig.height=4.1,eval=FALSE}
 # função
 f_crop <- function(df){
   r_novo <- raster(df$tif.name)
@@ -127,8 +119,8 @@ a_ply(df_tif,1,f_crop,.parallel = TRUE)
 # grid.arrange(grobs=l_p,nrow=1,top=df$SiteCode)
 ```
 
-```{r auditoria padronizacao das paisagens}
-df_aud <- data.frame(tif.name = list.files(path="./dados_para_iniciar_artigo/paisagens_mapbiomas6_padronizadas/",
+```{r auditoria padronizacao das paisagens,eval=FALSE}
+df_aud <- data.frame(tif.name = list.files(path="./dads_para_iniciar_artigo/paisagens_mapbiomas6_padronizadas/",
                                            pattern = ".tif",full.names=T)) |> 
   mutate(SiteCode = str_extract(tif.name,"(?<=\\/\\/).*?(?=\\.tif)"),
          SiteCode = factor(SiteCode))
@@ -154,16 +146,13 @@ f_ggplotRaster <- function(data){
   theme_bw() + labs(x="",y="") + theme(legend.position="none") 
 }
 #
-df <- df_naoPadronizadas[1,]
+# df <- df_naoPadronizadas[1,]
 f_plot <- function(df){
   r_plot <- f_dataRaster(df$tif.name)
   f_ggplotRaster(r_plot)
   f_crop(df)
 }
-a_ply(df_naoPadronizadas,1,f_plot)
-
-
-
+# a_ply(df_naoPadronizadas,1,f_plot)
 for(i in 1:nrow(df_naoPadronizadas)){
   df <- df_naoPadronizadas[i,]
   ## rasters individuais
@@ -176,6 +165,44 @@ for(i in 1:nrow(df_naoPadronizadas)){
   # v_top <- paste0(df$SiteCode,", sample year: ",df$year_bestProxy)
   grid.arrange(grobs=l_p,ncol=2,top=df$SiteCode)
 }
+```
 
+### todas as paisagens
+
+```{r salvar todas as paisagens em formato png,eval=FALSE}
+df_tif_aud <- data.frame(tif.name=list.files(path = "./dados_para_iniciar_artigo/paisagens_mapbiomas6_padronizadas",
+                                             pattern = ".tif",full.names = T)) |> 
+  mutate(SiteCode = str_extract(tif.name,"(?<=padronizadas\\/).*?(?=\\.tif)"))
+# leitura padronizada de rasters
+f_ggplotRaster <- function(df){
+  r <- raster(df$tif.name) |> 
+    as.data.frame(xy=TRUE) |> 
+    drop_na() |> 
+    rename(value=3) |> 
+    mutate(label=df$SiteCode)
+  ggplot(r) +
+    geom_tile(aes(x=x,y=y,fill=value)) +
+    scale_fill_gradientn(colours = rev(terrain.colors(10))) +
+    coord_cartesian(expand = FALSE) +
+    facet_wrap(~label) +
+    theme_bw() + labs(x="",y="") + theme(legend.position="none")
+  ggsave(paste0("./dados_para_iniciar_artigo/paisagens_mapbiomas6_padronizadas/png/",df$SiteCode,".png"))
+}
+registerDoMC(2)
+a_ply(df_tif_aud,1,f_ggplotRaster,.parallel = TRUE)
+```
+```{r plotar todas as paisagens em formato png,echo=FALSE,eval=TRUE,out.width="25%"}
+# f_png <- function(path) rasterGrob(as.raster(readPNG(path)),interpolate=F) 
+# l_png <- alply(list.files(path = "./dados_para_iniciar_artigo/paisagens_mapbiomas6_padronizadas/png/",pattern = ".png",full.names = T),
+#                1,f_png)
+# grid.arrange(grobs=l_png,ncol=4)
+l_png.path <- list.files(path = "./dados_para_iniciar_artigo/paisagens_mapbiomas6_padronizadas/png/",pattern = ".png",full.names = T)
+# knitr::include_graphics(l_png.path[[1]])
+teste <- readPNG(l_png.path[[1]])
+plot(teste)
+p <- grid.raster(teste)
+
+# image(teste)
+# plot(teste)
 ```
 
