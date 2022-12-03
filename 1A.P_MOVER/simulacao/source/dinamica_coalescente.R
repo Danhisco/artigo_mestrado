@@ -1,4 +1,4 @@
-dinamica_coalescente <- function(U, S=0, N_simul, seed, disp_range, disp_kernel, landscape){
+dinamica_coalescente <- function(U, S=0, N_simul, disp_range, landscape, seed = as.numeric(Sys.time()), disp_kernel = 2){
     # Runs coalescent simulations for a given heterogeneous landscape
     #
     # Parameters:
@@ -34,8 +34,6 @@ dinamica_coalescente <- function(U, S=0, N_simul, seed, disp_range, disp_kernel,
     }
     outfile <- tempfile()
     repeat {
-      print(paste('./dinamica_coalescente', land_dims[1], land_dims[2], U, S, N_simul,
-                  seed, disp_range, disp_kernel, infile, outfile))
         system(paste('./dinamica_coalescente', land_dims[1], land_dims[2], U, S, N_simul,
                  seed, disp_range, disp_kernel, infile, outfile))
         if (file.exists(outfile) || S == 0)
@@ -63,7 +61,6 @@ dinamica_coalescente <- function(U, S=0, N_simul, seed, disp_range, disp_kernel,
     }
     return(r)
 }
-
 rec_distribuicao_espacial <- function(r, landscape){
     # receives a vector `r` with species identities and the original landscape
     # (either a filename or a matrix), and returns a 2d matrix with the 2's
@@ -80,4 +77,12 @@ rec_distribuicao_espacial <- function(r, landscape){
     # matrix first
     l[l==2] <- r
     return(l)
+}
+f_simU <- function(df){
+  v <- dinamica_coalescente(U = 1.25e-06, 
+                            S=df$S_obs, 
+                            disp_range = df$d, 
+                            N_simul=1,
+                            landscape = df$txt.file)
+  v$U_est
 }
